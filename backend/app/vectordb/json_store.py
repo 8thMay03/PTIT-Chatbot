@@ -3,7 +3,7 @@ import json
 import math
 
 
-class VectorStore:
+class JsonVectorStore:
     collection_name = "ptit_documents"
 
     def __init__(self, persist_path: Path) -> None:

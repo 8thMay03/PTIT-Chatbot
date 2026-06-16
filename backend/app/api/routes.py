@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 
-from app.rag.schemas import ChatRequest, ChatResponse, IngestResponse
-from app.rag.service import rag_service
+from app.api.schemas import ChatRequest, ChatResponse, IngestResponse
+from app.generation import rag_chain
+from app.ingestion import ingestion_pipeline
 
 router = APIRouter()
 
@@ -13,7 +14,7 @@ def health() -> dict[str, str]:
 
 @router.post("/ingest", response_model=IngestResponse)
 def ingest() -> IngestResponse:
-    result = rag_service.ingest_documents()
+    result = ingestion_pipeline.ingest_documents()
     return IngestResponse(**result)
 
 
@@ -22,5 +23,5 @@ def chat(request: ChatRequest) -> ChatResponse:
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message must not be empty.")
 
-    result = rag_service.answer(request.message, top_k=request.top_k)
+    result = rag_chain.answer(request.message, top_k=request.top_k)
     return ChatResponse(**result)

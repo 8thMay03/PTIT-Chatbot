@@ -3,8 +3,6 @@ from __future__ import annotations
 import hashlib
 import math
 
-from app.core.config import settings
-
 
 class EmbeddingModel:
     def embed(self, texts: list[str]) -> list[list[float]]:
@@ -39,13 +37,3 @@ class SentenceTransformerEmbeddingModel(EmbeddingModel):
     def embed(self, texts: list[str]) -> list[list[float]]:
         embeddings = self.model.encode(texts, normalize_embeddings=True)
         return [embedding.tolist() for embedding in embeddings]
-
-
-def create_embedding_model() -> EmbeddingModel:
-    if settings.embedding_provider == "hash":
-        return HashEmbeddingModel()
-
-    try:
-        return SentenceTransformerEmbeddingModel(settings.embedding_model)
-    except Exception:
-        return HashEmbeddingModel()
