@@ -1,4 +1,4 @@
 from app.vectordb.base import VectorStore
-from app.vectordb.json_store import JsonVectorStore
+from app.vectordb.chroma_store import ChromaVectorStore
 
-__all__ = ["JsonVectorStore", "VectorStore"]
+__all__ = ["ChromaVectorStore", "VectorStore"]

@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "FastAPI RAG backend for PTIT chatbot"
 requires-python = ">=3.10"
 dependencies = [
+  "chromadb>=1.1.13",
   "fastapi>=0.111.0",
   "openai>=1.35.0",
   "pydantic>=2.7.0",

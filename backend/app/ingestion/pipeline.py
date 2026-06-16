@@ -4,7 +4,7 @@ from app.core.config import settings
 from app.embeddings import EmbeddingModel, create_embedding_model
 from app.ingestion.chunker import split_text
 from app.ingestion.loaders import load_documents
-from app.vectordb import JsonVectorStore, VectorStore
+from app.vectordb import ChromaVectorStore, VectorStore
 
 
 class IngestionPipeline:
@@ -14,7 +14,7 @@ class IngestionPipeline:
         vector_store: VectorStore | None = None,
     ) -> None:
         self.embedding_model = embedding_model or create_embedding_model()
-        self.vector_store = vector_store or JsonVectorStore(settings.vector_db_path)
+        self.vector_store = vector_store or ChromaVectorStore(settings.vector_db_path)
 
     def ingest_documents(self) -> dict:
         document_count, chunks_payload = self.build_chunks()
