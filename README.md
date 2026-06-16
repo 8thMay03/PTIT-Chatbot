@@ -34,15 +34,28 @@ python -m scripts.ingest
 uvicorn app.main:app --reload --port 8000
 ```
 
-Nếu có `OPENAI_API_KEY`, backend sẽ dùng OpenAI để tổng hợp câu trả lời. Nếu chưa có key, API vẫn chạy và trả về các đoạn tài liệu liên quan nhất.
+Backend dùng `OPENAI_API_KEY` cho cả embedding OpenAI và bước tổng hợp câu trả lời. Nếu chưa có key, đổi `EMBEDDING_PROVIDER=hash` để chạy local và API chat sẽ trả về các đoạn tài liệu liên quan nhất thay vì gọi LLM.
 
-Mặc định project dùng embedding `hash` để chạy nhanh khi dựng khung. Khi muốn dùng embedding đa ngôn ngữ tốt hơn, cài thêm:
+Mặc định project dùng OpenAI embedding `text-embedding-3-small`. Có thể đổi sang `text-embedding-3-large` trong `.env` nếu muốn chất lượng cao hơn:
+
+```env
+EMBEDDING_PROVIDER=openai
+EMBEDDING_MODEL=text-embedding-3-small
+```
+
+Sau khi đổi embedding model, cần chạy lại:
+
+```powershell
+python -m scripts.ingest
+```
+
+Nếu muốn dùng embedding local bằng Sentence Transformers, cài thêm:
 
 ```powershell
 pip install -e ".[ml]"
 ```
 
-Rồi đổi `EMBEDDING_PROVIDER=sentence-transformers` trong `.env`.
+Rồi đổi `EMBEDDING_PROVIDER=sentence-transformers` và `EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` trong `.env`.
 
 ## Chạy frontend
 

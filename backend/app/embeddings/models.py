@@ -28,6 +28,27 @@ class HashEmbeddingModel(EmbeddingModel):
         return [value / norm for value in vector]
 
 
+class OpenAIEmbeddingModel(EmbeddingModel):
+    def __init__(self, model_name: str, api_key: str | None) -> None:
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY is required when EMBEDDING_PROVIDER=openai.")
+
+        from openai import OpenAI
+
+        self.model_name = _normalize_openai_embedding_model(model_name)
+        self.client = OpenAI(api_key=api_key)
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+
+        response = self.client.embeddings.create(
+            input=texts,
+            model=self.model_name,
+        )
+        return [item.embedding for item in sorted(response.data, key=lambda item: item.index)]
+
+
 class SentenceTransformerEmbeddingModel(EmbeddingModel):
     def __init__(self, model_name: str) -> None:
         from sentence_transformers import SentenceTransformer
@@ -37,3 +58,12 @@ class SentenceTransformerEmbeddingModel(EmbeddingModel):
     def embed(self, texts: list[str]) -> list[list[float]]:
         embeddings = self.model.encode(texts, normalize_embeddings=True)
         return [embedding.tolist() for embedding in embeddings]
+
+
+def _normalize_openai_embedding_model(model_name: str) -> str:
+    aliases = {
+        "text-embedding3": "text-embedding-3-small",
+        "text-embedding-3": "text-embedding-3-small",
+        "embedding-3": "text-embedding-3-small",
+    }
+    return aliases.get(model_name.strip().lower(), model_name)
