@@ -11,6 +11,7 @@ class ChromaVectorStore:
         self.collection = self._get_or_create_collection()
 
     def reset(self) -> None:
+        # Rebuild the collection from scratch during ingest so stale chunks are removed.
         try:
             self.client.delete_collection(name=self.collection_name)
         except Exception:
@@ -22,6 +23,7 @@ class ChromaVectorStore:
         if not chunks:
             return
 
+        # Embeddings are computed by app.embeddings, so Chroma only persists and indexes them.
         self.collection.add(
             ids=[item["id"] for item in chunks],
             documents=[item["text"] for item in chunks],
@@ -51,6 +53,7 @@ class ChromaVectorStore:
                     "source": metadata.get("source", ""),
                     "chunk_index": int(metadata.get("chunk_index", 0)),
                     "text": document or "",
+                    # With cosine space, Chroma distance is 1 - cosine similarity.
                     "score": 1.0 - float(distance),
                 }
             )
@@ -60,6 +63,7 @@ class ChromaVectorStore:
     def _get_or_create_collection(self) -> Any:
         return self.client.get_or_create_collection(
             name=self.collection_name,
+            # Keep embedding ownership in this app instead of Chroma's default embedder.
             embedding_function=None,
             configuration={"hnsw": {"space": "cosine"}},
         )
@@ -78,6 +82,7 @@ def _create_persistent_client(persist_path: Path) -> Any:
 
 
 def _first_result_batch(value: Any) -> list:
+    # Chroma query results are grouped by query; this app always sends one query at a time.
     if not value:
         return []
     return value[0] or []
