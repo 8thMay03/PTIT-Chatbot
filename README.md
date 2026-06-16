@@ -8,9 +8,14 @@ Khung project RAG chatbot cho tài liệu PTIT, gồm backend FastAPI và fronte
 .
 ├── backend/
 │   ├── app/
-│   │   ├── api/          # HTTP routes
+│   │   ├── api/          # HTTP routes và request/response schemas
 │   │   ├── core/         # Settings/env
-│   │   └── rag/          # Loader, chunker, embeddings, vector store, LLM
+│   │   ├── ingestion/    # Load, clean và chunk tài liệu
+│   │   ├── embeddings/   # Embedding interface và model implementations
+│   │   ├── vectordb/     # Vector store adapters
+│   │   ├── retrieval/    # Truy vấn context từ vector store
+│   │   ├── generation/   # Prompt, LLM và RAG chain
+│   │   └── main.py       # FastAPI app entrypoint
 │   ├── scripts/          # CLI helpers
 │   └── tests/
 ├── data/                 # Tài liệu nguồn .md/.txt

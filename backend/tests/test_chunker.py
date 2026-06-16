@@ -1,4 +1,4 @@
-from app.rag.chunker import split_text
+from app.ingestion.chunker import split_text
 
 
 def test_split_text_returns_ordered_chunks() -> None:

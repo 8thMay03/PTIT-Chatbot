@@ -1,8 +1,8 @@
-from app.rag.service import rag_service
+from app.ingestion import ingestion_pipeline
 
 
 def main() -> None:
-    result = rag_service.ingest_documents()
+    result = ingestion_pipeline.ingest_documents()
     print(
         f"Ingested {result['documents']} document(s), "
         f"{result['chunks']} chunk(s) into {result['collection']}."

@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 import re
 
+from app.ingestion.cleaner import clean_text
+
 
 @dataclass(frozen=True)
 class Chunk:
@@ -9,7 +11,7 @@ class Chunk:
 
 
 def split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[Chunk]:
-    cleaned = re.sub(r"\n{3,}", "\n\n", text).strip()
+    cleaned = clean_text(text)
     if not cleaned:
         return []
 
