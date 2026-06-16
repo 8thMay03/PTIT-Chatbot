@@ -91,7 +91,7 @@ _**Chúc các bạn thành công!**_
 
 - Tên tiếng Việt : Học viện Công nghệ Bưu chính Viễn thông 
 
-- Tên tiếng Anh : **P** osts and **T** elecommunications **I** nstitute of **T** echnology 
+- Tên tiếng Anh : **Posts and Telecommunications Institute of Technology** 
 
 - Viết tắt: **PTIT** 
 
@@ -99,7 +99,7 @@ _**Chúc các bạn thành công!**_
 
 - **Trụ sở chính:** 122, Hoàng Quốc Việt, Cầu Giấy, Hà Nội 
 
-Điện thoại: 024.37562186 Fax: 024.37562036 Website: www.ptit.edu.vn Email: vanphonghv@ptit.edu.vn Ðiện thoại: 024.38544451 Fax: 024.33829236 
+Điện thoại: 024.37562186, Fax: 024.37562036, Website: www.ptit.edu.vn, Email: vanphonghv@ptit.edu.vn, Điện thoại: 024.38544451, Fax: 024.33829236 
 
 - **Cơ sở đào tạo Hà Nội:** Km10, Đường Nguyễn Trãi, Hà Đông, Hà Nội 
 
