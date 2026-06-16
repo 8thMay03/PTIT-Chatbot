@@ -3973,9 +3973,7 @@ Lớp tín chỉ là 1 danh sách tổng hợp các lớp tín chỉ mà sinh vi
 
 + **Cách 1:** Chọn chức năng **Lớp tín chỉ** trên màn hình **Chức năng phổ biến** ở màn hình trang chủ mặc định của hệ thống. 
 
-+ **Cách 2:** Chọn mục **Góc học tập** (Hình chồng sách) dưới thanh điều hướng > Chọn **Lớp tín** 
-
-## **chỉ** . 
++ **Cách 2:** Chọn mục **Góc học tập** (Hình chồng sách) dưới thanh điều hướng > Chọn **Lớp tín chỉ** . 
 
 **-** Màn hình hiển thị các lớp môn học trong kỳ hiện tại > Chọn học kỳ và lớp mong muốn > Màn hình hiển thị 3 sự lựa chọn: **Danh sách sinh viên, Nội dung cần chuẩn bị, Học liệu số >** Chọn mục muốn xem: 
 
