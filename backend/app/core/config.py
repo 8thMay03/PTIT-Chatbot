@@ -17,9 +17,9 @@ class Settings(BaseSettings):
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
 
-    embedding_provider: str = Field(default="hash", alias="EMBEDDING_PROVIDER")
+    embedding_provider: str = Field(default="openai", alias="EMBEDDING_PROVIDER")
     embedding_model: str = Field(
-        default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+        default="text-embedding-3-small",
         alias="EMBEDDING_MODEL",
     )
 
