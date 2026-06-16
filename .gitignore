@@ -1,2 +1,10 @@
 .env
-.venv\
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+backend/storage/
+backend/.env
+frontend/node_modules/
+frontend/dist/
