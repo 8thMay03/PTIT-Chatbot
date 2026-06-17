@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     )
 
     vector_db_path: Path = Field(default=Path("backend/storage/chroma"), alias="VECTOR_DB_PATH")
+    database_url: str = Field(
+        default="sqlite:///backend/storage/ptit_chatbot.db",
+        alias="DATABASE_URL",
+    )
     documents_path: Path = Field(default=Path("data"), alias="DOCUMENTS_PATH")
     chunk_size: int = Field(default=900, alias="CHUNK_SIZE")
     chunk_overlap: int = Field(default=150, alias="CHUNK_OVERLAP")
@@ -39,6 +43,15 @@ class Settings(BaseSettings):
     def model_post_init(self, __context: object) -> None:
         self.vector_db_path = _resolve_project_path(self.vector_db_path)
         self.documents_path = _resolve_project_path(self.documents_path)
+        if self.database_url.startswith("sqlite:///"):
+            database_path = _resolve_project_path(Path(self.database_url.removeprefix("sqlite:///")))
+            self.database_url = f"sqlite:///{database_path.as_posix()}"
+
+    @property
+    def database_path(self) -> Path:
+        if not self.database_url.startswith("sqlite:///"):
+            return PROJECT_ROOT / "backend/storage"
+        return Path(self.database_url.removeprefix("sqlite:///"))
 
 
 def _resolve_project_path(path: Path) -> Path:

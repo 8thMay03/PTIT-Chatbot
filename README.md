@@ -34,7 +34,23 @@ python -m scripts.ingest
 uvicorn app.main:app --reload --port 8000
 ```
 
-Backend lưu vector bằng ChromaDB trong `backend/storage/chroma`. Backend dùng `OPENAI_API_KEY` cho cả embedding OpenAI và bước tổng hợp câu trả lời. Nếu chưa có key, đổi `EMBEDDING_PROVIDER=hash` để chạy local và API chat sẽ trả về các đoạn tài liệu liên quan nhất thay vì gọi LLM.
+Backend lưu vector bằng ChromaDB trong `backend/storage/chroma`, và lưu metadata/hội thoại bằng SQLite trong `backend/storage/ptit_chatbot.db`. Backend dùng `OPENAI_API_KEY` cho cả embedding OpenAI và bước tổng hợp câu trả lời. Nếu chưa có key, đổi `EMBEDDING_PROVIDER=hash` để chạy local và API chat sẽ trả về các đoạn tài liệu liên quan nhất thay vì gọi LLM.
+
+Schema SQLite ban đầu gồm:
+
+- `documents`: tài liệu gốc trong thư mục `data/`.
+- `chunks`: các đoạn văn bản đã chia nhỏ, có `vector_id` trỏ sang Chroma.
+- `conversations`: phiên chat.
+- `messages`: tin nhắn user/assistant trong từng phiên.
+- `message_sources`: các chunk được dùng để tạo câu trả lời.
+
+Mặc định backend dùng:
+
+```env
+DATABASE_URL=sqlite:///backend/storage/ptit_chatbot.db
+```
+
+Khi cần chuyển sang PostgreSQL, có thể đổi `DATABASE_URL` sang connection string PostgreSQL và giữ nguyên tầng repository/schema.
 
 Mặc định project dùng OpenAI embedding `text-embedding-3-small`. Có thể đổi sang `text-embedding-3-large` trong `.env` nếu muốn chất lượng cao hơn:
 

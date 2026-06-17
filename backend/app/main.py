@@ -3,10 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
 from app.core.config import settings
+from app.db import init_db
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="PTIT RAG Chatbot API", version="0.1.0")
+    init_db()
 
     app.add_middleware(
         CORSMiddleware,

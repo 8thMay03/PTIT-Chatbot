@@ -15,6 +15,7 @@ function App() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [conversationId, setConversationId] = useState(null);
 
   async function sendMessage(event) {
     event.preventDefault();
@@ -29,7 +30,7 @@ function App() {
       const response = await fetch(`${API_BASE_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, top_k: 4 }),
+        body: JSON.stringify({ message: text, conversation_id: conversationId, top_k: 4 }),
       });
 
       if (!response.ok) {
@@ -37,6 +38,7 @@ function App() {
       }
 
       const data = await response.json();
+      setConversationId(data.conversation_id ?? conversationId);
       setMessages((current) => [
         ...current,
         { role: "assistant", content: data.answer, sources: data.sources ?? [] },

@@ -51,6 +51,7 @@ class ChromaVectorStore:
             contexts.append(
                 {
                     "source": metadata.get("source", ""),
+                    "chunk_id": metadata.get("chunk_id", ""),
                     "chunk_index": int(metadata.get("chunk_index", 0)),
                     "text": document or "",
                     # With cosine space, Chroma distance is 1 - cosine similarity.

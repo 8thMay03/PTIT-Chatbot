@@ -9,6 +9,7 @@ dependencies = [
   "openai>=1.35.0",
   "pydantic>=2.7.0",
   "pydantic-settings>=2.3.0",
+  "sqlalchemy>=2.0.30",
   "python-dotenv>=1.0.1",
   "uvicorn[standard]>=0.30.0",
 ]
