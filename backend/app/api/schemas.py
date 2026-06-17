@@ -3,7 +3,10 @@ from pydantic import BaseModel, Field
 
 class Source(BaseModel):
     source: str
+    source_name: str | None = None
+    document_id: str | None = None
     chunk_id: str | None = None
+    heading: str | None = None
     chunk_index: int
     text: str
     score: float | None = None
