@@ -28,7 +28,20 @@ class FakeChromaCollection:
         self.query_kwargs = kwargs
         return {
             "documents": [["first chunk"]],
-            "metadatas": [[{"source": "data/source.md", "chunk_index": 2}]],
+            "metadatas": [
+                [
+                    {
+                        "source": "data/source.md",
+                        "source_name": "source.md",
+                        "document_id": "doc-1",
+                        "chunk_id": "data/source.md::chunk-2",
+                        "heading": "Tuition",
+                        "heading_level": 2,
+                        "section_path": "Handbook > Tuition",
+                        "chunk_index": 2,
+                    }
+                ]
+            ],
             "distances": [[0.25]],
         }
 
@@ -59,6 +72,12 @@ def test_chroma_vector_store_search_maps_results(tmp_path: Path) -> None:
     assert results == [
         {
             "source": "data/source.md",
+            "source_name": "source.md",
+            "document_id": "doc-1",
+            "chunk_id": "data/source.md::chunk-2",
+            "heading": "Tuition",
+            "heading_level": 2,
+            "section_path": "Handbook > Tuition",
             "chunk_index": 2,
             "text": "first chunk",
             "score": 0.75,

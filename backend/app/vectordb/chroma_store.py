@@ -55,6 +55,8 @@ class ChromaVectorStore:
                     "document_id": metadata.get("document_id", ""),
                     "chunk_id": metadata.get("chunk_id", ""),
                     "heading": metadata.get("heading", ""),
+                    "heading_level": metadata.get("heading_level"),
+                    "section_path": metadata.get("section_path", ""),
                     "chunk_index": int(metadata.get("chunk_index", 0)),
                     "text": document or "",
                     # With cosine space, Chroma distance is 1 - cosine similarity.
