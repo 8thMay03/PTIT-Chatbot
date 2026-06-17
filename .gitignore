@@ -8,3 +8,4 @@ backend/storage/
 backend/.env
 frontend/node_modules/
 frontend/dist/
+test_*.py
