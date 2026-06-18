@@ -146,6 +146,34 @@ python -m scripts.evaluate `
 trả lời và 20% độ hợp lệ citation. Khi có `OPENAI_API_KEY`, script đánh giá câu
 trả lời sinh bởi model; nếu không có key, nó đánh giá câu trả lời trích xuất.
 
+### Đánh giá ngữ nghĩa với Ragas
+
+Cài thêm dependency evaluation:
+
+```powershell
+cd backend
+pip install -e ".[eval]"
+```
+
+Sau khi ingest dữ liệu và cấu hình `OPENAI_API_KEY`, chạy:
+
+```powershell
+python -m scripts.evaluate_ragas `
+  --top-k 4 `
+  --judge-model gpt-4.1-mini `
+  --output ragas-report.json
+```
+
+Script dùng ba metric Ragas:
+
+- `context_precision`: mức độ hữu ích và thứ hạng của các context được lấy về.
+- `faithfulness`: mức độ các nhận định trong câu trả lời được context hỗ trợ.
+- `answer_correctness`: độ đúng về dữ kiện so với `reference_answer`.
+
+`ragas_score` là trung bình của ba metric trên. Để dùng làm quality gate trong
+CI, thêm `--fail-below 0.75`. Ragas dùng LLM làm judge nên có phát sinh chi phí;
+evaluator deterministic `scripts.evaluate` vẫn phù hợp để chạy ở mọi commit.
+
 ## API nhanh
 
 - `GET /api/health`: kiểm tra server.
