@@ -9,3 +9,4 @@ backend/.env
 frontend/node_modules/
 frontend/dist/
 test_*.py
+!backend/tests/test_ptit_faq.py
