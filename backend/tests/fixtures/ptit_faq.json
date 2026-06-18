@@ -2,51 +2,61 @@
   {
     "id": "campus_address",
     "question": "Địa chỉ trụ sở đào tạo Hà Nội của PTIT ở đâu?",
-    "expected_terms": ["122", "Hoàng Quốc Việt"]
+    "expected_terms": ["122", "Hoàng Quốc Việt"],
+    "reference_answer": "Trụ sở chính của PTIT đặt tại số 122 Hoàng Quốc Việt, Cầu Giấy, Hà Nội."
   },
   {
     "id": "english_graduation_requirement",
     "question": "Chuẩn đầu ra tiếng Anh để tốt nghiệp là bao nhiêu?",
-    "expected_terms": ["450", "TOEIC"]
+    "expected_terms": ["450", "TOEIC"],
+    "reference_answer": "Sinh viên cần đạt trình độ tiếng Anh 450 điểm TOEIC quốc tế hoặc tương đương."
   },
   {
     "id": "academic_warning_level_one",
     "question": "Điều kiện cảnh báo kết quả học tập mức 1 là gì?",
-    "expected_terms": ["50%", "24"]
+    "expected_terms": ["50%", "24"],
+    "reference_answer": "Sinh viên bị cảnh báo mức 1 nếu số tín chỉ không đạt trong kỳ vượt quá 50% khối lượng đăng ký hoặc tổng số tín chỉ nợ từ đầu khóa vượt quá 24; hoặc điểm trung bình học kỳ hay tích lũy thấp hơn các ngưỡng quy định theo năm học."
   },
   {
     "id": "second_program_eligibility",
     "question": "Điều kiện học cùng lúc hai chương trình là gì?",
-    "expected_terms": ["năm thứ hai", "chương trình thứ nhất"]
+    "expected_terms": ["năm thứ hai", "chương trình thứ nhất"],
+    "reference_answer": "Sinh viên được đăng ký chương trình thứ hai sớm nhất khi đã được xếp trình độ năm thứ hai của chương trình thứ nhất và đáp ứng điều kiện về học lực, đầu vào và kỷ luật."
   },
   {
     "id": "graduation_rounds",
     "question": "Mỗi năm Học viện xét công nhận tốt nghiệp mấy đợt?",
-    "expected_terms": ["03 đợt", "tháng 2", "tháng 8", "tháng 10"]
+    "expected_terms": ["03 đợt", "tháng 2", "tháng 8", "tháng 10"],
+    "reference_answer": "Học viện xét công nhận tốt nghiệp 3 đợt mỗi năm: tháng 2, tháng 8 và tháng 10."
   },
   {
     "id": "scholarship_levels",
     "question": "Học bổng khuyến khích học tập có những mức nào?",
-    "expected_terms": ["150%", "120%", "100%"]
+    "expected_terms": ["150%", "120%", "100%"],
+    "reference_answer": "Học bổng khuyến khích học tập có ba mức: loại 1 bằng 150% loại 3, loại 2 bằng 120% loại 3, và loại 3 bằng 100% mức trần học phí theo ngành nhân 5 tháng."
   },
   {
     "id": "second_major_credit_limit",
     "question": "Học ngành thứ hai được đăng ký tối đa bao nhiêu tín chỉ mỗi học kỳ?",
-    "expected_terms": ["20 tín chỉ", "học kỳ"]
+    "expected_terms": ["20 tín chỉ", "học kỳ"],
+    "reference_answer": "Sinh viên học ngành thứ hai được đăng ký không quá 20 tín chỉ trong mỗi học kỳ."
   },
   {
     "id": "exam_score_review",
     "question": "Muốn phúc khảo điểm thi thì nộp đơn cho đơn vị nào?",
-    "expected_terms": ["Trung tâm KT&ĐBCLGD"]
+    "expected_terms": ["Trung tâm KT&ĐBCLGD"],
+    "reference_answer": "Sinh viên làm đơn đề nghị xem xét lại điểm thi và gửi Trung tâm Khảo thí và Đảm bảo chất lượng giáo dục."
   },
   {
     "id": "student_card_reissue",
     "question": "Bị mất thẻ sinh viên thì xin cấp lại như thế nào?",
-    "expected_terms": ["cấp lại", "thẻ sinh viên"]
+    "expected_terms": ["cấp lại", "thẻ sinh viên"],
+    "reference_answer": "Sinh viên bị mất thẻ phải làm đơn xin cấp lại, giải trình nguyên nhân và có xác nhận của Ban cán sự lớp; đơn được nộp cho Phòng Giáo vụ theo quy định."
   },
   {
     "id": "graduation_certificate_waiting",
     "question": "Trong thời gian chờ cấp bằng có được cấp giấy chứng nhận tốt nghiệp tạm thời không?",
-    "expected_terms": ["Giấy chứng nhận tốt nghiệp tạm thời"]
+    "expected_terms": ["Giấy chứng nhận tốt nghiệp tạm thời"],
+    "reference_answer": "Có. Trong thời gian chờ cấp bằng tốt nghiệp, Học viện cấp Giấy chứng nhận tốt nghiệp tạm thời cho sinh viên."
   }
 ]

@@ -23,6 +23,14 @@ dev = [
 ml = [
   "sentence-transformers>=3.0.0",
 ]
+eval = [
+  "ragas>=0.4.3,<0.5.0",
+  # Ragas 0.4.3 still imports modules removed from the LangChain 1.x line.
+  "langchain>=0.3.27,<0.4.0",
+  "langchain-core>=0.3.72,<0.4.0",
+  "langchain-community>=0.3.27,<0.4.0",
+  "langchain-openai>=0.3.28,<0.4.0",
+]
 
 [build-system]
 requires = ["setuptools>=68"]
