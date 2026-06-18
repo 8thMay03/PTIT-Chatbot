@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     hybrid_vector_weight: float = Field(default=0.65, ge=0, le=1, alias="HYBRID_VECTOR_WEIGHT")
     hybrid_candidate_multiplier: int = Field(default=4, ge=1, alias="HYBRID_CANDIDATE_MULTIPLIER")
     hybrid_rrf_k: int = Field(default=60, ge=1, alias="HYBRID_RRF_K")
+    retrieval_min_vector_score: float = Field(default=0.30, alias="RETRIEVAL_MIN_VECTOR_SCORE")
+    retrieval_min_bm25_score: float = Field(default=2.0, ge=0, alias="RETRIEVAL_MIN_BM25_SCORE")
     cors_origins_raw: str = Field(
         default="http://localhost:5173,http://127.0.0.1:5173",
         alias="CORS_ORIGINS",

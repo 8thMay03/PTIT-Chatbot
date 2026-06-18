@@ -42,7 +42,11 @@ Retrieval dùng hybrid search: semantic vector search từ Chroma kết hợp ke
 HYBRID_VECTOR_WEIGHT=0.65
 HYBRID_CANDIDATE_MULTIPLIER=4
 HYBRID_RRF_K=60
+RETRIEVAL_MIN_VECTOR_SCORE=0.30
+RETRIEVAL_MIN_BM25_SCORE=2.0
 ```
+
+Nếu không có chunk nào vượt ngưỡng vector hoặc BM25, chatbot không gửi context yếu cho LLM và trả về `Chưa tìm thấy thông tin này trong tài liệu.` mà không kèm citation.
 
 Schema SQLite ban đầu gồm:
 
