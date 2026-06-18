@@ -126,6 +126,26 @@ Test `test_ptit_faq.py` dùng bộ câu hỏi PTIT thường gặp trong
 được đúng bằng chứng từ sổ tay sinh viên. Bộ test chạy local, không gọi LLM
 hoặc API bên ngoài.
 
+Để đánh giá pipeline RAG sau khi ingest dữ liệu:
+
+```powershell
+cd backend
+python -m scripts.evaluate --top-k 4 --output evaluation-report.json
+```
+
+Evaluation báo cáo Retrieval Hit@K, MRR, tỷ lệ từ khóa đáp án, độ hợp lệ của
+citation và điểm answer quality tổng hợp. Có thể đặt ngưỡng cho CI:
+
+```powershell
+python -m scripts.evaluate `
+  --fail-below-hit-rate 0.8 `
+  --fail-below-answer-quality 0.7
+```
+
+`answer_quality` được tính bằng 80% tỷ lệ cụm từ đáp án xuất hiện trong câu
+trả lời và 20% độ hợp lệ citation. Khi có `OPENAI_API_KEY`, script đánh giá câu
+trả lời sinh bởi model; nếu không có key, nó đánh giá câu trả lời trích xuất.
+
 ## API nhanh
 
 - `GET /api/health`: kiểm tra server.

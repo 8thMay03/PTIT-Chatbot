@@ -6,6 +6,7 @@ import pytest
 from app.core.config import settings
 from app.ingestion.chunker import Chunk, split_text
 from app.retrieval.bm25 import rank_bm25
+from scripts.evaluate import _citation_validity, _evidence_rank, _term_coverage
 
 
 FAQ_PATH = Path(__file__).parent / "fixtures" / "ptit_faq.json"
@@ -57,3 +58,17 @@ def test_common_ptit_question_retrieves_expected_evidence(
         f"Không tìm thấy bằng chứng cho câu hỏi: {case['question']!r}. "
         f"Các cụm từ cần có trong cùng một chunk: {case['expected_terms']!r}"
     )
+
+
+def test_evaluation_metrics_score_retrieval_answer_and_citations() -> None:
+    contexts = [
+        {"text": "Chuẩn đầu ra yêu cầu 450 điểm TOEIC."},
+        {"text": "Nội dung không liên quan."},
+    ]
+    answer = "Sinh viên cần đạt 450 điểm TOEIC [1]."
+    terms = ["450", "TOEIC"]
+
+    assert _evidence_rank(contexts, terms) == 1
+    assert _term_coverage(answer, terms) == 1.0
+    assert _citation_validity(answer, [{"citation_id": 1}]) == 1.0
+    assert _citation_validity(answer, [{"citation_id": 2}]) == 0.0
