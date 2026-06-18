@@ -114,6 +114,18 @@ npm run dev
 
 Mở `http://localhost:5173`.
 
+## Chạy test
+
+```powershell
+cd backend
+pytest
+```
+
+Test `test_ptit_faq.py` dùng bộ câu hỏi PTIT thường gặp trong
+`backend/tests/fixtures/ptit_faq.json` để kiểm tra các câu hỏi vẫn truy xuất
+được đúng bằng chứng từ sổ tay sinh viên. Bộ test chạy local, không gọi LLM
+hoặc API bên ngoài.
+
 ## API nhanh
 
 - `GET /api/health`: kiểm tra server.

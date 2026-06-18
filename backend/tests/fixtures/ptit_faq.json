@@ -1,0 +1,52 @@
+[
+  {
+    "id": "campus_address",
+    "question": "Địa chỉ trụ sở đào tạo Hà Nội của PTIT ở đâu?",
+    "expected_terms": ["122", "Hoàng Quốc Việt"]
+  },
+  {
+    "id": "english_graduation_requirement",
+    "question": "Chuẩn đầu ra tiếng Anh để tốt nghiệp là bao nhiêu?",
+    "expected_terms": ["450", "TOEIC"]
+  },
+  {
+    "id": "academic_warning_level_one",
+    "question": "Điều kiện cảnh báo kết quả học tập mức 1 là gì?",
+    "expected_terms": ["50%", "24"]
+  },
+  {
+    "id": "second_program_eligibility",
+    "question": "Điều kiện học cùng lúc hai chương trình là gì?",
+    "expected_terms": ["năm thứ hai", "chương trình thứ nhất"]
+  },
+  {
+    "id": "graduation_rounds",
+    "question": "Mỗi năm Học viện xét công nhận tốt nghiệp mấy đợt?",
+    "expected_terms": ["03 đợt", "tháng 2", "tháng 8", "tháng 10"]
+  },
+  {
+    "id": "scholarship_levels",
+    "question": "Học bổng khuyến khích học tập có những mức nào?",
+    "expected_terms": ["150%", "120%", "100%"]
+  },
+  {
+    "id": "second_major_credit_limit",
+    "question": "Học ngành thứ hai được đăng ký tối đa bao nhiêu tín chỉ mỗi học kỳ?",
+    "expected_terms": ["20 tín chỉ", "học kỳ"]
+  },
+  {
+    "id": "exam_score_review",
+    "question": "Muốn phúc khảo điểm thi thì nộp đơn cho đơn vị nào?",
+    "expected_terms": ["Trung tâm KT&ĐBCLGD"]
+  },
+  {
+    "id": "student_card_reissue",
+    "question": "Bị mất thẻ sinh viên thì xin cấp lại như thế nào?",
+    "expected_terms": ["cấp lại", "thẻ sinh viên"]
+  },
+  {
+    "id": "graduation_certificate_waiting",
+    "question": "Trong thời gian chờ cấp bằng có được cấp giấy chứng nhận tốt nghiệp tạm thời không?",
+    "expected_terms": ["Giấy chứng nhận tốt nghiệp tạm thời"]
+  }
+]
