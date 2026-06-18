@@ -24,8 +24,14 @@ class RagChain:
         self.multi_query_generator = multi_query_generator or VietnameseMultiQueryGenerator()
         self.reranker = reranker or Reranker()
 
-    def answer(self, question: str, top_k: int = 4) -> dict:
-        rewritten_query = self.query_rewriter.rewrite(question)
+    def answer(
+        self,
+        question: str,
+        top_k: int = 4,
+        history: list[dict[str, str]] | None = None,
+    ) -> dict:
+        history = history or []
+        rewritten_query = self.query_rewriter.rewrite(question, history=history)
         queries = self.multi_query_generator.generate(rewritten_query)
         candidate_count = (
             max(top_k, top_k * settings.reranker_candidate_multiplier)
@@ -52,7 +58,7 @@ class RagChain:
                 "contexts": [],
             }
 
-        answer = answer_with_llm(question, contexts)
+        answer = answer_with_llm(question, contexts, history=history)
 
         return {
             "answer": answer,

@@ -29,13 +29,15 @@ CONVERSATIONAL_PREFIXES = (
 
 
 class VietnameseQueryRewriter:
-    def rewrite(self, question: str) -> str:
+    def rewrite(self, question: str, history: list[dict[str, str]] | None = None) -> str:
+        history = history or []
         fallback = rule_based_rewrite(question)
+        fallback = _resolve_rule_based_follow_up(fallback, history)
         if not settings.query_rewrite_use_llm or not settings.openai_api_key:
             return fallback
 
         try:
-            return _rewrite_with_llm(fallback) or fallback
+            return _rewrite_with_llm(fallback, history) or fallback
         except Exception:
             return fallback
 
@@ -55,15 +57,41 @@ def rule_based_rewrite(question: str) -> str:
     return rewritten or " ".join(question.split()).strip()
 
 
-def _rewrite_with_llm(query: str) -> str:
+def _resolve_rule_based_follow_up(query: str, history: list[dict[str, str]]) -> str:
+    follow_up_pattern = r"^(?:còn|thế còn|vậy|trường hợp (?:này|đó)|quy định (?:này|đó)|nó)\b"
+    if not re.search(follow_up_pattern, query):
+        return query
+
+    previous_user_message = next(
+        (
+            message.get("content", "")
+            for message in reversed(history)
+            if message.get("role") == "user" and message.get("content", "").strip()
+        ),
+        "",
+    )
+    if not previous_user_message:
+        return query
+    previous_query = rule_based_rewrite(previous_user_message)
+    return f"{previous_query} {query}"[:500]
+
+
+def _rewrite_with_llm(query: str, history: list[dict[str, str]]) -> str:
     from openai import OpenAI
 
     client = OpenAI(api_key=settings.openai_api_key)
+    history_text = "\n".join(
+        f"{message.get('role', 'user')}: {message.get('content', '')}"
+        for message in history
+    )
     response = client.chat.completions.create(
         model=settings.openai_model,
         messages=[
             {"role": "system", "content": REWRITE_SYSTEM_PROMPT},
-            {"role": "user", "content": query},
+            {
+                "role": "user",
+                "content": f"Lịch sử:\n{history_text or '(trống)'}\n\nCâu hỏi mới:\n{query}",
+            },
         ],
         temperature=0,
         max_tokens=100,

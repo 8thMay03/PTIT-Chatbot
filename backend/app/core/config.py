@@ -40,6 +40,17 @@ class Settings(BaseSettings):
     multi_query_enabled: bool = Field(default=True, alias="MULTI_QUERY_ENABLED")
     multi_query_use_llm: bool = Field(default=False, alias="MULTI_QUERY_USE_LLM")
     multi_query_count: int = Field(default=3, ge=1, le=8, alias="MULTI_QUERY_COUNT")
+    conversation_memory_enabled: bool = Field(default=True, alias="CONVERSATION_MEMORY_ENABLED")
+    conversation_memory_max_messages: int = Field(
+        default=6,
+        ge=0,
+        alias="CONVERSATION_MEMORY_MAX_MESSAGES",
+    )
+    conversation_memory_max_chars: int = Field(
+        default=6000,
+        ge=0,
+        alias="CONVERSATION_MEMORY_MAX_CHARS",
+    )
     reranker_enabled: bool = Field(default=True, alias="RERANKER_ENABLED")
     reranker_provider: str = Field(default="heuristic", alias="RERANKER_PROVIDER")
     reranker_model: str = Field(
