@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     documents_path: Path = Field(default=Path("data"), alias="DOCUMENTS_PATH")
     chunk_size: int = Field(default=900, alias="CHUNK_SIZE")
     chunk_overlap: int = Field(default=150, alias="CHUNK_OVERLAP")
+    hybrid_vector_weight: float = Field(default=0.65, ge=0, le=1, alias="HYBRID_VECTOR_WEIGHT")
+    hybrid_candidate_multiplier: int = Field(default=4, ge=1, alias="HYBRID_CANDIDATE_MULTIPLIER")
+    hybrid_rrf_k: int = Field(default=60, ge=1, alias="HYBRID_RRF_K")
     cors_origins_raw: str = Field(
         default="http://localhost:5173,http://127.0.0.1:5173",
         alias="CORS_ORIGINS",
