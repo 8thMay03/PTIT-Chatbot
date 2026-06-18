@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 
 
 class Source(BaseModel):
+    citation_id: int
     source_name: str
     heading: str | None = None
     section_path: str | None = None
