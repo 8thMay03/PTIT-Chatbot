@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     hybrid_rrf_k: int = Field(default=60, ge=1, alias="HYBRID_RRF_K")
     retrieval_min_vector_score: float = Field(default=0.30, alias="RETRIEVAL_MIN_VECTOR_SCORE")
     retrieval_min_bm25_score: float = Field(default=2.0, ge=0, alias="RETRIEVAL_MIN_BM25_SCORE")
+    query_rewrite_use_llm: bool = Field(default=False, alias="QUERY_REWRITE_USE_LLM")
     cors_origins_raw: str = Field(
         default="http://localhost:5173,http://127.0.0.1:5173",
         alias="CORS_ORIGINS",

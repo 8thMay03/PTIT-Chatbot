@@ -44,9 +44,12 @@ HYBRID_CANDIDATE_MULTIPLIER=4
 HYBRID_RRF_K=60
 RETRIEVAL_MIN_VECTOR_SCORE=0.30
 RETRIEVAL_MIN_BM25_SCORE=2.0
+QUERY_REWRITE_USE_LLM=false
 ```
 
 Nếu không có chunk nào vượt ngưỡng vector hoặc BM25, chatbot không gửi context yếu cho LLM và trả về `Chưa tìm thấy thông tin này trong tài liệu.` mà không kèm citation.
+
+Trước khi retrieval, câu hỏi tiếng Việt được chuẩn hóa và mở rộng các viết tắt phổ biến bằng rule-based rewriter. Đặt `QUERY_REWRITE_USE_LLM=true` để dùng model cấu hình trong `OPENAI_MODEL` cho bước rewrite; nếu lời gọi lỗi, hệ thống tự động dùng kết quả rule-based.
 
 Schema SQLite ban đầu gồm:
 
