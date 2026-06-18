@@ -1,7 +1,7 @@
 [
   {
     "id": "campus_address",
-    "question": "Địa chỉ cơ sở đào tạo Hà Nội của PTIT ở đâu?",
+    "question": "Địa chỉ trụ sở đào tạo Hà Nội của PTIT ở đâu?",
     "expected_terms": ["122", "Hoàng Quốc Việt"]
   },
   {
