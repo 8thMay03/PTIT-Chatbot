@@ -87,22 +87,32 @@ def _split_section(
     start_index: int,
 ) -> list[Chunk]:
     """Split one section into chunks that respect paragraph boundaries and size limits."""
-    if len(section.text) <= chunk_size:
-        return [_build_chunk(section.text, section, start_index)]
+    heading_line, body = _separate_heading(section)
+    if not body:
+        return []
+
+    heading_context = f"{heading_line}\n\n" if heading_line else ""
+    body_chunk_size = chunk_size - len(heading_context)
+    if body_chunk_size <= 0:
+        heading_context = ""
+        body_chunk_size = chunk_size
+
+    if len(body) <= body_chunk_size:
+        return [_build_chunk(f"{heading_context}{body}".strip(), section, start_index)]
 
     pieces: list[str] = []
     current = ""
 
-    for block in _split_blocks(section.text):
-        if len(block) > chunk_size:
+    for block in _split_blocks(body):
+        if len(block) > body_chunk_size:
             if current:
                 pieces.append(current)
                 current = ""
-            pieces.extend(_split_long_block(block, chunk_size, chunk_overlap))
+            pieces.extend(_split_long_block(block, body_chunk_size, chunk_overlap))
             continue
 
         candidate = f"{current}\n\n{block}".strip() if current else block
-        if len(candidate) <= chunk_size:
+        if len(candidate) <= body_chunk_size:
             current = candidate
             continue
 
@@ -114,10 +124,18 @@ def _split_section(
         pieces.append(current)
 
     return [
-        _build_chunk(_with_heading_context(piece, section), section, start_index + offset)
+        _build_chunk(f"{heading_context}{piece}".strip(), section, start_index + offset)
         for offset, piece in enumerate(pieces)
         if piece.strip()
     ]
+
+
+def _separate_heading(section: Section) -> tuple[str, str]:
+    """Return the leading markdown heading and substantive section body separately."""
+    lines = section.text.splitlines()
+    if lines and _parse_heading(lines[0]):
+        return lines[0].strip(), "\n".join(lines[1:]).strip()
+    return "", section.text.strip()
 
 
 def _split_blocks(text: str) -> list[str]:
@@ -139,16 +157,6 @@ def _split_long_block(text: str, chunk_size: int, chunk_overlap: int) -> list[st
         start += step
 
     return [piece for piece in pieces if piece]
-
-
-def _with_heading_context(text: str, section: Section) -> str:
-    """Prepend the section heading to chunk text when it is not already present."""
-    if not section.heading or _parse_heading(text.splitlines()[0] if text.splitlines() else ""):
-        return text
-
-    level = section.heading_level or 2
-    heading_line = f"{'#' * level} {section.heading}"
-    return f"{heading_line}\n\n{text}".strip()
 
 
 def _build_chunk(text: str, section: Section, index: int) -> Chunk:

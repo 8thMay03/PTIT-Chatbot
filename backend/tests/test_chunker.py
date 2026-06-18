@@ -33,3 +33,32 @@ def test_split_text_splits_long_section_without_losing_heading_context() -> None
     assert all(chunk.heading == "Academic Warning" for chunk in chunks)
     assert all(chunk.section_path == "Academic Warning" for chunk in chunks)
     assert all(chunk.text.startswith("## Academic Warning") for chunk in chunks)
+    assert all(len(chunk.text) <= 160 for chunk in chunks)
+    assert all(chunk.text.strip() != "## Academic Warning" for chunk in chunks)
+
+
+def test_split_text_does_not_create_heading_only_chunks() -> None:
+    text = """## A
+
+""" + ("A long paragraph with useful information. " * 20)
+
+    chunks = split_text(text, chunk_size=120, chunk_overlap=20)
+
+    assert len(chunks) > 1
+    assert all(chunk.text.startswith("## A\n\n") for chunk in chunks)
+    assert all(chunk.text.strip() != "## A" for chunk in chunks)
+    assert all(len(chunk.text) <= 120 for chunk in chunks)
+
+
+def test_split_text_skips_section_with_only_a_heading() -> None:
+    text = """# Parent
+
+## Child
+
+Child content.
+"""
+
+    chunks = split_text(text, chunk_size=120, chunk_overlap=20)
+
+    assert [chunk.heading for chunk in chunks] == ["Child"]
+    assert chunks[0].section_path == "Parent > Child"
