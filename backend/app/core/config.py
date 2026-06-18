@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     retrieval_min_vector_score: float = Field(default=0.30, alias="RETRIEVAL_MIN_VECTOR_SCORE")
     retrieval_min_bm25_score: float = Field(default=2.0, ge=0, alias="RETRIEVAL_MIN_BM25_SCORE")
     query_rewrite_use_llm: bool = Field(default=False, alias="QUERY_REWRITE_USE_LLM")
+    multi_query_enabled: bool = Field(default=True, alias="MULTI_QUERY_ENABLED")
+    multi_query_use_llm: bool = Field(default=False, alias="MULTI_QUERY_USE_LLM")
+    multi_query_count: int = Field(default=3, ge=1, le=8, alias="MULTI_QUERY_COUNT")
     reranker_enabled: bool = Field(default=True, alias="RERANKER_ENABLED")
     reranker_provider: str = Field(default="heuristic", alias="RERANKER_PROVIDER")
     reranker_model: str = Field(
