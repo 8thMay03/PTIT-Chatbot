@@ -37,6 +37,16 @@ class Settings(BaseSettings):
     retrieval_min_vector_score: float = Field(default=0.30, alias="RETRIEVAL_MIN_VECTOR_SCORE")
     retrieval_min_bm25_score: float = Field(default=2.0, ge=0, alias="RETRIEVAL_MIN_BM25_SCORE")
     query_rewrite_use_llm: bool = Field(default=False, alias="QUERY_REWRITE_USE_LLM")
+    reranker_enabled: bool = Field(default=True, alias="RERANKER_ENABLED")
+    reranker_provider: str = Field(default="heuristic", alias="RERANKER_PROVIDER")
+    reranker_model: str = Field(
+        default="cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+        alias="RERANKER_MODEL",
+    )
+    reranker_candidate_multiplier: int = Field(default=3, ge=1, alias="RERANKER_CANDIDATE_MULTIPLIER")
+    reranker_vector_weight: float = Field(default=0.45, ge=0, alias="RERANKER_VECTOR_WEIGHT")
+    reranker_bm25_weight: float = Field(default=0.35, ge=0, alias="RERANKER_BM25_WEIGHT")
+    reranker_lexical_weight: float = Field(default=0.20, ge=0, alias="RERANKER_LEXICAL_WEIGHT")
     cors_origins_raw: str = Field(
         default="http://localhost:5173,http://127.0.0.1:5173",
         alias="CORS_ORIGINS",
