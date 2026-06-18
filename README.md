@@ -48,6 +48,9 @@ QUERY_REWRITE_USE_LLM=false
 MULTI_QUERY_ENABLED=true
 MULTI_QUERY_USE_LLM=false
 MULTI_QUERY_COUNT=3
+CONVERSATION_MEMORY_ENABLED=true
+CONVERSATION_MEMORY_MAX_MESSAGES=6
+CONVERSATION_MEMORY_MAX_CHARS=6000
 RERANKER_ENABLED=true
 RERANKER_PROVIDER=heuristic
 RERANKER_MODEL=cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
@@ -59,6 +62,8 @@ Nếu không có chunk nào vượt ngưỡng vector hoặc BM25, chatbot không
 Trước khi retrieval, câu hỏi tiếng Việt được chuẩn hóa và mở rộng các viết tắt phổ biến bằng rule-based rewriter. Đặt `QUERY_REWRITE_USE_LLM=true` để dùng model cấu hình trong `OPENAI_MODEL` cho bước rewrite; nếu lời gọi lỗi, hệ thống tự động dùng kết quả rule-based.
 
 Multi-query retrieval giữ truy vấn đã rewrite và tạo thêm tối đa `MULTI_QUERY_COUNT` biến thể, sau đó hợp nhất kết quả bằng RRF. Đặt `MULTI_QUERY_ENABLED=false` để tắt hoặc `MULTI_QUERY_USE_LLM=true` để sinh biến thể bằng model; khi model lỗi hệ thống fallback về rule-based.
+
+Conversation memory đọc các message gần nhất từ SQLite theo `conversation_id`, giới hạn đồng thời bằng số message và tổng ký tự. Memory chỉ giúp hiểu câu hỏi nối tiếp; dữ kiện trả lời và citation vẫn bắt buộc đến từ tài liệu retrieval. Đặt `CONVERSATION_MEMORY_ENABLED=false` để tắt.
 
 Sau hybrid search, reranker sắp xếp lại tập candidate trước khi đưa context vào LLM. Đặt `RERANKER_ENABLED=false` để bỏ qua hoàn toàn bước này. `RERANKER_PROVIDER=heuristic` chạy ngay không cần model bổ sung. Để dùng CrossEncoder đa ngôn ngữ, cài `pip install -e ".[ml]"` rồi đặt `RERANKER_PROVIDER=cross-encoder`; nếu model lỗi, hệ thống tự động fallback về heuristic.
 

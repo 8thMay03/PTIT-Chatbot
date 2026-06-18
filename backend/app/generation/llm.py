@@ -5,7 +5,11 @@ from app.generation.citations import numbered_contexts, public_citations
 from app.generation.prompts import SYSTEM_PROMPT, build_context_prompt
 
 
-def answer_with_llm(question: str, contexts: list[dict]) -> str:
+def answer_with_llm(
+    question: str,
+    contexts: list[dict],
+    history: list[dict[str, str]] | None = None,
+) -> str:
     if not contexts:
         return "Mình chưa tìm thấy thông tin phù hợp trong kho tài liệu."
 
@@ -19,7 +23,7 @@ def answer_with_llm(question: str, contexts: list[dict]) -> str:
         model=settings.openai_model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": build_context_prompt(question, contexts)},
+            {"role": "user", "content": build_context_prompt(question, contexts, history)},
         ],
         temperature=0.2,
     )

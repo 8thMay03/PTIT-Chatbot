@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import delete, func, select, update
@@ -93,6 +94,7 @@ def add_message(
         role=role,
         content=content,
         message_metadata=metadata,
+        created_at=datetime.now(timezone.utc),
     )
     session.add(message)
     session.execute(
@@ -102,6 +104,53 @@ def add_message(
     )
     session.flush()
     return message
+
+
+def get_recent_conversation_history(
+    session: Session,
+    conversation_id: str,
+    max_messages: int,
+    max_chars: int,
+) -> list[dict[str, str]]:
+    if max_messages <= 0 or max_chars <= 0:
+        return []
+
+    messages = list(
+        session.scalars(
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.desc())
+            .limit(max_messages)
+        )
+    )
+    chronological = [
+        {"role": message.role, "content": message.content}
+        for message in reversed(messages)
+        if message.role in {"user", "assistant"}
+    ]
+    return limit_history(chronological, max_messages=max_messages, max_chars=max_chars)
+
+
+def limit_history(
+    messages: list[dict[str, str]],
+    max_messages: int,
+    max_chars: int,
+) -> list[dict[str, str]]:
+    """Keep the newest complete messages that fit within both memory limits."""
+    if max_messages <= 0 or max_chars <= 0:
+        return []
+
+    selected: list[dict[str, str]] = []
+    remaining_chars = max_chars
+    for message in reversed(messages[-max_messages:]):
+        content = message.get("content", "").strip()
+        if not content or remaining_chars <= 0:
+            continue
+        if len(content) > remaining_chars:
+            content = content[:remaining_chars].rstrip()
+        selected.append({"role": message.get("role", "user"), "content": content})
+        remaining_chars -= len(content)
+    return list(reversed(selected))
 
 
 def add_message_sources(session: Session, message_id: str, sources: list[dict]) -> None:
