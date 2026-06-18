@@ -36,6 +36,14 @@ uvicorn app.main:app --reload --port 8000
 
 Backend lưu vector bằng ChromaDB trong `backend/storage/chroma`, và lưu metadata/hội thoại bằng SQLite trong `backend/storage/ptit_chatbot.db`. Backend dùng `OPENAI_API_KEY` cho cả embedding OpenAI và bước tổng hợp câu trả lời. Nếu chưa có key, đổi `EMBEDDING_PROVIDER=hash` để chạy local và API chat sẽ trả về các đoạn tài liệu liên quan nhất thay vì gọi LLM.
 
+Retrieval dùng hybrid search: semantic vector search từ Chroma kết hợp keyword BM25 trên bảng `chunks`, sau đó hợp nhất thứ hạng bằng Reciprocal Rank Fusion. Có thể tinh chỉnh qua:
+
+```env
+HYBRID_VECTOR_WEIGHT=0.65
+HYBRID_CANDIDATE_MULTIPLIER=4
+HYBRID_RRF_K=60
+```
+
 Schema SQLite ban đầu gồm:
 
 - `documents`: tài liệu gốc trong thư mục `data/`.
