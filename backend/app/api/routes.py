@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.schemas import ChatRequest, ChatResponse, IngestResponse
 from app.db import get_session
 from app.db.repositories import add_message, add_message_sources, ensure_conversation
-from app.generation import rag_chain
+from app.generation.rag_chain import rag_chain
 from app.ingestion import ingestion_pipeline
 
 router = APIRouter()
@@ -35,7 +35,11 @@ def chat(request: ChatRequest, session: Session = Depends(get_session)) -> ChatR
     )
     add_message(session, conversation.id, "user", request.message)
     assistant_message = add_message(session, conversation.id, "assistant", result["answer"])
-    add_message_sources(session, assistant_message.id, result["sources"])
+    add_message_sources(session, assistant_message.id, result["contexts"])
     session.commit()
 
-    return ChatResponse(conversation_id=conversation.id, **result)
+    return ChatResponse(
+        conversation_id=conversation.id,
+        answer=result["answer"],
+        sources=result["sources"],
+    )

@@ -1,4 +1,5 @@
 from app.generation.llm import answer_with_llm
+from app.generation.citations import public_citations
 from app.retrieval import Retriever, retriever
 
 
@@ -12,7 +13,8 @@ class RagChain:
 
         return {
             "answer": answer,
-            "sources": contexts,
+            "sources": public_citations(contexts),
+            "contexts": contexts,
         }
 
 

@@ -87,8 +87,10 @@ function App() {
               {message.sources.length > 0 && (
                 <div className="sources">
                   {message.sources.slice(0, 3).map((source, sourceIndex) => (
-                    <span key={`${source.source}-${source.chunk_index}-${sourceIndex}`}>
-                      {source.source} · chunk {source.chunk_index}
+                    <span key={`${source.source_name}-${source.section_path}-${sourceIndex}`}>
+                      {source.source_name}
+                      {(source.section_path || source.heading) &&
+                        ` · ${source.section_path || source.heading}`}
                     </span>
                   ))}
                 </div>

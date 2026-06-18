@@ -2,16 +2,9 @@ from pydantic import BaseModel, Field
 
 
 class Source(BaseModel):
-    source: str
-    source_name: str | None = None
-    document_id: str | None = None
-    chunk_id: str | None = None
+    source_name: str
     heading: str | None = None
-    heading_level: int | None = None
     section_path: str | None = None
-    chunk_index: int
-    text: str
-    score: float | None = None
 
 
 class ChatRequest(BaseModel):
