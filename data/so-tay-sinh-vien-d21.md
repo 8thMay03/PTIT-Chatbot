@@ -14,9 +14,8 @@ _**(Thông tin dành cho sinh viên hệ chính quy tại Cơ sở đào tạo H
 
 ## **MỤC LỤC** 
 
-|**MỤC LỤC**||
+|**MỤC LỤC**| Trang |
 |---|---|
-||_Trang_|
 |**Lời nói đầu**|6|
 |**Phần 1 - Thông tin về các đơn vị trong Học viện và Cơ sở Hà Nội**|7|
 |- Khái quát về Học viện CNBCVT|8|

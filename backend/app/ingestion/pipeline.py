@@ -1,6 +1,5 @@
 from pathlib import Path
 from hashlib import sha256
-import re
 
 from app.core.config import PROJECT_ROOT, settings
 from app.db.repositories import ChunkRecord, DocumentRecord, replace_knowledge_base
@@ -60,16 +59,16 @@ class IngestionPipeline:
             )
 
             chunks = split_text(document.text, settings.chunk_size, settings.chunk_overlap)
-            current_heading = ""
             for chunk in chunks:
                 chunk_id = _chunk_id(document.path, chunk.index)
-                current_heading = _chunk_heading(chunk.text) or current_heading
                 metadata = {
                     "source": source_path,
                     "source_name": document.path.name,
                     "document_id": document_id,
                     "chunk_id": chunk_id,
-                    "heading": current_heading,
+                    "heading": chunk.heading,
+                    "heading_level": chunk.heading_level,
+                    "section_path": chunk.section_path,
                     "chunk_index": chunk.index,
                 }
                 chunk_records.append(
@@ -111,21 +110,6 @@ def _content_hash(text: str) -> str:
 
 def _estimate_token_count(text: str) -> int:
     return max(1, len(text.split()))
-
-
-def _chunk_heading(text: str) -> str:
-    for line in text.splitlines():
-        match = re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*$", line)
-        if match:
-            return _normalize_heading(match.group(1))
-    return ""
-
-
-def _normalize_heading(value: str) -> str:
-    value = re.sub(r"<[^>]+>", " ", value)
-    value = re.sub(r"[*_`]+", "", value)
-    value = re.sub(r"\s+", " ", value)
-    return value.strip(" #")
 
 
 def _chunk_id(path: Path, chunk_index: int) -> str:

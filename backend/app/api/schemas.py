@@ -7,6 +7,8 @@ class Source(BaseModel):
     document_id: str | None = None
     chunk_id: str | None = None
     heading: str | None = None
+    heading_level: int | None = None
+    section_path: str | None = None
     chunk_index: int
     text: str
     score: float | None = None
