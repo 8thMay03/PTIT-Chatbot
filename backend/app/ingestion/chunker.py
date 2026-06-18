@@ -22,6 +22,7 @@ class Section:
 
 
 def split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[Chunk]:
+    """Split raw text into sized chunks while preserving markdown section structure."""
     cleaned = clean_text(text)
     if not cleaned:
         return []
@@ -34,6 +35,7 @@ def split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[Chunk]:
 
 
 def _split_markdown_sections(text: str) -> list[Section]:
+    """Split markdown text into sections at heading boundaries and track heading hierarchy."""
     sections: list[Section] = []
     current_lines: list[str] = []
     current_heading = ""
@@ -84,6 +86,7 @@ def _split_section(
     chunk_overlap: int,
     start_index: int,
 ) -> list[Chunk]:
+    """Split one section into chunks that respect paragraph boundaries and size limits."""
     if len(section.text) <= chunk_size:
         return [_build_chunk(section.text, section, start_index)]
 
@@ -118,10 +121,12 @@ def _split_section(
 
 
 def _split_blocks(text: str) -> list[str]:
+    """Split text into paragraph blocks separated by blank lines."""
     return [block.strip() for block in re.split(r"\n\s*\n", text) if block.strip()]
 
 
 def _split_long_block(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
+    """Split an oversized block into fixed-size pieces with sliding overlap."""
     pieces: list[str] = []
     step = max(1, chunk_size - max(0, chunk_overlap))
     start = 0
@@ -137,6 +142,7 @@ def _split_long_block(text: str, chunk_size: int, chunk_overlap: int) -> list[st
 
 
 def _with_heading_context(text: str, section: Section) -> str:
+    """Prepend the section heading to chunk text when it is not already present."""
     if not section.heading or _parse_heading(text.splitlines()[0] if text.splitlines() else ""):
         return text
 
@@ -146,6 +152,7 @@ def _with_heading_context(text: str, section: Section) -> str:
 
 
 def _build_chunk(text: str, section: Section, index: int) -> Chunk:
+    """Create a Chunk with text content and inherited section metadata."""
     return Chunk(
         text=text,
         index=index,
@@ -156,6 +163,7 @@ def _build_chunk(text: str, section: Section, index: int) -> Chunk:
 
 
 def _parse_heading(line: str) -> tuple[int, str] | None:
+    """Parse a markdown heading line and return its level and title, or None if not a heading."""
     match = re.match(r"^\s{0,3}(#{1,6})\s+(.+?)\s*$", line)
     if not match:
         return None
@@ -168,6 +176,7 @@ def _parse_heading(line: str) -> tuple[int, str] | None:
 
 
 def _normalize_heading(value: str) -> str:
+    """Strip inline markdown and HTML from a heading title for consistent metadata."""
     value = re.sub(r"<[^>]+>", " ", value)
     value = re.sub(r"[*_`]+", "", value)
     value = re.sub(r"\s+", " ", value)
