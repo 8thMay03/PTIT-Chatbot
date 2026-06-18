@@ -874,13 +874,6 @@ _**- Các môn Giáo dục thể chất, giáo dục quốc phòng, Kỹ năng m
 |18|Toán rời rạc 1|INT1358|3|||HK3|||||||||Tin học cơ sở<br>1||
 |19|Ngôn ngữ lập trình C++|INT1339|3|||HK3|||||||||Tin học cơ sở<br>2||
 |20|Xử lý tín hiệu số|ELE1330|2|||HK3|||||||||||
-
-
-
-
-|TT|Tên môn học/học phần|Mã số<br>môn học|Số<br>TC|Năm học|Năm học|Năm học|Năm học|Năm học|Năm học|Năm học|Năm học|Năm học|Năm học|Môn tiên<br>quyết|Môn học<br>trước|Môn song<br>hành|
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-|||||Năm thứ 1||Năm thứ 2||Năm thứ 3||Năm thứ 4||Năm thứ 5|||||
 |21|Kỹ năng mềm 1||1|||HK3|||||||||||
 |22|Tư tưởng Hồ Chí Minh|BAS1122|2||||HK4||||||||Chủ nghĩa xã<br>hội khoa học||
 |23|Tiếng Anh (Course 3)|BAS1159|4||||HK4||||||||Tiếng Anh A12||
@@ -900,13 +893,6 @@ _**- Các môn Giáo dục thể chất, giáo dục quốc phòng, Kỹ năng m
 |37|Nhập môn công nghệ phần<br>mềm|INT1340|3||||||HK6|||||Ngôn ngữ<br>lập trình<br>C++|||
 |38|An toàn và bảo mật hệ<br>thống thông tin|INT1303|3||||||HK6||||||||
 |39|Lập trình web|INT1434|3||||||HK6|||||Ngôn ngữ<br>lập trình<br>C++|||
-
-
-
-
-|TT|Tên môn học/học phần|Mã số<br>môn học|Số<br>TC|Năm học|Năm học|Năm học|Năm học|Năm học|Năm học|Năm học|Năm học|Năm học|Năm học|Môn tiên<br>quyết|Môn học<br>trước|Môn song<br>hành|
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-|||||Năm thứ 1||Năm thứ 2||Năm thứ 3||Năm thứ 4||Năm thứ 5|||||
 |40|Cơ sở dữ liệu phân tán|INT14148|3||||||HK6||||||Cơ sở dữ liệu||
 |41|Thực tập cơ sở|INT13147|3||||||HK6||||||||
 |42|Kỹ năng mềm 3||1||||||HK6||||||||
