@@ -49,7 +49,13 @@ def chat(request: ChatRequest, session: Session = Depends(get_session)) -> ChatR
         else []
     )
     result = rag_chain.answer(request.message, top_k=request.top_k, history=history)
-    add_message(session, conversation.id, "user", request.message)
+    add_message(
+        session,
+        conversation.id,
+        "user",
+        request.message,
+        metadata={"retrieval_debug": result["retrieval_debug"]},
+    )
     assistant_message = add_message(session, conversation.id, "assistant", result["answer"])
     add_message_sources(session, assistant_message.id, result["contexts"])
     session.commit()

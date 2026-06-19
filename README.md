@@ -75,6 +75,12 @@ Schema SQLite ban đầu gồm:
 - `messages`: tin nhắn user/assistant trong từng phiên.
 - `message_sources`: các chunk được dùng để tạo câu trả lời.
 
+Mỗi user message còn lưu `retrieval_debug` trong cột JSON `messages.metadata`,
+bao gồm query gốc, query đã rewrite, các multi-query, candidate trước rerank,
+chunk được chọn sau rerank và toàn bộ điểm vector/BM25/RRF/rerank. Dữ liệu này
+không được trả ra public chat API, nhưng có thể đọc trực tiếp từ SQLite để phân
+tích các request retrieval sai hoặc bị confidence filter loại bỏ.
+
 Mặc định backend dùng:
 
 ```env

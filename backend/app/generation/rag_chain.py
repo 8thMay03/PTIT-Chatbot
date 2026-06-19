@@ -10,6 +10,33 @@ from app.retrieval.reranker import Reranker
 
 NO_CONTEXT_ANSWER = "Chưa tìm thấy thông tin này trong tài liệu."
 
+DEBUG_CHUNK_FIELDS = (
+    "chunk_id",
+    "document_id",
+    "source",
+    "source_name",
+    "heading",
+    "section_path",
+    "chunk_index",
+    "text",
+    "score",
+    "vector_score",
+    "bm25_score",
+    "rrf_score",
+    "rerank_score",
+    "query_hits",
+)
+
+
+def _debug_chunk(context: dict, rank: int) -> dict:
+    """Build a JSON-safe snapshot of a retrieved chunk for persisted debugging."""
+    snapshot = {"rank": rank}
+    for field in DEBUG_CHUNK_FIELDS:
+        value = context.get(field)
+        if value is not None:
+            snapshot[field] = float(value) if field.endswith("score") else value
+    return snapshot
+
 
 class RagChain:
     def __init__(
@@ -43,19 +70,39 @@ class RagChain:
             for query in queries
         ]
         contexts = fuse_multi_query_results(result_sets, top_k=candidate_count)
+        retrieved_chunks = [
+            _debug_chunk(context, rank)
+            for rank, context in enumerate(contexts, start=1)
+        ]
         if settings.reranker_enabled:
             contexts = self.reranker.rerank(rewritten_query, contexts, top_k=top_k)
         else:
             contexts = contexts[:top_k]
-        if not has_strong_context(
+        selected_chunks = [
+            _debug_chunk(context, rank)
+            for rank, context in enumerate(contexts, start=1)
+        ]
+        strong_context = has_strong_context(
             contexts,
             min_vector_score=settings.retrieval_min_vector_score,
             min_bm25_score=settings.retrieval_min_bm25_score,
-        ):
+        )
+        retrieval_debug = {
+            "original_query": question,
+            "rewritten_query": rewritten_query,
+            "retrieval_queries": queries,
+            "requested_top_k": top_k,
+            "candidate_count": candidate_count,
+            "retrieved_chunks": retrieved_chunks,
+            "selected_chunks": selected_chunks,
+            "strong_context": strong_context,
+        }
+        if not strong_context:
             return {
                 "answer": NO_CONTEXT_ANSWER,
                 "sources": [],
                 "contexts": [],
+                "retrieval_debug": retrieval_debug,
             }
 
         answer = answer_with_llm(question, contexts, history=history)
@@ -64,6 +111,7 @@ class RagChain:
             "answer": answer,
             "sources": public_citations(contexts),
             "contexts": contexts,
+            "retrieval_debug": retrieval_debug,
         }
 
 

@@ -59,12 +59,15 @@ def test_rag_chain_rejects_weak_context_without_calling_llm(monkeypatch) -> None
 
     result = RagChain(retriever_=WeakRetriever()).answer("Unrelated question")
 
-    assert result == {
-        "answer": NO_CONTEXT_ANSWER,
-        "sources": [],
-        "contexts": [],
-    }
     assert result["answer"] == NO_CONTEXT_ANSWER
+    assert result["sources"] == []
+    assert result["contexts"] == []
+    assert result["retrieval_debug"]["strong_context"] is False
+    retrieved_chunk = result["retrieval_debug"]["retrieved_chunks"][0]
+    assert retrieved_chunk["chunk_id"] == "weak-chunk"
+    assert retrieved_chunk["text"] == "Unrelated content"
+    assert retrieved_chunk["vector_score"] == 0.1
+    assert retrieved_chunk["bm25_score"] == 0.5
 
 
 class CapturingRetriever:
@@ -98,10 +101,12 @@ def test_rag_chain_retrieves_with_rewritten_query_but_answers_original_question(
         lambda question, contexts, history=None: answered_questions.append(question) or "Câu trả lời [1]",
     )
 
-    RagChain(retriever_=retriever, query_rewriter=FixedRewriter()).answer("Câu hỏi gốc")
+    result = RagChain(retriever_=retriever, query_rewriter=FixedRewriter()).answer("Câu hỏi gốc")
 
     assert retriever.query == "truy vấn đã viết lại"
     assert answered_questions == ["Câu hỏi gốc"]
+    assert result["retrieval_debug"]["rewritten_query"] == "truy vấn đã viết lại"
+    assert result["retrieval_debug"]["selected_chunks"][0]["chunk_id"] == "chunk-1"
 
 
 def test_rag_chain_can_disable_reranker(monkeypatch) -> None:
