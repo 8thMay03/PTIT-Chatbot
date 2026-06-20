@@ -1,62 +1,122 @@
 [
   {
-    "id": "campus_address",
-    "question": "Địa chỉ trụ sở đào tạo Hà Nội của PTIT ở đâu?",
-    "expected_terms": ["122", "Hoàng Quốc Việt"],
-    "reference_answer": "Trụ sở chính của PTIT đặt tại số 122 Hoàng Quốc Việt, Cầu Giấy, Hà Nội."
+    "id": "ptit_english_name",
+    "question": "Tên tiếng Anh của Học viện Công nghệ Bưu chính Viễn thông là gì?",
+    "expected_terms": ["Posts and Telecommunications Institute of Technology"],
+    "reference_answer": "Tên tiếng Anh của Học viện Công nghệ Bưu chính Viễn thông là Posts and Telecommunications Institute of Technology."
   },
   {
-    "id": "english_graduation_requirement",
-    "question": "Chuẩn đầu ra tiếng Anh để tốt nghiệp là bao nhiêu?",
-    "expected_terms": ["450", "TOEIC"],
-    "reference_answer": "Sinh viên cần đạt trình độ tiếng Anh 450 điểm TOEIC quốc tế hoặc tương đương."
+    "id": "ptit_abbreviation",
+    "question": "Tên viết tắt của Học viện Công nghệ Bưu chính Viễn thông là gì?",
+    "expected_terms": ["PTIT"],
+    "reference_answer": "Tên viết tắt của Học viện Công nghệ Bưu chính Viễn thông là PTIT."
   },
   {
-    "id": "academic_warning_level_one",
-    "question": "Điều kiện cảnh báo kết quả học tập mức 1 là gì?",
-    "expected_terms": ["50%", "24"],
-    "reference_answer": "Sinh viên bị cảnh báo mức 1 nếu số tín chỉ không đạt trong kỳ vượt quá 50% khối lượng đăng ký hoặc tổng số tín chỉ nợ từ đầu khóa vượt quá 24; hoặc điểm trung bình học kỳ hay tích lũy thấp hơn các ngưỡng quy định theo năm học."
+    "id": "ptit_headquarters",
+    "question": "Trụ sở chính của Học viện Công nghệ Bưu chính Viễn thông đặt ở đâu?",
+    "expected_terms": ["122 Hoàng Quốc Việt", "Cầu Giấy", "Hà Nội"],
+    "reference_answer": "Trụ sở chính của Học viện đặt tại số 122 Hoàng Quốc Việt, quận Cầu Giấy, Hà Nội."
   },
   {
-    "id": "second_program_eligibility",
-    "question": "Điều kiện học cùng lúc hai chương trình là gì?",
-    "expected_terms": ["năm thứ hai", "chương trình thứ nhất"],
-    "reference_answer": "Sinh viên được đăng ký chương trình thứ hai sớm nhất khi đã được xếp trình độ năm thứ hai của chương trình thứ nhất và đáp ứng điều kiện về học lực, đầu vào và kỷ luật."
+    "id": "hanoi_campus_location",
+    "question": "Cơ sở đào tạo Hà Nội của Học viện nằm ở đâu?",
+    "expected_terms": ["Km10", "Nguyễn Trãi", "Hà Đông"],
+    "reference_answer": "Cơ sở đào tạo Hà Nội của Học viện nằm tại Km10 đường Nguyễn Trãi, Hà Đông, Hà Nội."
   },
   {
-    "id": "graduation_rounds",
-    "question": "Mỗi năm Học viện xét công nhận tốt nghiệp mấy đợt?",
-    "expected_terms": ["03 đợt", "tháng 2", "tháng 8", "tháng 10"],
-    "reference_answer": "Học viện xét công nhận tốt nghiệp 3 đợt mỗi năm: tháng 2, tháng 8 và tháng 10."
+    "id": "school_type",
+    "question": "Học viện Công nghệ Bưu chính Viễn thông là trường công lập hay tư thục?",
+    "expected_terms": ["Công lập"],
+    "reference_answer": "Học viện Công nghệ Bưu chính Viễn thông là trường công lập."
   },
   {
-    "id": "scholarship_levels",
-    "question": "Học bổng khuyến khích học tập có những mức nào?",
-    "expected_terms": ["150%", "120%", "100%"],
-    "reference_answer": "Học bổng khuyến khích học tập có ba mức: loại 1 bằng 150% loại 3, loại 2 bằng 120% loại 3, và loại 3 bằng 100% mức trần học phí theo ngành nhân 5 tháng."
+    "id": "establishment_date",
+    "question": "Học viện Công nghệ Bưu chính Viễn thông được thành lập vào ngày nào?",
+    "expected_terms": ["11/07/1997"],
+    "reference_answer": "Học viện Công nghệ Bưu chính Viễn thông được thành lập ngày 11 tháng 07 năm 1997."
   },
   {
-    "id": "second_major_credit_limit",
-    "question": "Học ngành thứ hai được đăng ký tối đa bao nhiêu tín chỉ mỗi học kỳ?",
-    "expected_terms": ["20 tín chỉ", "học kỳ"],
-    "reference_answer": "Sinh viên học ngành thứ hai được đăng ký không quá 20 tín chỉ trong mỗi học kỳ."
+    "id": "transfer_to_ministry",
+    "question": "Từ ngày nào Học viện được điều chuyển về Bộ Thông tin và Truyền thông?",
+    "expected_terms": ["01/07/2014"],
+    "reference_answer": "Từ ngày 01/07/2014, Học viện được điều chuyển từ VNPT về Bộ Thông tin và Truyền thông."
   },
   {
-    "id": "exam_score_review",
-    "question": "Muốn phúc khảo điểm thi thì nộp đơn cho đơn vị nào?",
-    "expected_terms": ["Trung tâm KT&ĐBCLGD"],
-    "reference_answer": "Sinh viên làm đơn đề nghị xem xét lại điểm thi và gửi Trung tâm Khảo thí và Đảm bảo chất lượng giáo dục."
+    "id": "doctoral_program",
+    "question": "Học viện có đào tạo trình độ tiến sĩ hay không?",
+    "expected_terms": ["Tiến sĩ"],
+    "reference_answer": "Có. Học viện đào tạo trình độ nghiên cứu sinh (tiến sĩ)."
   },
   {
-    "id": "student_card_reissue",
-    "question": "Bị mất thẻ sinh viên thì xin cấp lại như thế nào?",
-    "expected_terms": ["cấp lại", "thẻ sinh viên"],
-    "reference_answer": "Sinh viên bị mất thẻ phải làm đơn xin cấp lại, giải trình nguyên nhân và có xác nhận của Ban cán sự lớp; đơn được nộp cho Phòng Giáo vụ theo quy định."
+    "id": "master_program",
+    "question": "Học viện có đào tạo trình độ thạc sĩ hay không?",
+    "expected_terms": ["Thạc sĩ"],
+    "reference_answer": "Có. Học viện đào tạo trình độ cao học (thạc sĩ)."
   },
   {
-    "id": "graduation_certificate_waiting",
-    "question": "Trong thời gian chờ cấp bằng có được cấp giấy chứng nhận tốt nghiệp tạm thời không?",
-    "expected_terms": ["Giấy chứng nhận tốt nghiệp tạm thời"],
-    "reference_answer": "Có. Trong thời gian chờ cấp bằng tốt nghiệp, Học viện cấp Giấy chứng nhận tốt nghiệp tạm thời cho sinh viên."
+    "id": "computer_science_major",
+    "question": "Khoa học máy tính có nằm trong các ngành đào tạo sau đại học của Học viện không?",
+    "expected_terms": ["Khoa học máy tính"],
+    "reference_answer": "Có. Khoa học máy tính là một trong các chuyên ngành đào tạo sau đại học của Học viện."
+  },
+  {
+    "id": "it_major_code",
+    "question": "Ngành Công nghệ thông tin có mã ngành đại học là bao nhiêu?",
+    "expected_terms": ["7480201"],
+    "reference_answer": "Ngành Công nghệ thông tin có mã ngành đại học là 7480201."
+  },
+  {
+    "id": "cybersecurity_major_code",
+    "question": "Ngành An toàn thông tin có mã ngành đại học là bao nhiêu?",
+    "expected_terms": ["7480202"],
+    "reference_answer": "Ngành An toàn thông tin có mã ngành đại học là 7480202."
+  },
+  {
+    "id": "marketing_major_code",
+    "question": "Ngành Marketing có mã ngành đại học là bao nhiêu?",
+    "expected_terms": ["7340115"],
+    "reference_answer": "Ngành Marketing có mã ngành đại học là 7340115."
+  },
+  {
+    "id": "fintech_major_code",
+    "question": "Ngành Công nghệ Tài chính có mã ngành đại học là bao nhiêu?",
+    "expected_terms": ["7340208"],
+    "reference_answer": "Ngành Công nghệ Tài chính (Fintech) có mã ngành đại học là 7340208."
+  },
+  {
+    "id": "double_degree",
+    "question": "Sinh viên có được học đồng thời hai ngành đào tạo hay không?",
+    "expected_terms": ["2 văn bằng", "2 ngành"],
+    "reference_answer": "Có. Sinh viên có năng lực và nguyện vọng được đăng ký học cùng lúc 2 văn bằng hoặc 2 ngành đào tạo đồng thời."
+  },
+  {
+    "id": "chairman_council",
+    "question": "Ai là Chủ tịch Hội đồng Học viện?",
+    "expected_terms": ["Từ Minh Phương"],
+    "reference_answer": "Chủ tịch Hội đồng Học viện là GS.TS Từ Minh Phương."
+  },
+  {
+    "id": "director_ptit",
+    "question": "Ai là Giám đốc Học viện Công nghệ Bưu chính Viễn thông?",
+    "expected_terms": ["Vũ Văn San"],
+    "reference_answer": "Giám đốc Học viện là PGS.TS Vũ Văn San."
+  },
+  {
+    "id": "training_duration_45",
+    "question": "Các ngành đào tạo 4,5 năm gồm bao nhiêu học kỳ?",
+    "expected_terms": ["9 học kỳ"],
+    "reference_answer": "Các ngành đào tạo 4,5 năm gồm 9 học kỳ, trong đó có 8 học kỳ học tập tại Học viện và 1 học kỳ thực tập."
+  },
+  {
+    "id": "toeic_requirement",
+    "question": "Chuẩn đầu ra tiếng Anh của sinh viên là bao nhiêu điểm TOEIC?",
+    "expected_terms": ["450 TOEIC"],
+    "reference_answer": "Sinh viên phải đạt trình độ tiếng Anh tương đương 450 điểm TOEIC quốc tế hoặc tương đương."
+  },
+  {
+    "id": "minimum_study_time",
+    "question": "Thời gian học tập tối thiểu của sinh viên là bao lâu?",
+    "expected_terms": ["3,5 năm", "4 năm"],
+    "reference_answer": "Thời gian học tập tối thiểu của sinh viên là từ 3,5 đến 4 năm tùy theo ngành đào tạo."
   }
 ]

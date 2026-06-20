@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.generation.rag_chain import RagChain, rag_chain
 
 
-DEFAULT_DATASET = Path(__file__).parents[1] / "tests" / "fixtures" / "ptit_faq.json"
+DEFAULT_DATASET = Path(__file__).parents[1] / "tests" / "fixtures" / "ptit_ragas_100.json"
 METRIC_NAMES = ("context_precision", "faithfulness", "answer_correctness")
 
 
