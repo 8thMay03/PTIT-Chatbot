@@ -7,6 +7,7 @@ from app.db.session import SessionLocal, init_db
 from app.embeddings import EmbeddingModel, create_embedding_model
 from app.ingestion.chunker import split_text
 from app.ingestion.loaders import load_documents
+from app.retrieval.bm25 import invalidate_bm25_cache
 from app.vectordb import ChromaVectorStore, VectorStore
 
 
@@ -31,6 +32,9 @@ class IngestionPipeline:
         with SessionLocal() as session:
             replace_knowledge_base(session, document_records, chunk_records)
             session.commit()
+
+        # The next keyword search lazily rebuilds one shared in-memory BM25 index.
+        invalidate_bm25_cache()
 
         return {
             "documents": len(document_records),
