@@ -23,11 +23,15 @@ function App() {
     if (!text || loading) return;
 
     setInput("");
-    setMessages((current) => [...current, { role: "user", content: text, sources: [] }]);
+    setMessages((current) => [
+      ...current,
+      { role: "user", content: text, sources: [] },
+      { role: "assistant", content: "", sources: [], streaming: true },
+    ]);
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/chat`, {
+      const response = await fetch(`${API_BASE_URL}/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, conversation_id: conversationId, top_k: 4 }),
@@ -37,23 +41,54 @@ function App() {
         throw new Error("Không gọi được API chat.");
       }
 
-      const data = await response.json();
-      setConversationId(data.conversation_id ?? conversationId);
-      setMessages((current) => [
-        ...current,
-        { role: "assistant", content: data.answer, sources: data.sources ?? [] },
-      ]);
+      if (!response.body) throw new Error("Trình duyệt không hỗ trợ streaming.");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finished = false;
+      while (!finished) {
+        const { value, done } = await reader.read();
+        finished = done;
+        buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const eventData = JSON.parse(line);
+          if (eventData.type === "start") {
+            setConversationId(eventData.conversation_id);
+          } else if (eventData.type === "delta") {
+            await appendCharacters(eventData.content);
+          } else if (eventData.type === "done") {
+            setConversationId(eventData.conversation_id);
+            setMessages((current) => current.map((message, index) =>
+              index === current.length - 1
+                ? { ...message, content: eventData.answer, sources: eventData.sources ?? [], streaming: false }
+                : message
+            ));
+          }
+        }
+      }
     } catch (error) {
-      setMessages((current) => [
-        ...current,
-        {
-          role: "assistant",
-          content: "Có lỗi khi gọi backend. Hãy kiểm tra server FastAPI và dữ liệu đã ingest.",
-          sources: [],
-        },
-      ]);
+      setMessages((current) => current.map((message, index) =>
+        index === current.length - 1
+          ? { role: "assistant", content: "Có lỗi khi gọi backend. Hãy kiểm tra server FastAPI và dữ liệu đã ingest.", sources: [] }
+          : message
+      ));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function appendCharacters(content) {
+    for (const character of content) {
+      setMessages((current) => current.map((message, index) =>
+        index === current.length - 1
+          ? { ...message, content: message.content + character }
+          : message
+      ));
+      await new Promise((resolve) => setTimeout(resolve, 8));
     }
   }
 
@@ -83,7 +118,7 @@ function App() {
         <div className="messages">
           {messages.map((message, index) => (
             <article key={index} className={`message ${message.role}`}>
-              <p>{message.content}</p>
+              <p>{message.content}{message.streaming && <span className="typing-cursor" />}</p>
               {message.sources.length > 0 && (
                 <div className="sources">
                   {message.sources.map((source, sourceIndex) => (
@@ -97,7 +132,7 @@ function App() {
               )}
             </article>
           ))}
-          {loading && (
+          {loading && messages.at(-1)?.content === "" && (
             <article className="message assistant loading">
               <Loader2 size={18} />
               <span>Đang tìm trong tài liệu...</span>

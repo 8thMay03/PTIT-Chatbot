@@ -57,6 +57,30 @@ class RagChain:
         top_k: int = 4,
         history: list[dict[str, str]] | None = None,
     ) -> dict:
+        result = self.retrieve_context(question, top_k=top_k, history=history)
+        if not result["strong_context"]:
+            return {
+                "answer": NO_CONTEXT_ANSWER,
+                "sources": [],
+                "contexts": [],
+                "retrieval_debug": result["retrieval_debug"],
+            }
+
+        answer = answer_with_llm(question, result["contexts"], history=history or [])
+        return {
+            "answer": answer,
+            "sources": public_citations(result["contexts"]),
+            "contexts": result["contexts"],
+            "retrieval_debug": result["retrieval_debug"],
+        }
+
+    def retrieve_context(
+        self,
+        question: str,
+        top_k: int = 4,
+        history: list[dict[str, str]] | None = None,
+    ) -> dict:
+        """Run retrieval independently so callers can stream generation."""
         history = history or []
         rewritten_query = self.query_rewriter.rewrite(question, history=history)
         queries = self.multi_query_generator.generate(rewritten_query)
@@ -97,21 +121,10 @@ class RagChain:
             "selected_chunks": selected_chunks,
             "strong_context": strong_context,
         }
-        if not strong_context:
-            return {
-                "answer": NO_CONTEXT_ANSWER,
-                "sources": [],
-                "contexts": [],
-                "retrieval_debug": retrieval_debug,
-            }
-
-        answer = answer_with_llm(question, contexts, history=history)
-
         return {
-            "answer": answer,
-            "sources": public_citations(contexts),
             "contexts": contexts,
             "retrieval_debug": retrieval_debug,
+            "strong_context": strong_context,
         }
 
 

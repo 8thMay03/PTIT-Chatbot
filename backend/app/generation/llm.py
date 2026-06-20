@@ -1,4 +1,5 @@
 import re
+from collections.abc import Iterator
 
 from app.core.config import settings
 from app.generation.citations import numbered_contexts, public_citations
@@ -29,6 +30,38 @@ def answer_with_llm(
     )
     answer = response.choices[0].message.content or ""
     return _normalize_answer_citations(answer, contexts)
+
+
+def stream_answer_with_llm(
+    question: str,
+    contexts: list[dict],
+    history: list[dict[str, str]] | None = None,
+) -> Iterator[str]:
+    """Yield answer deltas as they arrive from the model."""
+    if not contexts:
+        yield "Mình chưa tìm thấy thông tin phù hợp trong kho tài liệu."
+        return
+
+    if not settings.openai_api_key:
+        yield _extractive_answer(contexts)
+        return
+
+    from openai import OpenAI
+
+    client = OpenAI(api_key=settings.openai_api_key)
+    stream = client.chat.completions.create(
+        model=settings.openai_model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": build_context_prompt(question, contexts, history)},
+        ],
+        temperature=0.2,
+        stream=True,
+    )
+    for chunk in stream:
+        content = chunk.choices[0].delta.content
+        if content:
+            yield content
 
 
 def _extractive_answer(contexts: list[dict]) -> str:
