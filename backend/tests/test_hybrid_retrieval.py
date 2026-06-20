@@ -1,4 +1,4 @@
-from app.retrieval.bm25 import rank_bm25
+from app.retrieval.bm25 import BM25Search, invalidate_bm25_cache, rank_bm25
 from app.retrieval.hybrid import reciprocal_rank_fusion
 
 
@@ -13,6 +13,31 @@ def test_bm25_ranks_exact_keyword_match_first() -> None:
 
     assert ranked[0][0] == 1
     assert ranked[0][1] > 0
+
+
+def test_bm25_search_builds_once_until_cache_is_invalidated(monkeypatch) -> None:
+    search = BM25Search()
+    chunks = [
+        {"chunk_id": "1", "text": "quy định học phí"},
+        {"chunk_id": "2", "text": "thông tin thư viện"},
+        {"chunk_id": "3", "text": "lịch học sinh viên"},
+    ]
+    load_count = 0
+
+    def load_chunks() -> list[dict]:
+        nonlocal load_count
+        load_count += 1
+        return chunks
+
+    monkeypatch.setattr(search, "_load_chunks", load_chunks)
+
+    assert search.search("học phí", top_k=1)[0]["chunk_id"] == "1"
+    search.search("thư viện", top_k=1)
+    assert load_count == 1
+
+    invalidate_bm25_cache()
+    search.search("học phí", top_k=1)
+    assert load_count == 2
 
 
 def test_reciprocal_rank_fusion_combines_and_deduplicates_results() -> None:
