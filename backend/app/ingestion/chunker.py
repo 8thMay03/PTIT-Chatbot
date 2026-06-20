@@ -108,7 +108,10 @@ def _split_section(
             if current:
                 pieces.append(current)
                 current = ""
-            pieces.extend(_split_long_block(block, body_chunk_size, chunk_overlap))
+            if _is_markdown_table(block):
+                pieces.extend(_split_long_table(block, body_chunk_size))
+            else:
+                pieces.extend(_split_long_block(block, body_chunk_size, chunk_overlap))
             continue
 
         candidate = f"{current}\n\n{block}".strip() if current else block
@@ -139,8 +142,86 @@ def _separate_heading(section: Section) -> tuple[str, str]:
 
 
 def _split_blocks(text: str) -> list[str]:
-    """Split text into paragraph blocks separated by blank lines."""
-    return [block.strip() for block in re.split(r"\n\s*\n", text) if block.strip()]
+    """Split paragraphs and keep each Markdown table as a distinct block."""
+    lines = text.splitlines()
+    blocks: list[str] = []
+    current: list[str] = []
+    index = 0
+
+    def flush_current() -> None:
+        block = "\n".join(current).strip()
+        if block:
+            blocks.append(block)
+        current.clear()
+
+    while index < len(lines):
+        if _starts_markdown_table(lines, index):
+            flush_current()
+            table_lines = [lines[index].strip(), lines[index + 1].strip()]
+            index += 2
+            while index < len(lines) and _looks_like_table_row(lines[index]):
+                table_lines.append(lines[index].strip())
+                index += 1
+            blocks.append("\n".join(table_lines))
+            continue
+
+        if not lines[index].strip():
+            flush_current()
+        else:
+            current.append(lines[index])
+        index += 1
+
+    flush_current()
+    return blocks
+
+
+def _starts_markdown_table(lines: list[str], index: int) -> bool:
+    """Return whether two lines form a Markdown table header and delimiter."""
+    if index + 1 >= len(lines) or not _looks_like_table_row(lines[index]):
+        return False
+    cells = _table_cells(lines[index + 1])
+    return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell.strip()) for cell in cells)
+
+
+def _looks_like_table_row(line: str) -> bool:
+    stripped = line.strip()
+    return stripped.startswith("|") and stripped.endswith("|") and stripped.count("|") >= 2
+
+
+def _table_cells(line: str) -> list[str]:
+    stripped = line.strip().strip("|")
+    return stripped.split("|") if stripped else []
+
+
+def _is_markdown_table(text: str) -> bool:
+    return _starts_markdown_table(text.splitlines(), 0)
+
+
+def _split_long_table(text: str, chunk_size: int) -> list[str]:
+    """Split a table between rows and repeat its header in every resulting piece."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if len(lines) < 2:
+        return [text]
+
+    header = lines[:2]
+    rows = lines[2:]
+    header_text = "\n".join(header)
+    if not rows:
+        return [header_text]
+
+    pieces: list[str] = []
+    current_rows: list[str] = []
+    for row in rows:
+        candidate = "\n".join([*header, *current_rows, row])
+        if current_rows and len(candidate) > chunk_size:
+            pieces.append("\n".join([*header, *current_rows]))
+            current_rows = [row]
+        else:
+            current_rows.append(row)
+
+    if current_rows:
+        pieces.append("\n".join([*header, *current_rows]))
+    return pieces
 
 
 def _split_long_block(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:

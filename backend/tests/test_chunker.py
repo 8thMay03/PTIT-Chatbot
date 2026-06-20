@@ -62,3 +62,45 @@ Child content.
 
     assert [chunk.heading for chunk in chunks] == ["Child"]
     assert chunks[0].section_path == "Parent > Child"
+
+
+def test_split_text_splits_markdown_table_between_rows_and_repeats_header() -> None:
+    text = """## Tuition fees
+
+Introductory paragraph immediately before the table.
+| Program | Fee |
+|---|---:|
+| Information Technology | 123456 |
+| Electronics Engineering | 234567 |
+| Business Administration | 345678 |
+| Multimedia | 456789 |
+
+Closing paragraph.
+"""
+
+    chunks = split_text(text, chunk_size=125, chunk_overlap=20)
+    table_chunks = [chunk for chunk in chunks if "| Program | Fee |" in chunk.text]
+
+    assert len(table_chunks) > 1
+    assert all("|---|---:|" in chunk.text for chunk in table_chunks)
+    assert sum(chunk.text.count("| Information Technology | 123456 |") for chunk in table_chunks) == 1
+    assert sum(chunk.text.count("| Electronics Engineering | 234567 |") for chunk in table_chunks) == 1
+    assert sum(chunk.text.count("| Business Administration | 345678 |") for chunk in table_chunks) == 1
+    assert sum(chunk.text.count("| Multimedia | 456789 |") for chunk in table_chunks) == 1
+    assert all(chunk.heading == "Tuition fees" for chunk in table_chunks)
+
+
+def test_split_text_does_not_cut_an_oversized_table_row() -> None:
+    long_cell = "important policy detail " * 12
+    text = f"""## Policy
+
+| Rule | Description |
+|---|---|
+| A | {long_cell}|
+"""
+
+    chunks = split_text(text, chunk_size=100, chunk_overlap=20)
+
+    assert len(chunks) == 1
+    assert long_cell.strip() in chunks[0].text
+    assert "| Rule | Description |" in chunks[0].text
