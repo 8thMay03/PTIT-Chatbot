@@ -127,6 +127,20 @@ body {
   animation: spin 0.9s linear infinite;
 }
 
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: -0.12em;
+  background: #991b1b;
+  animation: blink 0.8s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
 .sources {
   display: flex;
   flex-wrap: wrap;
