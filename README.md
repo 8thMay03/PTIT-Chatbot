@@ -1,116 +1,131 @@
 # PTIT RAG Chatbot
 
-Khung project RAG chatbot cho tài liệu PTIT, gồm backend FastAPI và frontend React/Vite.
+Chatbot hỏi đáp tiếng Việt dựa trên tài liệu nội bộ của Học viện Công nghệ Bưu chính Viễn thông (PTIT). Hệ thống sử dụng Retrieval-Augmented Generation (RAG), kết hợp semantic search, BM25, multi-query và reranking để tìm bằng chứng trước khi sinh câu trả lời có citation.
 
-## Cấu trúc
+Project gồm backend FastAPI, giao diện React/Vite, ChromaDB để lưu vector và SQLite để lưu tài liệu, chunk cùng lịch sử hội thoại.
 
-```text
-.
-├── backend/
-│   ├── app/
-│   │   ├── api/          # HTTP routes và request/response schemas
-│   │   ├── core/         # Settings/env
-│   │   ├── ingestion/    # Load, clean và chunk tài liệu
-│   │   ├── embeddings/   # Embedding interface và model implementations
-│   │   ├── vectordb/     # Vector store adapters
-│   │   ├── retrieval/    # Truy vấn context từ vector store
-│   │   ├── generation/   # Prompt, LLM và RAG chain
-│   │   └── main.py       # FastAPI app entrypoint
-│   ├── scripts/          # CLI helpers
-│   └── tests/
-├── data/                 # Tài liệu nguồn .md/.txt
-└── frontend/             # React chat UI
+## Tính năng chính
+
+- Nạp tài liệu Markdown và TXT, làm sạch và chia chunk theo cấu trúc heading.
+- Giữ metadata gồm tài liệu, tiêu đề, đường dẫn mục và vị trí chunk.
+- Hybrid retrieval kết hợp vector search và BM25 bằng Reciprocal Rank Fusion.
+- BM25 được xây một lần trong bộ nhớ, tái sử dụng giữa các truy vấn và tự vô hiệu hóa sau khi ingest.
+- Chuẩn hóa câu hỏi tiếng Việt, mở rộng viết tắt và xử lý câu hỏi nối tiếp.
+- Multi-query retrieval để tăng khả năng tìm đúng bằng chứng.
+- Rerank bằng heuristic hoặc CrossEncoder đa ngôn ngữ.
+- Confidence gate từ chối trả lời khi context không đủ mạnh.
+- Trả lời bằng tiếng Việt kèm citation, không công khai đường dẫn hay ID nội bộ.
+- Ghi nhớ các tin nhắn gần nhất trong cùng một cuộc hội thoại.
+- Streaming câu trả lời từ backend và hiệu ứng hiển thị từng ký tự trên giao diện.
+- Lưu thông tin debug của từng bước retrieval để phân tích lỗi.
+- Đánh giá deterministic và đánh giá ngữ nghĩa bằng Ragas.
+
+## Kiến trúc
+
+```mermaid
+flowchart LR
+    D["Tài liệu Markdown/TXT"] --> I["Clean & chunk theo heading"]
+    I --> E["Embedding"]
+    E --> V["ChromaDB"]
+    I --> S["SQLite"]
+
+    Q["Câu hỏi"] --> W["Rewrite & multi-query"]
+    W --> VS["Vector search"]
+    W --> B["BM25 in-memory"]
+    V --> VS
+    S --> B
+    VS --> RRF["Reciprocal Rank Fusion"]
+    B --> RRF
+    RRF --> RR["Reranker"]
+    RR --> C["Confidence gate"]
+    C --> L["LLM + citation"]
+    L --> UI["React streaming UI"]
 ```
 
-## Chạy backend
+Luồng xử lý một câu hỏi:
+
+1. Chuẩn hóa câu hỏi và bổ sung ngữ cảnh hội thoại khi cần.
+2. Sinh một hoặc nhiều biến thể truy vấn.
+3. Chạy vector search và BM25 cho từng truy vấn.
+4. Hợp nhất kết quả bằng RRF, sau đó rerank candidate.
+5. Loại context yếu bằng ngưỡng confidence.
+6. Sinh câu trả lời từ context đã chọn và gắn citation.
+7. Stream nội dung về frontend, sau đó lưu câu trả lời và nguồn vào SQLite.
+
+## Cấu trúc thư mục
+
+```text
+PTIT Chatbot/
+├── backend/
+│   ├── app/
+│   │   ├── api/          # Routes và schema HTTP
+│   │   ├── core/         # Cấu hình môi trường
+│   │   ├── db/           # SQLAlchemy models và repositories
+│   │   ├── embeddings/   # OpenAI, Sentence Transformers, hash embedding
+│   │   ├── generation/   # Prompt, LLM, citation, rewrite và RAG chain
+│   │   ├── ingestion/    # Loader, cleaner, chunker và ingest pipeline
+│   │   ├── retrieval/    # BM25, hybrid search, multi-query và reranker
+│   │   ├── vectordb/     # ChromaDB adapter
+│   │   └── main.py       # FastAPI entry point
+│   ├── scripts/          # Ingest và evaluation CLI
+│   └── tests/            # Unit tests và evaluation fixtures
+├── data/                 # Kho tài liệu nguồn
+├── frontend/             # React/Vite chat UI
+├── .env.example
+└── README.md
+```
+
+## Yêu cầu
+
+- Python 3.10 trở lên.
+- Node.js 18 trở lên và npm.
+- OpenAI API key nếu dùng OpenAI embedding, sinh câu trả lời hoặc Ragas.
+
+Không bắt buộc API key nếu chạy local với `EMBEDDING_PROVIDER=hash`. Khi đó chatbot trả về các đoạn trích liên quan thay vì câu trả lời do LLM tổng hợp.
+
+## Cài đặt nhanh
+
+### 1. Cấu hình môi trường
+
+Tại thư mục gốc của project:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Để dùng OpenAI, cập nhật tối thiểu:
+
+```env
+OPENAI_API_KEY=your-api-key
+OPENAI_MODEL=gpt-4.1-mini
+EMBEDDING_PROVIDER=openai
+EMBEDDING_MODEL=text-embedding-3-small
+```
+
+Để chạy hoàn toàn local mà không cần API key:
+
+```env
+OPENAI_API_KEY=
+EMBEDDING_PROVIDER=hash
+```
+
+### 2. Cài và chạy backend
 
 ```powershell
 cd backend
 python -m venv .venv
 .venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 pip install -e ".[dev]"
-Copy-Item ..\.env.example ..\.env
 python -m scripts.ingest
 uvicorn app.main:app --reload --port 8000
 ```
 
-Backend lưu vector bằng ChromaDB trong `backend/storage/chroma`, và lưu metadata/hội thoại bằng SQLite trong `backend/storage/ptit_chatbot.db`. Backend dùng `OPENAI_API_KEY` cho cả embedding OpenAI và bước tổng hợp câu trả lời. Nếu chưa có key, đổi `EMBEDDING_PROVIDER=hash` để chạy local và API chat sẽ trả về các đoạn tài liệu liên quan nhất thay vì gọi LLM.
+Backend chạy tại `http://localhost:8000`; Swagger UI nằm tại `http://localhost:8000/docs`.
 
-Retrieval dùng hybrid search: semantic vector search từ Chroma kết hợp keyword BM25 trên bảng `chunks`, sau đó hợp nhất thứ hạng bằng Reciprocal Rank Fusion. Có thể tinh chỉnh qua:
+### 3. Cài và chạy frontend
 
-```env
-HYBRID_VECTOR_WEIGHT=0.65
-HYBRID_CANDIDATE_MULTIPLIER=4
-HYBRID_RRF_K=60
-RETRIEVAL_MIN_VECTOR_SCORE=0.30
-RETRIEVAL_MIN_BM25_SCORE=2.0
-QUERY_REWRITE_USE_LLM=false
-MULTI_QUERY_ENABLED=true
-MULTI_QUERY_USE_LLM=false
-MULTI_QUERY_COUNT=3
-CONVERSATION_MEMORY_ENABLED=true
-CONVERSATION_MEMORY_MAX_MESSAGES=6
-CONVERSATION_MEMORY_MAX_CHARS=6000
-RERANKER_ENABLED=true
-RERANKER_PROVIDER=heuristic
-RERANKER_MODEL=cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
-RERANKER_CANDIDATE_MULTIPLIER=3
-```
-
-Nếu không có chunk nào vượt ngưỡng vector hoặc BM25, chatbot không gửi context yếu cho LLM và trả về `Chưa tìm thấy thông tin này trong tài liệu.` mà không kèm citation.
-
-Trước khi retrieval, câu hỏi tiếng Việt được chuẩn hóa và mở rộng các viết tắt phổ biến bằng rule-based rewriter. Đặt `QUERY_REWRITE_USE_LLM=true` để dùng model cấu hình trong `OPENAI_MODEL` cho bước rewrite; nếu lời gọi lỗi, hệ thống tự động dùng kết quả rule-based.
-
-Multi-query retrieval giữ truy vấn đã rewrite và tạo thêm tối đa `MULTI_QUERY_COUNT` biến thể, sau đó hợp nhất kết quả bằng RRF. Đặt `MULTI_QUERY_ENABLED=false` để tắt hoặc `MULTI_QUERY_USE_LLM=true` để sinh biến thể bằng model; khi model lỗi hệ thống fallback về rule-based.
-
-Conversation memory đọc các message gần nhất từ SQLite theo `conversation_id`, giới hạn đồng thời bằng số message và tổng ký tự. Memory chỉ giúp hiểu câu hỏi nối tiếp; dữ kiện trả lời và citation vẫn bắt buộc đến từ tài liệu retrieval. Đặt `CONVERSATION_MEMORY_ENABLED=false` để tắt.
-
-Sau hybrid search, reranker sắp xếp lại tập candidate trước khi đưa context vào LLM. Đặt `RERANKER_ENABLED=false` để bỏ qua hoàn toàn bước này. `RERANKER_PROVIDER=heuristic` chạy ngay không cần model bổ sung. Để dùng CrossEncoder đa ngôn ngữ, cài `pip install -e ".[ml]"` rồi đặt `RERANKER_PROVIDER=cross-encoder`; nếu model lỗi, hệ thống tự động fallback về heuristic.
-
-Schema SQLite ban đầu gồm:
-
-- `documents`: tài liệu gốc trong thư mục `data/`.
-- `chunks`: các đoạn văn bản đã chia nhỏ, có `vector_id` trỏ sang Chroma.
-- `conversations`: phiên chat.
-- `messages`: tin nhắn user/assistant trong từng phiên.
-- `message_sources`: các chunk được dùng để tạo câu trả lời.
-
-Mỗi user message còn lưu `retrieval_debug` trong cột JSON `messages.metadata`,
-bao gồm query gốc, query đã rewrite, các multi-query, candidate trước rerank,
-chunk được chọn sau rerank và toàn bộ điểm vector/BM25/RRF/rerank. Dữ liệu này
-không được trả ra public chat API, nhưng có thể đọc trực tiếp từ SQLite để phân
-tích các request retrieval sai hoặc bị confidence filter loại bỏ.
-
-Mặc định backend dùng:
-
-```env
-DATABASE_URL=sqlite:///backend/storage/ptit_chatbot.db
-```
-
-Khi cần chuyển sang PostgreSQL, có thể đổi `DATABASE_URL` sang connection string PostgreSQL và giữ nguyên tầng repository/schema.
-
-Mặc định project dùng OpenAI embedding `text-embedding-3-small`. Có thể đổi sang `text-embedding-3-large` trong `.env` nếu muốn chất lượng cao hơn:
-
-```env
-EMBEDDING_PROVIDER=openai
-EMBEDDING_MODEL=text-embedding-3-small
-```
-
-Sau khi đổi embedding model, cần chạy lại:
-
-```powershell
-python -m scripts.ingest
-```
-
-Nếu muốn dùng embedding local bằng Sentence Transformers, cài thêm:
-
-```powershell
-pip install -e ".[ml]"
-```
-
-Rồi đổi `EMBEDDING_PROVIDER=sentence-transformers` và `EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` trong `.env`.
-
-## Chạy frontend
+Mở terminal khác:
 
 ```powershell
 cd frontend
@@ -118,86 +133,255 @@ npm install
 npm run dev
 ```
 
-Mở `http://localhost:5173`.
+Giao diện chạy tại `http://localhost:5173` và mặc định gọi backend ở `http://localhost:8000/api`.
 
-## Chạy test
+Nếu backend dùng địa chỉ khác, tạo `frontend/.env.local`:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000/api
+```
+
+## Nạp dữ liệu
+
+Đặt tài liệu `.md` hoặc `.txt` trong thư mục `data/`, sau đó chạy:
+
+```powershell
+cd backend
+python -m scripts.ingest
+```
+
+Mặc định dữ liệu được lưu tại:
+
+- Vector: `backend/storage/chroma`
+- Metadata và hội thoại: `backend/storage/ptit_chatbot.db`
+
+Pipeline sẽ xây lại Chroma collection và cập nhật bảng `documents`, `chunks`. BM25 không được dựng ở mỗi request: index được tạo lười ở lần tìm kiếm đầu tiên, dùng lại trong bộ nhớ và được đánh dấu cần rebuild sau một lần ingest thành công.
+
+Sau khi thay đổi embedding provider hoặc model, cần ingest lại toàn bộ tài liệu.
+
+### Embedding local bằng Sentence Transformers
+
+```powershell
+cd backend
+pip install -e ".[ml]"
+```
+
+```env
+EMBEDDING_PROVIDER=sentence-transformers
+EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+```
+
+Nếu không tải được Sentence Transformer, implementation hiện tại fallback về hash embedding.
+
+## Cấu hình RAG
+
+Các giá trị mặc định quan trọng trong `.env.example`:
+
+```env
+CHUNK_SIZE=900
+CHUNK_OVERLAP=150
+
+HYBRID_VECTOR_WEIGHT=0.65
+HYBRID_CANDIDATE_MULTIPLIER=4
+HYBRID_RRF_K=60
+
+RETRIEVAL_MIN_VECTOR_SCORE=0.30
+RETRIEVAL_MIN_BM25_SCORE=2.0
+
+QUERY_REWRITE_USE_LLM=false
+MULTI_QUERY_ENABLED=true
+MULTI_QUERY_USE_LLM=false
+MULTI_QUERY_COUNT=3
+
+RERANKER_ENABLED=true
+RERANKER_PROVIDER=heuristic
+RERANKER_CANDIDATE_MULTIPLIER=3
+RERANKER_VECTOR_WEIGHT=0.45
+RERANKER_BM25_WEIGHT=0.35
+RERANKER_LEXICAL_WEIGHT=0.20
+
+CONVERSATION_MEMORY_ENABLED=true
+CONVERSATION_MEMORY_MAX_MESSAGES=6
+CONVERSATION_MEMORY_MAX_CHARS=6000
+```
+
+`QUERY_REWRITE_USE_LLM` và `MULTI_QUERY_USE_LLM` mặc định tắt để giảm latency và chi phí. Khi bật, hệ thống tự fallback về rule-based nếu lời gọi model thất bại.
+
+Để dùng CrossEncoder:
+
+```env
+RERANKER_PROVIDER=cross-encoder
+RERANKER_MODEL=cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+```
+
+Cần cài optional dependency `.[ml]`. Nếu model reranker lỗi, hệ thống fallback về heuristic.
+
+## API
+
+### Health check
+
+```http
+GET /api/health
+```
+
+### Ingest tài liệu
+
+```http
+POST /api/ingest
+```
+
+### Chat thông thường
+
+```http
+POST /api/chat
+Content-Type: application/json
+```
+
+```json
+{
+  "message": "Sinh viên bị cảnh báo học tập khi nào?",
+  "conversation_id": null,
+  "top_k": 4
+}
+```
+
+Response:
+
+```json
+{
+  "conversation_id": "...",
+  "answer": "... [1]",
+  "sources": [
+    {
+      "citation_id": 1,
+      "source_name": "so-tay-sinh-vien-d21.md",
+      "heading": "Điều 33. Cảnh báo kết quả học tập",
+      "section_path": "..."
+    }
+  ]
+}
+```
+
+### Chat streaming
+
+```http
+POST /api/chat/stream
+Content-Type: application/json
+Accept: application/x-ndjson
+```
+
+Endpoint trả các JSON event phân cách bằng newline:
+
+```json
+{"type":"start","conversation_id":"..."}
+{"type":"delta","content":"Sinh viên"}
+{"type":"delta","content":" bị cảnh báo..."}
+{"type":"done","answer":"Sinh viên bị cảnh báo... [1]","sources":[],"conversation_id":"..."}
+```
+
+Frontend sử dụng các `delta` để hiển thị hiệu ứng sinh câu trả lời từng ký tự. Event `done` chứa câu trả lời đã chuẩn hóa citation và danh sách nguồn cuối cùng.
+
+## Conversation memory và debug retrieval
+
+Khi request tiếp theo gửi lại `conversation_id`, backend đọc các tin nhắn gần nhất trong SQLite để hiểu câu hỏi nối tiếp. Lịch sử chỉ được dùng để giải nghĩa truy vấn, không được phép trở thành nguồn dữ kiện cho câu trả lời.
+
+Mỗi user message lưu `retrieval_debug` trong JSON metadata, gồm:
+
+- Câu hỏi gốc và câu hỏi sau rewrite.
+- Danh sách multi-query.
+- Candidate trước rerank.
+- Chunk được chọn sau rerank.
+- Điểm vector, BM25, RRF và rerank.
+- Kết quả confidence gate.
+
+Dữ liệu debug không được trả qua public chat response.
+
+## Kiểm thử
 
 ```powershell
 cd backend
 pytest
 ```
 
-Test `test_ptit_faq.py` dùng bộ câu hỏi PTIT thường gặp trong
-`backend/tests/fixtures/ptit_faq.json` để kiểm tra các câu hỏi vẫn truy xuất
-được đúng bằng chứng từ sổ tay sinh viên. Bộ test chạy local, không gọi LLM
-hoặc API bên ngoài.
+Các test bao phủ chunking, embedding, Chroma, hybrid retrieval, BM25 cache, query rewriting, multi-query, reranker, confidence, citation, conversation memory, schema API và RAG chain.
 
-Để đánh giá pipeline RAG sau khi ingest dữ liệu:
+## Đánh giá chất lượng
+
+### Evaluation deterministic
+
+Evaluator mặc định sử dụng `tests/fixtures/ptit_faq.json` và báo cáo Retrieval Hit@K, MRR, keyword recall, citation validity và answer quality.
 
 ```powershell
 cd backend
-python -m scripts.evaluate --top-k 4 --output evaluation-report.json
+python -m scripts.evaluate `
+  --dataset tests/fixtures/ptit_faq.json `
+  --top-k 4 `
+  --output evaluation-report.json
 ```
 
-Evaluation báo cáo Retrieval Hit@K, MRR, tỷ lệ từ khóa đáp án, độ hợp lệ của
-citation và điểm answer quality tổng hợp. Có thể đặt ngưỡng cho CI:
+Có thể dùng làm quality gate trong CI:
 
 ```powershell
 python -m scripts.evaluate `
-  --fail-below-hit-rate 0.8 `
-  --fail-below-answer-quality 0.7
+  --fail-below-hit-rate 0.80 `
+  --fail-below-answer-quality 0.70
 ```
 
-`answer_quality` được tính bằng 80% tỷ lệ cụm từ đáp án xuất hiện trong câu
-trả lời và 20% độ hợp lệ citation. Khi có `OPENAI_API_KEY`, script đánh giá câu
-trả lời sinh bởi model; nếu không có key, nó đánh giá câu trả lời trích xuất.
+Không có API key thì evaluator chấm câu trả lời trích xuất; có API key thì chấm kết quả do model sinh.
 
-### Đánh giá ngữ nghĩa với Ragas
+### Evaluation bằng Ragas
 
-Cài thêm dependency evaluation:
+Cài dependency:
 
 ```powershell
 cd backend
 pip install -e ".[eval]"
 ```
 
-Sau khi ingest dữ liệu và cấu hình `OPENAI_API_KEY`, chạy:
+Project có bộ 100 câu hỏi được đối chiếu với tài liệu nguồn tại `tests/fixtures/ptit_ragas_100.json`.
 
 ```powershell
 python -m scripts.evaluate_ragas `
+  --dataset tests/fixtures/ptit_ragas_100.json `
   --top-k 4 `
   --judge-model gpt-4.1-mini `
-  --output ragas-report.json
+  --output ragas-report-100.json
 ```
 
-Script dùng ba metric Ragas:
+Các metric:
 
-- `context_precision`: mức độ hữu ích và thứ hạng của các context được lấy về.
-- `faithfulness`: mức độ các nhận định trong câu trả lời được context hỗ trợ.
-- `answer_correctness`: độ đúng về dữ kiện so với `reference_answer`.
+- `context_precision`: context được lấy về có liên quan và được xếp hạng tốt hay không.
+- `faithfulness`: các nhận định trong câu trả lời có được context hỗ trợ hay không.
+- `answer_correctness`: câu trả lời có đúng so với reference answer hay không.
+- `ragas_score`: trung bình các metric hợp lệ phía trên.
 
-`ragas_score` là trung bình của ba metric trên. Để dùng làm quality gate trong
-CI, thêm `--fail-below 0.75`. Ragas dùng LLM làm judge nên có phát sinh chi phí;
-evaluator deterministic `scripts.evaluate` vẫn phù hợp để chạy ở mọi commit.
+Thêm `--fail-below 0.75` để trả exit code lỗi khi chất lượng thấp hơn ngưỡng. Ragas dùng LLM làm judge nên cần `OPENAI_API_KEY` và phát sinh chi phí API.
 
-## API nhanh
+## Database
 
-- `GET /api/health`: kiểm tra server.
-- `POST /api/ingest`: nạp lại tài liệu trong `data/`.
-- `POST /api/chat`: hỏi đáp RAG.
+SQLite mặc định gồm các bảng:
 
-Ví dụ:
+- `documents`: tài liệu nguồn và content hash.
+- `chunks`: nội dung chunk, metadata và vector ID.
+- `conversations`: phiên hội thoại.
+- `messages`: tin nhắn user/assistant cùng metadata debug.
+- `message_sources`: chunk được dùng để tạo từng câu trả lời.
 
-```json
-{
-  "message": "Sinh viên bị cảnh báo học tập khi nào?",
-  "top_k": 4
-}
-```
+Có thể đổi `DATABASE_URL` sang PostgreSQL vì tầng truy cập dữ liệu sử dụng SQLAlchemy. Khi đổi database, cần cài thêm driver tương ứng.
 
-## Gợi ý phát triển tiếp
+## Lưu ý triển khai
 
-- Thêm parser PDF/DOCX cho tài liệu gốc.
-- Thêm đăng nhập quản trị để upload tài liệu và re-index.
-- Thêm reranker để cải thiện độ chính xác retrieval.
-- Lưu lịch sử hội thoại theo user/session.
+- `POST /api/ingest` hiện chưa có xác thực; không nên công khai endpoint này trên Internet.
+- Cần giới hạn quyền truy cập theo `user_id`/`conversation_id` trước khi dùng cho nhiều người dùng thật.
+- Cấu hình CORS bằng `CORS_ORIGINS`; không dùng wildcard trong production nếu gửi credential.
+- Không commit `.env`, API key, thư mục storage hay dữ liệu hội thoại.
+- Nên chạy nhiều worker, reverse proxy hỗ trợ streaming và đặt `X-Accel-Buffering: no` nếu dùng Nginx.
+- Tài liệu sổ tay khóa 2021 có thể không phản ánh quy định hiện hành; cần cập nhật nguồn và ingest lại khi quy định thay đổi.
+
+## Công nghệ sử dụng
+
+- Backend: FastAPI, Pydantic, SQLAlchemy, OpenAI SDK.
+- Retrieval: ChromaDB, rank-bm25, Reciprocal Rank Fusion.
+- ML tùy chọn: Sentence Transformers, CrossEncoder.
+- Frontend: React 18, Vite, Lucide React.
+- Evaluation: pytest và Ragas.
