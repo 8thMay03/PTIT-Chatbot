@@ -159,6 +159,39 @@ Pipeline sẽ xây lại Chroma collection và cập nhật bảng `documents`, 
 
 Sau khi thay đổi embedding provider hoặc model, cần ingest lại toàn bộ tài liệu.
 
+## Chạy bằng Docker
+
+Tạo file cấu hình rồi build và chạy cả frontend lẫn backend:
+
+```powershell
+Copy-Item .env.example .env
+docker compose up --build
+```
+
+- Giao diện: `http://localhost:5173`
+- Backend: `http://localhost:8000`
+- Swagger: `http://localhost:8000/docs`
+
+Ở lần chạy đầu tiên, backend tự ingest tài liệu nếu volume lưu trữ còn trống. ChromaDB và SQLite được giữ trong named volume `backend_storage`, còn thư mục `data/` được mount read-only vào container.
+
+Sau khi thay đổi tài liệu, chạy ingest lại:
+
+```powershell
+docker compose exec backend python -m scripts.ingest
+```
+
+Dừng hệ thống nhưng giữ dữ liệu:
+
+```powershell
+docker compose down
+```
+
+Muốn xóa luôn vector và lịch sử hội thoại để ingest mới hoàn toàn:
+
+```powershell
+docker compose down -v
+```
+
 ### Embedding local bằng Sentence Transformers
 
 ```powershell
