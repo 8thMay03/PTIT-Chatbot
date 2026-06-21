@@ -15,6 +15,7 @@ from app.db.repositories import (
     get_recent_conversation_history,
 )
 from app.generation.rag_chain import rag_chain
+from app.generation.guardrails import OUT_OF_SCOPE_ANSWER
 from app.generation.citations import public_citations
 from app.generation.llm import _normalize_answer_citations, stream_answer_with_llm
 from app.ingestion import ingestion_pipeline
@@ -103,7 +104,9 @@ def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -
         deltas: list[str] = []
         yield _ndjson({"type": "start", "conversation_id": conversation.id})
 
-        if retrieval["strong_context"]:
+        if not retrieval["guardrail_allowed"]:
+            stream = iter([OUT_OF_SCOPE_ANSWER])
+        elif retrieval["strong_context"]:
             stream = stream_answer_with_llm(request.message, contexts, history=history)
         else:
             stream = iter(["Chưa tìm thấy thông tin này trong tài liệu."])
