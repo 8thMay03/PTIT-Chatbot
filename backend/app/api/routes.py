@@ -15,7 +15,7 @@ from app.db.repositories import (
     get_recent_conversation_history,
 )
 from app.generation.rag_chain import rag_chain
-from app.generation.guardrails import OUT_OF_SCOPE_ANSWER
+from app.generation.guardrails import OUT_OF_SCOPE_ANSWER, filter_safe_history
 from app.generation.citations import public_citations
 from app.generation.llm import _normalize_answer_citations, stream_answer_with_llm
 from app.ingestion import ingestion_pipeline
@@ -55,6 +55,7 @@ def chat(request: ChatRequest, session: Session = Depends(get_session)) -> ChatR
         if settings.conversation_memory_enabled
         else []
     )
+    history = filter_safe_history(history)
     result = rag_chain.answer(request.message, top_k=request.top_k, history=history)
     add_message(
         session,
@@ -96,6 +97,7 @@ def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -
         if settings.conversation_memory_enabled
         else []
     )
+    history = filter_safe_history(history)
     retrieval = rag_chain.retrieve_context(request.message, top_k=request.top_k, history=history)
 
     def event_stream() -> Iterator[str]:
