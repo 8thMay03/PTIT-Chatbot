@@ -455,6 +455,8 @@ Các metric:
 
 Thêm `--fail-below 0.75` để trả exit code lỗi khi chất lượng thấp hơn ngưỡng. Ragas dùng LLM làm judge nên cần `OPENAI_API_KEY` và phát sinh chi phí API.
 
+Khi chạy, evaluator hiển thị progress bar gồm phần trăm hoàn tất, case hiện tại, metric đang chấm, thời gian đã chạy và ETA. Thêm `--no-progress` nếu chạy trong CI hoặc muốn tắt progress bar.
+
 ## Database
 
 SQLite mặc định gồm các bảng:

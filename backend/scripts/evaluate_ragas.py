@@ -4,6 +4,9 @@ import argparse
 import asyncio
 import json
 import math
+import sys
+import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from statistics import mean
@@ -28,6 +31,58 @@ class RagasCaseResult:
     reference: str
     scores: dict[str, float | None]
     errors: dict[str, str]
+
+
+class EvaluationProgress:
+    """Render progress for pipeline generation and every Ragas metric."""
+
+    def __init__(self, total_cases: int, metric_count: int) -> None:
+        self.total_cases = total_cases
+        self.steps_per_case = metric_count + 1
+        self.total_steps = total_cases * self.steps_per_case
+        self.completed_steps = 0
+        self.started_at = time.monotonic()
+
+    def show(self, case_number: int, case_id: str, stage: str) -> None:
+        elapsed = time.monotonic() - self.started_at
+        ratio = self.completed_steps / self.total_steps if self.total_steps else 1.0
+        filled = round(24 * ratio)
+        eta = (
+            elapsed / self.completed_steps * (self.total_steps - self.completed_steps)
+            if self.completed_steps
+            else None
+        )
+        bar = "#" * filled + "-" * (24 - filled)
+        eta_text = _format_duration(eta) if eta is not None else "--:--"
+        print(
+            f"\r[{bar}] {ratio:6.1%} case {case_number}/{self.total_cases} "
+            f"{case_id[:28]:<28} {stage:<20} "
+            f"elapsed {_format_duration(elapsed)} ETA {eta_text}",
+            end="",
+            file=sys.stderr,
+            flush=True,
+        )
+
+    def advance(self, case_number: int, case_id: str, stage: str) -> None:
+        self.completed_steps = min(self.total_steps, self.completed_steps + 1)
+        self.show(case_number, case_id, stage)
+
+    def skip_remaining_case_steps(self, case_number: int, case_id: str) -> None:
+        self.completed_steps = max(self.completed_steps, case_number * self.steps_per_case)
+        self.show(case_number, case_id, "pipeline error")
+
+    def finish(self) -> None:
+        if self.total_steps:
+            self.completed_steps = self.total_steps
+            self.show(self.total_cases, "complete", "done")
+        print(file=sys.stderr, flush=True)
+
+
+def _format_duration(seconds: float) -> str:
+    seconds = max(0, round(seconds))
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes:02d}:{seconds:02d}"
 
 
 def build_sample(case: dict, chain: RagChain, top_k: int) -> dict:
@@ -101,12 +156,18 @@ def _metric_inputs(metric_name: str, sample: dict) -> dict:
     raise ValueError(f"Unsupported Ragas metric: {metric_name}")
 
 
-async def score_sample(sample: dict, metrics: dict[str, Any]) -> RagasCaseResult:
+async def score_sample(
+    sample: dict,
+    metrics: dict[str, Any],
+    progress_callback: Callable[[str, bool], None] | None = None,
+) -> RagasCaseResult:
     """Score one generated sample while isolating failures to individual metrics."""
 
     scores: dict[str, float | None] = {}
     errors: dict[str, str] = {}
     for name, metric in metrics.items():
+        if progress_callback:
+            progress_callback(name, False)
         try:
             result = await metric.ascore(**_metric_inputs(name, sample))
             value = float(result.value)
@@ -114,6 +175,8 @@ async def score_sample(sample: dict, metrics: dict[str, Any]) -> RagasCaseResult
         except Exception as exc:
             scores[name] = None
             errors[name] = f"{type(exc).__name__}: {exc}"
+        if progress_callback:
+            progress_callback(name, True)
 
     return RagasCaseResult(
         id=sample["id"],
@@ -131,14 +194,30 @@ async def evaluate_ragas(
     chain: RagChain,
     metrics: dict[str, Any],
     top_k: int,
+    show_progress: bool = False,
 ) -> dict:
     """Generate answers, run all Ragas metrics, and aggregate valid scores."""
 
     results: list[RagasCaseResult] = []
-    for case in dataset:
+    progress = EvaluationProgress(len(dataset), len(metrics)) if show_progress else None
+    for case_number, case in enumerate(dataset, start=1):
+        case_id = str(case.get("id", "<unknown>"))
         try:
+            if progress:
+                progress.show(case_number, case_id, "pipeline")
             sample = build_sample(case, chain, top_k)
-            results.append(await score_sample(sample, metrics))
+            if progress:
+                progress.advance(case_number, case_id, "pipeline done")
+
+            def update_progress(metric_name: str, completed: bool) -> None:
+                if not progress:
+                    return
+                if completed:
+                    progress.advance(case_number, case_id, f"{metric_name} done")
+                else:
+                    progress.show(case_number, case_id, metric_name)
+
+            results.append(await score_sample(sample, metrics, update_progress))
         except Exception as exc:
             results.append(
                 RagasCaseResult(
@@ -151,6 +230,11 @@ async def evaluate_ragas(
                     errors={"pipeline": f"{type(exc).__name__}: {exc}"},
                 )
             )
+            if progress:
+                progress.skip_remaining_case_steps(case_number, case_id)
+
+    if progress:
+        progress.finish()
 
     summary: dict[str, Any] = {
         "cases": len(results),
@@ -202,6 +286,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--output", type=Path, help="Optional JSON report path.")
     parser.add_argument("--fail-below", type=float, help="Fail when ragas_score is below this value.")
+    parser.add_argument("--no-progress", action="store_true", help="Disable the progress bar.")
     args = parser.parse_args()
     if not 1 <= args.top_k <= 10:
         parser.error("--top-k must be between 1 and 10")
@@ -219,7 +304,15 @@ def main() -> int:
 
     dataset = json.loads(args.dataset.read_text(encoding="utf-8"))
     metrics = create_metrics(args.judge_model, settings.openai_api_key)
-    report = asyncio.run(evaluate_ragas(dataset, rag_chain, metrics, args.top_k))
+    report = asyncio.run(
+        evaluate_ragas(
+            dataset,
+            rag_chain,
+            metrics,
+            args.top_k,
+            show_progress=not args.no_progress,
+        )
+    )
     _print_report(report)
 
     if args.output:

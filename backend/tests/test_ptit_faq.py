@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.ingestion.chunker import Chunk, split_text
 from app.retrieval.bm25 import rank_bm25
 from scripts.evaluate import _citation_validity, _evidence_rank, _term_coverage
-from scripts.evaluate_ragas import build_sample, evaluate_ragas
+from scripts.evaluate_ragas import _format_duration, build_sample, evaluate_ragas
 
 
 FAQ_PATH = Path(__file__).parent / "fixtures" / "ptit_faq.json"
@@ -124,3 +124,8 @@ def test_ragas_evaluator_builds_samples_and_aggregates_metrics() -> None:
     assert report["summary"]["answer_correctness"] == pytest.approx(0.7)
     assert report["summary"]["ragas_score"] == pytest.approx(0.8)
     assert report["summary"]["errors"] == 0
+
+
+def test_ragas_progress_formats_duration() -> None:
+    assert _format_duration(65) == "01:05"
+    assert _format_duration(3661) == "01:01:01"
