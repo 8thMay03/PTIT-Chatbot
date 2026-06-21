@@ -1,4 +1,5 @@
 from app.generation.citations import public_citations
+from app.generation.guardrails import OUT_OF_SCOPE_ANSWER
 from app.generation.rag_chain import NO_CONTEXT_ANSWER, RagChain
 
 
@@ -57,7 +58,7 @@ def test_rag_chain_rejects_weak_context_without_calling_llm(monkeypatch) -> None
 
     monkeypatch.setattr("app.generation.rag_chain.answer_with_llm", fail_if_called)
 
-    result = RagChain(retriever_=WeakRetriever()).answer("Unrelated question")
+    result = RagChain(retriever_=WeakRetriever()).answer("Thông tin học phí không tồn tại")
 
     assert result["answer"] == NO_CONTEXT_ANSWER
     assert result["sources"] == []
@@ -101,10 +102,10 @@ def test_rag_chain_retrieves_with_rewritten_query_but_answers_original_question(
         lambda question, contexts, history=None: answered_questions.append(question) or "Câu trả lời [1]",
     )
 
-    result = RagChain(retriever_=retriever, query_rewriter=FixedRewriter()).answer("Câu hỏi gốc")
+    result = RagChain(retriever_=retriever, query_rewriter=FixedRewriter()).answer("Câu hỏi gốc về học phí")
 
     assert retriever.query == "truy vấn đã viết lại"
-    assert answered_questions == ["Câu hỏi gốc"]
+    assert answered_questions == ["Câu hỏi gốc về học phí"]
     assert result["retrieval_debug"]["rewritten_query"] == "truy vấn đã viết lại"
     assert result["retrieval_debug"]["selected_chunks"][0]["chunk_id"] == "chunk-1"
 
@@ -125,6 +126,22 @@ def test_rag_chain_can_disable_reranker(monkeypatch) -> None:
         retriever_=retriever,
         query_rewriter=FixedRewriter(),
         reranker=FailingReranker(),
-    ).answer("Câu hỏi gốc", top_k=4)
+    ).answer("Câu hỏi gốc về học phí", top_k=4)
 
     assert retriever.query == "truy vấn đã viết lại"
+
+
+def test_rag_chain_blocks_out_of_scope_request_before_retrieval() -> None:
+    class FailingRetriever:
+        def retrieve(self, question: str, top_k: int) -> list[dict]:
+            raise AssertionError("Retriever must not run for an out-of-scope request")
+
+    result = RagChain(retriever_=FailingRetriever()).answer("Viết mã Python cho tôi")
+
+    assert result["answer"] == OUT_OF_SCOPE_ANSWER
+    assert result["sources"] == []
+    assert result["contexts"] == []
+    assert result["retrieval_debug"]["guardrail"] == {
+        "allowed": False,
+        "reason": "code_generation",
+    }

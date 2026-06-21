@@ -1,4 +1,5 @@
 from app.generation.llm import _extractive_answer, _normalize_answer_citations
+from app.generation.guardrails import OUT_OF_SCOPE_ANSWER
 from app.generation.prompts import SYSTEM_PROMPT, build_context_prompt
 
 
@@ -51,3 +52,12 @@ def test_prompt_separates_conversation_memory_from_document_context() -> None:
     assert "LỊCH SỬ HỘI THOẠI (chỉ để hiểu tham chiếu)" in prompt
     assert "Người dùng: Câu hỏi trước về học phí" in prompt
     assert "NGỮ CẢNH TÀI LIỆU ĐƯỢC PHÉP SỬ DỤNG" in prompt
+
+
+def test_system_prompt_enforces_ptit_scope_and_blocks_code_generation() -> None:
+    assert "Phạm vi duy nhất" in SYSTEM_PROMPT
+    assert "Không viết mã nguồn" in SYSTEM_PROMPT
+
+
+def test_out_of_scope_refusal_does_not_receive_a_citation() -> None:
+    assert _normalize_answer_citations(OUT_OF_SCOPE_ANSWER, _contexts()) == OUT_OF_SCOPE_ANSWER

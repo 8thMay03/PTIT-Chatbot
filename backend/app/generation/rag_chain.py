@@ -1,5 +1,6 @@
 from app.core.config import settings
 from app.generation.confidence import has_strong_context
+from app.generation.guardrails import OUT_OF_SCOPE_ANSWER, check_scope
 from app.generation.llm import answer_with_llm
 from app.generation.citations import public_citations
 from app.generation.multi_query import VietnameseMultiQueryGenerator
@@ -58,6 +59,13 @@ class RagChain:
         history: list[dict[str, str]] | None = None,
     ) -> dict:
         result = self.retrieve_context(question, top_k=top_k, history=history)
+        if not result["guardrail_allowed"]:
+            return {
+                "answer": OUT_OF_SCOPE_ANSWER,
+                "sources": [],
+                "contexts": [],
+                "retrieval_debug": result["retrieval_debug"],
+            }
         if not result["strong_context"]:
             return {
                 "answer": NO_CONTEXT_ANSWER,
@@ -82,6 +90,26 @@ class RagChain:
     ) -> dict:
         """Run retrieval independently so callers can stream generation."""
         history = history or []
+        scope = check_scope(question, history)
+        if not scope.allowed:
+            retrieval_debug = {
+                "original_query": question,
+                "rewritten_query": "",
+                "retrieval_queries": [],
+                "requested_top_k": top_k,
+                "candidate_count": 0,
+                "retrieved_chunks": [],
+                "selected_chunks": [],
+                "strong_context": False,
+                "guardrail": {"allowed": False, "reason": scope.reason},
+            }
+            return {
+                "contexts": [],
+                "retrieval_debug": retrieval_debug,
+                "strong_context": False,
+                "guardrail_allowed": False,
+            }
+
         rewritten_query = self.query_rewriter.rewrite(question, history=history)
         queries = self.multi_query_generator.generate(rewritten_query)
         candidate_count = (
@@ -120,11 +148,13 @@ class RagChain:
             "retrieved_chunks": retrieved_chunks,
             "selected_chunks": selected_chunks,
             "strong_context": strong_context,
+            "guardrail": {"allowed": True, "reason": scope.reason},
         }
         return {
             "contexts": contexts,
             "retrieval_debug": retrieval_debug,
             "strong_context": strong_context,
+            "guardrail_allowed": True,
         }
 
 
