@@ -138,7 +138,7 @@ function injectCitations(html, sources) {
       JSON.stringify({
         id: source.citation_id,
         name: source.source_name,
-        section: source.section_path || source.heading || "",
+        section: source.locator || source.section_path || source.heading || "",
       })
     );
     return `<button type="button" class="citation-chip" data-source="${meta}">${num}</button>`;
@@ -506,10 +506,13 @@ function App() {
                               >
                                 <span className="source-badge">{source.citation_id}</span>
                                 <div className="source-meta">
-                                  <div className="source-name">{source.source_name}</div>
-                                  {(source.section_path || source.heading) && (
+                                  <div className="source-name">
+                                    {source.locator || source.heading || "Mục trong tài liệu"}
+                                  </div>
+                                  <div className="source-document">{source.source_name}</div>
+                                  {source.section_path && source.section_path !== source.locator && (
                                     <div className="source-section">
-                                      {source.section_path || source.heading}
+                                      {source.section_path}
                                     </div>
                                   )}
                                 </div>

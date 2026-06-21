@@ -699,6 +699,14 @@ button {
   overflow-wrap: anywhere;
 }
 
+.source-document {
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--brand-700);
+  overflow-wrap: anywhere;
+}
+
 /* ---------------- Trạng thái chào mừng ---------------- */
 .welcome {
   display: flex;

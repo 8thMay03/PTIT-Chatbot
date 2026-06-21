@@ -16,7 +16,7 @@ Project gồm backend FastAPI, giao diện React/Vite, ChromaDB để lưu vecto
 - Multi-query retrieval để tăng khả năng tìm đúng bằng chứng.
 - Rerank bằng heuristic hoặc CrossEncoder đa ngôn ngữ.
 - Confidence gate từ chối trả lời khi context không đủ mạnh.
-- Trả lời bằng tiếng Việt kèm citation, không công khai đường dẫn hay ID nội bộ.
+- Trả lời bằng tiếng Việt kèm citation chi tiết tới Điều/Khoản/Điểm hoặc mục tài liệu, không công khai đường dẫn hay ID nội bộ.
 - Ghi nhớ các tin nhắn gần nhất trong cùng một cuộc hội thoại.
 - Streaming câu trả lời từ backend và hiệu ứng hiển thị từng ký tự trên giao diện.
 - Lưu thông tin debug của từng bước retrieval để phân tích lỗi.
@@ -330,7 +330,11 @@ Response:
       "citation_id": 1,
       "source_name": "so-tay-sinh-vien-d21.md",
       "heading": "Điều 33. Cảnh báo kết quả học tập",
-      "section_path": "..."
+      "section_path": "Quy chế đào tạo > Điều 33. Cảnh báo kết quả học tập",
+      "article": "Điều 33. Cảnh báo kết quả học tập",
+      "clauses": ["1", "2"],
+      "points": ["a", "b"],
+      "locator": "Điều 33. Cảnh báo kết quả học tập — Khoản 1, 2; Điểm a, b"
     }
   ]
 }
@@ -364,6 +368,8 @@ Endpoint trả các JSON event phân cách bằng newline:
 ```
 
 Frontend sử dụng các `delta` để hiển thị hiệu ứng sinh câu trả lời từng ký tự. Event `done` chứa câu trả lời đã chuẩn hóa citation và danh sách nguồn cuối cùng.
+
+Mỗi nguồn ưu tiên hiển thị trường `locator`. Backend suy ra vị trí pháp lý từ heading và nội dung chunk; nếu tài liệu không có cấu trúc Điều/Khoản/Điểm, hệ thống fallback về heading hoặc mục gần nhất. Các chunk thuộc những khoản khác nhau nhận citation ID riêng.
 
 ## Conversation memory và debug retrieval
 
