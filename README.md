@@ -278,10 +278,15 @@ Phản hồi không có citation và không kích hoạt embedding, BM25, vector
 Mình chỉ hỗ trợ các câu hỏi liên quan đến PTIT và nội dung trong sổ tay sinh viên. Bạn có thể hỏi về học phí, học phần, thi cử, học bổng, rèn luyện, thủ tục sinh viên hoặc điều kiện tốt nghiệp.
 ```
 
-Guardrail gồm hai lớp:
+Guardrail gồm nhiều lớp:
 
-1. Bộ lọc deterministic trong `app/generation/guardrails.py` chặn sớm và hỗ trợ câu hỏi nối tiếp dựa trên lịch sử.
-2. System prompt yêu cầu LLM chỉ sử dụng tài liệu PTIT và từ chối yêu cầu ngoài phạm vi nếu lớp đầu tiên không nhận diện được.
+1. Bộ lọc deterministic trong `app/generation/guardrails.py` chặn sớm yêu cầu ngoài phạm vi và prompt injection bằng tiếng Việt hoặc tiếng Anh.
+2. Chuẩn hóa Unicode, ký tự zero-width, dấu phân cách và một số dạng leetspeak nhằm nhận diện chỉ dẫn bị làm rối.
+3. Loại tin nhắn injection khỏi lịch sử trước khi lịch sử được đưa vào query rewrite hoặc prompt.
+4. Loại chunk chứa indirect prompt injection khỏi context sau retrieval và ghi số chunk bị loại vào `unsafe_contexts_removed`.
+5. System prompt coi câu hỏi, lịch sử và tài liệu là dữ liệu không đáng tin cậy; không được thực thi chỉ dẫn nằm trong các vùng này.
+
+Các mẫu bị chặn gồm yêu cầu bỏ qua hoặc ghi đè chỉ dẫn, tiết lộ system/developer prompt, bật jailbreak/DAN, giả lập vai trò không giới hạn, đọc khóa API/biến môi trường và giải mã payload để thực thi. Đây là biện pháp giảm thiểu theo pattern, không phải bảo đảm an toàn tuyệt đối; cần tiếp tục bổ sung test khi phát hiện kiểu tấn công mới.
 
 Kết quả guardrail được lưu trong `retrieval_debug.guardrail` với `allowed` và `reason`. Danh sách thuật ngữ và pattern cần được cập nhật khi phạm vi kho tài liệu mở rộng.
 

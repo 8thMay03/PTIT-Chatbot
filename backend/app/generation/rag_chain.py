@@ -1,6 +1,11 @@
 from app.core.config import settings
 from app.generation.confidence import has_strong_context
-from app.generation.guardrails import OUT_OF_SCOPE_ANSWER, check_scope
+from app.generation.guardrails import (
+    OUT_OF_SCOPE_ANSWER,
+    check_scope,
+    contains_prompt_injection,
+    filter_safe_history,
+)
 from app.generation.llm import answer_with_llm
 from app.generation.citations import public_citations
 from app.generation.multi_query import VietnameseMultiQueryGenerator
@@ -58,7 +63,8 @@ class RagChain:
         top_k: int = 4,
         history: list[dict[str, str]] | None = None,
     ) -> dict:
-        result = self.retrieve_context(question, top_k=top_k, history=history)
+        safe_history = filter_safe_history(history)
+        result = self.retrieve_context(question, top_k=top_k, history=safe_history)
         if not result["guardrail_allowed"]:
             return {
                 "answer": OUT_OF_SCOPE_ANSWER,
@@ -74,7 +80,7 @@ class RagChain:
                 "retrieval_debug": result["retrieval_debug"],
             }
 
-        answer = answer_with_llm(question, result["contexts"], history=history or [])
+        answer = answer_with_llm(question, result["contexts"], history=safe_history)
         return {
             "answer": answer,
             "sources": public_citations(result["contexts"]),
@@ -89,7 +95,7 @@ class RagChain:
         history: list[dict[str, str]] | None = None,
     ) -> dict:
         """Run retrieval independently so callers can stream generation."""
-        history = history or []
+        history = filter_safe_history(history)
         scope = check_scope(question, history)
         if not scope.allowed:
             retrieval_debug = {
@@ -122,6 +128,15 @@ class RagChain:
             for query in queries
         ]
         contexts = fuse_multi_query_results(result_sets, top_k=candidate_count)
+        unsafe_context_count = sum(
+            contains_prompt_injection(str(context.get("text", "")))
+            for context in contexts
+        )
+        contexts = [
+            context
+            for context in contexts
+            if not contains_prompt_injection(str(context.get("text", "")))
+        ]
         retrieved_chunks = [
             _debug_chunk(context, rank)
             for rank, context in enumerate(contexts, start=1)
@@ -149,6 +164,7 @@ class RagChain:
             "selected_chunks": selected_chunks,
             "strong_context": strong_context,
             "guardrail": {"allowed": True, "reason": scope.reason},
+            "unsafe_contexts_removed": unsafe_context_count,
         }
         return {
             "contexts": contexts,

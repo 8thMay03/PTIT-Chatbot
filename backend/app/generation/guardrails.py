@@ -99,11 +99,23 @@ FOLLOW_UP_PATTERNS = (
 BLOCKED_PATTERNS = (
     ("code_generation", r"\b(?:viết|tạo|sinh|làm)\s+(?:cho\s+(?:tôi|mình|em)\s+)?(?:mã|code|script|chương trình)\b"),
     ("code_generation", r"\b(?:python|javascript|java|c\+\+|html|css|sql)\b.*\b(?:code|mã|script|lập trình)\b"),
-    ("prompt_injection", r"\b(?:bỏ qua|quên đi|phớt lờ)\b.*\b(?:hướng dẫn|chỉ dẫn|prompt|quy tắc)\b"),
-    ("prompt_injection", r"\b(?:system prompt|developer message|chỉ dẫn hệ thống)\b"),
     ("creative_request", r"\b(?:viết|sáng tác)\s+(?:một\s+)?(?:bài thơ|truyện|kịch bản|bài hát)\b"),
     ("general_task", r"\b(?:dịch|tóm tắt)\s+(?:đoạn|văn bản|bài viết)\s+(?:này|sau)\b"),
     ("general_task", r"\b(?:giải|làm)\s+(?:giúp\s+)?(?:bài toán|bài tập lập trình)\b"),
+)
+
+PROMPT_INJECTION_PATTERNS = (
+    r"\b(?:bỏ qua|quên đi|phớt lờ|ghi đè|vô hiệu hóa|không tuân theo)\b.{0,120}\b(?:hướng dẫn|chỉ dẫn|prompt|quy tắc|yêu cầu|nội dung phía trên|lệnh trước)\b",
+    r"\b(?:ignore|forget|disregard|override|bypass|do not follow)\b.{0,120}\b(?:previous|prior|above|all|system|developer|instructions?|rules?|prompts?|messages?)\b",
+    r"\b(?:hiển thị|tiết lộ|in ra|đọc lại|lặp lại|cho (?:tôi|mình) xem)\b.{0,100}\b(?:system prompt|developer message|chỉ dẫn hệ thống|prompt hệ thống|quy tắc nội bộ|hướng dẫn ẩn)\b",
+    r"\b(?:show|reveal|print|repeat|recite|expose|output)\b.{0,100}\b(?:system prompt|developer message|hidden instructions?|internal rules?|initial prompt)\b",
+    r"\b(?:what are|tell me|list)\b.{0,60}\b(?:your instructions|your system prompt|hidden rules)\b",
+    r"\b(?:jailbreak|developer mode|dan mode|do anything now|unrestricted mode)\b",
+    r"\b(?:đóng vai|giả vờ là|hãy là|act as|pretend to be|roleplay as)\b.{0,100}\b(?:system|developer|không giới hạn|unrestricted|dan|không có quy tắc)\b",
+    r"(?:\[|<|#{1,6}\s*)(?:system|developer|assistant)(?:\]|>|\s*:)",
+    r"\b(?:api key|openai_api_key|mật khẩu|password|secret key|biến môi trường|environment variables?)\b.{0,80}\b(?:hiển thị|tiết lộ|đọc|show|reveal|print|output)\b",
+    r"\b(?:hiển thị|tiết lộ|đọc|show|reveal|print|output)\b.{0,80}\b(?:api key|openai_api_key|mật khẩu|password|secret key|biến môi trường|environment variables?)\b",
+    r"\b(?:decode|giải mã)\b.{0,80}\bbase(?:64|6a)\b.{0,80}\b(?:follow|execute|thực hiện|làm theo)\b",
 )
 
 
@@ -115,6 +127,10 @@ def check_scope(
     normalized = _normalize(question)
     if not normalized:
         return ScopeDecision(False, "empty")
+
+    security_text = _security_normalize(question)
+    if contains_prompt_injection(security_text, normalized=True):
+        return ScopeDecision(False, "prompt_injection")
 
     for reason, pattern in BLOCKED_PATTERNS:
         if re.search(pattern, normalized):
@@ -141,3 +157,29 @@ def _contains_domain_term(text: str) -> bool:
 
 def _normalize(value: str) -> str:
     return " ".join(unicodedata.normalize("NFKC", value).casefold().split())
+
+
+def filter_safe_history(history: list[dict[str, str]] | None) -> list[dict[str, str]]:
+    """Remove prior user messages containing injection attempts before prompting an LLM."""
+    safe: list[dict[str, str]] = []
+    for message in history or []:
+        content = str(message.get("content", ""))
+        if message.get("role") == "user" and contains_prompt_injection(content):
+            continue
+        safe.append(message)
+    return safe
+
+
+def contains_prompt_injection(value: str, *, normalized: bool = False) -> bool:
+    """Return whether untrusted text contains a known prompt-injection pattern."""
+    security_text = value if normalized else _security_normalize(value)
+    return any(re.search(pattern, security_text) for pattern in PROMPT_INJECTION_PATTERNS)
+
+
+def _security_normalize(value: str) -> str:
+    """Normalize common Unicode, spacing and leetspeak obfuscation for security matching."""
+    normalized = unicodedata.normalize("NFKC", value).casefold()
+    normalized = re.sub(r"[\u200b-\u200f\u2060\ufeff]", "", normalized)
+    normalized = normalized.translate(str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t"}))
+    normalized = re.sub(r"[^\w+#<>\[\]]+", " ", normalized, flags=re.UNICODE)
+    return " ".join(normalized.split())
