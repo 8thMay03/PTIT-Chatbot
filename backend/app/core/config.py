@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
     ragas_judge_model: str = Field(default="gpt-4.1-mini", alias="RAGAS_JUDGE_MODEL")
+    ragas_embedding_model: str = Field(
+        default="text-embedding-3-small",
+        alias="RAGAS_EMBEDDING_MODEL",
+    )
 
     embedding_provider: str = Field(default="openai", alias="EMBEDDING_PROVIDER")
     embedding_model: str = Field(

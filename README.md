@@ -443,13 +443,16 @@ python -m scripts.evaluate_ragas `
   --dataset tests/fixtures/ptit_ragas_100.json `
   --top-k 4 `
   --judge-model gpt-4.1-mini `
+  --embedding-model text-embedding-3-small `
   --output ragas-report-100.json
 ```
 
 Các metric:
 
 - `context_precision`: context được lấy về có liên quan và được xếp hạng tốt hay không.
+- `context_recall`: context lấy về bao phủ được bao nhiêu thông tin trong reference answer.
 - `faithfulness`: các nhận định trong câu trả lời có được context hỗ trợ hay không.
+- `answer_relevancy`: câu trả lời có tập trung và liên quan đến câu hỏi hay không.
 - `answer_correctness`: câu trả lời có đúng so với reference answer hay không.
 - `ragas_score`: trung bình các metric hợp lệ phía trên.
 

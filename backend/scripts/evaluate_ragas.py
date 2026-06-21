@@ -16,8 +16,14 @@ from app.core.config import settings
 from app.generation.rag_chain import RagChain, rag_chain
 
 
-DEFAULT_DATASET = Path(__file__).parents[1] / "tests" / "fixtures" / "ptit_ragas_100.json"
-METRIC_NAMES = ("context_precision", "faithfulness", "answer_correctness")
+DEFAULT_DATASET = Path(__file__).parents[1] / "tests" / "fixtures" / "ptit_faq.json"
+METRIC_NAMES = (
+    "context_precision",
+    "context_recall",
+    "faithfulness",
+    "answer_relevancy",
+    "answer_correctness",
+)
 
 
 @dataclass(frozen=True)
@@ -106,15 +112,22 @@ def build_sample(case: dict, chain: RagChain, top_k: int) -> dict:
     }
 
 
-def create_metrics(judge_model: str, api_key: str) -> dict[str, Any]:
+def create_metrics(
+    judge_model: str,
+    embedding_model: str,
+    api_key: str,
+) -> dict[str, Any]:
     """Create modern Ragas metrics backed by one OpenAI judge model."""
 
     try:
         from openai import AsyncOpenAI
+        from ragas.embeddings.base import embedding_factory
         from ragas.llms import llm_factory
         from ragas.metrics.collections import (
             AnswerCorrectness,
+            AnswerRelevancy,
             ContextPrecision,
+            ContextRecall,
             Faithfulness,
         )
     except ImportError as exc:
@@ -125,9 +138,16 @@ def create_metrics(judge_model: str, api_key: str) -> dict[str, Any]:
 
     client = AsyncOpenAI(api_key=api_key)
     llm = llm_factory(judge_model, client=client)
+    embeddings = embedding_factory(
+        "openai",
+        model=embedding_model,
+        client=client,
+    )
     return {
         "context_precision": ContextPrecision(llm=llm),
+        "context_recall": ContextRecall(llm=llm),
         "faithfulness": Faithfulness(llm=llm),
+        "answer_relevancy": AnswerRelevancy(llm=llm, embeddings=embeddings),
         # Factual-only scoring avoids an additional embedding model and API call.
         "answer_correctness": AnswerCorrectness(
             llm=llm,
@@ -151,6 +171,14 @@ def _metric_inputs(metric_name: str, sample: dict) -> dict:
             "reference": sample["reference"],
             "retrieved_contexts": sample["retrieved_contexts"],
         }
+    if metric_name == "context_recall":
+        return {
+            "user_input": sample["user_input"],
+            "reference": sample["reference"],
+            "retrieved_contexts": sample["retrieved_contexts"],
+        }
+    if metric_name == "answer_relevancy":
+        return common
     if metric_name == "answer_correctness":
         return {**common, "reference": sample["reference"]}
     raise ValueError(f"Unsupported Ragas metric: {metric_name}")
@@ -284,6 +312,11 @@ def _parse_args() -> argparse.Namespace:
         "--judge-model",
         default=settings.ragas_judge_model,
     )
+    parser.add_argument(
+        "--embedding-model",
+        default=settings.ragas_embedding_model,
+        help="OpenAI embedding model used by answer_relevancy.",
+    )
     parser.add_argument("--output", type=Path, help="Optional JSON report path.")
     parser.add_argument("--fail-below", type=float, help="Fail when ragas_score is below this value.")
     parser.add_argument("--no-progress", action="store_true", help="Disable the progress bar.")
@@ -303,7 +336,11 @@ def main() -> int:
         raise SystemExit("OPENAI_API_KEY is required for Ragas LLM-based metrics.")
 
     dataset = json.loads(args.dataset.read_text(encoding="utf-8"))
-    metrics = create_metrics(args.judge_model, settings.openai_api_key)
+    metrics = create_metrics(
+        args.judge_model,
+        args.embedding_model,
+        settings.openai_api_key,
+    )
     report = asyncio.run(
         evaluate_ragas(
             dataset,
