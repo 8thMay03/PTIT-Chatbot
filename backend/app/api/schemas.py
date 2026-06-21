@@ -6,6 +6,10 @@ class Source(BaseModel):
     source_name: str
     heading: str | None = None
     section_path: str | None = None
+    article: str | None = None
+    clauses: list[str] = Field(default_factory=list)
+    points: list[str] = Field(default_factory=list)
+    locator: str | None = None
 
 
 class ChatRequest(BaseModel):

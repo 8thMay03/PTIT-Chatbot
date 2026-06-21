@@ -33,6 +33,10 @@ def test_public_citations_hide_paths_and_internal_fields() -> None:
             "source_name": "handbook.md",
             "heading": "Tuition",
             "section_path": "Handbook > Tuition",
+            "article": None,
+            "clauses": [],
+            "points": [],
+            "locator": "Tuition",
         }
     ]
 

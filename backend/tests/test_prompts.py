@@ -29,6 +29,7 @@ def test_prompt_uses_clean_deduplicated_citation_numbers() -> None:
     assert "[2]" not in prompt
     assert "C:\\private" not in prompt
     assert "Mỗi nhận định thực tế" in SYSTEM_PROMPT
+    assert "Vị trí trích dẫn: Tuition" in prompt
 
 
 def test_extractive_answer_includes_citations() -> None:

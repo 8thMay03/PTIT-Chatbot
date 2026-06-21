@@ -14,6 +14,7 @@ COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 RUN pip install --upgrade pip \
     && pip install . \
+    && sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
     && chmod +x /usr/local/bin/docker-entrypoint.sh \
     && useradd --create-home --uid 10001 appuser \
     && mkdir -p /app/backend/storage \
@@ -23,6 +24,6 @@ USER appuser
 
 EXPOSE 8000
 
-ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["uvicorn", "app.main:app", "--host", "reload=true", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
