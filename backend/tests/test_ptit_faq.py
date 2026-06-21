@@ -112,7 +112,9 @@ def test_ragas_evaluator_builds_samples_and_aggregates_metrics() -> None:
             FakeChain(),
             {
                 "context_precision": FakeMetric(0.8),
+                "context_recall": FakeMetric(0.6),
                 "faithfulness": FakeMetric(0.9),
+                "answer_relevancy": FakeMetric(1.0),
                 "answer_correctness": FakeMetric(0.7),
             },
             top_k=4,
@@ -120,7 +122,9 @@ def test_ragas_evaluator_builds_samples_and_aggregates_metrics() -> None:
     )
 
     assert report["summary"]["context_precision"] == pytest.approx(0.8)
+    assert report["summary"]["context_recall"] == pytest.approx(0.6)
     assert report["summary"]["faithfulness"] == pytest.approx(0.9)
+    assert report["summary"]["answer_relevancy"] == pytest.approx(1.0)
     assert report["summary"]["answer_correctness"] == pytest.approx(0.7)
     assert report["summary"]["ragas_score"] == pytest.approx(0.8)
     assert report["summary"]["errors"] == 0
