@@ -1,0 +1,46 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      VECTOR_DB_PATH: /app/backend/storage/chroma
+      DATABASE_URL: sqlite:////app/backend/storage/ptit_chatbot.db
+      DOCUMENTS_PATH: /app/data
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      PTIT_AUTO_INGEST: ${PTIT_AUTO_INGEST:-true}
+    volumes:
+      - ./data:/app/data:ro
+      - backend_storage:/app/backend/storage
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "5173:80"
+    restart: unless-stopped
+
+volumes:
+  backend_storage:
+
