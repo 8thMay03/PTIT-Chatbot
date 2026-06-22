@@ -15,7 +15,7 @@ from app.db.repositories import (
     get_recent_conversation_history,
 )
 from app.generation.rag_chain import rag_chain
-from app.generation.guardrails import OUT_OF_SCOPE_ANSWER, filter_safe_history
+from app.guardrails import OUT_OF_SCOPE_ANSWER, filter_safe_history
 from app.generation.citations import public_citations
 from app.generation.llm import _normalize_answer_citations, stream_answer_with_llm
 from app.ingestion import ingestion_pipeline

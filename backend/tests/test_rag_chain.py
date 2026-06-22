@@ -1,5 +1,5 @@
 from app.generation.citations import public_citations
-from app.generation.guardrails import OUT_OF_SCOPE_ANSWER
+from app.guardrails import OUT_OF_SCOPE_ANSWER
 from app.generation.rag_chain import NO_CONTEXT_ANSWER, RagChain
 
 

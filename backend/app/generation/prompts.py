@@ -1,5 +1,5 @@
 from app.generation.citations import numbered_contexts
-from app.generation.guardrails import OUT_OF_SCOPE_ANSWER
+from app.guardrails import OUT_OF_SCOPE_ANSWER
 
 
 SYSTEM_PROMPT = """Bạn là chatbot tư vấn dựa trên tài liệu nội bộ PTIT.

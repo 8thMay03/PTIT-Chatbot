@@ -1,6 +1,6 @@
 from app.core.config import settings
 from app.generation.confidence import has_strong_context
-from app.generation.guardrails import (
+from app.guardrails import (
     OUT_OF_SCOPE_ANSWER,
     check_scope,
     contains_prompt_injection,
