@@ -1,5 +1,5 @@
 from app.generation.llm import _extractive_answer, _normalize_answer_citations
-from app.generation.guardrails import OUT_OF_SCOPE_ANSWER
+from app.guardrails import OUT_OF_SCOPE_ANSWER
 from app.generation.prompts import SYSTEM_PROMPT, build_context_prompt
 
 

@@ -1,6 +1,6 @@
 import pytest
 
-from app.generation.guardrails import check_scope, contains_prompt_injection, filter_safe_history
+from app.guardrails import check_scope, contains_prompt_injection, filter_safe_history
 
 
 def test_guardrail_blocks_code_generation() -> None:

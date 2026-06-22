@@ -3,7 +3,7 @@ from collections.abc import Iterator
 
 from app.core.config import settings
 from app.generation.citations import numbered_contexts, public_citations
-from app.generation.guardrails import OUT_OF_SCOPE_ANSWER
+from app.guardrails import OUT_OF_SCOPE_ANSWER
 from app.generation.prompts import SYSTEM_PROMPT, build_context_prompt
 
 
