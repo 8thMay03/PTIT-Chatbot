@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     documents_path: Path = Field(default=Path("data"), alias="DOCUMENTS_PATH")
     chunk_size: int = Field(default=900, alias="CHUNK_SIZE")
     chunk_overlap: int = Field(default=150, alias="CHUNK_OVERLAP")
+    parent_child_chunking_enabled: bool = Field(
+        default=True,
+        alias="PARENT_CHILD_CHUNKING_ENABLED",
+    )
+    child_chunk_size: int = Field(default=450, ge=100, alias="CHILD_CHUNK_SIZE")
+    child_chunk_overlap: int = Field(default=75, ge=0, alias="CHILD_CHUNK_OVERLAP")
     hybrid_vector_weight: float = Field(default=0.65, ge=0, le=1, alias="HYBRID_VECTOR_WEIGHT")
     hybrid_candidate_multiplier: int = Field(default=4, ge=1, alias="HYBRID_CANDIDATE_MULTIPLIER")
     hybrid_rrf_k: int = Field(default=60, ge=1, alias="HYBRID_RRF_K")
