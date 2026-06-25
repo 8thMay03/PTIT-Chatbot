@@ -60,5 +60,12 @@ def test_system_prompt_enforces_ptit_scope_and_blocks_code_generation() -> None:
     assert "Không viết mã nguồn" in SYSTEM_PROMPT
 
 
+def test_system_prompt_prioritizes_relevant_and_complete_answers() -> None:
+    assert "Đưa câu trả lời chính ngay ở câu đầu tiên" in SYSTEM_PROMPT
+    assert "Loại bỏ mọi câu không trực tiếp giúp trả lời câu hỏi" in SYSTEM_PROMPT
+    assert "Kiểm tra câu trả lời cuối cùng đã trả lời đủ từng ý" in SYSTEM_PROMPT
+    assert "không tóm tắt toàn bộ ngữ cảnh" in SYSTEM_PROMPT
+
+
 def test_out_of_scope_refusal_does_not_receive_a_citation() -> None:
     assert _normalize_answer_citations(OUT_OF_SCOPE_ANSWER, _contexts()) == OUT_OF_SCOPE_ANSWER
