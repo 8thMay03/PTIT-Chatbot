@@ -169,15 +169,32 @@ def create_metrics(
         model=embedding_model,
         client=client,
     )
+    answer_relevancy = AnswerRelevancy(
+        llm=llm,
+        embeddings=embeddings,
+        strictness=3,
+    )
+    # The stock prompt uses English examples and can generate English questions
+    # from Vietnamese responses, which artificially lowers cosine similarity.
+    answer_relevancy.prompt.instruction = """
+Từ câu trả lời được cung cấp, hãy tạo đúng một câu hỏi mà câu trả lời đó trực tiếp giải đáp.
+Câu hỏi tạo ra BẮT BUỘC phải bằng tiếng Việt và giữ nguyên các tên riêng, thuật ngữ,
+mốc thời gian, đối tượng và phạm vi xuất hiện trong câu trả lời.
+Đặt noncommittal là 1 nếu câu trả lời né tránh, mơ hồ hoặc không đưa ra thông tin trả lời;
+ngược lại đặt là 0. Chỉ đánh giá nội dung, bỏ qua các ký hiệu trích dẫn dạng [1], [2].
+""".strip()
+
     return {
         "context_precision": ContextPrecision(llm=llm),
         "context_recall": ContextRecall(llm=llm),
         "faithfulness": Faithfulness(llm=llm),
-        "answer_relevancy": AnswerRelevancy(llm=llm, embeddings=embeddings),
-        # Factual-only scoring avoids an additional embedding model and API call.
+        "answer_relevancy": answer_relevancy,
+        # Standard Ragas scoring combines factual overlap and semantic
+        # similarity, avoiding excessive penalties for equivalent paraphrases.
         "answer_correctness": AnswerCorrectness(
             llm=llm,
-            weights=[1.0, 0.0],
+            embeddings=embeddings,
+            weights=[0.75, 0.25],
         ),
     }
 

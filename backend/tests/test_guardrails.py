@@ -21,6 +21,11 @@ def test_guardrail_allows_student_handbook_question() -> None:
     assert check_scope("Điều kiện xét học bổng của sinh viên là gì?").allowed is True
 
 
+def test_guardrail_allows_student_system_and_academic_calendar_questions() -> None:
+    assert check_scope("Đăng nhập lần đầu vào Edusoft Web như thế nào?").allowed is True
+    assert check_scope("Kế hoạch năm học quy định nghỉ Tết bao nhiêu tuần?").allowed is True
+
+
 def test_guardrail_allows_domain_follow_up_from_history() -> None:
     history = [{"role": "user", "content": "Học phí của sinh viên được quy định thế nào?"}]
 

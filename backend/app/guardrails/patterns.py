@@ -17,6 +17,7 @@ DOMAIN_TERMS = (
     "đoàn thanh niên", "công tác sinh viên", "thủ tục", "giấy xác nhận", "chứng chỉ",
     "chuẩn đầu ra", "giảng đường", "giảng viên", "giảng dạy", "lớp học", "vào lớp",
     "khảo thí", "thực tập", "cố vấn học tập", "thời khóa biểu", "lịch học", "lịch thi",
+    "edusoft", "qldt", "s-link", "kế hoạch năm học", "nghỉ tết", "tết nguyên đán",
     "địa chỉ trường", "cơ sở đào tạo", "phòng đào tạo", "trưởng khoa",
     "phó trưởng khoa", "chủ nhiệm khoa", "chủ nhiệm bộ môn", "chủ nhiệm viện",
     "chủ nhiệm phòng", "chủ nhiệm trung tâm",
