@@ -17,6 +17,7 @@ from app.generation.rag_chain import RagChain, rag_chain
 
 
 DEFAULT_DATASET = Path(__file__).parents[1] / "tests" / "fixtures" / "data.json"
+DEFAULT_REPORT = Path(__file__).parents[1] / "report.json"
 METRIC_NAMES = (
     "context_precision",
     "context_recall",
@@ -356,7 +357,12 @@ def _parse_args() -> argparse.Namespace:
         default=settings.ragas_embedding_model,
         help="OpenAI embedding model used by answer_relevancy.",
     )
-    parser.add_argument("--output", type=Path, help="Optional JSON report path.")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_REPORT,
+        help=f"JSON report path (default: {DEFAULT_REPORT}).",
+    )
     parser.add_argument("--fail-below", type=float, help="Fail when ragas_score is below this value.")
     parser.add_argument("--no-progress", action="store_true", help="Disable the progress bar.")
     args = parser.parse_args()
@@ -423,13 +429,12 @@ def main() -> int:
     )
     _print_report(report)
 
-    if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(
-            json.dumps(report, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        print(f"\nWrote JSON report to {args.output}")
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    print(f"\nWrote JSON report to {args.output}")
 
     score = report["summary"]["ragas_score"]
     if report["summary"]["errors"] or score is None:
