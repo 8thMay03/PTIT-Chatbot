@@ -27,7 +27,7 @@ def answer_with_llm(
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": build_context_prompt(question, contexts, history)},
         ],
-        temperature=0.2,
+        temperature=0.0,
     )
     answer = response.choices[0].message.content or ""
     return _normalize_answer_citations(answer, contexts)
