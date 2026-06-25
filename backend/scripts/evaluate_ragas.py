@@ -16,7 +16,7 @@ from app.core.config import settings
 from app.generation.rag_chain import RagChain, rag_chain
 
 
-DEFAULT_DATASET = Path(__file__).parents[1] / "tests" / "fixtures" / "ptit_faq.json"
+DEFAULT_DATASET = Path(__file__).parents[1] / "tests" / "fixtures" / "data.json"
 METRIC_NAMES = (
     "context_precision",
     "context_recall",
@@ -35,6 +35,9 @@ class RagasCaseResult:
     response: str
     retrieved_contexts: list[str]
     reference: str
+    reference_context: str
+    question_type: str
+    difficulty: str
     scores: dict[str, float | None]
     errors: dict[str, str]
 
@@ -91,24 +94,46 @@ def _format_duration(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes:02d}:{seconds:02d}"
 
 
-def build_sample(case: dict, chain: RagChain, top_k: int) -> dict:
+def normalize_case(case: dict, case_number: int | None = None) -> dict:
+    """Normalize both the legacy fixture format and the Ragas dataset format."""
+
+    user_input = str(case.get("user_input") or case.get("question") or "").strip()
+    reference = str(case.get("reference") or case.get("reference_answer") or "").strip()
+    case_id = str(case.get("id") or f"case_{case_number or 1:04d}")
+
+    if not user_input:
+        raise ValueError(f"Case {case_id!r} has no user_input")
+    if not reference:
+        raise ValueError(f"Case {case_id!r} has no reference")
+
+    return {
+        "id": case_id,
+        "user_input": user_input,
+        "reference": reference,
+        "reference_context": str(case.get("reference_context", "")).strip(),
+        "question_type": str(case.get("question_type", "")).strip(),
+        "difficulty": str(case.get("difficulty", "")).strip(),
+    }
+
+
+def build_sample(
+    case: dict,
+    chain: RagChain,
+    top_k: int,
+    case_number: int | None = None,
+) -> dict:
     """Run one question through the application and build a Ragas-compatible sample."""
 
-    reference = str(case.get("reference_answer", "")).strip()
-    if not reference:
-        raise ValueError(f"Case {case.get('id', '<unknown>')!r} has no reference_answer")
-
-    result = chain.answer(str(case["question"]), top_k=top_k)
+    normalized = normalize_case(case, case_number)
+    result = chain.answer(normalized["user_input"], top_k=top_k)
     return {
-        "id": str(case["id"]),
-        "user_input": str(case["question"]),
+        **normalized,
         "response": str(result.get("answer", "")),
         "retrieved_contexts": [
             str(context.get("text", ""))
             for context in result.get("contexts", [])
             if context.get("text")
         ],
-        "reference": reference,
     }
 
 
@@ -212,6 +237,9 @@ async def score_sample(
         response=sample["response"],
         retrieved_contexts=sample["retrieved_contexts"],
         reference=sample["reference"],
+        reference_context=sample["reference_context"],
+        question_type=sample["question_type"],
+        difficulty=sample["difficulty"],
         scores=scores,
         errors=errors,
     )
@@ -229,11 +257,11 @@ async def evaluate_ragas(
     results: list[RagasCaseResult] = []
     progress = EvaluationProgress(len(dataset), len(metrics)) if show_progress else None
     for case_number, case in enumerate(dataset, start=1):
-        case_id = str(case.get("id", "<unknown>"))
+        case_id = str(case.get("id") or f"case_{case_number:04d}")
         try:
             if progress:
                 progress.show(case_number, case_id, "pipeline")
-            sample = build_sample(case, chain, top_k)
+            sample = build_sample(case, chain, top_k, case_number)
             if progress:
                 progress.advance(case_number, case_id, "pipeline done")
 
@@ -247,13 +275,24 @@ async def evaluate_ragas(
 
             results.append(await score_sample(sample, metrics, update_progress))
         except Exception as exc:
+            normalized = {
+                "id": case_id,
+                "user_input": str(case.get("user_input") or case.get("question") or ""),
+                "reference": str(case.get("reference") or case.get("reference_answer") or ""),
+                "reference_context": str(case.get("reference_context", "")),
+                "question_type": str(case.get("question_type", "")),
+                "difficulty": str(case.get("difficulty", "")),
+            }
             results.append(
                 RagasCaseResult(
-                    id=str(case.get("id", "<unknown>")),
-                    question=str(case.get("question", "")),
+                    id=normalized["id"],
+                    question=normalized["user_input"],
                     response="",
                     retrieved_contexts=[],
-                    reference=str(case.get("reference_answer", "")),
+                    reference=normalized["reference"],
+                    reference_context=normalized["reference_context"],
+                    question_type=normalized["question_type"],
+                    difficulty=normalized["difficulty"],
                     scores={name: None for name in metrics},
                     errors={"pipeline": f"{type(exc).__name__}: {exc}"},
                 )
@@ -328,6 +367,38 @@ def _parse_args() -> argparse.Namespace:
     return args
 
 
+def load_dataset(path: Path) -> list[dict]:
+    """Load a JSON array, a wrapped JSON object, or a Markdown JSON code block."""
+
+    raw = path.read_text(encoding="utf-8").strip()
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        start = raw.find("```json")
+        if start == -1:
+            start = raw.find("```")
+        if start == -1:
+            raise ValueError(f"{path} is not valid JSON")
+        start = raw.find("\n", start) + 1
+        end = raw.find("```", start)
+        if start == 0 or end == -1:
+            raise ValueError(f"{path} contains an incomplete JSON code block")
+        payload = json.loads(raw[start:end].strip())
+
+    if isinstance(payload, dict):
+        for key in ("data", "samples", "cases", "questions"):
+            if isinstance(payload.get(key), list):
+                payload = payload[key]
+                break
+
+    if not isinstance(payload, list) or not all(isinstance(item, dict) for item in payload):
+        raise ValueError(
+            f"{path} must contain a JSON array of objects "
+            "(or an object with data/samples/cases/questions)."
+        )
+    return payload
+
+
 def main() -> int:
     """Run the Ragas evaluation and optionally enforce a CI quality threshold."""
 
@@ -335,7 +406,7 @@ def main() -> int:
     if not settings.openai_api_key:
         raise SystemExit("OPENAI_API_KEY is required for Ragas LLM-based metrics.")
 
-    dataset = json.loads(args.dataset.read_text(encoding="utf-8"))
+    dataset = load_dataset(args.dataset)
     metrics = create_metrics(
         args.judge_model,
         args.embedding_model,
