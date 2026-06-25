@@ -9,7 +9,8 @@ def fuse_multi_query_results(
     for results in result_sets:
         for rank, result in enumerate(results, start=1):
             key = str(
-                result.get("chunk_id")
+                result.get("parent_id")
+                or result.get("chunk_id")
                 or f"{result.get('document_id', '')}:{result.get('chunk_index', '')}"
             )
             entry = fused.setdefault(

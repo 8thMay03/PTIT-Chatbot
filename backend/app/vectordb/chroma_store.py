@@ -48,21 +48,30 @@ class ChromaVectorStore:
         contexts: list[dict] = []
         for document, metadata, distance in zip(documents, metadatas, distances):
             metadata = metadata or {}
-            contexts.append(
-                {
-                    "source": metadata.get("source", ""),
-                    "source_name": metadata.get("source_name", ""),
-                    "document_id": metadata.get("document_id", ""),
-                    "chunk_id": metadata.get("chunk_id", ""),
-                    "heading": metadata.get("heading", ""),
-                    "heading_level": metadata.get("heading_level"),
-                    "section_path": metadata.get("section_path", ""),
-                    "chunk_index": int(metadata.get("chunk_index", 0)),
-                    "text": document or "",
-                    # With cosine space, Chroma distance is 1 - cosine similarity.
-                    "score": 1.0 - float(distance),
-                }
-            )
+            context = {
+                "source": metadata.get("source", ""),
+                "source_name": metadata.get("source_name", ""),
+                "document_id": metadata.get("document_id", ""),
+                "chunk_id": metadata.get("chunk_id", ""),
+                "heading": metadata.get("heading", ""),
+                "heading_level": metadata.get("heading_level"),
+                "section_path": metadata.get("section_path", ""),
+                "chunk_index": int(metadata.get("chunk_index", 0)),
+                "text": document or "",
+                # With cosine space, Chroma distance is 1 - cosine similarity.
+                "score": 1.0 - float(distance),
+            }
+            if metadata.get("parent_id"):
+                context.update(
+                    {
+                        "parent_id": metadata["parent_id"],
+                        "parent_index": int(metadata.get("parent_index", 0)),
+                        "child_index": int(metadata.get("child_index", 0)),
+                        "parent_text": metadata.get("parent_text", document or ""),
+                        "chunk_type": metadata.get("chunk_type", "child"),
+                    }
+                )
+            contexts.append(context)
 
         return contexts
 

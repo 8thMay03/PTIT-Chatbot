@@ -41,3 +41,16 @@ def test_citation_falls_back_to_heading_when_no_legal_locator_exists() -> None:
 
     assert citation["article"] is None
     assert citation["locator"] == "Lịch tiếp sinh viên"
+
+
+def test_parent_context_uses_child_evidence_for_precise_clause_citation() -> None:
+    citation = public_citations([{
+        "source_name": "so-tay.md",
+        "heading": "Điều 12. Thu học phí",
+        "section_path": "Quy định > Điều 12. Thu học phí",
+        "text": "1. Học phí được thu hàng tháng.\n\n2. Thời hạn do Học viện quy định.",
+        "evidence_text": "2. Thời hạn do Học viện quy định.",
+    }])[0]
+
+    assert citation["clauses"] == ["2"]
+    assert citation["locator"] == "Điều 12. Thu học phí — Khoản 2"

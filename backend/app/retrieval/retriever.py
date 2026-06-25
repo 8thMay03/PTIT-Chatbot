@@ -2,6 +2,7 @@ from app.core.config import settings
 from app.embeddings import EmbeddingModel, create_embedding_model
 from app.retrieval.bm25 import BM25Search
 from app.retrieval.hybrid import reciprocal_rank_fusion
+from app.retrieval.parent_child import collapse_parent_results
 from app.vectordb import ChromaVectorStore, VectorStore
 
 
@@ -21,13 +22,14 @@ class Retriever:
         query_embedding = self.embedding_model.embed([query])[0]
         vector_results = self.vector_store.search(query_embedding, top_k=candidate_count)
         keyword_results = self.keyword_search.search(query, top_k=candidate_count)
-        return reciprocal_rank_fusion(
+        fused_children = reciprocal_rank_fusion(
             vector_results,
             keyword_results,
-            top_k=top_k,
+            top_k=candidate_count,
             vector_weight=settings.hybrid_vector_weight,
             rank_constant=settings.hybrid_rrf_k,
         )
+        return collapse_parent_results(fused_children, top_k=top_k)
 
 
 retriever = Retriever()

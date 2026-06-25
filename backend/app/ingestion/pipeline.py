@@ -5,7 +5,7 @@ from app.core.config import PROJECT_ROOT, settings
 from app.db.repositories import ChunkRecord, DocumentRecord, replace_knowledge_base
 from app.db.session import SessionLocal, init_db
 from app.embeddings import EmbeddingModel, create_embedding_model
-from app.ingestion.chunker import split_text
+from app.ingestion.chunker import Chunk, ParentChildChunk, split_parent_child, split_text
 from app.ingestion.loaders import load_documents
 from app.retrieval.bm25 import invalidate_bm25_cache
 from app.vectordb import ChromaVectorStore, VectorStore
@@ -62,9 +62,20 @@ class IngestionPipeline:
                 )
             )
 
-            chunks = split_text(document.text, settings.chunk_size, settings.chunk_overlap)
+            chunks = _split_document(document.text)
             for chunk in chunks:
-                chunk_id = _chunk_id(document.path, chunk.index)
+                if isinstance(chunk, ParentChildChunk):
+                    parent_index = chunk.parent_index
+                    child_index = chunk.child_index
+                    parent_id = _parent_id(document.path, parent_index)
+                    chunk_id = _child_id(document.path, parent_index, child_index)
+                    parent_text = chunk.parent_text
+                else:
+                    parent_index = chunk.index
+                    child_index = 0
+                    chunk_id = _chunk_id(document.path, chunk.index)
+                    parent_id = chunk_id
+                    parent_text = chunk.text
                 metadata = {
                     "source": source_path,
                     "source_name": document.path.name,
@@ -74,6 +85,11 @@ class IngestionPipeline:
                     "heading_level": chunk.heading_level,
                     "section_path": chunk.section_path,
                     "chunk_index": chunk.index,
+                    "parent_id": parent_id,
+                    "parent_index": parent_index,
+                    "child_index": child_index,
+                    "parent_text": parent_text,
+                    "chunk_type": "child",
                 }
                 chunk_records.append(
                     ChunkRecord(
@@ -118,6 +134,26 @@ def _estimate_token_count(text: str) -> int:
 
 def _chunk_id(path: Path, chunk_index: int) -> str:
     return f"{_source_path(path)}::chunk-{chunk_index}"
+
+
+def _parent_id(path: Path, parent_index: int) -> str:
+    return f"{_source_path(path)}::parent-{parent_index}"
+
+
+def _child_id(path: Path, parent_index: int, child_index: int) -> str:
+    return f"{_parent_id(path, parent_index)}::child-{child_index}"
+
+
+def _split_document(text: str) -> list[Chunk | ParentChildChunk]:
+    if settings.parent_child_chunking_enabled:
+        return split_parent_child(
+            text,
+            parent_size=settings.chunk_size,
+            parent_overlap=settings.chunk_overlap,
+            child_size=settings.child_chunk_size,
+            child_overlap=settings.child_chunk_overlap,
+        )
+    return split_text(text, settings.chunk_size, settings.chunk_overlap)
 
 
 ingestion_pipeline = IngestionPipeline()

@@ -1,5 +1,6 @@
 from app.retrieval.bm25 import BM25Search, invalidate_bm25_cache, rank_bm25
 from app.retrieval.hybrid import reciprocal_rank_fusion
+from app.retrieval.parent_child import collapse_parent_results
 
 
 def test_bm25_ranks_exact_keyword_match_first() -> None:
@@ -60,3 +61,43 @@ def test_reciprocal_rank_fusion_combines_and_deduplicates_results() -> None:
     assert [result["chunk_id"] for result in results] == ["shared", "semantic", "exact"]
     assert results[0]["vector_score"] == 0.8
     assert results[0]["bm25_score"] == 4.2
+
+
+def test_parent_child_results_collapse_to_parent_with_best_child_evidence() -> None:
+    results = collapse_parent_results(
+        [
+            {
+                "chunk_id": "parent-1::child-0",
+                "parent_id": "parent-1",
+                "text": "Khoản 1 về học phí.",
+                "parent_text": "Điều 10.\nKhoản 1 về học phí.\nKhoản 2 về thời hạn.",
+                "score": 0.7,
+                "vector_score": 0.8,
+            },
+            {
+                "chunk_id": "parent-1::child-1",
+                "parent_id": "parent-1",
+                "text": "Khoản 2 về thời hạn.",
+                "parent_text": "Điều 10.\nKhoản 1 về học phí.\nKhoản 2 về thời hạn.",
+                "score": 0.9,
+                "bm25_score": 4.0,
+            },
+            {
+                "chunk_id": "parent-2::child-0",
+                "parent_id": "parent-2",
+                "text": "Thông tin thư viện.",
+                "parent_text": "Thông tin thư viện.",
+                "score": 0.5,
+            },
+        ],
+        top_k=2,
+    )
+
+    assert len(results) == 2
+    assert results[0]["parent_id"] == "parent-1"
+    assert results[0]["text"].startswith("Điều 10.")
+    assert results[0]["evidence_text"] == "Khoản 2 về thời hạn."
+    assert results[0]["chunk_id"] == "parent-1::child-1"
+    assert results[0]["matched_child_count"] == 2
+    assert results[0]["vector_score"] == 0.8
+    assert results[0]["bm25_score"] == 4.0

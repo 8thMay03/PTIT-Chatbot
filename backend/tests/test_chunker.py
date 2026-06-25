@@ -1,4 +1,4 @@
-from app.ingestion.chunker import split_text
+from app.ingestion.chunker import split_parent_child, split_text
 
 
 def test_split_text_keeps_markdown_section_metadata() -> None:
@@ -104,3 +104,28 @@ def test_split_text_does_not_cut_an_oversized_table_row() -> None:
     assert len(chunks) == 1
     assert long_cell.strip() in chunks[0].text
     assert "| Rule | Description |" in chunks[0].text
+
+
+def test_parent_child_chunking_keeps_large_parent_for_each_small_child() -> None:
+    text = """## Điều 10. Học phí
+
+""" + "\n\n".join(
+        f"{index}. Nội dung quy định học phí dành cho sinh viên trong trường hợp {index}."
+        for index in range(1, 9)
+    )
+
+    chunks = split_parent_child(
+        text,
+        parent_size=360,
+        parent_overlap=40,
+        child_size=150,
+        child_overlap=30,
+    )
+
+    assert len(chunks) > 2
+    assert all(chunk.parent_text for chunk in chunks)
+    assert all(len(chunk.text) <= 150 for chunk in chunks)
+    assert all(len(chunk.parent_text) >= len(chunk.text) for chunk in chunks)
+    assert all(chunk.heading == "Điều 10. Học phí" for chunk in chunks)
+    assert {chunk.parent_index for chunk in chunks} == {0, 1}
+    assert chunks[0].child_index == 0

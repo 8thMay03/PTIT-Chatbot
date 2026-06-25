@@ -94,6 +94,11 @@ class BM25Search:
                     "section_path": metadata.get("section_path", ""),
                     "chunk_index": chunk.chunk_index,
                     "text": chunk.text,
+                    "parent_id": metadata.get("parent_id", chunk.id),
+                    "parent_index": metadata.get("parent_index", chunk.chunk_index),
+                    "child_index": metadata.get("child_index", 0),
+                    "parent_text": metadata.get("parent_text", chunk.text),
+                    "chunk_type": metadata.get("chunk_type", "child"),
                 }
             )
         return snapshots

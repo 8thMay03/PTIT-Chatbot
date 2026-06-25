@@ -34,7 +34,7 @@ def _citation_metadata(context: dict) -> dict:
     source_name = _safe_source_name(context.get("source_name") or context.get("source"))
     section_path = str(context.get("section_path") or "").strip()
     heading = str(context.get("heading") or "").strip()
-    text = str(context.get("text") or "")
+    text = str(context.get("evidence_text") or context.get("text") or "")
     article = _extract_article(heading, section_path, text)
     clauses = _extract_numbered_units(text, r"(\d{1,2})[.)]")
     points = _extract_numbered_units(text, r"([a-zđ])[.)]") if article or clauses else []

@@ -21,6 +21,20 @@ class Section:
     section_path: str = ""
 
 
+@dataclass(frozen=True)
+class ParentChildChunk:
+    """A small searchable child paired with its larger generation parent."""
+
+    text: str
+    index: int
+    parent_text: str
+    parent_index: int
+    child_index: int
+    heading: str = ""
+    heading_level: int | None = None
+    section_path: str = ""
+
+
 def split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[Chunk]:
     """Split raw text into sized chunks while preserving markdown section structure."""
     cleaned = clean_text(text)
@@ -32,6 +46,76 @@ def split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[Chunk]:
         chunks.extend(_split_section(section, chunk_size, chunk_overlap, start_index=len(chunks)))
 
     return chunks
+
+
+def split_parent_child(
+    text: str,
+    parent_size: int,
+    parent_overlap: int,
+    child_size: int,
+    child_overlap: int,
+) -> list[ParentChildChunk]:
+    """Create searchable child chunks while retaining larger parent context."""
+    parents = split_text(text, parent_size, parent_overlap)
+    output: list[ParentChildChunk] = []
+
+    for parent in parents:
+        children = _enforce_child_size(
+            split_text(parent.text, child_size, child_overlap),
+            child_size,
+            child_overlap,
+        )
+        if not children:
+            children = [
+                Chunk(
+                    text=parent.text,
+                    index=0,
+                    heading=parent.heading,
+                    heading_level=parent.heading_level,
+                    section_path=parent.section_path,
+                )
+            ]
+
+        for child_index, child in enumerate(children):
+            output.append(
+                ParentChildChunk(
+                    text=child.text,
+                    index=len(output),
+                    parent_text=parent.text,
+                    parent_index=parent.index,
+                    child_index=child_index,
+                    heading=child.heading or parent.heading,
+                    heading_level=child.heading_level or parent.heading_level,
+                    section_path=child.section_path or parent.section_path,
+                )
+            )
+
+    return output
+
+
+def _enforce_child_size(
+    children: list[Chunk],
+    child_size: int,
+    child_overlap: int,
+) -> list[Chunk]:
+    """Split oversized searchable children while leaving their parent intact."""
+    output: list[Chunk] = []
+    for child in children:
+        if len(child.text) <= child_size:
+            output.append(child)
+            continue
+
+        for piece in _split_long_block(child.text, child_size, child_overlap):
+            output.append(
+                Chunk(
+                    text=piece,
+                    index=len(output),
+                    heading=child.heading,
+                    heading_level=child.heading_level,
+                    section_path=child.section_path,
+                )
+            )
+    return output
 
 
 def _split_markdown_sections(text: str) -> list[Section]:
