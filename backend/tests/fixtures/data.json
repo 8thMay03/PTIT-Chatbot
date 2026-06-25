@@ -1,0 +1,402 @@
+[
+    {
+      "user_input": "Địa chỉ Cơ sở đào tạo Hà Nội của Học viện Công nghệ Bưu chính Viễn thông ở đâu?",
+      "reference": "Km10, Đường Nguyễn Trãi, Hà Đông, Hà Nội.",
+      "reference_context": "- Cơ sở đào tạo Hà Nội: Km10, Đường Nguyễn Trãi, Hà Đông, Hà Nội",
+      "question_type": "factual",
+      "difficulty": "easy",
+      "id": 1
+    },
+    {
+      "user_input": "Học phần tiên quyết được quy định như thế nào?",
+      "reference": "Học phần A là học phần tiên quyết của học phần B, khi sinh viên muốn đăng ký học học phần B thì phải đăng ký và hoàn thành với kết quả “Loại đạt” học phần A.",
+      "reference_context": "c) Học phần tiên quyết: học phần A là học phần tiên quyết của học phần B, khi sinh viên muốn đăng ký học học phần B thì phải đăng ký và hoàn thành với kết quả “Loại đạt” học phần A;",
+      "question_type": "definition",
+      "difficulty": "easy",
+      "id": 2
+    },
+    {
+      "user_input": "Quy trình đăng ký bổ sung hoặc rút bớt học phần bao gồm những bước nào?",
+      "reference": "a) Trong thời gian quy định, sinh viên viết đơn xin bổ sung hoặc rút bớt học phần đã đăng ký và gửi cho phòng Giáo vụ; b) Căn cứ vào đơn của sinh viên và các quy định của Học viện, phòng Giáo vụ xử lý và thông báo kết quả đến sinh viên, giảng viên phụ trách lớp học phần và các đơn vị liên quan; c) Sinh viên có trách nhiệm xem kết quả đăng ký học tập tại phòng Giáo vụ hoặc trên tài khoản cá nhân trực tuyến. Sau khi có kết quả được bổ sung hoặc rút bớt học phần, sinh viên mới được phép đến dự học hoặc không dự lớp.",
+      "reference_context": "4. Quy trình đăng ký bổ sung hoặc rút bớt các học phần\na) Trong thời gian quy định, sinh viên viết đơn xin bổ sung hoặc rút bớt học phần đã đăng ký và gửi cho phòng Giáo vụ;\nb) Căn cứ vào đơn của sinh viên và các quy định của Học viện, phòng Giáo vụ xử lý và thông báo kết quả đến sinh viên, giảng viên phụ trách lớp học phần và các đơn vị liên quan;\nc) Sinh viên có trách nhiệm xem kết quả đăng ký học tập tại phòng Giáo vụ hoặc trên tài khoản cá nhân trực tuyến. Sau khi có kết quả được bổ sung hoặc rút bớt học phần, sinh viên mới được phép đến dự học hoặc không dự lớp.",
+      "question_type": "procedure",
+      "difficulty": "medium",
+      "id": 3
+    },
+    {
+      "user_input": "Hãy so sánh sự khác nhau về thời gian học tập chuẩn toàn khóa của hình thức đào tạo vừa làm vừa học so với hình thức đào tạo chính quy.",
+      "reference": "Thời gian theo kế hoạch học tập chuẩn toàn khóa đối với hình thức đào tạo vừa làm vừa học dài hơn tối thiểu 20% so với hình thức đào tạo chính quy của cùng chương trình đào tạo.",
+      "reference_context": "9. Thời gian theo kế hoạch học tập chuẩn toàn khóa đối với hình thức đào tạo vừa làm vừa học dài hơn tối thiểu 20% so với hình thức đào tạo chính quy của cùng chương trình đào tạo.",
+      "question_type": "comparison",
+      "difficulty": "medium",
+      "id": 4
+    },
+    {
+      "user_input": "Tại sao sinh viên bị xếp lịch học tập trung thời gian không được học quá 4 giờ một ngày cho một học phần?",
+      "reference": "Vì theo quy định của Học viện, trong trường hợp cần thiết phải xếp lịch học tập trung thời gian, số giờ giảng dạy với một học phần bất kỳ không vượt quá 15 giờ/tuần và 4 giờ/ngày.",
+      "reference_context": "Trong trường hợp cần thiết phải xếp lịch học tập trung thời gian, số giờ giảng dạy với một học phần bất kỳ không vượt quá 15 giờ/tuần và 4 giờ/ngày.",
+      "question_type": "reasoning",
+      "difficulty": "hard",
+      "id": 5
+    },
+    {
+      "user_input": "Địa chỉ văn phòng làm việc của Chủ tịch Hội đồng Học viện GS.TS Từ Minh Phương là ở đâu?",
+      "reference": "Km10 - Đường Nguyễn Trãi, Hà Đông, Hà Nội.",
+      "reference_context": "1. Chủ tịch Hội đồng Học viện: GS.TS Từ Minh Phương\nĐịa chỉ văn phòng: Km10 - Đường Nguyễn Trãi, Hà Đông, Hà Nội.",
+      "question_type": "paraphrased",
+      "difficulty": "easy",
+      "id": 6
+    },
+    {
+      "user_input": "Tên tiếng Anh đầy đủ của Học viện Công nghệ Bưu chính Viễn thông là gì?",
+      "reference": "Posts and Telecommunications Institute of Technology",
+      "reference_context": "- Tên tiếng Anh : Posts and Telecommunications Institute of Technology",
+      "question_type": "factual",
+      "difficulty": "easy",
+      "id": 7
+    },
+    {
+      "user_input": "Thế nào là một giờ tín chỉ theo quy định của Học viện?",
+      "reference": "Một giờ tín chỉ được tính bằng 50 phút học tập.",
+      "reference_context": "7. Một giờ tín chỉ được tính bằng 50 phút học tập.",
+      "type": "definition",
+      "difficulty": "easy",
+      "id": 8
+    },
+    {
+      "user_input": "Các bước đăng nhập lần đầu vào hệ thống Edusoft Web được thực hiện như thế nào?",
+      "reference": "Sinh viên đăng nhập vào hệ thống Edusoft Web (http://qldt.ptit.edu.vn) với Tên đăng nhập là mã sinh viên và Mật khẩu là số CMTND/CCCD của sinh viên.",
+      "reference_context": "Đầu tiên, sinh viên cần đăng nhập vào hệ thống Edusoft Web (http://qldt.ptit.edu.vn) với tài khoản cá nhân của sinh viên như sau:\n- Tên đăng nhập là: mã sinh viên , ví dụ: B12DCCN333\n- Mật khẩu (nếu là đăng nhập lần đầu) là: số CMTND/CCCD của sinh viên.",
+      "question_type": "procedure",
+      "difficulty": "medium",
+      "id": 9
+    },
+    {
+      "user_input": "Hãy so sánh mức trần học phí năm học 2021-2022 giữa Khối ngành III và Khối ngành V đối với cơ sở giáo dục đại học công lập chưa tự bảo đảm chi thường xuyên.",
+      "reference": "Mức trần học phí Khối ngành III là 980 nghìn đồng/sinh viên/tháng, còn Khối ngành V là 1.170 nghìn đồng/sinh viên/tháng.",
+      "reference_context": "Khối ngành III: Kinh doanh và quản lý, pháp luật: 980\nKhối ngành V: Toán, thống kê máy tính, công nghệ thông tin...: 1.170",
+      "question_type": "comparison",
+      "difficulty": "medium",
+      "id": 10
+    },
+    {
+      "user_input": "Vì sao tổng số học phí thu theo tín chỉ của cả khóa học không được vượt quá mức học phí quy định cho khóa học nếu thu theo năm học?",
+      "reference": "Vì đây là nguyên tắc bắt buộc khi tổ chức giảng dạy, học tập theo học chế tín chỉ, cơ sở giáo dục có thể quy đổi để thu học phí theo tín chỉ nhưng tổng số học phí không được vượt quá mức quy định cho khóa học nếu thu theo năm học.",
+      "reference_context": "3. In trường hợp tổ chức giảng dạy, học tập theo học chế tín chỉ, cơ sở giáo dục có thể quy đổi để thu học phí theo tín chỉ, tuy nhiên tổng số học phí thu theo tín chỉ của cả khóa học không được vượt quá mức học phí quy định cho khóa học nếu thu theo năm học.",
+      "question_type": "reasoning",
+      "difficulty": "hard",
+      "id": 11
+    },
+    {
+      "user_input": "Lịch tiếp sinh viên của các phòng ban được công bố ở phần mấy trong Sổ tay sinh viên?",
+      "reference": "Phần 4 - Hướng dẫn thủ tục hành chính.",
+      "reference_context": "Phần 4- Hướng dẫn thủ tục hành chính\n- Lịch tiếp sinh viên của các phòng/trung tâm chức năng|184",
+      "question_type": "paraphrased",
+      "difficulty": "easy",
+      "id": 12
+    },
+    {
+      "user_input": "Học viện Công nghệ Bưu chính Viễn thông được thành lập vào ngày tháng năm nào?",
+      "reference": "Ngày 11/07/1997.",
+      "reference_context": "Học viện Công nghệ Bưu chính Viễn thông được thành lập ngày 11/07/1997 trên cơ sở sắp xếp lại 4 đơn vị thành viên của Tập đoàn Bưu chính Viễn thông Việt Nam (VNPT)",
+      "question_type": "factual",
+      "difficulty": "easy",
+      "id": 13
+    },
+    {
+      "user_input": "Khái niệm Học phần tương đương được hiểu như thế nào?",
+      "reference": "Học phần tương đương là một hay một nhóm học phần thuộc chương trình đào tạo của một ngành, chuyên ngành khác đang đào tạo, được phép tích lũy để thay cho một hay một nhóm học phần trong chương trình đào tạo của ngành, chuyên ngành. Học phần tương đương phải có nội dung giống tối thiểu 80% và có số tín chỉ tương đương hoặc lớn hơn so với học phần cần xem xét.",
+      "reference_context": "- Học phần tương đương là một hay một nhóm học phần thuộc chương trình đào tạo của một ngành, chuyên ngành khác đang đào tạo, được phép tích lũy để thay cho một hay một nhóm học phần trong chương trình đào tạo của ngành, chuyên ngành. Học phần tương đương phải có nội dung giống tối thiểu 80% và có số tín chỉ tương đương hoặc lớn her so với học phần cần xem xét;",
+      "question_type": "definition",
+      "difficulty": "medium",
+      "id": 14
+    },
+    {
+      "user_input": "Quy trình thực hiện nộp hồ sơ đề nghị miễn, giảm học phí của sinh viên diễn ra như thế nào về mặt thời gian và hình thức?",
+      "reference": "Trong vòng 45 ngày làm việc kể từ ngày khai giảng năm học, sinh viên nộp Đơn và bản sao chứng thực các giấy tờ minh chứng gửi cơ sở giáo dục theo hình thức nộp trực tiếp hoặc qua bưu điện hoặc hệ thống giao dịch điện tử.",
+      "reference_context": "Trong vòng 45 ngày làm việc kể từ ngày khai giảng năm học... học sinh, sinh viên... nộp Đơn... và bản sao chứng thực hoặc bản sao kèm bản chính để đối chiếu hoặc bản sao từ sổ gốc một trong các giấy tờ được quy định tại khoản 1 Điều này để minh chứng thuộc đối tượng miễn, giảm học phí và hỗ trợ chi phí học tập gửi cơ sở giáo dục theo hình thức nộp trực tiếp hoặc qua bưu điện hoặc hệ thống giao dịch điện tử.",
+      "question_type": "procedure",
+      "difficulty": "hard",
+      "id": 15
+    },
+    {
+      "user_input": "So sánh điều kiện tối thiểu về số lượng sinh viên của một lớp học phần thông thường và một lớp học phần thực hành.",
+      "reference": "Lớp học phần thông thường (thuộc khối kiến thức chung, cơ sở ngành, chuyên ngành) có tối thiểu là 50 sinh viên/lớp học phần, trong khi học phần thực hành có tối thiểu là 25 sinh viên/lớp học phần.",
+      "reference_context": "a) Học phần thuộc khối kiến thức chung... có tối thiểu là 50 sinh viên/lớp học phần...\ne) Học phần thực hành có tối thiểu là 25 sinh viên/lớp học phần;",
+      "question_type": "comparison",
+      "difficulty": "medium",
+      "id": 16
+    },
+    {
+      "user_input": "Tại sao điểm học phần nhận điểm I sau 2 học kỳ tiếp theo không đăng ký thi lại sẽ bị xử lý như thế nào và vì sao?",
+      "reference": "Sẽ bị đổi thành điểm không (0) vì qua hai kỳ tiếp theo sinh viên không đăng ký thi lại các nội dung còn thiếu.",
+      "reference_context": "Qua hai kỳ tiếp theo, nếu sinh viên không đăng ký thi lại thì điểm I sẽ bị đổi thành điểm không (0).",
+      "question_type": "reasoning",
+      "difficulty": "medium",
+      "id": 17
+    },
+    {
+      "user_input": "Mã ngành của ngành An toàn thông tin hệ Đại học chính quy tại Học viện là gì?",
+      "reference": "7480202",
+      "reference_context": "- An toàn thông tin ( mã ngành ĐH: 7480202 );",
+      "question_type": "paraphrased",
+      "difficulty": "easy",
+      "id": 18
+    },
+    {
+      "user_input": "Mức vốn cho vay tối đa đối với học sinh, sinh viên theo Quyết định số 157/2007/QĐ-TTg là bao nhiêu?",
+      "reference": "2.500.000 đồng/tháng/học sinh, sinh viên.",
+      "reference_context": "1. Mức vốn cho vay tối đa là 2.500.000 đồng/tháng/học sinh, sinh viên .",
+      "question_type": "factual",
+      "difficulty": "easy",
+      "id": 19
+    },
+    {
+      "user_input": "Chuẩn đầu ra của chương trình đào tạo được định nghĩa là gì?",
+      "reference": "Chuẩn đầu ra là những nội dung cụ thể hóa mục tiêu của chương trình đào tạo được trình bày thành một danh sách các chuẩn đầu ra đánh giá được; trong đó bao gồm các nội dung và mức độ yêu cầu về kiến thức, kỹ năng, mức độ tự chủ và trách nhiệm, năng lực cần thiết, phẩm chất đạo đức; công việc mà người học có thể đảm nhận sau khi tốt nghiệp và các yêu cầu đặc thù khác đối với từng chương trình và ngành đào tạo.",
+      "reference_context": "1. Chuẩn đầu ra là những nội dung cụ thể hóa mục tiêu của chương trình đào tạo được trình bày thành một danh sách các chuẩn đầu ra đánh giá được; trong đó bao gồm các nội dung và mức độ yêu cầu về kiến thức, kỹ năng, mức độ tự chủ và trách nhiệm, năng lực cần thiết, phẩm chất đạo đức; công việc mà người học có thể đảm nhận sau khi tốt nghiệp và các yêu cầu đặc thù khác đối với từng chương trình và ngành đào tạo.",
+      "question_type": "definition",
+      "difficulty": "hard",
+      "id": 20
+    },
+    {
+      "user_input": "Trình tự xử lý hồ sơ đề nghị miễn, giảm học phí tại cơ sở giáo dục đại học công lập quy định thời gian xét duyệt là bao lâu?",
+      "reference": "Trong vòng 10 ngày làm việc kể từ khi nhận được đơn đề nghị miễn, giảm học phí, Thủ trưởng cơ sở giáo dục đại học công lập có trách nhiệm xét duyệt hồ sơ và quyết định.",
+      "reference_context": "c) Đối với cơ sở giáo dục nghề nghiệp và giáo dục đại học công lập: Trong vòng 10 ngày làm việc kể từ khi nhận được đơn đề nghị miễn, giảm học phí, Thủ trưởng cơ sở giáo dục nghề nghiệp và giáo dục đại học công lập có trách nhiệm xét duyệt hồ sơ và quyết định miễn, giảm học phí đối với học sinh, sinh viên và học viên;",
+      "question_type": "procedure",
+      "difficulty": "medium",
+      "id": 21
+    },
+    {
+      "user_input": "So sánh mức giảm học phí giữa đối tượng học chuyên ngành nhã nhạc cung đình và đối tượng là con cán bộ bị tai nạn lao động hưởng trợ cấp thường xuyên.",
+      "reference": "Đối tượng học chuyên ngành nhã nhạc cung đình được giảm 70% học phí, còn con cán bộ bị tai nạn lao động hưởng trợ cấp thường xuyên được giảm 50% học phí.",
+      "reference_context": "Điều 16. Đối tượng được giảm học phí và hỗ trợ tiền đóng học phí\n1. Các đối tượng được giảm 70% học phí gồm:\n...b) Học sinh, sinh viên học các chuyên ngành nhã nhạc cung đình...\n2. Các đối tượng được giảm 50% học phí gồm:\na) Trẻ em học mẫu giáo và học sinh, sinh viên là con cán bộ, công chức, viên chức, công nhân mà cha hoặc mẹ bị tai nạn lao động hoặc mắc bệnh nghề nghiệp được hưởng trợ cấp thường xuyên;",
+      "question_type": "comparison",
+      "difficulty": "hard",
+      "id": 22
+    },
+    {
+      "user_input": "Vì sao sinh viên không hoàn thành nghĩa vụ đóng học phí lại bị xử lý buộc thôi học?",
+      "reference": "Vì theo quy định xử lý học tập tại Điều 32, không hoàn thành nghĩa vụ đóng học phí theo quy định của Học viện là một trong các trường hợp dẫn đến việc sinh viên bị buộc thôi học.",
+      "reference_context": "2. Buộc thôi học\nSinh viên bị buộc thôi học nếu phạm một trong những trường hợp sau:\n...e) Không hoàn thành nghĩa vụ đóng học phí theo quy định của Học viện;",
+      "question_type": "reasoning",
+      "difficulty": "medium",
+      "id": 23
+    },
+    {
+      "user_input": "Hình thức kỷ luật nào áp dụng cho sinh viên có hành vi nhờ người khác thi hộ lần đầu tiên?",
+      "reference": "Nhận điểm (0) học phần nhờ thi hộ và đình chỉ học tập 1 năm.",
+      "reference_context": "2. Xử lý thi hộ: Áp dụng cho cả người thi hộ và người nhờ thi hộ:\n2.1. Vi phạm lần thứ nhất:\na. Người nhờ thi hộ: nhận điểm (0) học phần nhờ thi hộ và đình chỉ học tập 1 năm.",
+      "question_type": "paraphrased",
+      "difficulty": "easy",
+      "id": 24
+    },
+    {
+      "user_input": "Để đạt chuẩn đầu ra về ngoại ngữ khi tốt nghiệp, sinh viên hệ đại học chính quy cần đạt bao nhiêu điểm TOEIC quốc tế?",
+      "reference": "Đạt trình độ tiếng Anh 450 điểm TOEIC quốc tế hoặc tương đương.",
+      "reference_context": "- Đạt trình độ tiếng Anh 450 điểm TOEIC quốc tế hoặc tương đương;",
+      "question_type": "factual",
+      "difficulty": "easy",
+      "id": 25
+    },
+    {
+      "user_input": "Thế nào là 'Học phần song hành' theo quy định đào tạo của Học viện?",
+      "reference": "Học phần A là học phần song hành của học phần B thì sinh viên có thể theo học trước hoặc đồng thời với học phần B.",
+      "reference_context": "đ) Học phần song hành: Học phần A là học phần song hành của học phần B thì sinh viên có thể theo học trước hoặc đồng thời với học phần B.",
+      "question_type": "definition",
+      "difficulty": "easy",
+      "id": 26
+    },
+    {
+      "user_input": "Quy trình chấm và giải quyết đơn phúc tra điểm thi viết của sinh viên tại Trung tâm Khảo thí diễn ra theo mốc thời gian như thế nào?",
+      "reference": "Trong phạm vi 07 ngày làm việc kể từ khi nhận đơn phúc tra điểm của sinh viên, Trung tâm KT&ĐBCLGD phải tổ chức chấm phúc tra và công bố kết quả phúc tra cho sinh viên.",
+      "reference_context": "4. Trong phạm vi 07 ngày làm việc kể từ khi nhận đơn phúc tra điểm của sinh viên, Trung tâm KT&ĐBCLGD phải tổ chức chấm phúc tra và công bố kết quả phúc tra cho sinh viên.",
+      "question_type": "procedure",
+      "difficulty": "medium",
+      "id": 27
+    },
+    {
+      "user_input": "Hãy so sánh cách tính điểm trung bình chung tích lũy (ĐTBCTL) và điểm trung bình chung học kỳ (ĐTBCHK) về việc có tính điểm các học phần ký hiệu M và R hay không.",
+      "reference": "Điểm trung bình chung học kỳ không tính điểm M và điểm R, trong khi điểm trung bình chung tích lũy có tính cả điểm M và R.",
+      "reference_context": "2. Điểm trung bình chung học kỳ (ĐTBCHK)... không tính điểm M và điểm R.\n3. Điểm trung bình chung tích lũy (ĐTBCTL)\na) Điểm TBCTL... được tính theo điểm học phần của các học phần đạt từ điểm D trở lên mà sinh viên đã đăng ký học (kể cả điểm M và R);",
+      "question_type": "comparison",
+      "difficulty": "hard",
+      "id": 28
+    },
+    {
+      "user_input": "Vì sao kết quả học tập của học kỳ phụ không được dùng để xét các hình thức khen thưởng?",
+      "reference": "Vì quy chế đào tạo quy định rõ kết quả học tập của học kỳ phụ chỉ được tính vào điểm trung bình chung tích lũy chứ không được sử dụng để xét khen thưởng.",
+      "reference_context": "4. Kết quả học tập của học kỳ phụ (nếu có) được tính vào ĐTBCTL nhưng không được sử dụng để xét các hình thức khen thưởng.",
+      "question_type": "reasoning",
+      "difficulty": "easy",
+      "id": 29
+    },
+    {
+      "user_input": "Số điện thoại liên hệ trực tiếp của phòng Giáo vụ Cơ sở đào tạo Hà Nội là số nào?",
+      "reference": "024.38547797",
+      "reference_context": "Phòng Giáo vụ | Tầng 1 - nhà A1 | 024.38547797",
+      "question_type": "paraphrased",
+      "difficulty": "easy",
+      "id": 30
+    },
+    {
+      "user_input": "Số tín chỉ bắt buộc tối thiểu đối với ngành đào tạo cử nhân hệ 4 năm là bao nhiêu?",
+      "reference": "125-130 tín chỉ.",
+      "reference_context": "đối với các ngành đào tạo 4 năm là 125-130 tín chỉ bao gồm Khối kiến thức GDĐC, Khối kiến thức GDCN và Thực tập, thi tốt nghiệp.",
+      "question_type": "factual",
+      "difficulty": "easy",
+      "id": 31
+    },
+    {
+      "user_input": "Định nghĩa về khái niệm 'Tín chỉ' là gì và một tín chỉ lý thuyết được quy đổi ra bao nhiêu tiết?",
+      "reference": "Tín chỉ là đơn vị tính khối lượng học tập của sinh viên. Một tín chỉ được quy định bằng 15 tiết (giờ tín chỉ) lý thuyết.",
+      "reference_context": "6. Tín chỉ (TC) là đơn vị tính khối lượng học tập của sinh viên. Một tín chỉ được quy định bằng 15 tiết (giờ tín chỉ) lý thuyết và 30 giờ tự học, chuẩn bị cá nhân có hướng dẫn;",
+      "question_type": "definition",
+      "difficulty": "medium",
+      "id": 32
+    },
+    {
+      "user_input": "Để đăng ký học chương trình thứ hai (học cùng lúc hai chương trình), sinh viên cần thực hiện thủ tục gì vào thời gian nào?",
+      "reference": "Sinh viên nộp đơn đăng ký học chương trình thứ hai cho phòng Giáo vụ và lệ phí đăng ký cho phòng Tài chính kế toán trước ngày 30 tháng 4 hàng năm; đơn đăng ký học phải có ý kiến và xác nhận của Cố vấn học tập.",
+      "reference_context": "b) Sinh viên đăng ký học chương trình thứ hai tại phòng Giáo vụ theo các bước:\n- Nộp đơn đăng ký học chương trình thứ hai cho phòng Giáo vụ và lệ phí đăng ký cho phòng Tài chính kế toán trước ngày 30 tháng 4 hàng năm; đơn đăng ký học phải có ý kiến và xác nhận của Cố vấn học tập;",
+      "question_type": "procedure",
+      "difficulty": "medium",
+      "id": 33
+    },
+    {
+      "user_input": "So sánh điều kiện xếp hạng học lực loại Xuất sắc và loại Giỏi dựa trên điểm trung bình chung tích lũy.",
+      "reference": "Loại Xuất sắc yêu cầu điểm trung bình chung tích lũy từ 3,60 đến 4,00, còn loại Giỏi yêu cầu từ 3,20 đến 3,59.",
+      "reference_context": "1. Loại XUẤT SẮC: Từ 3,60 đến 4,00\n2. Loại GIỎI: Từ 3,20 đến 3,59",
+      "question_type": "comparison",
+      "difficulty": "easy",
+      "id": 34
+    },
+    {
+      "user_input": "Tại sao sinh viên có điểm trung bình chung tích lũy loại xuất sắc vẫn có thể bị giảm hạng tốt nghiệp xuống loại giỏi?",
+      "reference": "Vì sinh viên thuộc một trong hai trường hợp: Có khối lượng của các học phần bị điểm F và phải học lại vượt quá 5% so với tổng số tín chỉ quy định toàn chương trình, hoặc đã bị kỷ luật trong thời gian học từ mức cảnh cáo ở cấp Học viện trở lên.",
+      "reference_context": "6. Hạng tốt nghiệp của sinh viên có điểm trung bình chung tích lũy loại xuất sắc và giỏi sẽ bị giảm đi một (01) mức nếu thuộc một trong các trường hợp sau:\na) Có khối lượng của các học phần bị điểm F và phải học lại vượt quá 5% so với tổng số tín chỉ theo quy định cho toàn chương trình đào tạo;\nb) Đã bị kỷ luật trong thời gian học từ mức cảnh cáo ở cấp Học viện trở lên trong thời gian học.",
+      "question_type": "reasoning",
+      "difficulty": "hard",
+      "id": 35
+    },
+    {
+      "user_input": "Địa chỉ website chính thức của trang tin phòng Giáo vụ Học viện là gì?",
+      "reference": "http://portal.ptit.edu.vn/giaovu",
+      "reference_context": "- Trang tin phòng Giáo vụ: http://portal.ptit.edu.vn/giaovu",
+      "question_type": "paraphrased",
+      "difficulty": "easy",
+      "id": 36
+    },
+    {
+      "user_input": "Mức lãi suất cho vay ưu đãi đối với học sinh, sinh viên được quy định là bao nhiêu một tháng?",
+      "reference": "0,5%/tháng.",
+      "reference_context": "1. Lãi suất cho vay ưu đãi đối với học sinh, sinh viên là 0,5%/tháng.",
+      "question_type": "factual",
+      "difficulty": "easy",
+      "id": 37
+    },
+    {
+      "user_input": "Học phần thay thế được định nghĩa như thế nào trong hệ thống đào tạo tín chỉ?",
+      "reference": "Học phần thay thế được sử dụng thay thế cho một học phần có trong chương trình đào tạo nhưng nay không còn tổ chức giảng dạy nữa hoặc là một học phần tự chọn thay cho một học phần tự chọn khác mà sinh viên đã thi không đạt kết quả (bị điểm F).",
+      "reference_context": "- Học phần thay thế được sử dụng thay thế cho một học phần có trong chương trình đào tạo nhưng nay không còn tổ chức giảng dạy nữa hoặc là một học phần tự chọn thay cho một học phần tự chọn khác mà sinh viên đã thi không đạt kết quả (bị điểm F);",
+      "question_type": "definition",
+      "difficulty": "medium",
+      "id": 38
+    },
+    {
+      "user_input": "Khi sinh viên muốn khiếu nại về điểm thi kết thúc học phần, họ phải nộp đơn phúc tra trong thời hạn tối đa bao nhiêu ngày?",
+      "reference": "Chậm nhất 10 ngày kể từ ngày công bố điểm.",
+      "reference_context": "3. Thời hạn khiếu nại điểm là chậm nhất 10 ngày kể từ ngày công bố điểm. Sau thời hạn này, mọi yêu cầu khiếu nại điểm đều không được chấp nhập.",
+      "question_type": "procedure",
+      "difficulty": "easy",
+      "id": 39
+    },
+    {
+      "user_input": "So sánh giới hạn khối lượng đăng ký học tập tối đa trong một học kỳ chính giữa chương trình đào tạo cử nhân và kỳ học phụ.",
+      "reference": "Trong học kỳ chính, sinh viên cử nhân được đăng ký tối đa không vượt quá 25 tín chỉ, còn trong kỳ học phụ khối lượng tối đa không vượt quá 12 tín chỉ.",
+      "reference_context": "a) Đối với các chương trình đào tạo cử nhân: khối lượng tối thiểu không thấp hơn 15 tín chỉ và tối đa không vượt quá 25 tín chỉ;\nc) Trong mỗi kỳ học phụ, khối lượng tối ta không vượt quá 12 tín chỉ;",
+      "question_type": "comparison",
+      "difficulty": "medium",
+      "id": 40
+    },
+    {
+      "user_input": "Vì sao sinh viên đăng ký rút bớt học phần sau tuần học thứ 3 của học kỳ chính vẫn phải chịu học phí và nhận điểm F?",
+      "reference": "Vì đã quá thời hạn quy định cho phép đăng ký bổ sung hoặc rút bớt học phần (từ tuần học thứ 2 đến tuần học thứ 3 kể từ ngày bắt đầu học kỳ), các môn học sẽ được giữ nguyên và sinh viên không đi học sẽ bị coi là tự ý bỏ học.",
+      "reference_context": "a) Nếu sinh viên theo học thấy không thể hoàn thành tốt khối lượng học tập đã đăng ký... sinh viên có thể đăng ký bổ sung hoặc rút bớt học phần đã đăng ký trong thời gian từ tuần học thứ 2 đến tuần học thứ 3 kể từ ngày bắt đầu học kỳ...\nb) Ngoài thời hạn trên, các môn học vẫn được giữ nguyên như sinh viên đã đăng ký. Nếu sinh viên không đi học, sinh viên bị coi là tự ý bỏ học, trong trường hợp này, sinh viên vẫn phải chịu học phí và nhận điểm F.",
+      "question_type": "reasoning",
+      "difficulty": "hard",
+      "id": 41
+    },
+    {
+      "user_input": "Để xem lịch thi hoặc lịch thi lại cá nhân trên trang quản lý đào tạo, người dùng cần truy cập vào mục nào?",
+      "reference": "XEM LỊCH THI hoặc XEM LỊCH THI LẠI",
+      "reference_context": "- Chọn “XEM LỊCH THI” hoặc “XEM LỊCH THI LẠI” đề xem lịch thi của sinh viên:",
+      "question_type": "paraphrased",
+      "difficulty": "easy",
+      "id": 42
+    },
+    {
+      "user_input": "Học phần thực tập cuối khóa kéo dài trong thời gian bao nhiêu tuần tại cơ sở?",
+      "reference": "Từ 05 đến 06 tuần.",
+      "reference_context": "b) Thời gian thực tập cuối khóa tại cơ sở là từ 05 đến 06 tuần;",
+      "question_type": "factual",
+      "difficulty": "easy",
+      "id": 43
+    },
+    {
+      "user_input": "Khái niệm 'Học phần bắt buộc' được giải thích như thế nào?",
+      "reference": "Học phần bắt buộc là học phần chứa đựng những nội dung kiến thức chính yếu của chương trình đào tạo đối với từng ngành, chuyên ngành mà tất cả sinh viên thuộc ngành hay chuyên ngành bắt buộc đều phải tích lũy.",
+      "reference_context": "a) Học phần bắt buộc là học phần chứa đựng những nội dung kiến thức chính yếu của chương trình đào tạo đối với từng ngành, chuyên ngành mà tất cả sinh viên thuộc ngành hay chuyên ngành bắt buộc đều phải tích lũy;",
+      "question_type": "definition",
+      "difficulty": "easy",
+      "id": 44
+    },
+    {
+      "user_input": "Quy trình xem điểm thi học kỳ trên ứng dụng PTIT S-Link yêu cầu sinh viên phải thực hiện thao tác bắt buộc nào trước tiên?",
+      "reference": "Sinh viên phải lựa chọn đánh giá Giảng viên của mỗi môn học xong mới xem được điểm thi.",
+      "reference_context": "để xem điểm thi bấm vào môn muốn xem điểm, mỗi môn học sẽ có phần đánh giá Giảng viên, sinh viên phải lựa chọn đánh giá Giảng viên của mỗi môn học xong mới xem được điểm thi.",
+      "question_type": "procedure",
+      "difficulty": "medium",
+      "id": 45
+    },
+    {
+      "user_input": "So sánh hình thức xử lý kỷ luật khi vi phạm lần thứ nhất giữa hành vi khiển trách và hành vi cảnh cáo trong phòng thi.",
+      "reference": "Khiển trách áp dụng đối với sinh viên nhìn bài, trao đổi, thảo luận với người khác và bị trừ 25% số điểm bài thi. Cảnh cáo áp dụng đối với sinh viên trao đổi bài làm, giấy nháp, chép bài hoặc cho sinh viên khác chép bài và bị trừ 50% số điểm bài thi.",
+      "reference_context": "1. Đối với các học phần vi phạm\na. Khiển trách: Trừ 25% số điểm bài thi. Áp dụng đối với những sinh viên phạm lỗi một lần: nhìn bài, trao đổi, thảo luận với người khác.\nb. Cảnh cáo: Trừ 50 % số điểm bài thi. Áp dụng đối với những sinh viên vi phạm một trong các lỗi sau đây: ... trao đổi bài làm, giấy nháp với sinh viên khác; chép bài của sinh viên khác, cho sinh viên khác chép bài.",
+      "question_type": "comparison",
+      "difficulty": "hard",
+      "id": 46
+    },
+    {
+      "user_input": "Vì sao sinh viên đã bị cảnh cáo kết quả học tập mức 2 lại bị đưa vào danh sách xem xét buộc thôi học?",
+      "reference": "Vì kết quả của lần xử lý tiếp theo sau khi bị cảnh cáo mức 2 không được cải thiện, dẫn đến việc nhận cảnh cáo kết quả học tập mức 3.",
+      "reference_context": "5. Cảnh báo kết quả học tập mức 3 áp dụng cho các sinh viên đã bị cảnh báo mức 2 nhưng kết quả của lần xử lý tiếp theo không được cải thiện. Sinh viên bị cảnh báo kết quả học tập mức 3 sẽ bị đưa vào danh sách xem xét buộc thôi học.",
+      "question_type": "reasoning",
+      "difficulty": "medium",
+      "id": 47
+    },
+    {
+      "user_input": "Thời gian nghỉ Tết Nguyên Đán quy định trong kế hoạch năm học 2021-2022 là bao nhiêu tuần?",
+      "reference": "2 tuần",
+      "reference_context": "3 | Nghỉ Tết Nguyên đán | 2 tuần | 24/01 - 06/02/2022",
+      "question_type": "paraphrased",
+      "difficulty": "easy",
+      "id": 48
+    },
+    {
+      "user_input": "Học viện tổ chức xét công nhận tốt nghiệp cho sinh viên làm mấy đợt trong một năm?",
+      "reference": "03 đợt: Đợt 1 vào tháng 2, Đợt 2 vào tháng 8 và Đợt 3 vào tháng 10.",
+      "reference_context": "1. Hàng năm, Học viện xét công nhận tốt nghiệp cho sinh viên đủ điều kiện tốt nghiệp 03 đợt: Đợt 1 vào tháng 2, Đợt 2 vào tháng 8 và Đợt 3 vào tháng 10.",
+      "question_type": "factual",
+      "difficulty": "easy",
+      "id": 49
+    },
+    {
+      "user_input": "Thời hạn chấm và công bố kết quả phúc khảo bài thi viết của giảng viên bộ môn được giới hạn trong bao lâu?",
+      "reference": "Chậm nhất 7 (bảy) ngày kể từ ngày nhận được thông báo, giảng viên phải hoàn thành việc chấm phúc khảo bài thi và lập Bảng điểm chấm phúc khảo.",
+      "reference_context": "b. Chậm nhất 7 (bảy) ngày kể từ ngày nhận được thông báo, giảng viên phải hoàn thành việc chấm phúc khảo bài thi và lập Bảng điểm chấm phúc khảo có đầy đủ các chữ ký của giảng viên chấm phúc khảo và Trưởng bộ môn.",
+      "question_type": "definition",
+      "difficulty": "medium",
+      "id": 50
+    }
+  ]
