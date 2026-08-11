@@ -31,6 +31,11 @@ class ChromaVectorStore:
             embeddings=embeddings,
         )
 
+    def delete(self, ids: list[str]) -> None:
+        if not ids:
+            return
+        self.collection.delete(ids=ids)
+
     def search(self, query_embedding: list[float], top_k: int) -> list[dict]:
         if top_k <= 0:
             return []

@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from pathlib import Path
+
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
@@ -62,6 +64,124 @@ def replace_knowledge_base(
         )
         for chunk in chunks
     )
+
+
+def list_documents(session: Session) -> list[tuple[Document, int]]:
+    chunk_count = func.count(Chunk.id).label("chunk_count")
+    rows = session.execute(
+        select(Document, chunk_count)
+        .outerjoin(Chunk, Chunk.document_id == Document.id)
+        .group_by(Document.id)
+        .order_by(Document.updated_at.desc(), Document.title.asc())
+    ).all()
+    return [(document, count) for document, count in rows]
+
+
+def get_document_with_chunk_count(session: Session, document_id: str) -> tuple[Document, int] | None:
+    chunk_count = func.count(Chunk.id).label("chunk_count")
+    row = session.execute(
+        select(Document, chunk_count)
+        .outerjoin(Chunk, Chunk.document_id == Document.id)
+        .where(Document.id == document_id)
+        .group_by(Document.id)
+    ).first()
+    if row is None:
+        return None
+    return row[0], row[1]
+
+
+def get_document_vector_ids(session: Session, document_id: str) -> list[str]:
+    return list(session.scalars(select(Chunk.vector_id).where(Chunk.document_id == document_id)))
+
+
+def upsert_document(
+    session: Session,
+    document: DocumentRecord,
+    chunks: list[ChunkRecord],
+) -> Document:
+    existing = session.get(Document, document.id)
+    if existing is None:
+        existing = Document(
+            id=document.id,
+            source_path=document.source_path,
+            title=document.title,
+            file_type=document.file_type,
+            content_hash=document.content_hash,
+            status="active",
+            document_metadata=document.metadata,
+        )
+        session.add(existing)
+    else:
+        existing.source_path = document.source_path
+        existing.title = document.title
+        existing.file_type = document.file_type
+        existing.content_hash = document.content_hash
+        existing.status = "active"
+        existing.document_metadata = document.metadata
+        existing.updated_at = datetime.now(timezone.utc)
+        session.execute(delete(Chunk).where(Chunk.document_id == document.id))
+
+    session.flush()
+    session.add_all(
+        Chunk(
+            id=chunk.id,
+            document_id=chunk.document_id,
+            chunk_index=chunk.chunk_index,
+            text=chunk.text,
+            token_count=chunk.token_count,
+            vector_id=chunk.vector_id,
+            chunk_metadata=chunk.metadata,
+        )
+        for chunk in chunks
+    )
+    session.flush()
+    return existing
+
+
+def delete_document(session: Session, document_id: str) -> Document | None:
+    document = session.get(Document, document_id)
+    if document is None:
+        return None
+    session.delete(document)
+    session.flush()
+    return document
+
+
+def get_document_preview_text(session: Session, document_id: str, limit: int = 2500) -> str | None:
+    texts = list(
+        session.scalars(
+            select(Chunk.text)
+            .where(Chunk.document_id == document_id)
+            .order_by(Chunk.chunk_index)
+            .limit(4)
+        )
+    )
+    if not texts:
+        return None
+    joined = "\n\n".join(texts)
+    if len(joined) <= limit:
+        return joined
+    return joined[:limit].rstrip() + "…"
+
+
+def serialize_document(document: Document, chunk_count: int, size_bytes: int | None = None) -> dict:
+    metadata = document.document_metadata or {}
+    file_name = Path(document.source_path).name
+    if size_bytes is None:
+        raw_size = metadata.get("size_bytes")
+        size_bytes = raw_size if isinstance(raw_size, int) else None
+    return {
+        "id": document.id,
+        "title": document.title or Path(document.source_path).stem,
+        "file_name": file_name,
+        "source_path": document.source_path,
+        "file_type": document.file_type,
+        "status": document.status,
+        "chunk_count": chunk_count,
+        "size_bytes": size_bytes,
+        "created_at": document.created_at,
+        "updated_at": document.updated_at,
+    }
 
 
 def ensure_conversation(

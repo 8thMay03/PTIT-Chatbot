@@ -20,9 +20,13 @@ class FakeChromaCollection:
     def __init__(self) -> None:
         self.create_kwargs = {}
         self.add_kwargs = {}
+        self.deleted_ids: list[str] = []
 
     def add(self, **kwargs) -> None:
         self.add_kwargs = kwargs
+
+    def delete(self, ids=None, **kwargs) -> None:
+        self.deleted_ids = list(ids or [])
 
     def query(self, **kwargs):
         self.query_kwargs = kwargs
@@ -83,3 +87,12 @@ def test_chroma_vector_store_search_maps_results(tmp_path: Path) -> None:
             "score": 0.75,
         }
     ]
+
+
+def test_chroma_vector_store_deletes_chunk_ids(tmp_path: Path) -> None:
+    client = FakeChromaClient()
+    store = ChromaVectorStore(tmp_path, client=client)
+
+    store.delete(["chunk-1", "chunk-2"])
+
+    assert client.collection.deleted_ids == ["chunk-1", "chunk-2"]

@@ -12,6 +12,7 @@ dependencies = [
   "rank-bm25>=0.2.2",
   "sqlalchemy>=2.0.30",
   "python-dotenv>=1.0.1",
+  "python-multipart>=0.0.9",
   "uvicorn[standard]>=0.30.0",
 ]
 
