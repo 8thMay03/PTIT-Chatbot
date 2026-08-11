@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -29,3 +31,29 @@ class IngestResponse(BaseModel):
     documents: int
     chunks: int
     collection: str
+
+
+class DocumentItem(BaseModel):
+    id: str
+    title: str
+    file_name: str
+    source_path: str
+    file_type: str | None = None
+    status: str = "active"
+    chunk_count: int = 0
+    size_bytes: int | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class DocumentDetail(DocumentItem):
+    preview: str | None = None
+
+
+class DocumentListResponse(BaseModel):
+    documents: list[DocumentItem]
+
+
+class DocumentDeleteResponse(BaseModel):
+    id: str
+    deleted: bool = True

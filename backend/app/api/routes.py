@@ -1,24 +1,37 @@
 import json
 from collections.abc import Iterator
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.api.schemas import ChatRequest, ChatResponse, IngestResponse
+from app.api.schemas import (
+    ChatRequest,
+    ChatResponse,
+    DocumentDeleteResponse,
+    DocumentDetail,
+    DocumentItem,
+    DocumentListResponse,
+    IngestResponse,
+)
 from app.db import get_session
 from app.core.config import settings
 from app.db.repositories import (
     add_message,
     add_message_sources,
     ensure_conversation,
+    get_document_preview_text,
+    get_document_with_chunk_count,
     get_recent_conversation_history,
+    list_documents,
+    serialize_document,
 )
 from app.generation.rag_chain import rag_chain
 from app.guardrails import OUT_OF_SCOPE_ANSWER, filter_safe_history
 from app.generation.citations import public_citations
 from app.generation.llm import _normalize_answer_citations, stream_answer_with_llm
 from app.ingestion import ingestion_pipeline
+from app.ingestion.uploads import DocumentUploadError, read_preview, resolve_source_path
 
 router = APIRouter()
 
@@ -32,6 +45,68 @@ def health() -> dict[str, str]:
 def ingest() -> IngestResponse:
     result = ingestion_pipeline.ingest_documents()
     return IngestResponse(**result)
+
+
+@router.get("/documents", response_model=DocumentListResponse)
+def get_documents(session: Session = Depends(get_session)) -> DocumentListResponse:
+    documents = [
+        DocumentItem(**_document_payload(document, chunk_count))
+        for document, chunk_count in list_documents(session)
+    ]
+    return DocumentListResponse(documents=documents)
+
+
+@router.get("/documents/{document_id}", response_model=DocumentDetail)
+def get_document(document_id: str, session: Session = Depends(get_session)) -> DocumentDetail:
+    row = get_document_with_chunk_count(session, document_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
+
+    document, chunk_count = row
+    preview = read_preview(document.source_path) or get_document_preview_text(session, document.id)
+    return DocumentDetail(**_document_payload(document, chunk_count), preview=preview)
+
+
+@router.get("/documents/{document_id}/file")
+def download_document(document_id: str, session: Session = Depends(get_session)) -> FileResponse:
+    row = get_document_with_chunk_count(session, document_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
+
+    document, _chunk_count = row
+    path = resolve_source_path(document.source_path)
+    if path is None or not path.is_file():
+        raise HTTPException(status_code=404, detail="File nguồn không còn trên đĩa.")
+
+    return FileResponse(
+        path,
+        filename=path.name,
+        media_type="text/plain; charset=utf-8",
+    )
+
+
+@router.post("/documents", response_model=DocumentItem)
+async def upload_document(file: UploadFile = File(...)) -> DocumentItem:
+    try:
+        payload = ingestion_pipeline.ingest_upload(file.filename or "", await file.read())
+    except DocumentUploadError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return DocumentItem(**payload)
+
+
+@router.delete("/documents/{document_id}", response_model=DocumentDeleteResponse)
+def remove_document(document_id: str) -> DocumentDeleteResponse:
+    result = ingestion_pipeline.delete_ingested_document(document_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
+    return DocumentDeleteResponse(**result)
+
+
+def _document_payload(document, chunk_count: int) -> dict:
+    path = resolve_source_path(document.source_path)
+    size_bytes = path.stat().st_size if path is not None and path.is_file() else None
+    return serialize_document(document, chunk_count, size_bytes)
 
 
 @router.post("/chat", response_model=ChatResponse)

@@ -2,11 +2,20 @@ from pathlib import Path
 from hashlib import sha256
 
 from app.core.config import PROJECT_ROOT, settings
-from app.db.repositories import ChunkRecord, DocumentRecord, replace_knowledge_base
+from app.db.repositories import (
+    ChunkRecord,
+    DocumentRecord,
+    delete_document,
+    get_document_vector_ids,
+    replace_knowledge_base,
+    serialize_document,
+    upsert_document,
+)
 from app.db.session import SessionLocal, init_db
 from app.embeddings import EmbeddingModel, create_embedding_model
 from app.ingestion.chunker import Chunk, ParentChildChunk, split_parent_child, split_text
-from app.ingestion.loaders import load_documents
+from app.ingestion.loaders import SourceDocument, load_documents
+from app.ingestion.uploads import delete_source_file, prepare_upload
 from app.retrieval.bm25 import invalidate_bm25_cache
 from app.vectordb import ChromaVectorStore, VectorStore
 
@@ -42,6 +51,48 @@ class IngestionPipeline:
             "collection": self.vector_store.collection_name,
         }
 
+    def ingest_upload(self, filename: str, content: bytes) -> dict:
+        path = prepare_upload(filename, content, settings.documents_path)
+        return self.ingest_path(path)
+
+    def ingest_path(self, path: Path) -> dict:
+        init_db()
+        text = path.read_text(encoding="utf-8")
+        document_record, chunk_records, chunks_payload = _records_for_document(
+            SourceDocument(path=path, text=text)
+        )
+
+        with SessionLocal() as session:
+            existing_ids = get_document_vector_ids(session, document_record.id)
+            if existing_ids:
+                self.vector_store.delete(existing_ids)
+            stored = upsert_document(session, document_record, chunk_records)
+            session.commit()
+            session.refresh(stored)
+            document_item = serialize_document(stored, len(chunk_records), _file_size(path))
+
+        if chunks_payload:
+            embeddings = self.embedding_model.embed([chunk["text"] for chunk in chunks_payload])
+            self.vector_store.add(chunks_payload, embeddings)
+
+        invalidate_bm25_cache()
+        return document_item
+
+    def delete_ingested_document(self, document_id: str) -> dict | None:
+        init_db()
+        with SessionLocal() as session:
+            vector_ids = get_document_vector_ids(session, document_id)
+            document = delete_document(session, document_id)
+            if document is None:
+                return None
+            source_path = document.source_path
+            self.vector_store.delete(vector_ids)
+            session.commit()
+
+        delete_source_file(source_path)
+        invalidate_bm25_cache()
+        return {"id": document_id, "deleted": True}
+
     def build_chunks(self) -> tuple[list[DocumentRecord], list[ChunkRecord], list[dict]]:
         documents = load_documents(settings.documents_path)
         document_records: list[DocumentRecord] = []
@@ -49,68 +100,88 @@ class IngestionPipeline:
         chunks_payload: list[dict] = []
 
         for document in documents:
-            document_id = _document_id(document.path)
-            source_path = _source_path(document.path)
-            document_records.append(
-                DocumentRecord(
-                    id=document_id,
-                    source_path=source_path,
-                    title=document.path.stem,
-                    file_type=document.path.suffix.lower().lstrip("."),
-                    content_hash=_content_hash(document.text),
-                    metadata={"source": source_path},
-                )
-            )
-
-            chunks = _split_document(document.text)
-            for chunk in chunks:
-                if isinstance(chunk, ParentChildChunk):
-                    parent_index = chunk.parent_index
-                    child_index = chunk.child_index
-                    parent_id = _parent_id(document.path, parent_index)
-                    chunk_id = _child_id(document.path, parent_index, child_index)
-                    parent_text = chunk.parent_text
-                else:
-                    parent_index = chunk.index
-                    child_index = 0
-                    chunk_id = _chunk_id(document.path, chunk.index)
-                    parent_id = chunk_id
-                    parent_text = chunk.text
-                metadata = {
-                    "source": source_path,
-                    "source_name": document.path.name,
-                    "document_id": document_id,
-                    "chunk_id": chunk_id,
-                    "heading": chunk.heading,
-                    "heading_level": chunk.heading_level,
-                    "section_path": chunk.section_path,
-                    "chunk_index": chunk.index,
-                    "parent_id": parent_id,
-                    "parent_index": parent_index,
-                    "child_index": child_index,
-                    "parent_text": parent_text,
-                    "chunk_type": "child",
-                }
-                chunk_records.append(
-                    ChunkRecord(
-                        id=chunk_id,
-                        document_id=document_id,
-                        chunk_index=chunk.index,
-                        text=chunk.text,
-                        token_count=_estimate_token_count(chunk.text),
-                        vector_id=chunk_id,
-                        metadata=metadata,
-                    )
-                )
-                chunks_payload.append(
-                    {
-                        "id": chunk_id,
-                        "text": chunk.text,
-                        "metadata": metadata,
-                    }
-                )
+            record, chunks, payload = _records_for_document(document)
+            document_records.append(record)
+            chunk_records.extend(chunks)
+            chunks_payload.extend(payload)
 
         return document_records, chunk_records, chunks_payload
+
+
+def _records_for_document(document: SourceDocument) -> tuple[DocumentRecord, list[ChunkRecord], list[dict]]:
+    document_id = _document_id(document.path)
+    source_path = _source_path(document.path)
+    size_bytes = _file_size(document.path)
+    document_record = DocumentRecord(
+        id=document_id,
+        source_path=source_path,
+        title=document.path.stem,
+        file_type=document.path.suffix.lower().lstrip("."),
+        content_hash=_content_hash(document.text),
+        metadata={
+            "source": source_path,
+            "file_name": document.path.name,
+            "size_bytes": size_bytes,
+        },
+    )
+
+    chunk_records: list[ChunkRecord] = []
+    chunks_payload: list[dict] = []
+    for chunk in _split_document(document.text):
+        if isinstance(chunk, ParentChildChunk):
+            parent_index = chunk.parent_index
+            child_index = chunk.child_index
+            parent_id = _parent_id(document.path, parent_index)
+            chunk_id = _child_id(document.path, parent_index, child_index)
+            parent_text = chunk.parent_text
+        else:
+            parent_index = chunk.index
+            child_index = 0
+            chunk_id = _chunk_id(document.path, chunk.index)
+            parent_id = chunk_id
+            parent_text = chunk.text
+        metadata = {
+            "source": source_path,
+            "source_name": document.path.name,
+            "document_id": document_id,
+            "chunk_id": chunk_id,
+            "heading": chunk.heading,
+            "heading_level": chunk.heading_level,
+            "section_path": chunk.section_path,
+            "chunk_index": chunk.index,
+            "parent_id": parent_id,
+            "parent_index": parent_index,
+            "child_index": child_index,
+            "parent_text": parent_text,
+            "chunk_type": "child",
+        }
+        chunk_records.append(
+            ChunkRecord(
+                id=chunk_id,
+                document_id=document_id,
+                chunk_index=chunk.index,
+                text=chunk.text,
+                token_count=_estimate_token_count(chunk.text),
+                vector_id=chunk_id,
+                metadata=metadata,
+            )
+        )
+        chunks_payload.append(
+            {
+                "id": chunk_id,
+                "text": chunk.text,
+                "metadata": metadata,
+            }
+        )
+
+    return document_record, chunk_records, chunks_payload
+
+
+def _file_size(path: Path) -> int | None:
+    try:
+        return path.stat().st_size
+    except OSError:
+        return None
 
 
 def _document_id(path: Path) -> str:

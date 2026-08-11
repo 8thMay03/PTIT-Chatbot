@@ -15,6 +15,7 @@ Thay vì để mô hình trả lời hoàn toàn từ kiến thức có sẵn, c
 - Confidence gate từ chối trả lời khi không tìm thấy bằng chứng đủ mạnh.
 - Câu trả lời có citation tới tài liệu, mục, Điều, Khoản hoặc Điểm.
 - Streaming câu trả lời trên giao diện web.
+- Quản lý tài liệu trên giao diện: tải lên, xem trước, tải xuống và xóa.
 - Lưu lịch sử hội thoại và thông tin debug retrieval.
 - Đánh giá chất lượng bằng Ragas.
 
@@ -161,7 +162,7 @@ Backend:
 - Swagger UI: `http://localhost:8000/docs`
 - Health check: `http://localhost:8000/api/health`
 
-Mỗi khi tài liệu trong `data/` thay đổi, chạy lại:
+Có thể nạp tài liệu mới trực tiếp trên giao diện **Tài liệu**, hoặc khi file trong `data/` thay đổi thì chạy lại:
 
 ```powershell
 cd backend

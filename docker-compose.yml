@@ -12,7 +12,7 @@ services:
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       PTIT_AUTO_INGEST: ${PTIT_AUTO_INGEST:-true}
     volumes:
-      - ./data:/app/data:ro
+      - ./data:/app/data
       - ./backend/app:/app/backend/app
       - ./backend/scripts:/app/backend/scripts
       - backend_storage:/app/backend/storage
