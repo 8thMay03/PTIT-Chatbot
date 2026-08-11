@@ -5,10 +5,8 @@ import {
   FileText,
   Files,
   Loader2,
-  MessageSquare,
   RefreshCw,
   Search,
-  Sparkles,
   Trash2,
   Upload,
   X,
@@ -36,7 +34,7 @@ function apiError(payload, fallback) {
   return fallback;
 }
 
-export default function DocumentsView({ onOpenChat, onChanged }) {
+export default function DocumentsView({ onChanged }) {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -211,19 +209,6 @@ export default function DocumentsView({ onOpenChat, onChanged }) {
 
   return (
     <section className="docs-screen">
-      <div className="mobile-topbar">
-        <div className="brand-mark">
-          <Sparkles size={18} />
-        </div>
-        <div>
-          <h1>Tài liệu</h1>
-          <p>Kho tri thức chatbot</p>
-        </div>
-        <button className="icon-btn mobile-nav-btn" onClick={onOpenChat} aria-label="Trò chuyện" title="Trò chuyện">
-          <MessageSquare size={17} />
-        </button>
-      </div>
-
       <header className="docs-header">
         <div>
           <h2>Quản lý tài liệu</h2>

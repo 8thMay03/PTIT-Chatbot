@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { BookOpen, Files, MessageSquare, RefreshCw, Sparkles } from "lucide-react";
+import { BookOpen, Home, RefreshCw, Sparkles } from "lucide-react";
 import ChatView from "./ChatView";
 import DocumentsView from "./DocumentsView";
 import { API_BASE_URL } from "./api";
@@ -33,30 +33,58 @@ export default function App() {
   }
 
   return (
-    <main className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">
-            <Sparkles size={22} />
-          </div>
-          <div>
-            <h1>PTIT Chatbot</h1>
-            <p>Trợ lý sổ tay sinh viên</p>
-          </div>
+    <main className={`app-shell ${view === "documents" ? "view-documents" : "view-chat"}`}>
+      <header className="app-header">
+        <div className="app-header-left">
+          <button className="brand header-brand" onClick={() => setView("chat")} type="button">
+            <div className="brand-mark">
+              <Sparkles size={18} />
+            </div>
+            <div>
+              <h1>PTIT Chatbot</h1>
+              <p>Trợ lý sổ tay sinh viên</p>
+            </div>
+          </button>
         </div>
 
-        <nav className="sidebar-nav">
-          <button className={`nav-item ${view === "chat" ? "active" : ""}`} onClick={() => setView("chat")}>
-            <MessageSquare size={16} />
-            Trò chuyện
+        <nav className="top-nav" aria-label="Điều hướng chính">
+          <button
+            type="button"
+            className="top-nav-home"
+            onClick={() => setView("chat")}
+            aria-label="Trang chủ"
+            title="Trang chủ"
+          >
+            <Home size={16} />
           </button>
-          <button className={`nav-item ${view === "documents" ? "active" : ""}`} onClick={() => setView("documents")}>
-            <Files size={16} />
-            Tài liệu
-            {docCount != null && <span className="nav-badge">{docCount}</span>}
+          <button
+            type="button"
+            className={`top-nav-item ${view === "documents" ? "active" : ""}`}
+            onClick={() => setView("documents")}
+          >
+            Dataset
+            {docCount != null && <span className="top-nav-count">{docCount}</span>}
+          </button>
+          <button
+            type="button"
+            className={`top-nav-item ${view === "chat" ? "active" : ""}`}
+            onClick={() => setView("chat")}
+          >
+            Chat
           </button>
         </nav>
 
+        <div className="app-header-right">
+          {view === "chat" && (
+            <button className="header-new-chat" onClick={startNewChat} disabled={chatLoading} type="button">
+              <RefreshCw size={15} />
+              Cuộc trò chuyện mới
+            </button>
+          )}
+        </div>
+      </header>
+
+      <aside className="sidebar">
         <button className="new-chat-btn" onClick={startNewChat} disabled={chatLoading}>
           <RefreshCw size={16} />
           Cuộc trò chuyện mới
@@ -79,19 +107,17 @@ export default function App() {
           </button>
         </div>
 
-        {view === "chat" && (
-          <div className="sidebar-section">
-            <span className="sidebar-label">Mẹo sử dụng</span>
-            <ul className="tip-list">
-              {SIDEBAR_TIPS.map((tip, index) => (
-                <li key={index}>
-                  <span className="tip-dot" />
-                  <span>{tip}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <div className="sidebar-section">
+          <span className="sidebar-label">Mẹo sử dụng</span>
+          <ul className="tip-list">
+            {SIDEBAR_TIPS.map((tip, index) => (
+              <li key={index}>
+                <span className="tip-dot" />
+                <span>{tip}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
 
         <div className="sidebar-footer">
           Hệ thống <strong>RAG</strong> hybrid retrieval · trả lời kèm citation từ tài liệu chính thức.
@@ -102,10 +128,9 @@ export default function App() {
         <ChatView
           ref={chatRef}
           hidden={view !== "chat"}
-          onOpenDocuments={() => setView("documents")}
           onLoadingChange={setChatLoading}
         />
-        {view === "documents" && <DocumentsView onOpenChat={() => setView("chat")} onChanged={refreshDocCount} />}
+        {view === "documents" && <DocumentsView onChanged={refreshDocCount} />}
       </div>
     </main>
   );

@@ -3,7 +3,6 @@ import {
   BookOpen,
   Check,
   Copy,
-  Files,
   GraduationCap,
   Lightbulb,
   RefreshCw,
@@ -129,7 +128,7 @@ function injectCitations(html, sources) {
   });
 }
 
-const ChatView = forwardRef(function ChatView({ hidden, onOpenDocuments, onLoadingChange }, ref) {
+const ChatView = forwardRef(function ChatView({ hidden, onLoadingChange }, ref) {
   const [messages, setMessages] = useState([
     {
       role: "assistant",
@@ -328,24 +327,6 @@ const ChatView = forwardRef(function ChatView({ hidden, onOpenDocuments, onLoadi
 
   return (
     <section className="chat" hidden={hidden} aria-hidden={hidden}>
-      <div className="mobile-topbar">
-        <div className="brand-mark">
-          <Sparkles size={18} />
-        </div>
-        <div>
-          <h1>PTIT Chatbot</h1>
-          <p>Trợ lý sổ tay sinh viên</p>
-        </div>
-        <button
-          className="icon-btn mobile-nav-btn"
-          onClick={onOpenDocuments}
-          aria-label="Quản lý tài liệu"
-          title="Quản lý tài liệu"
-        >
-          <Files size={17} />
-        </button>
-      </div>
-
       <header className="chat-header">
         <div className="title">
           <span className="status-dot" />
