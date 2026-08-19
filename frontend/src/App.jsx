@@ -49,10 +49,6 @@ export default function App() {
   const NAV_ITEMS = [
     { key: "documents", label: "Dataset" },
     { key: "chat", label: "Chat" },
-    { key: "search", label: "Search" },
-    { key: "agent", label: "Agent" },
-    { key: "memory", label: "Memory" },
-    { key: "file", label: "File" },
   ];
 
   return (
@@ -65,7 +61,6 @@ export default function App() {
             </div>
             <div>
               <h1>PTIT Chatbot</h1>
-              <p>Trợ lý sổ tay sinh viên</p>
             </div>
           </button>
         </div>

@@ -166,21 +166,21 @@ button {
   border-radius: var(--radius-pill);
   border: 0;
   background: transparent;
-  color: #64748b;
+  color: #972635;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .top-nav-home:hover {
   background: #e2e8f0;
-  color: #0f172a;
+  color: #972635;
 }
 
 .top-nav-item {
   border: 0;
   cursor: pointer;
   font: inherit;
-  color: #475569;
+  color: #972635;
   background: transparent;
   height: 32px;
   padding: 0 16px;
@@ -197,9 +197,9 @@ button {
 
 .top-nav-item.active {
   color: #ffffff;
-  background: #0f172a;
+  background: #972635;
   font-weight: 600;
-  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.3);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.3);
 }
 
 .header-icon-link,
@@ -1179,7 +1179,7 @@ button {
   padding: 0 14px;
   border: 0;
   border-radius: 6px;
-  background: #0f172a;
+  background: #972635;
   color: #ffffff;
   font-size: 13px;
   font-weight: 600;
@@ -1188,7 +1188,7 @@ button {
 }
 
 .add-file-btn:hover:not(:disabled) {
-  background: #1e293b;
+  background: #7f1d1d;
 }
 
 .dataset-banner {
@@ -1277,7 +1277,7 @@ button {
 }
 
 .dataset-table tbody tr.is-selected {
-  background: #f0fdf4;
+  background: #fef2f2;
 }
 
 .col-checkbox {
@@ -1288,7 +1288,7 @@ button {
 .col-checkbox input[type="checkbox"] {
   width: 15px;
   height: 15px;
-  accent-color: #0f172a;
+  accent-color: #972635;
   cursor: pointer;
 }
 
@@ -1336,7 +1336,7 @@ button {
 }
 
 .file-name-text:hover {
-  color: #0d9488;
+  color: #972635;
   text-decoration: underline;
 }
 
@@ -1363,7 +1363,7 @@ button {
 }
 
 .toggle-switch.on {
-  background: #0d9488; /* Cyan / Teal switch from screenshot */
+  background: #972635; /* PTIT Red switch */
 }
 
 .toggle-switch.off {
@@ -1422,7 +1422,7 @@ button {
 }
 
 .parse-target-icon {
-  color: #0d9488;
+  color: #972635;
 }
 
 /* Row Action Icons */
@@ -1495,7 +1495,7 @@ button {
 .primary-btn {
   border: 0;
   color: #fff;
-  background: #0f172a;
+  background: #972635;
 }
 
 .ghost-btn {
@@ -1642,7 +1642,7 @@ button {
 }
 
 .edit-form-group input:focus {
-  border-color: #0d9488;
+  border-color: #972635;
 }
 
 /* ---------------- Mobile ---------------- */
