@@ -1,5 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { BookOpen, Home, RefreshCw, Sparkles } from "lucide-react";
+import {
+  BookOpen,
+  ChevronDown,
+  Clock,
+  Disc,
+  Github,
+  Home,
+  Moon,
+  RefreshCw,
+  Sparkles,
+  Sun,
+  User,
+} from "lucide-react";
 import ChatView from "./ChatView";
 import DocumentsView from "./DocumentsView";
 import { API_BASE_URL } from "./api";
@@ -11,9 +23,11 @@ const SIDEBAR_TIPS = [
 ];
 
 export default function App() {
-  const [view, setView] = useState("chat");
+  const [view, setView] = useState("documents");
   const [docCount, setDocCount] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
+  const [lang, setLang] = useState("English");
+  const [theme, setTheme] = useState("light");
   const chatRef = useRef(null);
 
   const refreshDocCount = useCallback(() => {
@@ -32,6 +46,15 @@ export default function App() {
     setView("chat");
   }
 
+  const NAV_ITEMS = [
+    { key: "documents", label: "Dataset" },
+    { key: "chat", label: "Chat" },
+    { key: "search", label: "Search" },
+    { key: "agent", label: "Agent" },
+    { key: "memory", label: "Memory" },
+    { key: "file", label: "File" },
+  ];
+
   return (
     <main className={`app-shell ${view === "documents" ? "view-documents" : "view-chat"}`}>
       <header className="app-header">
@@ -47,40 +70,81 @@ export default function App() {
           </button>
         </div>
 
-        <nav className="top-nav" aria-label="Điều hướng chính">
+        {/* Center Pill Navigation Bar matching screenshot */}
+        <nav className="top-nav" aria-label="Main Navigation">
           <button
             type="button"
             className="top-nav-home"
             onClick={() => setView("chat")}
-            aria-label="Trang chủ"
-            title="Trang chủ"
+            aria-label="Home"
+            title="Home"
           >
-            <Home size={16} />
+            <Home size={15} />
           </button>
-          <button
-            type="button"
-            className={`top-nav-item ${view === "documents" ? "active" : ""}`}
-            onClick={() => setView("documents")}
-          >
-            Dataset
-            {docCount != null && <span className="top-nav-count">{docCount}</span>}
-          </button>
-          <button
-            type="button"
-            className={`top-nav-item ${view === "chat" ? "active" : ""}`}
-            onClick={() => setView("chat")}
-          >
-            Chat
-          </button>
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={`top-nav-item ${view === item.key ? "active" : ""}`}
+              onClick={() => {
+                if (item.key === "documents" || item.key === "chat") {
+                  setView(item.key);
+                }
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
         </nav>
 
+        {/* Right Header Toolbar matching screenshot */}
         <div className="app-header-right">
-          {view === "chat" && (
-            <button className="header-new-chat" onClick={startNewChat} disabled={chatLoading} type="button">
-              <RefreshCw size={15} />
-              Cuộc trò chuyện mới
-            </button>
-          )}
+          <a
+            href="https://discord.com"
+            target="_blank"
+            rel="noreferrer"
+            className="header-icon-link"
+            title="Discord"
+          >
+            <Disc size={16} />
+          </a>
+          <a
+            href="https://github.com"
+            target="_blank"
+            rel="noreferrer"
+            className="header-icon-link"
+            title="GitHub"
+          >
+            <Github size={16} />
+          </a>
+
+          <div className="lang-selector" title="Select Language">
+            <span>{lang}</span>
+            <ChevronDown size={13} />
+          </div>
+
+          <button
+            type="button"
+            className="header-icon-btn"
+            title="History / Clock"
+          >
+            <Clock size={15} />
+          </button>
+
+          <button
+            type="button"
+            className="header-icon-btn"
+            title="Toggle theme"
+            onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+          >
+            {theme === "light" ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+
+          <button type="button" className="user-avatar-btn" title="User Profile">
+            <div className="avatar-gradient">
+              <User size={15} />
+            </div>
+          </button>
         </div>
       </header>
 
@@ -100,7 +164,7 @@ export default function App() {
               <strong>Tài liệu đã nạp</strong>
               <span>
                 {docCount == null
-                  ? "Quản lý file Markdown và TXT"
+                  ? "Quản lý file PDF, MD và TXT"
                   : `${docCount} tài liệu trong chatbot`}
               </span>
             </div>

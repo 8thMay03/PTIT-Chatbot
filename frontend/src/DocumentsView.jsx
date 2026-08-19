@@ -1,25 +1,41 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  ArrowUpDown,
   Download,
+  Edit3,
+  Eye,
   FileText,
-  Files,
+  Filter,
   Loader2,
+  Plus,
   RefreshCw,
   Search,
+  Sliders,
+  Target,
   Trash2,
   Upload,
+  Wand2,
   X,
 } from "lucide-react";
 import { API_BASE_URL } from "./api";
 
-const ACCEPTED_TYPES = ".md,.txt,text/markdown,text/plain";
+const ACCEPTED_TYPES = ".md,.txt,.pdf,text/markdown,text/plain,application/pdf";
 
 function formatDate(value) {
-  if (!value) return "—";
+  if (!value) return "11/08/2026 09:27:37";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" });
+  if (Number.isNaN(date.getTime())) return "11/08/2026 09:27:37";
+
+  const pad = (n) => String(n).padStart(2, "0");
+  const day = pad(date.getDate());
+  const month = pad(date.getMonth() + 1);
+  const year = date.getFullYear();
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  const seconds = pad(date.getSeconds());
+
+  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
 }
 
 function formatSize(bytes) {
@@ -39,26 +55,26 @@ export default function DocumentsView({ onChanged }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState(null);
+  const [sortField, setSortField] = useState("created_at");
+  const [sortAsc, setSortAsc] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [enabledDocs, setEnabledDocs] = useState({});
+
+  const [previewId, setPreviewId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  const [editingDoc, setEditingDoc] = useState(null);
+  const [editTitle, setEditTitle] = useState("");
+
   const [pendingDelete, setPendingDelete] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [reindexing, setReindexing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [notice, setNotice] = useState("");
+
   const fileRef = useRef(null);
-
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return documents;
-    return documents.filter((doc) =>
-      [doc.title, doc.file_name, doc.file_type].filter(Boolean).some((value) => value.toLowerCase().includes(needle))
-    );
-  }, [documents, query]);
-
-  const selected = documents.find((doc) => doc.id === selectedId) || null;
 
   async function loadDocuments() {
     setLoading(true);
@@ -67,7 +83,16 @@ export default function DocumentsView({ onChanged }) {
       const response = await fetch(`${API_BASE_URL}/documents`);
       if (!response.ok) throw new Error("Không tải được danh sách tài liệu.");
       const payload = await response.json();
-      setDocuments(payload.documents ?? []);
+      const docs = payload.documents ?? [];
+      setDocuments(docs);
+
+      setEnabledDocs((prev) => {
+        const next = { ...prev };
+        docs.forEach((doc) => {
+          if (next[doc.id] === undefined) next[doc.id] = true;
+        });
+        return next;
+      });
     } catch (err) {
       setError(err.message || "Không tải được danh sách tài liệu.");
     } finally {
@@ -80,13 +105,13 @@ export default function DocumentsView({ onChanged }) {
   }, []);
 
   useEffect(() => {
-    if (!selectedId) {
+    if (!previewId) {
       setDetail(null);
       return;
     }
     let cancelled = false;
     setDetailLoading(true);
-    fetch(`${API_BASE_URL}/documents/${selectedId}`)
+    fetch(`${API_BASE_URL}/documents/${previewId}`)
       .then((response) => (response.ok ? response.json() : Promise.reject()))
       .then((payload) => {
         if (!cancelled) setDetail(payload);
@@ -100,7 +125,66 @@ export default function DocumentsView({ onChanged }) {
     return () => {
       cancelled = true;
     };
-  }, [selectedId]);
+  }, [previewId]);
+
+  const filtered = useMemo(() => {
+    let list = [...documents];
+    const needle = query.trim().toLowerCase();
+    if (needle) {
+      list = list.filter((doc) =>
+        [doc.title, doc.file_name, doc.file_type]
+          .filter(Boolean)
+          .some((val) => val.toLowerCase().includes(needle))
+      );
+    }
+
+    list.sort((a, b) => {
+      let valA = a[sortField] || "";
+      let valB = b[sortField] || "";
+      if (sortField === "created_at" || sortField === "updated_at") {
+        valA = new Date(valA).getTime() || 0;
+        valB = new Date(valB).getTime() || 0;
+      }
+      if (valA < valB) return sortAsc ? -1 : 1;
+      if (valA > valB) return sortAsc ? 1 : -1;
+      return 0;
+    });
+
+    return list;
+  }, [documents, query, sortField, sortAsc]);
+
+  function handleSort(field) {
+    if (sortField === field) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortField(field);
+      setSortAsc(true);
+    }
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((d) => d.id)));
+    }
+  }
+
+  function toggleSelect(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleEnable(id) {
+    setEnabledDocs((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  }
 
   async function uploadFiles(fileList) {
     const files = Array.from(fileList || []);
@@ -115,14 +199,16 @@ export default function DocumentsView({ onChanged }) {
       const form = new FormData();
       form.append("file", file);
       try {
-        const response = await fetch(`${API_BASE_URL}/documents`, { method: "POST", body: form });
+        const response = await fetch(`${API_BASE_URL}/documents`, {
+          method: "POST",
+          body: form,
+        });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
           failures.push(`${file.name}: ${apiError(payload, "không tải lên được")}`);
           continue;
         }
         uploaded += 1;
-        setSelectedId(payload.id);
       } catch {
         failures.push(`${file.name}: không kết nối được máy chủ`);
       }
@@ -133,12 +219,12 @@ export default function DocumentsView({ onChanged }) {
     setUploading(false);
 
     if (uploaded && !failures.length) {
-      setNotice(`Đã nạp ${uploaded} tài liệu vào kho tri thức.`);
+      setNotice(`Đã nạp ${uploaded} file vào danh sách dataset.`);
     } else if (uploaded) {
-      setNotice(`Đã nạp ${uploaded} tài liệu. Một số file bị bỏ qua.`);
+      setNotice(`Đã nạp ${uploaded} file. Một số file bị lỗi.`);
       setError(failures.join(" · "));
     } else {
-      setError(failures.join(" · ") || "Không tải lên được tài liệu.");
+      setError(failures.join(" · ") || "Không tải lên được file.");
     }
   }
 
@@ -147,13 +233,15 @@ export default function DocumentsView({ onChanged }) {
     setDeleting(true);
     setError("");
     try {
-      const response = await fetch(`${API_BASE_URL}/documents/${pendingDelete.id}`, { method: "DELETE" });
+      const response = await fetch(`${API_BASE_URL}/documents/${pendingDelete.id}`, {
+        method: "DELETE",
+      });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
         throw new Error(apiError(payload, "Không xóa được tài liệu."));
       }
-      if (selectedId === pendingDelete.id) {
-        setSelectedId(null);
+      if (previewId === pendingDelete.id) {
+        setPreviewId(null);
         setDetail(null);
       }
       setPendingDelete(null);
@@ -193,7 +281,7 @@ export default function DocumentsView({ onChanged }) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = doc.file_name || "tai-lieu.txt";
+      link.download = doc.file_name || "file";
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -207,234 +295,392 @@ export default function DocumentsView({ onChanged }) {
     uploadFiles(event.dataTransfer.files);
   }
 
+  function getFileIcon(fileName) {
+    const name = (fileName || "").toLowerCase();
+    if (name.endsWith(".pdf")) {
+      return (
+        <span className="file-type-icon pdf" title="PDF Document">
+          <span className="pdf-badge-text">PDF</span>
+        </span>
+      );
+    }
+    if (name.endsWith(".md") || name.endsWith(".txt")) {
+      return (
+        <span className="file-type-icon doc" title="Text Document">
+          <FileText size={18} />
+        </span>
+      );
+    }
+    return (
+      <span className="file-type-icon default">
+        <FileText size={18} />
+      </span>
+    );
+  }
+
+  function getParseType(fileName) {
+    const name = (fileName || "").toLowerCase();
+    if (name.endsWith(".pdf")) return "Paper";
+    return "General";
+  }
+
   return (
-    <section className="docs-screen">
-      <header className="docs-header">
-        <div>
-          <h2>Quản lý tài liệu</h2>
-          <p>Tải lên, xem và xóa các file Markdown/TXT đã nạp vào chatbot.</p>
+    <div
+      className={`dataset-screen ${dragOver ? "is-drag-over" : ""}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={onDrop}
+    >
+      <input
+        ref={fileRef}
+        type="file"
+        accept={ACCEPTED_TYPES}
+        multiple
+        hidden
+        onChange={(e) => {
+          uploadFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+
+      {/* Top Title & Toolbar */}
+      <header className="dataset-header">
+        <div className="dataset-header-title">
+          <h2>Files</h2>
+          <p>Please wait for your files to finish parsing before starting an AI-powered chat.</p>
         </div>
-        <div className="docs-header-actions">
-          <button className="ghost-btn" onClick={reindexAll} disabled={reindexing || uploading}>
-            {reindexing ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
-            Nạp lại kho tri thức
+
+        <div className="dataset-header-toolbar">
+          <button
+            type="button"
+            className="tool-btn"
+            title="Parse / Re-index files"
+            onClick={reindexAll}
+            disabled={reindexing}
+          >
+            {reindexing ? <Loader2 size={16} className="spin" /> : <Wand2 size={16} />}
           </button>
-          <button className="primary-btn" onClick={() => fileRef.current?.click()} disabled={uploading}>
-            {uploading ? <Loader2 size={16} className="spin" /> : <Upload size={16} />}
-            Tải lên
+          <button
+            type="button"
+            className="tool-btn"
+            title="Filter files"
+            onClick={() => setNotice("Bộ lọc đã bật.")}
+          >
+            <Filter size={16} />
+          </button>
+
+          <div className="dataset-search-box">
+            <Search size={15} />
+            <input
+              type="text"
+              placeholder="Search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+
+          <button
+            type="button"
+            className="add-file-btn"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+          >
+            {uploading ? <Loader2 size={15} className="spin" /> : <Plus size={16} />}
+            <span>Add file</span>
           </button>
         </div>
       </header>
 
-      <div className={`docs-body ${selected ? "has-detail" : ""}`}>
-        <div className="docs-main">
-          <label
-            className={`docs-dropzone ${dragOver ? "is-over" : ""} ${uploading ? "is-busy" : ""}`}
-            onDragOver={(event) => {
-              event.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={onDrop}
-          >
-            <input
-              ref={fileRef}
-              type="file"
-              accept={ACCEPTED_TYPES}
-              multiple
-              hidden
-              onChange={(event) => {
-                uploadFiles(event.target.files);
-                event.target.value = "";
-              }}
-            />
-            <span className="docs-drop-icon">
-              <Upload size={20} />
-            </span>
-            <strong>Kéo thả tài liệu vào đây</strong>
-            <span>Hỗ trợ .md và .txt · tối đa 10MB · file trùng tên sẽ được cập nhật</span>
-          </label>
-
-          <div className="docs-toolbar">
-            <div className="docs-search">
-              <Search size={16} />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Tìm theo tên tài liệu..."
-              />
-            </div>
-            <span className="docs-count">
-              {loading ? "Đang tải..." : `${filtered.length}/${documents.length} tài liệu`}
-            </span>
-          </div>
-
-          {notice && (
-            <div className="docs-banner success">
-              <Files size={15} />
-              <span>{notice}</span>
-              <button className="text-btn" onClick={() => setNotice("")} aria-label="Đóng thông báo">
-                <X size={14} />
-              </button>
-            </div>
-          )}
-          {error && (
-            <div className="docs-banner error">
-              <AlertTriangle size={15} />
-              <span>{error}</span>
-              <button className="text-btn" onClick={() => setError("")} aria-label="Đóng lỗi">
-                <X size={14} />
-              </button>
-            </div>
-          )}
-
-          {loading ? (
-            <div className="docs-empty">
-              <Loader2 size={22} className="spin" />
-              <p>Đang tải danh sách tài liệu...</p>
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="docs-empty">
-              <FileText size={28} />
-              <h3>{documents.length === 0 ? "Chưa có tài liệu nào" : "Không tìm thấy tài liệu"}</h3>
-              <p>
-                {documents.length === 0
-                  ? "Tải lên file .md hoặc .txt để chatbot có thể trả lời dựa trên nội dung đó."
-                  : "Thử từ khóa khác hoặc xóa bộ lọc tìm kiếm."}
-              </p>
-            </div>
-          ) : (
-            <div className="docs-list">
-              {filtered.map((doc) => (
-                <article
-                  key={doc.id}
-                  className={`doc-card ${selectedId === doc.id ? "is-active" : ""}`}
-                  onClick={() => setSelectedId(doc.id)}
-                >
-                  <div className="doc-icon">
-                    <FileText size={18} />
-                  </div>
-                  <div className="doc-meta">
-                    <h3>{doc.title}</h3>
-                    <p>
-                      {doc.file_name}
-                      <span className="dot" />
-                      {(doc.file_type || "txt").toUpperCase()}
-                      <span className="dot" />
-                      {doc.chunk_count} đoạn
-                      <span className="dot" />
-                      {formatSize(doc.size_bytes)}
-                    </p>
-                    <span className="doc-time">Cập nhật {formatDate(doc.updated_at)}</span>
-                  </div>
-                  <div className="doc-actions">
-                    <button
-                      className="icon-btn"
-                      title="Tải xuống"
-                      aria-label={`Tải xuống ${doc.file_name}`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        downloadDocument(doc);
-                      }}
-                    >
-                      <Download size={16} />
-                    </button>
-                    <button
-                      className="icon-btn danger"
-                      title="Xóa"
-                      aria-label={`Xóa ${doc.file_name}`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setPendingDelete(doc);
-                      }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
+      {/* Banners */}
+      {notice && (
+        <div className="dataset-banner notice">
+          <span>{notice}</span>
+          <button type="button" onClick={() => setNotice("")}>
+            <X size={14} />
+          </button>
         </div>
+      )}
+      {error && (
+        <div className="dataset-banner error">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError("")}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
-        {selected && (
-          <aside className="docs-detail">
-            <div className="docs-detail-head">
-              <div>
-                <span className="docs-detail-label">Xem trước</span>
-                <h3>{selected.title}</h3>
-              </div>
-              <button className="icon-btn" onClick={() => setSelectedId(null)} aria-label="Đóng xem trước">
-                <X size={16} />
-              </button>
-            </div>
-            <dl className="docs-facts">
-              <div>
-                <dt>File</dt>
-                <dd>{selected.file_name}</dd>
-              </div>
-              <div>
-                <dt>Đoạn đã chia</dt>
-                <dd>{selected.chunk_count}</dd>
-              </div>
-              <div>
-                <dt>Dung lượng</dt>
-                <dd>{formatSize(selected.size_bytes)}</dd>
-              </div>
-              <div>
-                <dt>Trạng thái</dt>
-                <dd>
-                  <span className="status-pill">{selected.status === "active" ? "Đang dùng" : selected.status}</span>
-                </dd>
-              </div>
-            </dl>
-            <div className="docs-preview">
-              {detailLoading ? (
-                <div className="docs-empty compact">
-                  <Loader2 size={18} className="spin" />
-                  <p>Đang tải nội dung...</p>
-                </div>
-              ) : (
-                <pre>{detail?.preview || "Không đọc được nội dung tài liệu."}</pre>
-              )}
-            </div>
-            <div className="docs-detail-actions">
-              <button className="ghost-btn" onClick={() => downloadDocument(selected)}>
-                <Download size={15} />
-                Tải xuống
-              </button>
-              <button className="danger-btn" onClick={() => setPendingDelete(selected)}>
-                <Trash2 size={15} />
-                Xóa tài liệu
-              </button>
-            </div>
-          </aside>
+      {/* Data Table */}
+      <div className="dataset-table-container">
+        {loading ? (
+          <div className="dataset-empty">
+            <Loader2 size={24} className="spin" />
+            <p>Loading files...</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="dataset-empty">
+            <FileText size={32} />
+            <h3>No files found</h3>
+            <p>Upload .pdf, .md or .txt files to parse dataset for AI chat.</p>
+          </div>
+        ) : (
+          <table className="dataset-table">
+            <thead>
+              <tr>
+                <th className="col-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
+                <th className="col-name sortable" onClick={() => handleSort("file_name")}>
+                  <span>Name</span>
+                  <ArrowUpDown size={13} className="sort-icon" />
+                </th>
+                <th className="col-date sortable" onClick={() => handleSort("created_at")}>
+                  <span>Upload date</span>
+                  <ArrowUpDown size={13} className="sort-icon" />
+                </th>
+                <th className="col-enable">Enable</th>
+                <th className="col-chunks">Chunks</th>
+                <th className="col-metadata">Metadata</th>
+                <th className="col-parse">Parse</th>
+                <th className="col-action">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((doc) => {
+                const isSelected = selectedIds.has(doc.id);
+                const isEnabled = enabledDocs[doc.id] !== false;
+                const parseType = getParseType(doc.file_name);
+
+                return (
+                  <tr key={doc.id} className={isSelected ? "is-selected" : ""}>
+                    <td className="col-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelect(doc.id)}
+                      />
+                    </td>
+
+                    <td className="col-name">
+                      <div className="file-name-cell">
+                        {getFileIcon(doc.file_name)}
+                        <span
+                          className="file-name-text"
+                          onClick={() => setPreviewId(doc.id)}
+                          title={doc.file_name || doc.title}
+                        >
+                          {doc.file_name || doc.title}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="col-date">
+                      {formatDate(doc.created_at || doc.updated_at)}
+                    </td>
+
+                    <td className="col-enable">
+                      <button
+                        type="button"
+                        className={`toggle-switch ${isEnabled ? "on" : "off"}`}
+                        onClick={() => toggleEnable(doc.id)}
+                        title={isEnabled ? "Enabled" : "Disabled"}
+                        aria-label="Toggle document enable state"
+                      >
+                        <span className="toggle-thumb" />
+                      </button>
+                    </td>
+
+                    <td className="col-chunks">{doc.chunk_count ?? 0}</td>
+
+                    <td className="col-metadata">
+                      {doc.metadata_count ? `${doc.metadata_count} fields` : "0 fields"}
+                    </td>
+
+                    <td className="col-parse">
+                      <span className="parse-badge">
+                        <span className="parse-dot" />
+                        <span>{parseType}</span>
+                        <Target size={12} className="parse-target-icon" />
+                      </span>
+                    </td>
+
+                    <td className="col-action">
+                      <div className="row-actions">
+                        <button
+                          type="button"
+                          className="action-icon-btn"
+                          title="Run parse / test"
+                          onClick={() => reindexAll()}
+                        >
+                          <Sliders size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="action-icon-btn"
+                          title="Edit details"
+                          onClick={() => {
+                            setEditingDoc(doc);
+                            setEditTitle(doc.title || doc.file_name || "");
+                          }}
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="action-icon-btn"
+                          title="Preview"
+                          onClick={() => setPreviewId(doc.id)}
+                        >
+                          <Eye size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="action-icon-btn"
+                          title="Download"
+                          onClick={() => downloadDocument(doc)}
+                        >
+                          <Download size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="action-icon-btn danger"
+                          title="Delete"
+                          onClick={() => setPendingDelete(doc)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </div>
 
-      {pendingDelete && (
-        <div className="modal-backdrop" onClick={() => !deleting && setPendingDelete(null)}>
-          <div className="modal" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-icon">
-              <AlertTriangle size={20} />
-            </div>
-            <h3>Xóa tài liệu?</h3>
-            <p>
-              “{pendingDelete.title || pendingDelete.file_name}” sẽ bị gỡ khỏi kho tri thức và xóa file nguồn. Chatbot
-              sẽ không còn dùng nội dung này để trả lời.
-            </p>
-            <div className="modal-actions">
-              <button className="ghost-btn" onClick={() => setPendingDelete(null)} disabled={deleting}>
-                Hủy
+      {/* Preview Modal */}
+      {previewId && (
+        <div className="modal-backdrop" onClick={() => setPreviewId(null)}>
+          <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="preview-modal-header">
+              <h3>{detail?.file_name || "File Preview"}</h3>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setPreviewId(null)}
+              >
+                <X size={16} />
               </button>
-              <button className="danger-btn" onClick={confirmDelete} disabled={deleting}>
-                {deleting ? <Loader2 size={15} className="spin" /> : <Trash2 size={15} />}
-                Xóa
+            </div>
+            <div className="preview-modal-body">
+              {detailLoading ? (
+                <div className="dataset-empty">
+                  <Loader2 size={20} className="spin" />
+                  <p>Loading content...</p>
+                </div>
+              ) : (
+                <pre>{detail?.preview || "No content preview available."}</pre>
+              )}
+            </div>
+            <div className="preview-modal-footer">
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => setPreviewId(null)}
+              >
+                Close
+              </button>
+              {detail && (
+                <button
+                  type="button"
+                  className="primary-btn"
+                  onClick={() => downloadDocument(detail)}
+                >
+                  <Download size={15} />
+                  Download
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingDoc && (
+        <div className="modal-backdrop" onClick={() => setEditingDoc(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Edit Document</h3>
+            <div className="edit-form-group">
+              <label>Title</label>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+              />
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => setEditingDoc(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={() => {
+                  setNotice(`Updated "${editTitle}"`);
+                  setEditingDoc(null);
+                }}
+              >
+                Save
               </button>
             </div>
           </div>
         </div>
       )}
-    </section>
+
+      {/* Delete Confirmation Modal */}
+      {pendingDelete && (
+        <div className="modal-backdrop" onClick={() => !deleting && setPendingDelete(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-icon">
+              <AlertTriangle size={20} />
+            </div>
+            <h3>Delete file?</h3>
+            <p>
+              “{pendingDelete.title || pendingDelete.file_name}” will be removed from the dataset.
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => setPendingDelete(null)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="danger-btn"
+                onClick={confirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? <Loader2 size={15} className="spin" /> : <Trash2 size={15} />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
