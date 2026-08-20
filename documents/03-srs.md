@@ -49,174 +49,128 @@ Hệ thống **không** thực hiện các nghiệp vụ như đăng ký môn h�
 
 ## 2.2 Kiến trúc mức cao
 
-Hệ thống gồm các thành phần:
+Hệ thống gồm các thành phần chính:
 
-* Frontend Chat Interface
-* FastAPI Backend
-* Retriever
-* ChromaDB
-* Large Language Model
-* Document Storage
+* **Frontend Chat & Admin UI:** Xây dựng bằng React 18, Vite 5, hỗ trợ Real-time Streaming và Quản lý tài liệu.
+* **FastAPI Backend:** Xử lý API, điều phối luồng RAG và quản lý cơ sở dữ liệu.
+* **Scope & Security Guardrails:** Chặn các câu hỏi ngoài phạm vi PTIT và phòng chống Prompt Injection.
+* **Query Rewrite & Multi-query Generator:** Tối ưu câu hỏi tiếng Việt và mở rộng các câu hỏi tương đương.
+* **Hybrid Retriever:** Kết hợp Vector Search (**ChromaDB**) và Keyword Search (**BM25**).
+* **RRF & Reranker:** Hợp nhất kết quả bằng Reciprocal Rank Fusion và đánh lại thứ tự ưu tiên bằng Reranker.
+* **Parent-Child Chunking Engine:** Truy xuất child chunks và khôi phục nội dung parent chunk kèm cấu trúc Mục/Điều/Khoản.
+* **Confidence Gate:** Đánh giá độ mạnh của context trước khi gọi LLM.
+* **Large Language Model (LLM):** OpenAI `gpt-4.1-mini` sinh câu trả lời theo dạng Streaming.
+* **Data Storage (SQLite & SQLAlchemy):** Lưu lịch sử hội thoại, nguồn trích dẫn và metadata tài liệu.
 
-Luồng xử lý:
+### Luồng xử lý câu hỏi chi tiết:
 
-1. Người dùng gửi câu hỏi.
-2. Backend nhận yêu cầu.
-3. Retriever tìm Top-K context.
-4. LLM sinh câu trả lời.
-5. Trả về đáp án và nguồn.
+1. Người dùng gửi câu hỏi từ Frontend UI tới API `POST /api/chat/stream`.
+2. Guardrail kiểm tra an toàn (Scope & Prompt Injection).
+3. Nếu hợp lệ, hệ thống tạo truy vấn mở rộng (Multi-query).
+4. Tìm kiếm song song trên ChromaDB (Vector Search) và BM25 Index (Keyword Search).
+5. Hợp nhất danh sách bằng RRF, sắp xếp lại bằng Reranker và khôi phục Parent Context.
+6. Confidence Gate kiểm tra xem context có đủ mạnh không. Nếu yếu, trả về thông báo từ chối cố định.
+7. LLM sinh câu trả lời và truyền về cho Frontend theo dạng NDJSON Streaming (`start`, `delta`, `done`).
+8. Lưu câu hỏi, câu trả lời, debug metadata và danh sách nguồn (sources) vào cơ sở dữ liệu SQLite.
 
 ---
 
 # 3. Yêu cầu chức năng
 
 ## FR-01 Tiếp nhận câu hỏi
-
-**Mô tả**
-
-Hệ thống phải cho phép người dùng nhập câu hỏi bằng tiếng Việt.
-
-**Input**
-
-* Văn bản UTF-8
-* Độ dài tối đa 1000 ký tự
-
-**Output**
-
-* Yêu cầu được chuyển tới Retriever
-
+**Mô tả:** Hệ thống phải cho phép người dùng nhập câu hỏi bằng tiếng Việt trên giao diện web.
+**Input:** Văn bản UTF-8 (độ dài tối đa 1000 ký tự).
+**Output:** Chuyển câu hỏi sang bộ lọc Guardrail và Retriever.
 **Độ ưu tiên:** Cao
 
 ---
 
-## FR-02 Truy xuất tài liệu
-
-**Mô tả**
-
-Hệ thống phải tìm các đoạn văn liên quan nhất từ Vector Database.
-
-**Điều kiện**
-
-* Sử dụng embedding ngữ nghĩa.
-* Mặc định lấy Top 5 chunk.
-
-**Output**
-
-Danh sách context gồm:
-
-* Nội dung
-* Tên tài liệu
-* Trang
-* Điểm tương đồng
+## FR-02 Truy xuất tài liệu Hybrid (Hybrid Retrieval)
+**Mô tả:** Hệ thống tìm các đoạn văn liên quan nhất kết hợp Vector Search và BM25.
+**Điều kiện:**
+* Sử dụng embedding OpenAI `text-embedding-3-small` (hoặc fallback).
+* Sử dụng giải thuật BM25 trên tập từ khóa tiếng Việt.
+* Sử dụng RRF và Reranker để xếp hạng.
+* Khôi phục parent chunk để giữ toàn bộ ngữ cảnh đoạn văn.
+**Output:** Danh sách context gồm: Chunk ID, Document Name, Section Path (Mục/Điều/Khoản), Text Content, Rerank Score.
 
 ---
 
-## FR-03 Sinh câu trả lời
-
-**Mô tả**
-
-LLM phải sinh câu trả lời **chỉ dựa trên context**.
-
-**Ràng buộc**
-
-* Không tự bổ sung thông tin ngoài nguồn.
-* Ưu tiên diễn đạt dễ hiểu.
-* Trả lời bằng tiếng Việt.
-
-**Output**
-
-* Answer
-* Citation
+## FR-03 Sinh câu trả lời Real-time Streaming
+**Mô tả:** LLM sinh câu trả lời chỉ dựa trên context đã được kiểm duyệt và truyền streaming về client.
+**Ràng buộc:**
+* Không tự bổ sung thông tin ngoài nguồn được cung cấp.
+* Trả lời bằng tiếng Việt tự nhiên, dễ hiểu.
+* Truyền nội dung theo dạng NDJSON Streaming (`type: delta`).
+**Output:** Stream câu trả lời + Citation Metadata.
 
 ---
 
-## FR-04 Trích dẫn nguồn
-
-Mỗi câu trả lời phải chứa tối thiểu một nguồn.
-
-Thông tin hiển thị:
-
-* Tên tài liệu
-* Số trang
-* Đoạn được sử dụng
-
-Ví dụ:
-
-> Quy chế đào tạo 2026 — Trang 18
+## FR-04 Trích dẫn nguồn (Citations)
+**Mô tả:** Mỗi câu trả lời có bằng chứng phải hiển thị danh sách trích dẫn.
+**Thông tin hiển thị:**
+* Tên tài liệu (`source_name` / `title`)
+* Vị trí (`heading` / `section_path`)
+* Đoạn văn bản trích dẫn ngắn (`preview_text`)
 
 ---
 
 ## FR-05 Lưu lịch sử hội thoại
-
-Hệ thống phải lưu:
-
-* Câu hỏi
-* Câu trả lời
-* Thời gian
-* Danh sách citation
-
-Người dùng có thể xem lại các cuộc hội thoại trước.
+**Mô tả:** Hệ thống tự động lưu lịch sử trao đổi trong SQLite.
+**Thông tin lưu trữ:**
+* Lịch sử hội thoại (Conversation ID, User ID, Title)
+* Danh sách tin nhắn (Role, Content, Timestamp, Metadata Debug)
+* Nguồn trích dẫn liên kết với từng tin nhắn (MessageSource)
 
 ---
 
-## FR-06 Xử lý khi không tìm thấy thông tin
-
-Nếu Retriever không tìm đủ context hoặc độ tương đồng dưới ngưỡng:
-
-Hệ thống phải trả lời:
-
-> "Không tìm thấy thông tin trong các tài liệu chính thức của PTIT."
-
-Không được suy diễn.
+## FR-06 An toàn & Từ chối trả lời (Guardrail & Confidence Gate)
+**Mô tả:** 
+* Nếu phát hiện Prompt Injection hoặc câu hỏi ngoài phạm vi PTIT: Trả về câu từ chối cố định theo quy định.
+* Nếu điểm tương đồng context của tất cả các đoạn đều dưới ngưỡng (Confidence Gate): Trả về *"Chưa tìm thấy thông tin này trong tài liệu."* mà không tự suy diễn.
 
 ---
 
-## FR-07 Quản lý tài liệu (Admin)
-
-Quản trị viên có thể:
-
-* Upload PDF
-* Upload DOCX
-* Upload Excel
-* Xóa tài liệu
-* Re-index Vector Database
+## FR-07 Quản lý tài liệu (Document Management)
+**Mô tả:** Người dùng/Quản trị viên có thể quản lý kho tài liệu RAG qua Web UI hoặc REST API.
+**Chức năng:**
+* `POST /api/documents`: Upload file `.md` / `.txt`, tự động phân chia parent-child chunk, embedding và lưu trữ.
+* `GET /api/documents`: Lấy danh sách tài liệu kèm số lượng chunk và dung lượng.
+* `GET /api/documents/{id}`: Xem chi tiết metadata và bản xem trước (preview text).
+* `GET /api/documents/{id}/file`: Tải file gốc về máy.
+* `DELETE /api/documents/{id}`: Xóa tài liệu khỏi hệ thống backend, ChromaDB và SQLite.
 
 ---
 
 # 4. Use Case
 
-## UC-01 Tra cứu quy chế
+## UC-01 Tra cứu quy chế & học vụ
 
-**Actor**
+**Actor:** Sinh viên / Người dùng
 
-Sinh viên
+**Tiền điều kiện:** Hệ thống hoạt động, tài liệu đã được nạp và index.
 
-**Tiền điều kiện**
+**Luồng chính:**
+1. Người dùng nhập câu hỏi trên chat UI.
+2. Backend kiểm tra Guardrail -> Chạy Hybrid Search -> Rerank -> Khôi phục Parent Chunk.
+3. Confidence Gate xác nhận bằng chứng đủ mạnh.
+4. LLM sinh câu trả lời dạng Streaming.
+5. Giao diện hiển thị phản hồi và danh sách nguồn trích dẫn.
 
-* Hệ thống hoạt động.
-* Kho tài liệu đã được index.
-
-**Luồng chính**
-
-1. Sinh viên nhập câu hỏi.
-2. Hệ thống tìm context.
-3. LLM sinh câu trả lời.
-4. Hiển thị đáp án và nguồn.
-
-**Luồng thay thế**
-
-Nếu không có context:
-
-* Thông báo không tìm thấy.
-* Gợi ý đặt câu hỏi khác.
+**Luồng thay thế:**
+* Nếu câu hỏi ngoài phạm vi hoặc bị Confidence Gate từ chối: Hiển thị thông báo từ chối cố định.
 
 ---
 
-## UC-02 Xem lịch sử
+## UC-02 Quản lý tài liệu tri thức
 
-1. Người dùng mở mục lịch sử.
-2. Danh sách hội thoại được hiển thị.
-3. Chọn một cuộc hội thoại để xem lại.
+**Actor:** Quản trị viên / Người dùng
+
+**Luồng chính:**
+1. Người dùng mở trang **Tài liệu** trên giao diện web.
+2. Chọn "Tải lên tài liệu" và tải file `.md` hoặc `.txt`.
+3. Hệ thống nạp dữ liệu, tạo vector embedding và báo thành công.
+4. Người dùng có thể xem trước nội dung hoặc xóa tài liệu khi không còn sử dụng.
 
 ---
 
@@ -224,103 +178,141 @@ Nếu không có context:
 
 ## NFR-01 Hiệu năng
 
-| Tiêu chí           |  Giá trị |
-| ------------------ | -------: |
-| Thời gian phản hồi | ≤ 5 giây |
-| Truy xuất vector   | ≤ 1 giây |
-| Concurrent users   |      100 |
+| Tiêu chí | Giá trị |
+| --- | ---: |
+| Thời gian phản hồi ký tự đầu tiên (TTFT) | ≤ 2 giây |
+| Thời gian truy xuất Hybrid Search | ≤ 1 giây |
+| Đồng bộ dữ liệu khi upload file | Real-time |
 
-## NFR-02 Độ chính xác
+## NFR-02 Độ chính xác (Kết quả đo đạc thực tế với Ragas)
 
-* Retriever Recall ≥ 95%
-* Faithfulness ≥ 90%
-* Citation Coverage = 100%
+* **Context Precision:** ≥ 0.90 (90%)
+* **Context Recall:** ≥ 0.95 (95%)
+* **Faithfulness:** ≥ 0.93 (93%)
+* **Answer Relevancy:** ≥ 0.85 (85%)
 
-## NFR-03 Khả dụng
+## NFR-03 Khả dụng & Triển khai
 
-* Uptime ≥ 99%
-* Tự động khởi động lại khi Backend lỗi
+* Hỗ trợ chạy container hóa hoàn toàn với **Docker & Docker Compose**.
+* Tự động khởi động lại dịch vụ backend khi gặp lỗi.
 
 ## NFR-04 Bảo mật
 
-* HTTPS
-* Mã hóa lịch sử hội thoại
-* Phân quyền Admin/User
-* Không lưu thông tin nhạy cảm trong prompt
+* Bảo mật API với CORS & HTTP Headers (`X-Accel-Buffering: no` cho streaming).
+* Phòng chống Prompt Injection ở tầng Guardrail trước khi gọi LLM.
 
 ---
 
 # 6. Quy tắc nghiệp vụ
 
 ## BR-01
-
-Chỉ sử dụng tài liệu có trạng thái **Approved**.
+Chỉ sinh câu trả lời dựa trên thông tin có trong các tài liệu PTIT đã được nạp.
 
 ## BR-02
-
-Nếu tồn tại nhiều phiên bản của cùng một văn bản:
-
-* Ưu tiên phiên bản mới nhất.
-* Phiên bản cũ chỉ dùng để tham khảo.
+Nếu tồn tại nhiều phiên bản văn bản, ưu tiên sử dụng phiên bản mới nhất dựa trên tiêu đề hoặc metadata.
 
 ## BR-03
-
-Citation luôn lấy từ chính context đã được Retriever trả về.
+Citation luôn được trích xuất trực tiếp từ các parent chunks đã thông qua Confidence Gate.
 
 ---
 
-# 7. Mô hình dữ liệu
+# 7. Mô hình dữ liệu (SQLite / SQLAlchemy Schema)
 
-## Conversation
+## Conversation (Bảng lưu hội thoại)
 
-| Thuộc tính | Kiểu     |
-| ---------- | -------- |
-| id         | UUID     |
-| user_id    | UUID     |
-| created_at | Datetime |
+| Thuộc tính | Kiểu dữ liệu | Mô tả |
+| --- | --- | --- |
+| id | String (UUID) | Khóa chính |
+| user_id | String | ID người dùng |
+| title | String | Tiêu đề cuộc hội thoại |
+| created_at | DateTime | Thời gian tạo |
+| updated_at | DateTime | Thời gian cập nhật |
 
-## Message
+## Message (Bảng lưu tin nhắn)
 
-| Thuộc tính | Kiểu           |
-| ---------- | -------------- |
-| role       | user/assistant |
-| content    | Text           |
-| timestamp  | Datetime       |
+| Thuộc tính | Kiểu dữ liệu | Mô tả |
+| --- | --- | --- |
+| id | String (UUID) | Khóa chính |
+| conversation_id | String (FK) | Khóa ngoại tới Conversation |
+| role | String | `user` hoặc `assistant` |
+| content | Text | Nội dung tin nhắn |
+| metadata_json | Text (JSON) | Lưu thông tin retrieval debug |
+| timestamp | DateTime | Thời gian tạo |
 
-## Document Chunk
+## MessageSource (Bảng lưu trích dẫn của tin nhắn)
 
-| Thuộc tính    | Kiểu    |
-| ------------- | ------- |
-| chunk_id      | UUID    |
-| document_name | String  |
-| page          | Integer |
-| content       | Text    |
-| embedding     | Vector  |
+| Thuộc tính | Kiểu dữ liệu | Mô tả |
+| --- | --- | --- |
+| id | Integer | Khóa chính tự tăng |
+| message_id | String (FK) | Khóa ngoại tới Message |
+| document_id | String | ID tài liệu trích dẫn |
+| chunk_id | String | ID chunk được dùng |
+| heading | String | Tiêu đề đoạn/mục |
+| section_path | String | Đường dẫn cấu trúc Mục/Điều/Khoản |
+| text | Text | Nội dung văn bản bằng chứng |
+| rank | Integer | Thứ hạng truy xuất |
+| score | Float | Điểm số tương đồng |
+
+## Document (Bảng lưu thông tin tài liệu)
+
+| Thuộc tính | Kiểu dữ liệu | Mô tả |
+| --- | --- | --- |
+| id | String | Khóa chính (hash hoặc UUID) |
+| title | String | Tiêu đề tài liệu |
+| source_path | String | Đường dẫn file trên ổ đĩa |
+| file_hash | String | Hash kiểm tra trùng lặp file |
+| created_at | DateTime | Thời gian nạp tài liệu |
+| updated_at | DateTime | Thời gian cập nhật |
+
+## DocumentParentChunk (Bảng lưu đoạn văn bản gốc)
+
+| Thuộc tính | Kiểu dữ liệu | Mô tả |
+| --- | --- | --- |
+| id | String | Khóa chính chunk |
+| document_id | String (FK) | Khóa ngoại tới Document |
+| chunk_index | Integer | Thứ tự chunk trong tài liệu |
+| heading | String | Tiêu đề đoạn/mục |
+| section_path | String | Đường dẫn cấu trúc Mục/Điều/Khoản |
+| text | Text | Nội dung đầy đủ của Parent Chunk |
 
 ---
 
 # 8. API Requirements
 
-## POST /chat
+## POST /api/chat/stream (Endpoint chính dùng cho Real-time Chat)
 
 ### Request
-
 ```json
 {
-  "question": "Điều kiện học cải thiện là gì?",
-  "conversation_id": "uuid"
+  "message": "Điều kiện học cải thiện là gì?",
+  "conversation_id": "optional-uuid",
+  "top_k": 4
 }
 ```
 
-### Response
+### Response (NDJSON Stream)
+```ndjson
+{"type": "start", "conversation_id": "c1f7b8d0-..."}
+{"type": "delta", "content": "Theo quy chế đào tạo..."}
+{"type": "delta", "content": " sinh viên được học cải thiện khi..."}
+{"type": "done", "answer": "...", "sources": [{"title": "...", "section_path": "...", "text": "..."}], "conversation_id": "c1f7b8d0-..."}
+```
 
+---
+
+## POST /api/chat (Endpoint đồng bộ)
+
+### Response
 ```json
 {
-  "answer": "...",
-  "citations": [
+  "conversation_id": "c1f7b8d0-...",
+  "answer": "Theo quy chế đào tạo...",
+  "sources": [
     {
-      "document": "Quy che dao tao.pdf",
-      "page": 18
+      "title": "Quy chế đào tạo 2024",
+      "heading": "Điều 18. Học cải thiện",
+      "section_path": "Chương III > Điều 18",
+      "preview_text": "Sinh viên đạt điểm D..."
     }
   ]
 }
@@ -328,33 +320,61 @@ Citation luôn lấy từ chính context đã được Retriever trả về.
 
 ---
 
-## GET /conversations
+## GET /api/documents (Danh sách tài liệu)
 
-Trả về danh sách lịch sử hội thoại của người dùng.
-
----
-
-## POST /documents
-
-Upload tài liệu mới và thực hiện indexing.
-
----
-
-# 9. Tiêu chí chấp nhận
-
-| ID    | Tiêu chí                                                              |
-| ----- | --------------------------------------------------------------------- |
-| AC-01 | Chatbot trả lời bằng tiếng Việt                                       |
-| AC-02 | Có ít nhất một citation trong mỗi câu trả lời                         |
-| AC-03 | Không trả lời khi không có context phù hợp                            |
-| AC-04 | Lưu được lịch sử hội thoại                                            |
-| AC-05 | Admin upload tài liệu thành công và có thể tra cứu ngay sau khi index |
+### Response
+```json
+{
+  "documents": [
+    {
+      "id": "doc-01",
+      "title": "Quy che dao tao.md",
+      "source_path": "data/Quy che dao tao.md",
+      "chunk_count": 12,
+      "size_bytes": 15420,
+      "created_at": "2026-08-20T10:00:00"
+    }
+  ]
+}
+```
 
 ---
 
-# 10. Giới hạn hệ thống
+## POST /api/documents (Upload tài liệu mới)
 
-* Chỉ hỗ trợ tiếng Việt.
-* Chỉ trả lời dựa trên tài liệu nội bộ PTIT.
-* Không thay thế các hệ thống nghiệp vụ của Học viện.
-* Chất lượng câu trả lời phụ thuộc vào chất lượng tài liệu và quá trình indexing.
+* **Content-Type:** `multipart/form-data`
+* **Body:** `file` (File `.md` hoặc `.txt`)
+* **Response:** Chi tiết tài liệu đã được nạp và index.
+
+---
+
+## DELETE /api/documents/{document_id} (Xóa tài liệu)
+
+* **Response:** `{"success": true, "message": "Đã xóa tài liệu thành công."}`
+
+---
+
+## GET /api/health (Health Check)
+
+* **Response:** `{"status": "ok"}`
+
+---
+
+# 9. Tiêu chí chấp nhận (Acceptance Criteria)
+
+| ID | Tiêu chí | Trạng thái |
+| --- | --- | :---: |
+| AC-01 | Chatbot trả lời bằng tiếng Việt theo dạng Streaming mượt mà | **Pass** |
+| AC-02 | Mỗi câu trả lời đúng có trích dẫn nguồn (Mục/Điều/Khoản) | **Pass** |
+| AC-03 | Tự động từ chối khi câu hỏi ngoài phạm vi PTIT hoặc thiếu bằng chứng | **Pass** |
+| AC-04 | Lưu và tải lại được lịch sử hội thoại trong SQLite | **Pass** |
+| AC-05 | Người dùng có thể upload, xem trước và xóa tài liệu trên Web UI | **Pass** |
+
+---
+
+# 10. Giới hạn hệ thống (System Limitations)
+
+* Tập trung tối ưu cho dữ liệu văn bản tiếng Việt.
+* MVP 1.0 nạp các file văn bản đã được định dạng cấu trúc Markdown (`.md`) hoặc Text (`.txt`).
+* Phụ thuộc vào kết nối OpenAI API (hoặc local fallback embedding/LLM nếu được cấu hình).
+

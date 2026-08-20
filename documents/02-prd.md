@@ -20,19 +20,23 @@ PTIT AI Chatbot được xây dựng nhằm trở thành một điểm truy cậ
 
 ### Mục tiêu chính
 
-* Trả lời câu hỏi của sinh viên bằng tiếng Việt.
-* Tra cứu thông tin từ tài liệu chính thức của PTIT.
-* Hiển thị nguồn trích dẫn để người dùng kiểm chứng.
-* Giảm thời gian tìm kiếm thông tin học vụ và hành chính.
+* Trả lời câu hỏi của sinh viên bằng tiếng Việt dựa trên tài liệu chính thức.
+* Tra cứu thông tin chính xác từ quy chế, học phí, học phần và các biểu mẫu PTIT.
+* Hiển thị nguồn trích dẫn rõ ràng (tài liệu, Điều, Khoản) để người dùng kiểm chứng.
+* Giảm hallucination tối đa nhờ Guardrails và Confidence Gate.
+* Giảm thời gian phản hồi với cơ chế Real-time NDJSON Streaming.
 
-### Chỉ số thành công (Success Metrics)
+### Chỉ số thành công (Success Metrics - Đo lường thực tế với Ragas)
 
-| Chỉ số                            | Mục tiêu |
-| --------------------------------- | -------: |
-| Độ chính xác câu trả lời          |    ≥ 90% |
-| Câu trả lời có trích nguồn        |     100% |
-| Thời gian phản hồi                | ≤ 5 giây |
-| Tỷ lệ tìm thấy tài liệu liên quan |    ≥ 95% |
+Kết quả kiểm thử tự động trên bộ đánh giá 50 câu hỏi RAG (`top_k=4`):
+
+| Chỉ số | Mục tiêu ban đầu | Kết quả thực tế MVP | Ý nghĩa |
+| --- | ---: | ---: | --- |
+| **Context Precision** | ≥ 85% | **0.90 (90%)** | Mức độ liên quan và thứ hạng của context truy xuất |
+| **Context Recall** | ≥ 90% | **0.95 (95%)** | Khả năng tìm đủ bằng chứng cần thiết từ tài liệu |
+| **Faithfulness** | ≥ 90% | **0.93 (93%)** | Mức độ câu trả lời trung thực với context, không bịa |
+| **Answer Relevancy** | ≥ 80% | **0.85 (85%)** | Mức độ câu trả lời tập trung vào đúng câu hỏi |
+| **Thời gian phản hồi (TTFT)** | ≤ 5 giây | **< 2 giây** | Thời gian xuất hiện ký tự đầu tiên (Streaming) |
 
 ---
 
@@ -44,11 +48,9 @@ PTIT AI Chatbot được xây dựng nhằm trở thành một điểm truy cậ
 
 Nhu cầu:
 
-* Hỏi học phí
-* Tra cứu quy chế đào tạo
-* Thủ tục xin giấy xác nhận
-* Quy định học lại, cải thiện điểm
-* Lịch và quy trình hành chính
+* Hỏi học phí, quy chế đào tạo.
+* Thủ tục xin giấy xác nhận, quy trình hành chính.
+* Quy định học lại, cải thiện điểm, điều kiện tốt nghiệp.
 
 ## Người dùng phụ
 
@@ -59,28 +61,23 @@ Nhu cầu:
 
 # 5. Phạm vi (Scope)
 
-## Trong phạm vi (In Scope)
+## Trong phạm vi MVP 1.0 (In Scope)
 
-* Hỏi đáp bằng tiếng Việt.
-* Tra cứu tài liệu PDF, DOCX, Excel của PTIT.
-* Trích dẫn nguồn và số trang.
-* Lưu lịch sử hội thoại.
-* Hỗ trợ các lĩnh vực:
+* Hỏi đáp tiếng Việt theo dạng hội thoại (hỗ trợ lưu lịch sử hội thoại).
+* Real-time Streaming câu trả lời (NDJSON streaming).
+* Nạp và xử lý tài liệu cấu trúc **Markdown (`.md`) và Text (`.txt`)** bảo toàn cấu trúc tiêu đề.
+* Parent-child chunking & Hybrid retrieval (Vector + BM25 + RRF + Reranker).
+* Trích dẫn nguồn chi tiết (tên tài liệu, tiêu đề Mục/Điều/Khoản, đoạn văn bản bằng chứng).
+* Guardrail chặn câu hỏi ngoài phạm vi PTIT và chống Prompt Injection.
+* Confidence gate từ chối trả lời khi không có đủ bằng chứng.
+* Web UI quản lý tài liệu: Tải file lên, xem trước, tải xuống và xóa tài liệu.
 
-  * Quy chế đào tạo
-  * Học phí
-  * Học bổng
-  * Thủ tục hành chính
-  * Biểu mẫu
-  * Quy định tốt nghiệp
+## Định hướng nâng cấp ở các phiên bản sau (Out of Scope for MVP 1.0)
 
-## Ngoài phạm vi (Out of Scope)
-
-* Chỉnh sửa dữ liệu sinh viên.
-* Đăng ký môn học.
-* Thanh toán học phí.
-* Truy cập dữ liệu cá nhân từ hệ thống SIS.
-* Tư vấn pháp lý hoặc y tế.
+* Đọc file PDF, DOCX, Excel thô (chưa qua chuẩn hóa Markdown/TXT).
+* Chỉnh sửa dữ liệu sinh viên hoặc Đăng ký môn học.
+* Thanh toán học phí hoặc Truy cập dữ liệu cá nhân từ hệ thống SIS.
+* Tư vấn pháp lý hoặc y tế ngoài học vụ PTIT.
 
 ---
 
@@ -97,7 +94,7 @@ Nhu cầu:
 **Acceptance Criteria**
 
 * Trả lời đúng theo quy chế.
-* Hiển thị tên tài liệu và trang nguồn.
+* Hiển thị tên tài liệu, Mục/Điều và trang/đoạn trích dẫn.
 
 ---
 
@@ -110,7 +107,7 @@ Nhu cầu:
 **Acceptance Criteria**
 
 * Liệt kê đầy đủ các bước.
-* Đính kèm biểu mẫu nếu có.
+* Đính kèm trích dẫn văn bản quy định.
 
 ---
 
@@ -122,18 +119,30 @@ Nhu cầu:
 
 **Acceptance Criteria**
 
-* Trả lời theo đúng năm học.
-* Nếu nhiều phiên bản, ưu tiên văn bản mới nhất.
+* Trả lời theo đúng năm học trong tài liệu.
+* Ưu tiên văn bản quy định mới nhất.
+
+---
+
+### US-04: Quản lý tài liệu tri thức (Admin/Quản trị)
+
+**Là một quản trị viên**, tôi muốn tải lên hoặc xóa tài liệu trên giao diện web để hệ thống tự động cập nhật kho tri thức RAG.
+
+**Acceptance Criteria**
+
+* Upload thành công file `.md` / `.txt`.
+* Hệ thống tự động làm sạch, chunking, embedding và lưu vào ChromaDB + SQLite + BM25.
+* Có thể xóa tài liệu và tự động làm sạch vector store.
 
 ---
 
 # 7. Chức năng sản phẩm
 
-## 7.1 Chat hỏi đáp
+## 7.1 Chat hỏi đáp & Streaming
 
 **Mô tả**
 
-Người dùng nhập câu hỏi bằng ngôn ngữ tự nhiên.
+Người dùng nhập câu hỏi bằng ngôn ngữ tự nhiên. Giao diện nhận phản hồi dạng Real-time Streaming (NDJSON) từng từ/từng dòng.
 
 **Input**
 
@@ -141,41 +150,44 @@ Người dùng nhập câu hỏi bằng ngôn ngữ tự nhiên.
 
 **Output**
 
-* Câu trả lời
-* Trích dẫn nguồn
-* Trang tài liệu
+* Câu trả lời stream từng ký tự
+* Danh sách nguồn trích dẫn (sources)
+* Nút sao chép câu trả lời và xem debug thông tin retrieval
 
 ---
 
-## 7.2 Trích dẫn nguồn
+## 7.2 Trích dẫn nguồn (Citations)
 
-Mỗi câu trả lời phải hiển thị:
+Mỗi câu trả lời phải hiển thị danh sách bằng chứng:
 
 * Tên tài liệu
-* Số trang
-* Đoạn văn được sử dụng
-
-Ví dụ:
-
-> Quy chế đào tạo đại học 2026 — Trang 18
+* Tiêu đề/Vị trí (Mục, Điều, Khoản)
+* Đoạn văn bản trích dẫn (Preview text)
 
 ---
 
 ## 7.3 Lịch sử hội thoại
 
-* Lưu các cuộc trò chuyện.
-* Cho phép xem lại.
-* Tiếp tục cuộc hội thoại trước.
+* Lưu các cuộc trò chuyện trong SQLite database.
+* Hiển thị danh sách hội thoại ở thanh bên (Sidebar).
+* Cho phép chọn lại hội thoại cũ để xem tiếp.
 
 ---
 
-## 7.4 Xử lý khi không đủ thông tin
+## 7.4 Bảo mật & Lọc an toàn (Guardrails)
 
-Nếu tài liệu không chứa đáp án, chatbot phải trả lời:
+* **Scope Filter:** Tự động phát hiện và từ chối các câu hỏi không liên quan tới PTIT hoặc câu hỏi tư vấn y tế, pháp lý.
+* **Prompt Injection Protection:** Chặn các câu hỏi cố tình thay đổi chỉ thị hệ thống (System Prompt Override).
+* **Confidence Gate:** Nếu điểm tương đồng context quá thấp, trả về thông báo cố định: *"Chưa tìm thấy thông tin này trong tài liệu."* mà không tự suy diễn.
 
-> "Mình không tìm thấy thông tin này trong các tài liệu chính thức của PTIT."
+---
 
-Không được tự suy diễn.
+## 7.5 Quản lý tài liệu (Document Management UI)
+
+* **Danh sách tài liệu:** Hiển thị tên, số lượng chunk, dung lượng file.
+* **Tải tài liệu mới (Upload):** Kéo thả hoặc chọn file `.md`/`.txt` để nạp trực tiếp vào kho tri thức.
+* **Xem trước & Tải về:** Xem nội dung file text/markdown hoặc tải file gốc về máy.
+* **Xóa tài liệu:** Xóa tài liệu khỏi hệ thống backend, tự động đồng bộ gỡ bỏ khỏi ChromaDB và SQLite.
 
 ---
 
@@ -183,10 +195,11 @@ Không được tự suy diễn.
 
 1. Sinh viên mở chatbot.
 2. Nhập câu hỏi.
-3. Hệ thống tìm kiếm tài liệu liên quan.
-4. AI sinh câu trả lời.
-5. Hiển thị nguồn trích dẫn.
-6. Người dùng có thể hỏi tiếp.
+3. Hệ thống chạy Guardrail kiểm tra an toàn.
+4. Chạy Hybrid Search (Vector ChromaDB + BM25) + RRF + Reranker.
+5. Kiểm tra Confidence Gate.
+6. AI sinh câu trả lời dạng Streaming (NDJSON) kèm nguồn trích dẫn.
+7. Người dùng đọc đáp án, kiểm tra nguồn trích dẫn và tiếp tục hỏi đáp.
 
 ---
 
@@ -194,41 +207,42 @@ Không được tự suy diễn.
 
 ## Hiệu năng
 
-* Phản hồi dưới 5 giây.
-* Hỗ trợ tối thiểu 100 người dùng đồng thời.
+* Thời gian phản hồi ký tự đầu tiên (TTFT) < 2 giây.
+* Hỗ trợ xử lý song song Hybrid Search + Reranking nhanh chóng.
 
-## Độ tin cậy
+## Độ tin cậy & An toàn
 
-* Chỉ sử dụng tài liệu đã được phê duyệt.
-* Không tạo thông tin ngoài nguồn (hallucination).
+* Chỉ sử dụng bằng chứng từ tài liệu chính thức đã nạp.
+* Tự động từ chối khi câu hỏi ngoài phạm vi hoặc cố tình hack prompt.
 
 ## Bảo mật
 
-* Không lưu thông tin cá nhân nhạy cảm.
-* Nhật ký hội thoại được mã hóa khi lưu trữ.
+* Không lưu thông tin nhạy cảm cá nhân trong prompt.
+* Lưu trữ an toàn trong cơ sở dữ liệu nội bộ (SQLite).
 
 ---
 
 # 10. Tiêu chí hoàn thành (Definition of Done)
 
-* Chatbot trả lời được các nhóm câu hỏi học vụ chính.
-* Mỗi câu trả lời đều có trích dẫn nguồn.
-* Không trả lời bịa khi thiếu dữ liệu.
-* Bộ kiểm thử đạt tối thiểu 90% độ chính xác.
-* Hoàn thành tài liệu kỹ thuật và hướng dẫn triển khai.
+* Chatbot trả lời chính xác các nhóm câu hỏi quy chế học vụ PTIT.
+* Mọi câu trả lời hợp lệ đều có trích dẫn nguồn (mục, Điều, Khoản).
+* Có Guardrail từ chối khi câu hỏi ngoài phạm vi hoặc thiếu dữ liệu.
+* Bộ kiểm thử Ragas đạt kết quả: Context Recall ≥ 90%, Faithfulness ≥ 90%.
+* Giao diện web chạy mượt mà tính năng Streaming và Quản lý tài liệu.
 
 ---
 
-# 11. Phiên bản MVP
+# 11. Phiên bản MVP 1.0 (Trạng thái hoàn thành thực tế)
 
-Các chức năng ưu tiên cho bản đầu tiên:
+| Độ ưu tiên | Chức năng | Trạng thái MVP 1.0 |
+| ---------- | ------------------------------- | :---: |
+| P0 | Chat hỏi đáp tiếng Việt & Streaming | **Đã hoàn thành** |
+| P0 | Hybrid RAG (Vector + BM25 + Parent-child) | **Đã hoàn thành** |
+| P0 | Trích dẫn nguồn (Tên tài liệu, Điều/Khoản) | **Đã hoàn thành** |
+| P0 | Guardrails (Chống injection & Lọc scope) | **Đã hoàn thành** |
+| P1 | Lưu lịch sử hội thoại (SQLite) | **Đã hoàn thành** |
+| P1 | Quản lý tài liệu trên Web UI (Upload/Delete) | **Đã hoàn thành** |
+| P1 | Hỗ trợ dữ liệu Markdown (`.md`) và TXT (`.txt`) | **Đã hoàn thành** |
+| P2 | Tự động đọc file PDF/DOCX thô | Roadmap (P2) |
+| P2 | Đánh giá chất lượng tự động với Ragas | **Đã hoàn thành** |
 
-| Độ ưu tiên | Chức năng                       |
-| ---------- | ------------------------------- |
-| P0         | Chat hỏi đáp tiếng Việt         |
-| P0         | RAG từ tài liệu PDF             |
-| P0         | Trích dẫn nguồn                 |
-| P1         | Lưu lịch sử hội thoại           |
-| P1         | Hỗ trợ DOCX và Excel            |
-| P2         | Gợi ý câu hỏi thường gặp        |
-| P2         | Đánh giá chất lượng câu trả lời |

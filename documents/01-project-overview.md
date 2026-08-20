@@ -64,19 +64,25 @@ Xây dựng một hệ thống AI có khả năng hiểu câu hỏi tiếng Vi�
 
 ## 6. Giải pháp đề xuất
 
-Hệ thống sử dụng kiến trúc **RAG (Retrieval-Augmented Generation)** gồm ba thành phần chính:
+Hệ thống sử dụng kiến trúc **Advanced Hybrid RAG (Retrieval-Augmented Generation)** gồm các thành phần chính:
 
-1. **Retriever:** Tìm các đoạn văn liên quan trong kho tài liệu.
-2. **Vector Database:** Lưu trữ embedding của tài liệu để truy xuất ngữ nghĩa.
-3. **Large Language Model:** Sinh câu trả lời dựa trên context được truy xuất.
+1. **Guardrails:** Kiểm tra an toàn, chống prompt injection và lọc câu hỏi ngoài phạm vi PTIT.
+2. **Multi-query & Rewriter:** Chuẩn hóa câu hỏi tiếng Việt và mở rộng các truy vấn tương đương.
+3. **Hybrid Retriever:** Kết hợp tìm kiếm ngữ nghĩa (**Vector Search với ChromaDB**) và tìm kiếm từ khóa (**BM25 Search**).
+4. **Reciprocal Rank Fusion (RRF) & Reranker:** Hợp nhất và sắp xếp lại thứ tự ưu tiên của các đoạn văn bản.
+5. **Parent-Child Context Restoration:** Tìm kiếm trên các thẻ thông tin nhỏ (child chunks) nhưng khôi phục toàn bộ ngữ cảnh đoạn lớn (parent chunk) kèm tiêu đề/Điều/Khoản.
+6. **Confidence Gate:** Kiểm tra độ tin cậy của bằng chứng trước khi chuyển tới mô hình ngôn ngữ.
+7. **Large Language Model (LLM):** Sinh câu trả lời theo dạng streaming chỉ dựa trên context được cung cấp.
 
 Quy trình hoạt động:
 
-1. Người dùng nhập câu hỏi.
-2. Câu hỏi được chuyển thành embedding.
-3. Retriever tìm các đoạn tài liệu phù hợp.
-4. LLM sinh câu trả lời từ context.
-5. Hệ thống trả về đáp án kèm nguồn trích dẫn.
+1. Người dùng nhập câu hỏi trên giao diện web.
+2. Guardrail kiểm tra tính hợp lệ và phạm vi câu hỏi.
+3. Hệ thống tạo các truy vấn tìm kiếm mở rộng (multi-query).
+4. Thực hiện truy xuất song song qua Vector DB và BM25 Index.
+5. Sắp xếp lại kết quả bằng RRF và Reranker, sau đó khôi phục ngữ cảnh Parent Chunk.
+6. Confidence Gate đánh giá độ mạnh của bằng chứng.
+7. LLM sinh câu trả lời kèm nguồn trích dẫn và truyền về giao diện theo dạng Real-time Streaming.
 
 ---
 
@@ -96,19 +102,22 @@ Quy trình hoạt động:
 
 ---
 
-## 8. Công nghệ dự kiến
+## 8. Công nghệ thực tế (MVP Stack)
 
-| Thành phần      | Công nghệ                  |
-| --------------- | -------------------------- |
-| Frontend        | React / Next.js            |
-| Backend         | FastAPI                    |
-| Embedding       | BGE-M3 hoặc Qwen Embedding |
-| Vector Database | Qdrant                     |
-| LLM             | Chatgpt, Gemini            |
-| Document Parser | LlamaParse hoặc Docling    |
-| Graph Database  | Neo4j                      |
+| Thành phần      | Công nghệ thực tế                   |
+| --------------- | ----------------------------------- |
+| Frontend        | React 18, Vite 5, Lucide React     |
+| Backend API     | Python 3.10+, FastAPI, Uvicorn     |
+| Embedding       | OpenAI `text-embedding-3-small` (hỗ trợ SentenceTransformers / Hash fallback) |
+| Vector Database | ChromaDB                           |
+| Keyword Search  | BM25 (`rank-bm25`)                 |
+| Data Storage    | SQLite, SQLAlchemy                 |
+| LLM             | OpenAI `gpt-4.1-mini`              |
+| RAG Pipeline    | Parent-Child Chunking, RRF, Reranker, Scope & Injection Guardrails |
+| Evaluation      | Ragas, pytest                      |
+| Deployment      | Docker, Docker Compose, Nginx      |
 ---
 
 ## 9. Kết quả mong đợi
 
-Sau khi hoàn thành, PTIT AI Chatbot có thể trở thành cổng tra cứu thông tin tập trung cho sinh viên PTIT, cho phép người dùng đặt câu hỏi bằng tiếng Việt và nhận câu trả lời nhanh chóng, chính xác, có căn cứ từ các tài liệu chính thức của Học viện.
+Sau khi hoàn thành, PTIT AI Chatbot trở thành cổng tra cứu thông tin tập trung cho sinh viên PTIT, cho phép người dùng đặt câu hỏi bằng tiếng Việt và nhận câu trả lời nhanh chóng, chính xác, có căn cứ từ các tài liệu chính thức của Học viện.
