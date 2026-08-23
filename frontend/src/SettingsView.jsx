@@ -271,7 +271,7 @@ export default function SettingsView() {
   }
 
   async function handleReset() {
-    if (!window.confirm("Bạn có chắc chắn muốn khôi phục cài đặt gốc theo file .env?")) {
+    if (!window.confirm("Bạn có chắc chắn muốn khôi phục cài đặt gốc?")) {
       return;
     }
     setSaving(true);
@@ -899,7 +899,7 @@ export default function SettingsView() {
           disabled={saving}
         >
           <RotateCcw size={16} />
-          <span>Khôi phục mặc định (.env)</span>
+          <span>Khôi phục mặc định</span>
         </button>
 
         <button
