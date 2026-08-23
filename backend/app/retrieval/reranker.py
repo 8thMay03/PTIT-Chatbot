@@ -11,6 +11,7 @@ class Reranker:
 
     def __init__(self) -> None:
         self._cross_encoder: Any | None = None
+        self._loaded_model_name: str | None = None
 
     def rerank(self, query: str, contexts: list[dict], top_k: int) -> list[dict]:
         if not contexts or top_k <= 0:
@@ -30,10 +31,11 @@ class Reranker:
         contexts: list[dict],
         top_k: int,
     ) -> list[dict]:
-        if self._cross_encoder is None:
+        if self._cross_encoder is None or self._loaded_model_name != settings.reranker_model:
             from sentence_transformers import CrossEncoder
 
             self._cross_encoder = CrossEncoder(settings.reranker_model)
+            self._loaded_model_name = settings.reranker_model
 
         pairs = [(query, context.get("text", "")) for context in contexts]
         scores = self._cross_encoder.predict(pairs)

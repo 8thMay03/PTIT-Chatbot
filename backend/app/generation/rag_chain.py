@@ -108,26 +108,30 @@ class RagChain:
         history: list[dict[str, str]] | None = None,
     ) -> dict:
         """Run retrieval independently so callers can stream generation."""
-        history = filter_safe_history(history)
-        scope = check_scope(question, history)
-        if not scope.allowed:
-            retrieval_debug = {
-                "original_query": question,
-                "rewritten_query": "",
-                "retrieval_queries": [],
-                "requested_top_k": top_k,
-                "candidate_count": 0,
-                "retrieved_chunks": [],
-                "selected_chunks": [],
-                "strong_context": False,
-                "guardrail": {"allowed": False, "reason": scope.reason},
-            }
-            return {
-                "contexts": [],
-                "retrieval_debug": retrieval_debug,
-                "strong_context": False,
-                "guardrail_allowed": False,
-            }
+        scope_allowed = True
+        scope_reason = ""
+        if settings.guardrail_scope_enabled:
+            scope = check_scope(question, history)
+            scope_allowed = scope.allowed
+            scope_reason = scope.reason
+            if not scope_allowed:
+                retrieval_debug = {
+                    "original_query": question,
+                    "rewritten_query": "",
+                    "retrieval_queries": [],
+                    "requested_top_k": top_k,
+                    "candidate_count": 0,
+                    "retrieved_chunks": [],
+                    "selected_chunks": [],
+                    "strong_context": False,
+                    "guardrail": {"allowed": False, "reason": scope_reason},
+                }
+                return {
+                    "contexts": [],
+                    "retrieval_debug": retrieval_debug,
+                    "strong_context": False,
+                    "guardrail_allowed": False,
+                }
 
         rewritten_query = self.query_rewriter.rewrite(question, history=history)
         queries = self.multi_query_generator.generate(rewritten_query)

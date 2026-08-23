@@ -111,6 +111,9 @@ class Settings(BaseSettings):
     reranker_vector_weight: float = Field(default=0.45, ge=0, alias="RERANKER_VECTOR_WEIGHT")
     reranker_bm25_weight: float = Field(default=0.35, ge=0, alias="RERANKER_BM25_WEIGHT")
     reranker_lexical_weight: float = Field(default=0.20, ge=0, alias="RERANKER_LEXICAL_WEIGHT")
+    retrieval_default_top_k: int = Field(default=4, ge=1, le=20, alias="RETRIEVAL_DEFAULT_TOP_K")
+    retrieval_max_top_k: int = Field(default=10, ge=1, le=50, alias="RETRIEVAL_MAX_TOP_K")
+    guardrail_scope_enabled: bool = Field(default=True, alias="GUARDRAIL_SCOPE_ENABLED")
     cors_origins_raw: str = Field(
         default="http://localhost:5173,http://127.0.0.1:5173",
         alias="CORS_ORIGINS",
@@ -146,3 +149,206 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+# Snapshot initial defaults for reset capability
+_INITIAL_SETTINGS = settings.model_dump()
+
+
+def _mask_api_key(key: str | None) -> str | None:
+    if not key:
+        return None
+    cleaned = key.strip()
+    if len(cleaned) <= 8:
+        return "••••••••"
+    return f"{cleaned[:3]}••••••••{cleaned[-4:]}"
+
+
+def get_runtime_config_dict() -> dict:
+    """Return a comprehensive runtime configuration dictionary with masked API keys."""
+    provider = settings.llm_provider.lower()
+    
+    has_active_key = False
+    active_model = settings.openai_model
+    active_base_url = settings.openai_base_url
+
+    if provider in ("openai",):
+        has_active_key = bool(settings.openai_api_key)
+        active_model = settings.openai_model
+        active_base_url = settings.openai_base_url
+    elif provider in ("gemini", "google"):
+        has_active_key = bool(settings.gemini_api_key)
+        active_model = settings.gemini_model
+        active_base_url = None
+    elif provider in ("azure", "azure_openai"):
+        has_active_key = bool(settings.azure_openai_api_key)
+        active_model = settings.azure_openai_deployment_name or "azure-default"
+        active_base_url = settings.azure_openai_endpoint
+    elif provider in ("openai_compatible", "local", "ollama", "vllm"):
+        has_active_key = bool(settings.openai_compatible_api_key) or True  # local often no key needed
+        active_model = settings.openai_compatible_model
+        active_base_url = settings.openai_compatible_base_url
+
+    return {
+        "llm": {
+            "provider": settings.llm_provider,
+            "model": active_model,
+            "temperature": settings.llm_temperature,
+            "timeout": settings.llm_timeout,
+            "max_retries": settings.llm_max_retries,
+            "has_api_key": has_active_key,
+            "base_url": active_base_url,
+            "openai_model": settings.openai_model,
+            "openai_has_key": bool(settings.openai_api_key),
+            "gemini_model": settings.gemini_model,
+            "gemini_has_key": bool(settings.gemini_api_key),
+            "azure_openai_endpoint": settings.azure_openai_endpoint,
+            "azure_openai_deployment_name": settings.azure_openai_deployment_name,
+            "azure_openai_api_version": settings.azure_openai_api_version,
+            "azure_has_key": bool(settings.azure_openai_api_key),
+            "openai_compatible_base_url": settings.openai_compatible_base_url,
+            "openai_compatible_model": settings.openai_compatible_model,
+            "openai_compatible_has_key": bool(settings.openai_compatible_api_key),
+        },
+        "retrieval": {
+            "multi_query_enabled": settings.multi_query_enabled,
+            "multi_query_use_llm": settings.multi_query_use_llm,
+            "multi_query_count": settings.multi_query_count,
+            "query_rewrite_use_llm": settings.query_rewrite_use_llm,
+            "top_k": settings.retrieval_default_top_k,
+            "max_top_k": settings.retrieval_max_top_k,
+            "hybrid_vector_weight": settings.hybrid_vector_weight,
+            "hybrid_candidate_multiplier": settings.hybrid_candidate_multiplier,
+            "hybrid_rrf_k": settings.hybrid_rrf_k,
+        },
+        "reranker": {
+            "enabled": settings.reranker_enabled,
+            "provider": settings.reranker_provider,
+            "model": settings.reranker_model,
+            "candidate_multiplier": settings.reranker_candidate_multiplier,
+            "vector_weight": settings.reranker_vector_weight,
+            "bm25_weight": settings.reranker_bm25_weight,
+            "lexical_weight": settings.reranker_lexical_weight,
+        },
+        "guardrails": {
+            "scope_enabled": settings.guardrail_scope_enabled,
+            "min_vector_score": settings.retrieval_min_vector_score,
+            "min_bm25_score": settings.retrieval_min_bm25_score,
+        },
+        "available_providers": {
+            "llm": ["openai", "gemini", "azure", "openai_compatible"],
+            "reranker": ["heuristic", "cross-encoder"],
+        },
+    }
+
+
+def update_runtime_config(payload: dict) -> dict:
+    """Update runtime settings in-memory and return refreshed config dict."""
+    llm = payload.get("llm") or {}
+    if "provider" in llm and llm["provider"]:
+        settings.llm_provider = str(llm["provider"]).strip().lower()
+    if "temperature" in llm and llm["temperature"] is not None:
+        settings.llm_temperature = max(0.0, min(2.0, float(llm["temperature"])))
+    if "timeout" in llm and llm["timeout"] is not None:
+        settings.llm_timeout = max(1.0, float(llm["timeout"]))
+    if "max_retries" in llm and llm["max_retries"] is not None:
+        settings.llm_max_retries = max(0, int(llm["max_retries"]))
+
+    # Specific LLM Provider fields
+    if "openai_model" in llm and llm["openai_model"]:
+        settings.openai_model = str(llm["openai_model"]).strip()
+    if "openai_api_key" in llm and llm["openai_api_key"] is not None and llm["openai_api_key"] != "":
+        settings.openai_api_key = str(llm["openai_api_key"]).strip()
+    if "openai_base_url" in llm:
+        settings.openai_base_url = str(llm["openai_base_url"]).strip() if llm["openai_base_url"] else None
+
+    if "gemini_model" in llm and llm["gemini_model"]:
+        settings.gemini_model = str(llm["gemini_model"]).strip()
+    if "gemini_api_key" in llm and llm["gemini_api_key"] is not None and llm["gemini_api_key"] != "":
+        settings.gemini_api_key = str(llm["gemini_api_key"]).strip()
+
+    if "azure_openai_api_key" in llm and llm["azure_openai_api_key"] is not None and llm["azure_openai_api_key"] != "":
+        settings.azure_openai_api_key = str(llm["azure_openai_api_key"]).strip()
+    if "azure_openai_endpoint" in llm and llm["azure_openai_endpoint"]:
+        settings.azure_openai_endpoint = str(llm["azure_openai_endpoint"]).strip()
+    if "azure_openai_deployment_name" in llm and llm["azure_openai_deployment_name"]:
+        settings.azure_openai_deployment_name = str(llm["azure_openai_deployment_name"]).strip()
+    if "azure_openai_api_version" in llm and llm["azure_openai_api_version"]:
+        settings.azure_openai_api_version = str(llm["azure_openai_api_version"]).strip()
+
+    if "openai_compatible_base_url" in llm and llm["openai_compatible_base_url"]:
+        settings.openai_compatible_base_url = str(llm["openai_compatible_base_url"]).strip()
+    if "openai_compatible_api_key" in llm and llm["openai_compatible_api_key"] is not None:
+        settings.openai_compatible_api_key = str(llm["openai_compatible_api_key"]).strip() or None
+    if "openai_compatible_model" in llm and llm["openai_compatible_model"]:
+        settings.openai_compatible_model = str(llm["openai_compatible_model"]).strip()
+
+    # Generic api_key / model field mapping to current active provider
+    if "api_key" in llm and llm["api_key"] is not None and llm["api_key"] != "":
+        key_val = str(llm["api_key"]).strip()
+        curr_provider = settings.llm_provider.lower()
+        if curr_provider in ("openai",):
+            settings.openai_api_key = key_val
+        elif curr_provider in ("gemini", "google"):
+            settings.gemini_api_key = key_val
+        elif curr_provider in ("azure", "azure_openai"):
+            settings.azure_openai_api_key = key_val
+        elif curr_provider in ("openai_compatible", "local", "ollama", "vllm"):
+            settings.openai_compatible_api_key = key_val
+
+    if "model" in llm and llm["model"]:
+        model_val = str(llm["model"]).strip()
+        curr_provider = settings.llm_provider.lower()
+        if curr_provider in ("openai",):
+            settings.openai_model = model_val
+        elif curr_provider in ("gemini", "google"):
+            settings.gemini_model = model_val
+        elif curr_provider in ("azure", "azure_openai"):
+            settings.azure_openai_deployment_name = model_val
+        elif curr_provider in ("openai_compatible", "local", "ollama", "vllm"):
+            settings.openai_compatible_model = model_val
+
+    # Retrieval
+    retrieval = payload.get("retrieval") or {}
+    if "multi_query_enabled" in retrieval and retrieval["multi_query_enabled"] is not None:
+        settings.multi_query_enabled = bool(retrieval["multi_query_enabled"])
+    if "multi_query_use_llm" in retrieval and retrieval["multi_query_use_llm"] is not None:
+        settings.multi_query_use_llm = bool(retrieval["multi_query_use_llm"])
+    if "multi_query_count" in retrieval and retrieval["multi_query_count"] is not None:
+        settings.multi_query_count = max(1, min(8, int(retrieval["multi_query_count"])))
+    if "query_rewrite_use_llm" in retrieval and retrieval["query_rewrite_use_llm"] is not None:
+        settings.query_rewrite_use_llm = bool(retrieval["query_rewrite_use_llm"])
+    if "top_k" in retrieval and retrieval["top_k"] is not None:
+        settings.retrieval_default_top_k = max(1, min(20, int(retrieval["top_k"])))
+    if "hybrid_vector_weight" in retrieval and retrieval["hybrid_vector_weight"] is not None:
+        settings.hybrid_vector_weight = max(0.0, min(1.0, float(retrieval["hybrid_vector_weight"])))
+
+    # Reranker
+    reranker = payload.get("reranker") or {}
+    if "enabled" in reranker and reranker["enabled"] is not None:
+        settings.reranker_enabled = bool(reranker["enabled"])
+    if "provider" in reranker and reranker["provider"]:
+        settings.reranker_provider = str(reranker["provider"]).strip().lower()
+    if "model" in reranker and reranker["model"]:
+        settings.reranker_model = str(reranker["model"]).strip()
+    if "candidate_multiplier" in reranker and reranker["candidate_multiplier"] is not None:
+        settings.reranker_candidate_multiplier = max(1, min(8, int(reranker["candidate_multiplier"])))
+
+    # Guardrails
+    guardrails = payload.get("guardrails") or {}
+    if "scope_enabled" in guardrails and guardrails["scope_enabled"] is not None:
+        settings.guardrail_scope_enabled = bool(guardrails["scope_enabled"])
+    if "min_vector_score" in guardrails and guardrails["min_vector_score"] is not None:
+        settings.retrieval_min_vector_score = float(guardrails["min_vector_score"])
+    if "min_bm25_score" in guardrails and guardrails["min_bm25_score"] is not None:
+        settings.retrieval_min_bm25_score = float(guardrails["min_bm25_score"])
+
+    return get_runtime_config_dict()
+
+
+def reset_runtime_config() -> dict:
+    """Reset runtime configuration back to fresh default settings."""
+    fresh = Settings()
+    for field_name in Settings.model_fields.keys():
+        if hasattr(settings, field_name) and hasattr(fresh, field_name):
+            setattr(settings, field_name, getattr(fresh, field_name))
+    return get_runtime_config_dict()
