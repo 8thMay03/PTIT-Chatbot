@@ -50,6 +50,9 @@ def _debug_chunk(context: dict, rank: int) -> dict:
     return snapshot
 
 
+from app.llm import BaseLLMProvider
+
+
 class RagChain:
     def __init__(
         self,
@@ -57,17 +60,20 @@ class RagChain:
         query_rewriter: VietnameseQueryRewriter | None = None,
         multi_query_generator: VietnameseMultiQueryGenerator | None = None,
         reranker: Reranker | None = None,
+        llm_provider: BaseLLMProvider | None = None,
     ) -> None:
         self.retriever = retriever_ or retriever
         self.query_rewriter = query_rewriter or VietnameseQueryRewriter()
         self.multi_query_generator = multi_query_generator or VietnameseMultiQueryGenerator()
         self.reranker = reranker or Reranker()
+        self.llm_provider = llm_provider
 
     def answer(
         self,
         question: str,
         top_k: int = 4,
         history: list[dict[str, str]] | None = None,
+        llm_provider: BaseLLMProvider | None = None,
     ) -> dict:
         safe_history = filter_safe_history(history)
         result = self.retrieve_context(question, top_k=top_k, history=safe_history)
@@ -86,7 +92,8 @@ class RagChain:
                 "retrieval_debug": result["retrieval_debug"],
             }
 
-        answer = answer_with_llm(question, result["contexts"], history=safe_history)
+        provider = llm_provider or self.llm_provider
+        answer = answer_with_llm(question, result["contexts"], history=safe_history, provider=provider)
         return {
             "answer": answer,
             "sources": public_citations(result["contexts"]),

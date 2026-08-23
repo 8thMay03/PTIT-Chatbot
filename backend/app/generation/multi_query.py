@@ -22,15 +22,22 @@ DOMAIN_EXPANSIONS = {
 }
 
 
+from app.llm import BaseLLMProvider, get_llm_provider
+
+
 class VietnameseMultiQueryGenerator:
+    def __init__(self, llm_provider: BaseLLMProvider | None = None) -> None:
+        self.llm_provider = llm_provider
+
     def generate(self, query: str) -> list[str]:
         if not settings.multi_query_enabled:
             return [query]
 
         queries = [query]
-        if settings.multi_query_use_llm and settings.openai_api_key:
+        llm = self.llm_provider or get_llm_provider()
+        if settings.multi_query_use_llm and llm.is_configured():
             try:
-                queries.extend(_generate_with_llm(query))
+                queries.extend(_generate_with_llm(query, llm=llm))
             except Exception:
                 queries.extend(_rule_based_variants(query))
         else:
@@ -53,20 +60,17 @@ def _rule_based_variants(query: str) -> list[str]:
     return variants
 
 
-def _generate_with_llm(query: str) -> list[str]:
-    from openai import OpenAI
-
-    client = OpenAI(api_key=settings.openai_api_key)
-    response = client.chat.completions.create(
-        model=settings.openai_model,
-        messages=[
-            {"role": "system", "content": MULTI_QUERY_SYSTEM_PROMPT},
-            {"role": "user", "content": query},
-        ],
+def _generate_with_llm(query: str, llm: BaseLLMProvider | None = None) -> list[str]:
+    provider = llm or get_llm_provider()
+    messages = [
+        {"role": "system", "content": MULTI_QUERY_SYSTEM_PROMPT},
+        {"role": "user", "content": query},
+    ]
+    content = provider.generate(
+        messages=messages,
         temperature=0.3,
         max_tokens=180,
     )
-    content = response.choices[0].message.content or ""
     return [re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", line) for line in content.splitlines()]
 
 

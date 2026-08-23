@@ -98,15 +98,24 @@ class FixedRewriter:
         return "truy vấn đã viết lại"
 
 
+class SingleQueryGenerator:
+    def generate(self, query: str) -> list[str]:
+        return [query]
+
+
 def test_rag_chain_retrieves_with_rewritten_query_but_answers_original_question(monkeypatch) -> None:
     retriever = CapturingRetriever()
     answered_questions = []
     monkeypatch.setattr(
         "app.generation.rag_chain.answer_with_llm",
-        lambda question, contexts, history=None: answered_questions.append(question) or "Câu trả lời [1]",
+        lambda question, contexts, history=None, provider=None: answered_questions.append(question) or "Câu trả lời [1]",
     )
 
-    result = RagChain(retriever_=retriever, query_rewriter=FixedRewriter()).answer("Câu hỏi gốc về học phí")
+    result = RagChain(
+        retriever_=retriever,
+        query_rewriter=FixedRewriter(),
+        multi_query_generator=SingleQueryGenerator(),
+    ).answer("Câu hỏi gốc về học phí")
 
     assert retriever.query == "truy vấn đã viết lại"
     assert answered_questions == ["Câu hỏi gốc về học phí"]
@@ -123,12 +132,13 @@ def test_rag_chain_can_disable_reranker(monkeypatch) -> None:
     monkeypatch.setattr("app.generation.rag_chain.settings.reranker_enabled", False)
     monkeypatch.setattr(
         "app.generation.rag_chain.answer_with_llm",
-        lambda question, contexts, history=None: "Câu trả lời [1]",
+        lambda question, contexts, history=None, provider=None: "Câu trả lời [1]",
     )
 
     RagChain(
         retriever_=retriever,
         query_rewriter=FixedRewriter(),
+        multi_query_generator=SingleQueryGenerator(),
         reranker=FailingReranker(),
     ).answer("Câu hỏi gốc về học phí", top_k=4)
 
@@ -166,3 +176,28 @@ def test_rag_chain_removes_indirect_prompt_injection_from_retrieved_context() ->
     assert result["answer"] == NO_CONTEXT_ANSWER
     assert result["contexts"] == []
     assert result["retrieval_debug"]["unsafe_contexts_removed"] == 1
+
+
+def test_rag_chain_supports_pluggable_llm_provider() -> None:
+    from app.llm import BaseLLMProvider
+
+    class CustomTestProvider(BaseLLMProvider):
+        def is_configured(self) -> bool:
+            return True
+
+        def generate(self, messages, **kwargs) -> str:
+            return "Câu trả lời từ CustomTestProvider [1]"
+
+        def generate_stream(self, messages, **kwargs):
+            yield "Custom stream"
+
+    chain = RagChain(
+        retriever_=CapturingRetriever(),
+        multi_query_generator=SingleQueryGenerator(),
+        llm_provider=CustomTestProvider(),
+    )
+    result = chain.answer("Học phí PTIT?")
+
+    assert result["answer"] == "Câu trả lời từ CustomTestProvider [1]"
+    assert len(result["sources"]) == 1
+

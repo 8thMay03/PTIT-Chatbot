@@ -26,3 +26,24 @@ def test_rewriter_resolves_vietnamese_follow_up_from_recent_history(monkeypatch)
 
     assert rewritten.startswith("điều kiện cảnh báo học tập")
     assert "còn trường hợp đó thì sao" in rewritten
+
+
+def test_rewriter_with_llm_provider(monkeypatch) -> None:
+    from app.llm import BaseLLMProvider
+
+    class MockRewriterLLM(BaseLLMProvider):
+        def is_configured(self) -> bool:
+            return True
+
+        def generate(self, messages, **kwargs) -> str:
+            return "truy vấn viết lại từ LLM"
+
+        def generate_stream(self, messages, **kwargs):
+            yield "unused"
+
+    monkeypatch.setattr("app.generation.query_rewriter.settings.query_rewrite_use_llm", True)
+    rewriter = VietnameseQueryRewriter(llm_provider=MockRewriterLLM())
+    result = rewriter.rewrite("Học phí bao nhiêu?")
+
+    assert result == "truy vấn viết lại từ LLM"
+
