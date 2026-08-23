@@ -83,3 +83,51 @@ def get_llm_provider(provider_name: str | None = None) -> BaseLLMProvider:
 
     logger.warning("Unknown LLM provider %r, falling back to 'openai'.", name)
     return create_openai_provider()
+
+
+def create_llm_provider_from_config(
+    provider: str,
+    model: str | None = None,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    endpoint: str | None = None,
+    deployment_name: str | None = None,
+    api_version: str | None = None,
+    timeout: float = 15.0,
+) -> BaseLLMProvider:
+    """Create a temporary provider instance with explicit credentials for testing/dry-run."""
+    name = provider.strip().lower()
+    
+    if name in ("gemini", "google"):
+        return GeminiProvider(
+            api_key=api_key or settings.gemini_api_key,
+            model_name=model or settings.gemini_model,
+            timeout=timeout,
+            max_retries=1,
+        )
+    elif name in ("azure", "azure_openai"):
+        return AzureOpenAIProvider(
+            api_key=api_key or settings.azure_openai_api_key,
+            endpoint=endpoint or settings.azure_openai_endpoint,
+            deployment_name=deployment_name or model or settings.azure_openai_deployment_name,
+            api_version=api_version or settings.azure_openai_api_version,
+            timeout=timeout,
+            max_retries=1,
+        )
+    elif name in ("openai_compatible", "local", "ollama", "vllm"):
+        return OpenAICompatibleProvider(
+            base_url=base_url or settings.openai_compatible_base_url,
+            api_key=api_key or settings.openai_compatible_api_key,
+            model_name=model or settings.openai_compatible_model,
+            timeout=timeout,
+            max_retries=1,
+        )
+    else:  # default openai
+        return OpenAIProvider(
+            api_key=api_key or settings.openai_api_key,
+            model_name=model or settings.openai_model,
+            base_url=base_url or settings.openai_base_url,
+            timeout=timeout,
+            max_retries=1,
+        )
+

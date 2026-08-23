@@ -1,4 +1,5 @@
 import json
+import time
 from collections.abc import Iterator
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -12,10 +13,14 @@ from app.api.schemas import (
     DocumentDetail,
     DocumentItem,
     DocumentListResponse,
+    FullConfigResponse,
     IngestResponse,
+    TestLLMRequest,
+    TestLLMResponse,
+    UpdateConfigRequest,
 )
 from app.db import get_session
-from app.core.config import settings
+from app.core.config import get_runtime_config_dict, reset_runtime_config, settings, update_runtime_config
 from app.db.repositories import (
     add_message,
     add_message_sources,
@@ -32,6 +37,7 @@ from app.generation.citations import public_citations
 from app.generation.llm import _normalize_answer_citations, stream_answer_with_llm
 from app.ingestion import ingestion_pipeline
 from app.ingestion.uploads import DocumentUploadError, read_preview, resolve_source_path
+from app.llm.factory import create_llm_provider_from_config
 
 router = APIRouter()
 
@@ -39,6 +45,66 @@ router = APIRouter()
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.get("/config", response_model=FullConfigResponse)
+def get_config() -> FullConfigResponse:
+    return FullConfigResponse(**get_runtime_config_dict())
+
+
+@router.put("/config", response_model=FullConfigResponse)
+def update_config(request: UpdateConfigRequest) -> FullConfigResponse:
+    payload = request.model_dump(exclude_unset=True)
+    updated = update_runtime_config(payload)
+    return FullConfigResponse(**updated)
+
+
+@router.post("/config/reset", response_model=FullConfigResponse)
+def reset_config() -> FullConfigResponse:
+    reset_data = reset_runtime_config()
+    return FullConfigResponse(**reset_data)
+
+
+@router.post("/config/test-llm", response_model=TestLLMResponse)
+def test_llm(request: TestLLMRequest) -> TestLLMResponse:
+    start_time = time.perf_counter()
+    try:
+        provider_instance = create_llm_provider_from_config(
+            provider=request.provider,
+            model=request.model,
+            api_key=request.api_key,
+            base_url=request.base_url,
+            endpoint=request.endpoint,
+            deployment_name=request.deployment_name,
+            api_version=request.api_version,
+            timeout=15.0,
+        )
+        if not provider_instance.is_configured():
+            return TestLLMResponse(
+                success=False,
+                message=f"Provider '{request.provider}' chưa được cấu hình API Key hoặc Endpoint.",
+            )
+
+        prompt_messages = [
+            {"role": "system", "content": "You are a test assistant."},
+            {"role": "user", "content": "Reply with 'OK PTIT' in 3 words or less."},
+        ]
+        output = provider_instance.generate(prompt_messages, max_tokens=15, temperature=0.0)
+        latency_ms = round((time.perf_counter() - start_time) * 1000, 1)
+        return TestLLMResponse(
+            success=True,
+            message=f"Kết nối thành công tới {request.provider} ({request.model or 'mặc định'}).",
+            latency_ms=latency_ms,
+            sample_output=output.strip(),
+        )
+    except Exception as exc:
+        latency_ms = round((time.perf_counter() - start_time) * 1000, 1)
+        return TestLLMResponse(
+            success=False,
+            message=f"Lỗi khi kết nối tới {request.provider}: {str(exc)}",
+            latency_ms=latency_ms,
+        )
+
 
 
 @router.post("/ingest", response_model=IngestResponse)
@@ -131,7 +197,7 @@ def chat(request: ChatRequest, session: Session = Depends(get_session)) -> ChatR
         else []
     )
     history = filter_safe_history(history)
-    result = rag_chain.answer(request.message, top_k=request.top_k, history=history)
+    result = rag_chain.answer(request.message, top_k=request.effective_top_k, history=history)
     add_message(
         session,
         conversation.id,
@@ -173,7 +239,7 @@ def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -
         else []
     )
     history = filter_safe_history(history)
-    retrieval = rag_chain.retrieve_context(request.message, top_k=request.top_k, history=history)
+    retrieval = rag_chain.retrieve_context(request.message, top_k=request.effective_top_k, history=history)
 
     def event_stream() -> Iterator[str]:
         contexts = retrieval["contexts"] if retrieval["strong_context"] else []
