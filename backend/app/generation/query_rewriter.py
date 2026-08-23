@@ -28,16 +28,26 @@ CONVERSATIONAL_PREFIXES = (
 )
 
 
+from app.llm import BaseLLMProvider, get_llm_provider
+
+
 class VietnameseQueryRewriter:
+    def __init__(self, llm_provider: BaseLLMProvider | None = None) -> None:
+        self.llm_provider = llm_provider
+
     def rewrite(self, question: str, history: list[dict[str, str]] | None = None) -> str:
         history = history or []
         fallback = rule_based_rewrite(question)
         fallback = _resolve_rule_based_follow_up(fallback, history)
-        if not settings.query_rewrite_use_llm or not settings.openai_api_key:
+        if not settings.query_rewrite_use_llm:
+            return fallback
+
+        llm = self.llm_provider or get_llm_provider()
+        if not llm.is_configured():
             return fallback
 
         try:
-            return _rewrite_with_llm(fallback, history) or fallback
+            return _rewrite_with_llm(fallback, history, llm=llm) or fallback
         except Exception:
             return fallback
 
@@ -76,25 +86,27 @@ def _resolve_rule_based_follow_up(query: str, history: list[dict[str, str]]) -> 
     return f"{previous_query} {query}"[:500]
 
 
-def _rewrite_with_llm(query: str, history: list[dict[str, str]]) -> str:
-    from openai import OpenAI
-
-    client = OpenAI(api_key=settings.openai_api_key)
+def _rewrite_with_llm(
+    query: str,
+    history: list[dict[str, str]],
+    llm: BaseLLMProvider | None = None,
+) -> str:
+    provider = llm or get_llm_provider()
     history_text = "\n".join(
         f"{message.get('role', 'user')}: {message.get('content', '')}"
         for message in history
     )
-    response = client.chat.completions.create(
-        model=settings.openai_model,
-        messages=[
-            {"role": "system", "content": REWRITE_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": f"Lịch sử:\n{history_text or '(trống)'}\n\nCâu hỏi mới:\n{query}",
-            },
-        ],
-        temperature=0,
+    messages = [
+        {"role": "system", "content": REWRITE_SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": f"Lịch sử:\n{history_text or '(trống)'}\n\nCâu hỏi mới:\n{query}",
+        },
+    ]
+    response_text = provider.generate(
+        messages=messages,
+        temperature=0.0,
         max_tokens=100,
     )
-    rewritten = (response.choices[0].message.content or "").strip().strip('"`')
+    rewritten = response_text.strip().strip('"`')
     return " ".join(rewritten.split())[:500]

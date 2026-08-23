@@ -32,3 +32,29 @@ def test_multi_query_fusion_promotes_chunks_found_by_multiple_queries() -> None:
     assert results[0]["query_hits"] == 2
     assert results[0]["vector_score"] == 0.7
     assert results[0]["bm25_score"] == 4.0
+
+
+def test_multi_query_with_llm_provider(monkeypatch) -> None:
+    from app.llm import BaseLLMProvider
+
+    class MockMultiQueryLLM(BaseLLMProvider):
+        def is_configured(self) -> bool:
+            return True
+
+        def generate(self, messages, **kwargs) -> str:
+            return "truy vấn 1\ntruy vấn 2"
+
+        def generate_stream(self, messages, **kwargs):
+            yield "unused"
+
+    monkeypatch.setattr("app.generation.multi_query.settings.multi_query_enabled", True)
+    monkeypatch.setattr("app.generation.multi_query.settings.multi_query_use_llm", True)
+    monkeypatch.setattr("app.generation.multi_query.settings.multi_query_count", 3)
+
+    generator = VietnameseMultiQueryGenerator(llm_provider=MockMultiQueryLLM())
+    queries = generator.generate("câu hỏi gốc")
+
+    assert "câu hỏi gốc" in queries
+    assert "truy vấn 1" in queries
+    assert "truy vấn 2" in queries
+

@@ -1,3 +1,4 @@
+import logging
 import re
 from collections.abc import Iterator
 
@@ -5,31 +6,34 @@ from app.core.config import settings
 from app.generation.citations import numbered_contexts, public_citations
 from app.guardrails import OUT_OF_SCOPE_ANSWER
 from app.generation.prompts import SYSTEM_PROMPT, build_context_prompt
+from app.llm import BaseLLMProvider, get_llm_provider
+
+logger = logging.getLogger(__name__)
 
 
 def answer_with_llm(
     question: str,
     contexts: list[dict],
     history: list[dict[str, str]] | None = None,
+    provider: BaseLLMProvider | None = None,
 ) -> str:
     if not contexts:
         return "Mình chưa tìm thấy thông tin phù hợp trong kho tài liệu."
 
-    if not settings.openai_api_key:
+    llm = provider or get_llm_provider()
+    if not llm.is_configured():
         return _extractive_answer(contexts)
 
-    from openai import OpenAI
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": build_context_prompt(question, contexts, history)},
+    ]
+    try:
+        answer = llm.generate(messages, temperature=settings.llm_temperature)
+    except Exception as exc:
+        logger.warning("LLM generation failed: %s. Falling back to extractive answer.", exc)
+        return _extractive_answer(contexts)
 
-    client = OpenAI(api_key=settings.openai_api_key)
-    response = client.chat.completions.create(
-        model=settings.openai_model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": build_context_prompt(question, contexts, history)},
-        ],
-        temperature=0.0,
-    )
-    answer = response.choices[0].message.content or ""
     return _normalize_answer_citations(answer, contexts)
 
 
@@ -37,32 +41,27 @@ def stream_answer_with_llm(
     question: str,
     contexts: list[dict],
     history: list[dict[str, str]] | None = None,
+    provider: BaseLLMProvider | None = None,
 ) -> Iterator[str]:
     """Yield answer deltas as they arrive from the model."""
     if not contexts:
         yield "Mình chưa tìm thấy thông tin phù hợp trong kho tài liệu."
         return
 
-    if not settings.openai_api_key:
+    llm = provider or get_llm_provider()
+    if not llm.is_configured():
         yield _extractive_answer(contexts)
         return
 
-    from openai import OpenAI
-
-    client = OpenAI(api_key=settings.openai_api_key)
-    stream = client.chat.completions.create(
-        model=settings.openai_model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": build_context_prompt(question, contexts, history)},
-        ],
-        temperature=0.2,
-        stream=True,
-    )
-    for chunk in stream:
-        content = chunk.choices[0].delta.content
-        if content:
-            yield content
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": build_context_prompt(question, contexts, history)},
+    ]
+    try:
+        yield from llm.generate_stream(messages, temperature=0.2)
+    except Exception as exc:
+        logger.warning("LLM streaming failed: %s. Falling back to extractive answer.", exc)
+        yield _extractive_answer(contexts)
 
 
 def _extractive_answer(contexts: list[dict]) -> str:
@@ -72,7 +71,7 @@ def _extractive_answer(contexts: list[dict]) -> str:
         excerpts.append(f"- {text[:700]} [{citation_id}]")
 
     return (
-        "Chưa cấu hình OPENAI_API_KEY nên mình trả về các đoạn liên quan nhất:\n"
+        "Chưa cấu hình API Key cho LLM nên mình trả về các đoạn liên quan nhất:\n"
         + "\n".join(excerpts)
     )
 

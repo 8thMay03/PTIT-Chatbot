@@ -14,8 +14,47 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # LLM Settings
+    llm_provider: str = Field(default="openai", alias="LLM_PROVIDER")
+    llm_timeout: float = Field(default=30.0, ge=1.0, alias="LLM_TIMEOUT")
+    llm_max_retries: int = Field(default=2, ge=0, alias="LLM_MAX_RETRIES")
+    llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0, alias="LLM_TEMPERATURE")
+
+    # OpenAI Settings
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
+    openai_base_url: str | None = Field(default=None, alias="OPENAI_BASE_URL")
+
+    # Google Gemini Settings
+    gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
+    gemini_model: str = Field(default="gemini-1.5-flash", alias="GEMINI_MODEL")
+
+    # Azure OpenAI Settings
+    azure_openai_api_key: str | None = Field(default=None, alias="AZURE_OPENAI_API_KEY")
+    azure_openai_endpoint: str | None = Field(default=None, alias="AZURE_OPENAI_ENDPOINT")
+    azure_openai_deployment_name: str | None = Field(
+        default=None,
+        alias="AZURE_OPENAI_DEPLOYMENT_NAME",
+    )
+    azure_openai_api_version: str = Field(
+        default="2024-02-15-preview",
+        alias="AZURE_OPENAI_API_VERSION",
+    )
+
+    # OpenAI Compatible / Local Model Settings
+    openai_compatible_base_url: str | None = Field(
+        default=None,
+        alias="OPENAI_COMPATIBLE_BASE_URL",
+    )
+    openai_compatible_api_key: str | None = Field(
+        default=None,
+        alias="OPENAI_COMPATIBLE_API_KEY",
+    )
+    openai_compatible_model: str = Field(
+        default="default",
+        alias="OPENAI_COMPATIBLE_MODEL",
+    )
+
     ragas_judge_model: str = Field(default="gpt-4.1-mini", alias="RAGAS_JUDGE_MODEL")
     ragas_embedding_model: str = Field(
         default="text-embedding-3-small",
