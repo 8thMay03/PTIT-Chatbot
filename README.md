@@ -25,7 +25,7 @@ Thay vì để mô hình trả lời hoàn toàn từ kiến thức có sẵn, c
 |---|---|
 | Frontend | React 18, Vite 5, Lucide React |
 | Backend API | Python 3.10+, FastAPI, Uvicorn, Pydantic |
-| LLM | OpenAI API, mặc định `gpt-4.1-mini` |
+| LLM | Đa provider: OpenAI (`gpt-4.1-mini`), Google Gemini, Azure OpenAI, OpenAI-Compatible (Ollama, vLLM) |
 | Embedding | OpenAI `text-embedding-3-small`; hỗ trợ Sentence Transformers hoặc hash embedding |
 | Vector database | ChromaDB |
 | Keyword retrieval | BM25 với `rank-bm25` |
@@ -133,14 +133,37 @@ Tại thư mục gốc:
 Copy-Item .env.example .env
 ```
 
-Cập nhật API key trong `.env`:
+Cập nhật cấu hình trong `.env`:
 
 ```env
+# 1. Sử dụng OpenAI (mặc định)
+LLM_PROVIDER=openai
 OPENAI_API_KEY=your-openai-api-key
 OPENAI_MODEL=gpt-4.1-mini
+
+# 2. Sử dụng Google Gemini
+# LLM_PROVIDER=gemini
+# GEMINI_API_KEY=your-gemini-api-key
+# GEMINI_MODEL=gemini-1.5-flash
+
+# 3. Sử dụng Azure OpenAI
+# LLM_PROVIDER=azure
+# AZURE_OPENAI_API_KEY=your-azure-api-key
+# AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+# AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
+# AZURE_OPENAI_API_VERSION=2024-02-15-preview
+
+# 4. Sử dụng mô hình cục bộ / OpenAI-Compatible (Ollama, vLLM, LocalAI)
+# LLM_PROVIDER=openai_compatible
+# OPENAI_COMPATIBLE_BASE_URL=http://localhost:11434/v1
+# OPENAI_COMPATIBLE_API_KEY=ollama
+# OPENAI_COMPATIBLE_MODEL=llama3
+
 EMBEDDING_PROVIDER=openai
 EMBEDDING_MODEL=text-embedding-3-small
 ```
+
+Hệ thống cho phép chuyển đổi provider linh hoạt qua biến môi trường `LLM_PROVIDER` mà không cần thay đổi bất kỳ dòng code nào trong RAG chain.
 
 Các cấu hình RAG mặc định đã được khai báo trong `.env.example`.
 
