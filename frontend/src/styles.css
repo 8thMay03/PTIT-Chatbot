@@ -3732,6 +3732,152 @@ button {
   white-space: normal;
 }
 
+/* ==========================================================================
+   MARKDOWN RENDERED STYLES (Document View & Chunk Cards)
+   ========================================================================== */
+.doc-markdown-rendered-view,
+.chunk-card-markdown-view {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #1e293b;
+  word-break: break-word;
+}
+
+.doc-markdown-rendered-view .doc-h1,
+.chunk-card-markdown-view .doc-h1 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 14px 0 6px 0;
+  line-height: 1.35;
+}
+
+.doc-markdown-rendered-view .doc-h2,
+.chunk-card-markdown-view .doc-h2 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 12px 0 6px 0;
+  line-height: 1.4;
+}
+
+.doc-markdown-rendered-view .doc-h3,
+.chunk-card-markdown-view .doc-h3 {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 10px 0 4px 0;
+  line-height: 1.4;
+}
+
+.doc-markdown-rendered-view .doc-h4,
+.chunk-card-markdown-view .doc-h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  margin: 8px 0 4px 0;
+}
+
+.doc-markdown-rendered-view .doc-p,
+.chunk-card-markdown-view .doc-p {
+  margin: 0 0 6px 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #334155;
+}
+
+.doc-markdown-rendered-view .doc-ul,
+.chunk-card-markdown-view .doc-ul {
+  margin: 4px 0 8px 18px;
+  padding: 0;
+  list-style-type: disc;
+}
+
+.doc-markdown-rendered-view .doc-ol,
+.chunk-card-markdown-view .doc-ol {
+  margin: 4px 0 8px 18px;
+  padding: 0;
+  list-style-type: decimal;
+}
+
+.doc-markdown-rendered-view li,
+.chunk-card-markdown-view li {
+  margin-bottom: 3px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.doc-markdown-rendered-view strong,
+.chunk-card-markdown-view strong {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.doc-markdown-rendered-view em,
+.chunk-card-markdown-view em {
+  font-style: italic;
+  color: #475569;
+}
+
+.doc-inline-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
+  background: #f1f5f9;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+}
+
+.doc-blockquote {
+  margin: 8px 0;
+  padding: 6px 12px;
+  border-left: 3px solid #14b8a6;
+  background: #f0fdfa;
+  color: #0f766e;
+  border-radius: 0 4px 4px 0;
+  font-size: 12.5px;
+}
+
+.doc-table-wrapper {
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.doc-table th,
+.doc-table td {
+  border: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.doc-table th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.doc-hr {
+  border: 0;
+  height: 1px;
+  background: #e2e8f0;
+  margin: 12px 0;
+}
+
+.doc-link {
+  color: #0284c7;
+  text-decoration: underline;
+}
+
+
+
 .chunk-pagination-footer {
   display: flex;
   align-items: center;

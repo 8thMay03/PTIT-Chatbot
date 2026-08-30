@@ -64,49 +64,166 @@ function apiError(payload, fallback) {
   return fallback;
 }
 
-function renderFormattedMarkdown(text) {
-  if (!text) return "";
-  const lines = text.split(/\r?\n/);
-  return lines.map((line, index) => {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("### ")) {
-      return (
-        <h4 key={index} className="doc-md-h4">
-          {trimmed.replace(/^###\s+/, "")}
-        </h4>
-      );
-    }
-    if (trimmed.startsWith("## ")) {
-      return (
-        <h3 key={index} className="doc-md-h3">
-          {trimmed.replace(/^##\s+/, "")}
-        </h3>
-      );
-    }
-    if (trimmed.startsWith("# ")) {
-      return (
-        <h2 key={index} className="doc-md-h2">
-          {trimmed.replace(/^#\s+/, "")}
-        </h2>
-      );
-    }
-    if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-      return (
-        <li key={index} className="doc-md-li">
-          {trimmed.replace(/^[-*]\s+/, "")}
-        </li>
-      );
-    }
-    if (!trimmed) {
-      return <div key={index} className="doc-md-spacer" />;
-    }
-    return (
-      <p key={index} className="doc-md-p">
-        {line}
-      </p>
-    );
-  });
+function escapeHtml(value) {
+  if (!value) return "";
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
+
+function parseInlineMarkdown(text) {
+  if (!text) return "";
+  let res = text;
+  // Inline code
+  res = res.replace(/`([^`]+)`/g, '<code class="doc-inline-code">$1</code>');
+  // Bold + Italic
+  res = res.replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>");
+  res = res.replace(/_\*\*([^*]+)\*\*_|\*\*_([^_]+)_\*\*/g, "<strong><em>$1$2</em></strong>");
+  // Bold
+  res = res.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  res = res.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+  // Italic
+  res = res.replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
+  res = res.replace(/(^|[^_])_([^_]+)_/g, "$1<em>$2</em>");
+  // Links
+  res = res.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noreferrer" class="doc-link">$1</a>'
+  );
+  return res;
+}
+
+function renderMarkdownHtml(rawText) {
+  if (!rawText) return "";
+  const text = escapeHtml(rawText);
+  const lines = text.split(/\r?\n/);
+  const out = [];
+  let inList = false;
+  let listType = null;
+  let inTable = false;
+
+  const closeList = () => {
+    if (inList) {
+      out.push(`</${listType}>`);
+      inList = false;
+      listType = null;
+    }
+  };
+
+  const closeTable = () => {
+    if (inTable) {
+      out.push("</tbody></table></div>");
+      inTable = false;
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const trimmed = rawLine.trim();
+
+    if (!trimmed) {
+      closeList();
+      closeTable();
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^(\-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+      closeList();
+      closeTable();
+      out.push('<hr class="doc-hr" />');
+      continue;
+    }
+
+    // Headings (# to ######)
+    const headingMatch = /^(#{1,6})\s+(.*)$/.exec(trimmed);
+    if (headingMatch) {
+      closeList();
+      closeTable();
+      const level = headingMatch[1].length;
+      out.push(`<h${level} class="doc-h${level}">${parseInlineMarkdown(headingMatch[2])}</h${level}>`);
+      continue;
+    }
+
+    // Blockquote
+    if (trimmed.startsWith("&gt; ") || trimmed.startsWith("> ")) {
+      closeList();
+      closeTable();
+      const quoteText = trimmed.replace(/^(&gt;|>)\s+/, "");
+      out.push(`<blockquote class="doc-blockquote">${parseInlineMarkdown(quoteText)}</blockquote>`);
+      continue;
+    }
+
+    // Table rows
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      closeList();
+      if (/^\|(\s*[-:]+[-| :]*)\|$/.test(trimmed)) {
+        continue;
+      }
+      const cells = trimmed
+        .slice(1, -1)
+        .split("|")
+        .map((c) => c.trim());
+
+      if (!inTable) {
+        inTable = true;
+        out.push('<div class="doc-table-wrapper"><table class="doc-table"><thead><tr>');
+        cells.forEach((cell) => {
+          out.push(`<th>${parseInlineMarkdown(cell)}</th>`);
+        });
+        out.push("</tr></thead><tbody>");
+      } else {
+        out.push("<tr>");
+        cells.forEach((cell) => {
+          out.push(`<td>${parseInlineMarkdown(cell)}</td>`);
+        });
+        out.push("</tr>");
+      }
+      continue;
+    } else {
+      closeTable();
+    }
+
+    // Unordered lists
+    const ulMatch = /^\s*[-*]\s+(.*)$/.exec(rawLine);
+    if (ulMatch) {
+      closeTable();
+      if (!inList || listType !== "ul") {
+        closeList();
+        out.push('<ul class="doc-ul">');
+        inList = true;
+        listType = "ul";
+      }
+      out.push(`<li>${parseInlineMarkdown(ulMatch[1])}</li>`);
+      continue;
+    }
+
+    // Ordered lists
+    const olMatch = /^\s*(\d+)\.\s+(.*)$/.exec(rawLine);
+    if (olMatch) {
+      closeTable();
+      if (!inList || listType !== "ol") {
+        closeList();
+        out.push('<ol class="doc-ol">');
+        inList = true;
+        listType = "ol";
+      }
+      out.push(`<li>${parseInlineMarkdown(olMatch[2])}</li>`);
+      continue;
+    }
+
+    // Paragraph
+    closeList();
+    closeTable();
+    out.push(`<p class="doc-p">${parseInlineMarkdown(trimmed)}</p>`);
+  }
+
+  closeList();
+  closeTable();
+  return out.join("\n");
+}
+
 
 export default function DocumentsView({ onChanged }) {
   const [activeTab, setActiveTab] = useState("files"); // files | retrieval | logs | config
@@ -593,11 +710,14 @@ export default function DocumentsView({ onChanged }) {
                   <p>Loading document...</p>
                 </div>
               ) : (
-                <div className="doc-markdown-content">
-                  {renderFormattedMarkdown(
-                    docDetail?.full_text || docDetail?.preview || "No content available."
-                  )}
-                </div>
+                <div
+                  className="doc-markdown-rendered-view"
+                  dangerouslySetInnerHTML={{
+                    __html: renderMarkdownHtml(
+                      docDetail?.full_text || docDetail?.preview || "No content available."
+                    ),
+                  }}
+                />
               )}
             </div>
           </div>
@@ -625,7 +745,7 @@ export default function DocumentsView({ onChanged }) {
                 </label>
 
                 <div className="chunk-toolbar-right">
-                  {/* Segmented Mode Button */}
+                  {/* Segmented Mode Button (Full text | Ellipse | Markdown) */}
                   <div className="chunk-mode-toggle">
                     <button
                       type="button"
@@ -640,6 +760,13 @@ export default function DocumentsView({ onChanged }) {
                       onClick={() => setChunkMode("ellipse")}
                     >
                       Ellipse
+                    </button>
+                    <button
+                      type="button"
+                      className={`chunk-mode-btn ${chunkMode === "markdown" ? "active" : ""}`}
+                      onClick={() => setChunkMode("markdown")}
+                    >
+                      Markdown
                     </button>
                   </div>
 
@@ -726,14 +853,23 @@ export default function DocumentsView({ onChanged }) {
                           </div>
                         </div>
 
-                        {/* Body Content */}
-                        <div
-                          className={`chunk-card-text ${
-                            chunkMode === "ellipse" ? "is-ellipse" : ""
-                          }`}
-                        >
-                          {chunk.text}
-                        </div>
+                        {/* Body Content: Render Markdown when chunkMode === 'markdown' */}
+                        {chunkMode === "markdown" ? (
+                          <div
+                            className="chunk-card-markdown-view"
+                            dangerouslySetInnerHTML={{
+                              __html: renderMarkdownHtml(chunk.text),
+                            }}
+                          />
+                        ) : (
+                          <div
+                            className={`chunk-card-text ${
+                              chunkMode === "ellipse" ? "is-ellipse" : ""
+                            }`}
+                          >
+                            {chunk.text}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
