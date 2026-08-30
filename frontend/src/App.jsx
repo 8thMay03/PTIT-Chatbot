@@ -3,6 +3,7 @@ import {
   BookOpen,
   ChevronDown,
   Clock,
+  Cpu,
   Disc,
   Github,
   Home,
@@ -15,17 +16,18 @@ import {
 } from "lucide-react";
 import ChatView from "./ChatView";
 import DocumentsView from "./DocumentsView";
-import SettingsView from "./SettingsView";
+import ConfigView from "./ConfigView";
+import ModelsView from "./ModelsView";
 import { API_BASE_URL } from "./api";
 
 const SIDEBAR_TIPS = [
   "Hỏi cụ thể một quy định, ví dụ \"điều kiện tốt nghiệp\".",
   "Có thể hỏi tiếp để làm rõ câu trả lời trước đó.",
   "Mỗi câu trả lời kèm nguồn trích từ sổ tay sinh viên.",
-  "Tùy chỉnh LLM & Reranker trong tab Cấu hình.",
+  "Tùy chỉnh LLM & Reranker trong màn Cấu hình hoặc Mô hình.",
 ];
 
-const VALID_VIEWS = ["chat", "documents", "settings"];
+const VALID_VIEWS = ["chat", "documents", "config", "models", "settings"];
 
 function getInitialView() {
   if (typeof window !== "undefined") {
@@ -88,7 +90,8 @@ export default function App() {
   const NAV_ITEMS = [
     { key: "documents", label: "Dataset" },
     { key: "chat", label: "Chat" },
-    { key: "settings", label: "Cấu hình" },
+    { key: "config", label: "Cấu hình" },
+    { key: "models", label: "Mô hình" },
   ];
 
   return (
@@ -120,7 +123,9 @@ export default function App() {
             <button
               key={item.key}
               type="button"
-              className={`top-nav-item ${view === item.key ? "active" : ""}`}
+              className={`top-nav-item ${
+                view === item.key || (item.key === "config" && view === "settings") ? "active" : ""
+              }`}
               onClick={() => setView(item.key)}
             >
               {item.label}
@@ -156,9 +161,11 @@ export default function App() {
 
           <button
             type="button"
-            className={`header-icon-btn ${view === "settings" ? "active" : ""}`}
+            className={`header-icon-btn ${
+              view === "config" || view === "models" || view === "settings" ? "active" : ""
+            }`}
             title="Cài đặt hệ thống"
-            onClick={() => setView("settings")}
+            onClick={() => setView("config")}
           >
             <Sliders size={15} />
           </button>
@@ -205,14 +212,24 @@ export default function App() {
           </div>
 
           <div className="sidebar-section">
-            <span className="sidebar-label">Cấu hình nhanh</span>
-            <button className="panel panel-button" onClick={() => setView("settings")}>
+            <span className="sidebar-label">Cấu hình & Mô hình</span>
+            <button className="panel panel-button" onClick={() => setView("config")}>
               <div className="panel-icon">
                 <Sliders size={18} />
               </div>
               <div>
-                <strong>Tùy chỉnh RAG</strong>
-                <span>Chọn LLM, Reranker, Multi-Query</span>
+                <strong>Cấu hình RAG</strong>
+                <span>Temperature, Top-K, Threshold</span>
+              </div>
+            </button>
+
+            <button className="panel panel-button" onClick={() => setView("models")} style={{ marginTop: "8px" }}>
+              <div className="panel-icon">
+                <Cpu size={18} />
+              </div>
+              <div>
+                <strong>Quản lý Mô hình</strong>
+                <span>Chọn LLM, Embedding, Rerank</span>
               </div>
             </button>
           </div>
@@ -242,8 +259,10 @@ export default function App() {
           onLoadingChange={setChatLoading}
         />
         {view === "documents" && <DocumentsView onChanged={refreshDocCount} />}
-        {view === "settings" && <SettingsView />}
+        {(view === "config" || view === "settings") && <ConfigView />}
+        {view === "models" && <ModelsView />}
       </div>
     </main>
   );
 }
+
