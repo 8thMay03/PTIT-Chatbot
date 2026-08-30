@@ -6,22 +6,12 @@ import {
   Gauge,
   Info,
   Layers,
-  Play,
   RotateCcw,
   Save,
-  Search,
   ShieldCheck,
   Sliders,
-  X,
-  Zap,
 } from "lucide-react";
 import { API_BASE_URL } from "./api";
-
-const SAMPLE_QUERIES = [
-  "Điều kiện xét học bổng khuyến khích học tập?",
-  "Quy định cảnh báo học vụ và buộc thôi học?",
-  "Thủ tục đăng ký học lại hoặc cải thiện điểm?",
-];
 
 export default function ConfigView() {
   const [loading, setLoading] = useState(true);
@@ -46,12 +36,6 @@ export default function ConfigView() {
 
   const [rerankerEnabled, setRerankerEnabled] = useState(true);
   const [candidateMultiplier, setCandidateMultiplier] = useState(3);
-
-  // Live Retrieval Playground State
-  const [testQuery, setTestQuery] = useState("");
-  const [testingRetrieval, setTestingRetrieval] = useState(false);
-  const [retrievalResult, setRetrievalResult] = useState(null);
-  const [retrievalError, setRetrievalError] = useState(null);
 
   useEffect(() => {
     fetchBackendConfig();
@@ -159,44 +143,6 @@ export default function ConfigView() {
     }
   }
 
-  async function handleRunRetrievalTest(queryText) {
-    const q = (queryText || testQuery || "").trim();
-    if (!q) {
-      setRetrievalError("Vui lòng nhập câu hỏi để thử nghiệm.");
-      return;
-    }
-    setTestingRetrieval(true);
-    setRetrievalError(null);
-    setRetrievalResult(null);
-
-    try {
-      const payload = {
-        query: q,
-        top_k: parseInt(topK, 10) || 4,
-        similarity_threshold: parseFloat(minVectorScore) || 0.30,
-        vector_similarity_weight: parseFloat(hybridVectorWeight) || 0.65,
-      };
-
-      const res = await fetch(`${API_BASE_URL}/retrieval/test`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.detail || "Không thể thực hiện truy xuất");
-      }
-
-      const data = await res.json();
-      setRetrievalResult(data);
-    } catch (err) {
-      setRetrievalError(`Lỗi kiểm tra truy xuất: ${err.message}`);
-    } finally {
-      setTestingRetrieval(false);
-    }
-  }
-
   if (loading) {
     return (
       <div className="model-mgmt-loading">
@@ -224,7 +170,7 @@ export default function ConfigView() {
           <div>
             <h2 className="config-main-title">Cấu hình Hệ thống & Tham số RAG</h2>
             <p className="config-main-desc">
-              Tinh chỉnh nhiệt độ sinh (Temperature), số đoạn văn bản (Top-K), ngưỡng tương đồng (Similarity Threshold), tỷ trọng Hybrid Search và thử nghiệm truy xuất trực tiếp.
+              Tinh chỉnh nhiệt độ sinh (Temperature), số đoạn văn bản (Top-K), ngưỡng tương đồng (Similarity Threshold) và tỷ trọng Hybrid Search.
             </p>
           </div>
         </div>
@@ -255,7 +201,7 @@ export default function ConfigView() {
 
       <div className="config-view-container">
         <div className="config-two-col-grid">
-          {/* Left Column: Parameter Control Cards */}
+          {/* Column 1: LLM Generation & Reranker Tuning */}
           <div className="config-col-left">
             {/* CARD 1: THAM SỐ MÔ HÌNH SINH (LLM) */}
             <div className="config-panel-card">
@@ -361,6 +307,55 @@ export default function ConfigView() {
               </div>
             </div>
 
+            {/* CARD 4: TÁI XẾP HẠNG TÀI LIỆU (RERANKER TUNING) */}
+            <div className="config-panel-card">
+              <div className="config-card-header">
+                <div className="config-card-icon purple">
+                  <Gauge size={17} />
+                </div>
+                <div>
+                  <h3 className="config-card-title">Tái xếp hạng tài liệu (Reranker Tuning)</h3>
+                  <p className="config-card-subtitle">Sắp xếp lại các ứng viên truy xuất theo độ tương quan chính xác</p>
+                </div>
+              </div>
+
+              <div className="config-card-body">
+                <div className="config-toggle-header">
+                  <div>
+                    <span className="config-toggle-title">Kích hoạt Reranker</span>
+                    <p className="config-toggle-desc">Sử dụng Cross-Encoder / Cohere Rerank để sắp xếp lại danh sách tài liệu</p>
+                  </div>
+                  <button
+                    type="button"
+                    className={`pill-switch ${rerankerEnabled ? "on" : "off"}`}
+                    onClick={() => setRerankerEnabled(!rerankerEnabled)}
+                  >
+                    <span className="pill-switch-thumb" />
+                  </button>
+                </div>
+
+                {rerankerEnabled && (
+                  <div className="sub-settings-panel" style={{ marginTop: "12px" }}>
+                    <div className="sub-setting-row">
+                      <label>Hệ số ứng viên sơ bộ (Candidate Multiplier): <strong>{candidateMultiplier}x</strong> (Lấy {topK * candidateMultiplier} chunks trước khi Rerank)</label>
+                      <input
+                        type="range"
+                        min="1"
+                        max="6"
+                        step="1"
+                        className="custom-range-slider compact"
+                        value={candidateMultiplier}
+                        onChange={(e) => setCandidateMultiplier(parseInt(e.target.value, 10))}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Column 2: Retrieval & Guardrails */}
+          <div className="config-col-right">
             {/* CARD 2: THAM SỐ TRUY XUẤT & TÌM KIẾM (RETRIEVAL) */}
             <div className="config-panel-card">
               <div className="config-card-header">
@@ -585,187 +580,6 @@ export default function ConfigView() {
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* CARD 4: TÁI XẾP HẠNG TÀI LIỆU (RERANKER TUNING) */}
-            <div className="config-panel-card">
-              <div className="config-card-header">
-                <div className="config-card-icon purple">
-                  <Gauge size={17} />
-                </div>
-                <div>
-                  <h3 className="config-card-title">Tái xếp hạng tài liệu (Reranker Tuning)</h3>
-                  <p className="config-card-subtitle">Sắp xếp lại các ứng viên truy xuất theo độ tương quan chính xác</p>
-                </div>
-              </div>
-
-              <div className="config-card-body">
-                <div className="config-toggle-header">
-                  <div>
-                    <span className="config-toggle-title">Kích hoạt Reranker</span>
-                    <p className="config-toggle-desc">Sử dụng Cross-Encoder / Cohere Rerank để sắp xếp lại danh sách tài liệu</p>
-                  </div>
-                  <button
-                    type="button"
-                    className={`pill-switch ${rerankerEnabled ? "on" : "off"}`}
-                    onClick={() => setRerankerEnabled(!rerankerEnabled)}
-                  >
-                    <span className="pill-switch-thumb" />
-                  </button>
-                </div>
-
-                {rerankerEnabled && (
-                  <div className="sub-settings-panel" style={{ marginTop: "12px" }}>
-                    <div className="sub-setting-row">
-                      <label>Hệ số ứng viên sơ bộ (Candidate Multiplier): <strong>{candidateMultiplier}x</strong> (Lấy {topK * candidateMultiplier} chunks trước khi Rerank)</label>
-                      <input
-                        type="range"
-                        min="1"
-                        max="6"
-                        step="1"
-                        className="custom-range-slider compact"
-                        value={candidateMultiplier}
-                        onChange={(e) => setCandidateMultiplier(parseInt(e.target.value, 10))}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Interactive Retrieval Playground & Live Test */}
-          <div className="config-col-right">
-            <div className="playground-sticky-card">
-              <div className="playground-header">
-                <div className="playground-title-box">
-                  <Zap size={18} className="zap-icon" />
-                  <h3>Thử nghiệm Truy xuất (Retrieval Playground)</h3>
-                </div>
-                <span className="playground-pill-badge">Live Test</span>
-              </div>
-
-              <p className="playground-desc">
-                Kiểm tra xem hệ thống RAG với các siêu tham số hiện tại (Top-K={topK}, Threshold={minVectorScore.toFixed(2)}, Vector={Math.round(hybridVectorWeight * 100)}%) sẽ tìm thấy những đoạn văn nào trong tài liệu.
-              </p>
-
-              {/* Sample queries pills */}
-              <div className="sample-queries-container">
-                <span className="sample-label">Câu hỏi mẫu:</span>
-                <div className="sample-chips-list">
-                  {SAMPLE_QUERIES.map((sq, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      className="sample-query-chip"
-                      onClick={() => {
-                        setTestQuery(sq);
-                        handleRunRetrievalTest(sq);
-                      }}
-                    >
-                      {sq}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Input Search Box */}
-              <div className="playground-input-form">
-                <div className="playground-input-wrapper">
-                  <Search size={16} className="play-search-icon" />
-                  <input
-                    type="text"
-                    className="playground-input"
-                    placeholder="Nhập câu hỏi thử nghiệm để kiểm tra trích xuất tài liệu..."
-                    value={testQuery}
-                    onChange={(e) => setTestQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleRunRetrievalTest();
-                    }}
-                  />
-                  {testQuery && (
-                    <button
-                      type="button"
-                      className="play-clear-btn"
-                      onClick={() => setTestQuery("")}
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  className="btn-run-retrieval"
-                  onClick={() => handleRunRetrievalTest()}
-                  disabled={testingRetrieval}
-                >
-                  {testingRetrieval ? <div className="spinner-sm" /> : <Play size={14} />}
-                  <span>{testingRetrieval ? "Đang tìm kiếm..." : "Thử nghiệm"}</span>
-                </button>
-              </div>
-
-              {/* Error Box */}
-              {retrievalError && (
-                <div className="playground-error-box">
-                  <AlertCircle size={16} />
-                  <span>{retrievalError}</span>
-                </div>
-              )}
-
-              {/* Test Results Display */}
-              {retrievalResult && (
-                <div className="playground-results-container">
-                  <div className="results-summary-bar">
-                    <div className="summary-stat">
-                      <span>Đoạn văn trích xuất:</span>
-                      <strong>{retrievalResult.contexts?.length || 0} chunks</strong>
-                    </div>
-                    <div className="summary-stat">
-                      <span>Đánh giá ngữ cảnh:</span>
-                      <span
-                        className={`context-badge ${
-                          retrievalResult.strong_context ? "strong" : "weak"
-                        }`}
-                      >
-                        {retrievalResult.strong_context ? "✓ Đạt độ tin cậy cao" : "⚠ Ngữ cảnh yếu"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {retrievalResult.contexts?.length === 0 ? (
-                    <div className="empty-results-box">
-                      <p>Không tìm thấy đoạn văn nào vượt qua ngưỡng tương đồng ({minVectorScore.toFixed(2)}).</p>
-                    </div>
-                  ) : (
-                    <div className="contexts-list">
-                      {retrievalResult.contexts.map((ctx, idx) => {
-                        const score = ctx.score || ctx.vector_score || 0;
-                        return (
-                          <div key={idx} className="context-chunk-card">
-                            <div className="chunk-card-top">
-                              <div className="chunk-rank-badge">#{idx + 1}</div>
-                              <div className="chunk-heading-info">
-                                <span className="chunk-heading">
-                                  {ctx.heading || ctx.section_path || "Đoạn văn bản quy định"}
-                                </span>
-                                <span className="chunk-source">{ctx.source_name || "Sổ tay sinh viên"}</span>
-                              </div>
-                              <div className="chunk-score-pill" title="Similarity Score">
-                                <span>Score: {(score * 100).toFixed(1)}%</span>
-                              </div>
-                            </div>
-
-                            <div className="chunk-text-preview">
-                              {ctx.text || ctx.evidence_text}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         </div>

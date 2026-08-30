@@ -2601,20 +2601,23 @@ button {
 
 .config-two-col-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.05fr);
-  gap: 28px;
-  max-width: 1440px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  max-width: 1360px;
+  margin: 0 auto;
 }
 
-.config-col-left {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+@media (max-width: 960px) {
+  .config-two-col-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
+.config-col-left,
 .config-col-right {
   display: flex;
   flex-direction: column;
+  gap: 20px;
 }
 
 /* Parameter Cards */
