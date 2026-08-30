@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  BookOpen,
   ChevronDown,
-  Clock,
   Disc,
   Github,
   Home,
@@ -15,23 +13,60 @@ import {
 } from "lucide-react";
 import ChatView from "./ChatView";
 import DocumentsView from "./DocumentsView";
-import SettingsView from "./SettingsView";
+import ConfigView from "./ConfigView";
+import ModelsView from "./ModelsView";
 import { API_BASE_URL } from "./api";
 
 const SIDEBAR_TIPS = [
   "Hỏi cụ thể một quy định, ví dụ \"điều kiện tốt nghiệp\".",
   "Có thể hỏi tiếp để làm rõ câu trả lời trước đó.",
   "Mỗi câu trả lời kèm nguồn trích từ sổ tay sinh viên.",
-  "Tùy chỉnh LLM & Reranker trong tab Cấu hình.",
+  "Tùy chỉnh LLM & Reranker trong màn Cấu hình hoặc Mô hình.",
 ];
 
+const VALID_VIEWS = ["chat", "documents", "config", "models", "settings"];
+
+function getInitialView() {
+  if (typeof window !== "undefined") {
+    const hash = window.location.hash.replace(/^#\/?/, "");
+    if (VALID_VIEWS.includes(hash)) {
+      return hash;
+    }
+    const saved = localStorage.getItem("ptit_chatbot_view");
+    if (VALID_VIEWS.includes(saved)) {
+      return saved;
+    }
+  }
+  return "chat";
+}
+
 export default function App() {
-  const [view, setView] = useState("chat");
+  const [view, setView] = useState(getInitialView);
   const [docCount, setDocCount] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
   const [lang, setLang] = useState("Tiếng Việt");
   const [theme, setTheme] = useState("light");
   const chatRef = useRef(null);
+
+  // Sync view state to localStorage and URL hash
+  useEffect(() => {
+    localStorage.setItem("ptit_chatbot_view", view);
+    if (window.location.hash.replace(/^#\/?/, "") !== view) {
+      window.history.replaceState(null, "", `#${view}`);
+    }
+  }, [view]);
+
+  // Listen to browser hash changes (Back / Forward)
+  useEffect(() => {
+    function handleHashChange() {
+      const hash = window.location.hash.replace(/^#\/?/, "");
+      if (VALID_VIEWS.includes(hash)) {
+        setView(hash);
+      }
+    }
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
 
   const refreshDocCount = useCallback(() => {
     fetch(`${API_BASE_URL}/documents`)
@@ -52,7 +87,8 @@ export default function App() {
   const NAV_ITEMS = [
     { key: "documents", label: "Dataset" },
     { key: "chat", label: "Chat" },
-    { key: "settings", label: "Cấu hình" },
+    { key: "config", label: "Cấu hình" },
+    { key: "models", label: "Mô hình" },
   ];
 
   return (
@@ -84,7 +120,9 @@ export default function App() {
             <button
               key={item.key}
               type="button"
-              className={`top-nav-item ${view === item.key ? "active" : ""}`}
+              className={`top-nav-item ${
+                view === item.key || (item.key === "config" && view === "settings") ? "active" : ""
+              }`}
               onClick={() => setView(item.key)}
             >
               {item.label}
@@ -120,9 +158,11 @@ export default function App() {
 
           <button
             type="button"
-            className={`header-icon-btn ${view === "settings" ? "active" : ""}`}
+            className={`header-icon-btn ${
+              view === "config" || view === "models" || view === "settings" ? "active" : ""
+            }`}
             title="Cài đặt hệ thống"
-            onClick={() => setView("settings")}
+            onClick={() => setView("config")}
           >
             <Sliders size={15} />
           </button>
@@ -152,36 +192,6 @@ export default function App() {
           </button>
 
           <div className="sidebar-section">
-            <span className="sidebar-label">Kho tri thức</span>
-            <button className="panel panel-button" onClick={() => setView("documents")}>
-              <div className="panel-icon">
-                <BookOpen size={18} />
-              </div>
-              <div>
-                <strong>Tài liệu đã nạp</strong>
-                <span>
-                  {docCount == null
-                    ? "Quản lý file PDF, MD và TXT"
-                    : `${docCount} tài liệu trong chatbot`}
-                </span>
-              </div>
-            </button>
-          </div>
-
-          <div className="sidebar-section">
-            <span className="sidebar-label">Cấu hình nhanh</span>
-            <button className="panel panel-button" onClick={() => setView("settings")}>
-              <div className="panel-icon">
-                <Sliders size={18} />
-              </div>
-              <div>
-                <strong>Tùy chỉnh RAG</strong>
-                <span>Chọn LLM, Reranker, Multi-Query</span>
-              </div>
-            </button>
-          </div>
-
-          <div className="sidebar-section">
             <span className="sidebar-label">Mẹo sử dụng</span>
             <ul className="tip-list">
               {SIDEBAR_TIPS.map((tip, index) => (
@@ -193,9 +203,6 @@ export default function App() {
             </ul>
           </div>
 
-          <div className="sidebar-footer">
-            Hệ thống <strong>RAG</strong> hybrid retrieval · trả lời kèm citation từ tài liệu chính thức.
-          </div>
         </aside>
       )}
 
@@ -206,8 +213,10 @@ export default function App() {
           onLoadingChange={setChatLoading}
         />
         {view === "documents" && <DocumentsView onChanged={refreshDocCount} />}
-        {view === "settings" && <SettingsView />}
+        {(view === "config" || view === "settings") && <ConfigView />}
+        {view === "models" && <ModelsView />}
       </div>
     </main>
   );
 }
+

@@ -2432,11 +2432,767 @@ button {
 }
 
 /* ==========================================================================
-   MÀN HÌNH CẤU HÌNH RAG & QUẢN LÝ MÔ HÌNH (SETTINGS / MODEL MANAGER)
-   Designed to match reference layout: Set default models, Added models, Available models
+   MÀN HÌNH CẤU HÌNH RAG & QUẢN LÝ MÔ HÌNH (SETTINGS & MODELS)
+   ========================================================================== */
+.settings-page-wrapper,
+.config-page-wrapper,
+.models-page-wrapper {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.config-header-title-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.config-header-icon-box {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #0f172a;
+  flex-shrink: 0;
+}
+
+.config-header-icon-box.red-gradient {
+  background: #fef2f2;
+  color: #972635;
+}
+
+/* Top Sub-Tabs Navigation Bar */
+.settings-subtabs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 32px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+  z-index: 10;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.settings-subtabs-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.settings-subtab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.settings-subtab-btn:hover {
+  color: #0f172a;
+}
+
+.settings-subtab-btn.active {
+  background: #ffffff;
+  color: #972635;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.settings-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-outline-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-outline-reset:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.btn-outline-reset:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 18px;
+  border-radius: 6px;
+  border: 0;
+  background: #972635;
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(151, 38, 53, 0.25);
+  transition: all 0.15s ease;
+}
+
+.btn-primary-save:hover:not(:disabled) {
+  background: #7f1d1d;
+  box-shadow: 0 2px 6px rgba(151, 38, 53, 0.35);
+}
+
+.btn-primary-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   TAB 1: CẤU HÌNH (CONFIG VIEW)
+   ========================================================================== */
+.config-view-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px 60px;
+}
+
+.config-view-intro {
+  margin-bottom: 20px;
+}
+
+.config-main-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.config-main-desc {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.config-two-col-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  max-width: 1360px;
+  margin: 0 auto;
+}
+
+@media (max-width: 960px) {
+  .config-two-col-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.config-col-left,
+.config-col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Parameter Cards */
+.config-panel-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  overflow: hidden;
+}
+
+.config-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #ffffff;
+}
+
+.config-card-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.config-card-icon.red {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.config-card-icon.blue {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.config-card-icon.green {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.config-card-icon.purple {
+  background: #faf5ff;
+  color: #9333ea;
+}
+
+.config-card-title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.config-card-subtitle {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.config-card-body {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.config-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.config-field-group.bordered-group {
+  padding: 12px;
+  border: 1px solid #f1f5f9;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.config-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.config-field-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.config-badge-val {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+}
+
+.config-hint-text {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.config-micro-help {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.slider-with-number {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.custom-range-slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  outline: none;
+  cursor: pointer;
+  accent-color: #972635;
+}
+
+.custom-range-slider.compact {
+  height: 4px;
+}
+
+.number-input-box {
+  width: 64px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  text-align: center;
+}
+
+.number-input-box:focus {
+  border-color: #972635;
+  outline: none;
+}
+
+.pill-selector-group {
+  display: flex;
+  gap: 6px;
+}
+
+.pill-sel-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pill-sel-btn:hover {
+  background: #f1f5f9;
+}
+
+.pill-sel-btn.active {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Hybrid Ratio Bar */
+.hybrid-ratio-bar {
+  display: flex;
+  height: 24px;
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-top: 4px;
+}
+
+.hybrid-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: width 0.2s ease;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.hybrid-segment.vector {
+  background: #2563eb;
+}
+
+.hybrid-segment.bm25 {
+  background: #0d9488;
+}
+
+/* Toggle Switches & Sub Settings */
+.config-toggle-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.config-toggle-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.config-toggle-desc {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.sub-settings-panel {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sub-setting-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #334155;
+}
+
+.sub-setting-row-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #334155;
+}
+
+/* ==========================================================================
+   LIVE RETRIEVAL PLAYGROUND
+   ========================================================================== */
+.playground-sticky-card {
+  position: sticky;
+  top: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.playground-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.playground-title-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.playground-title-box h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.zap-icon {
+  color: #eab308;
+}
+
+.playground-pill-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #15803d;
+  background: #dcfce7;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.playground-desc {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.sample-queries-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.sample-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.sample-chips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sample-query-chip {
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #f1f5f9;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.sample-query-chip:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.playground-input-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.playground-input-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  transition: border-color 0.15s ease;
+}
+
+.playground-input-wrapper:focus-within {
+  border-color: #972635;
+}
+
+.play-search-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.playground-input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.playground-input::placeholder {
+  color: #94a3b8;
+}
+
+.play-clear-btn {
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.btn-run-retrieval {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-run-retrieval:hover:not(:disabled) {
+  background: #1e293b;
+}
+
+.btn-run-retrieval:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.playground-error-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 12.5px;
+  margin-bottom: 12px;
+}
+
+.playground-results-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.results-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #64748b;
+  padding-bottom: 4px;
+}
+
+.summary-stat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.context-badge {
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.context-badge.strong {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.context-badge.weak {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.empty-results-box {
+  padding: 18px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 12.5px;
+  border: 1px dashed #e2e8f0;
+  border-radius: 8px;
+}
+
+.contexts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.context-chunk-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chunk-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chunk-rank-badge {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.chunk-heading-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chunk-heading {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chunk-source {
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+.chunk-score-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f766e;
+  background: #ccfbf1;
+  padding: 2px 7px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.chunk-text-preview {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #334155;
+  background: #f8fafc;
+  padding: 8px;
+  border-radius: 6px;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.spin-icon {
+  animation: spin 0.8s linear infinite;
+}
+
+/* ==========================================================================
+   TAB 2: MÀN HÌNH QUẢN LÝ MÔ HÌNH (MODEL MANAGER)
    ========================================================================== */
 .model-mgmt-page {
-  height: 100%;
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding: 28px 36px 60px;
