@@ -129,9 +129,15 @@ class GuardrailsConfigPayload(BaseModel):
     min_bm25_score: float = 2.0
 
 
+class EmbeddingConfigPayload(BaseModel):
+    provider: str = "openai"
+    model: str = "text-embedding-3-small"
+
+
 class AvailableProviders(BaseModel):
-    llm: list[str] = ["openai", "gemini", "azure", "openai_compatible"]
-    reranker: list[str] = ["heuristic", "cross-encoder"]
+    llm: list[str] = ["openai", "gemini", "azure", "openai_compatible", "anthropic", "deepseek", "cohere", "qwen"]
+    embedding: list[str] = ["openai", "sentence-transformers", "cohere", "gemini"]
+    reranker: list[str] = ["heuristic", "cross-encoder", "cohere"]
 
 
 class FullConfigResponse(BaseModel):
@@ -139,6 +145,7 @@ class FullConfigResponse(BaseModel):
     retrieval: RetrievalConfigPayload
     reranker: RerankerConfigPayload
     guardrails: GuardrailsConfigPayload
+    embedding: EmbeddingConfigPayload = Field(default_factory=EmbeddingConfigPayload)
     available_providers: AvailableProviders
 
 
@@ -162,6 +169,11 @@ class UpdateLLMConfig(BaseModel):
     openai_compatible_base_url: str | None = None
     openai_compatible_api_key: str | None = None
     openai_compatible_model: str | None = None
+
+
+class UpdateEmbeddingConfig(BaseModel):
+    provider: str | None = None
+    model: str | None = None
 
 
 class UpdateRetrievalConfig(BaseModel):
@@ -188,6 +200,7 @@ class UpdateGuardrailsConfig(BaseModel):
 
 class UpdateConfigRequest(BaseModel):
     llm: UpdateLLMConfig | None = None
+    embedding: UpdateEmbeddingConfig | None = None
     retrieval: UpdateRetrievalConfig | None = None
     reranker: UpdateRerankerConfig | None = None
     guardrails: UpdateGuardrailsConfig | None = None
