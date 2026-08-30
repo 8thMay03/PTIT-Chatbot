@@ -415,6 +415,14 @@ export default function ModelsView() {
   }, []);
 
   useEffect(() => {
+    try {
+      localStorage.setItem("ptit_added_providers", JSON.stringify(addedProviders));
+    } catch (e) {
+      // ignore
+    }
+  }, [addedProviders]);
+
+  useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setActiveDropdownSlot(null);
@@ -499,11 +507,22 @@ export default function ModelsView() {
   }
 
   function handleOpenConfigModal(provider) {
+    const defaultBases = {
+      openai: "https://api.openai.com/v1",
+      deepseek: "https://api.deepseek.com/v1",
+      moonshot: "https://api.moonshot.cn/v1",
+      tongyi: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      zhipu: "https://open.bigmodel.cn/api/paas/v4",
+      xai: "https://api.x.ai/v1",
+      ollama: "http://localhost:11434/v1",
+    };
+
     setConfigModalProvider(provider);
     setConfigForm({
       instanceName: `${provider.id}_${Math.floor(100 + Math.random() * 900)}`,
       apiKey: "",
-      baseUrl: provider.id === "openai" ? "https://api.openai.com/v1" : "",
+      baseUrl: defaultBases[provider.id] || "",
       selectedModelIds: provider.models.map((m) => m.id),
     });
     setTestResult(null);
@@ -552,6 +571,7 @@ export default function ModelsView() {
       providerId: configModalProvider.id,
       providerName: configModalProvider.name,
       instanceName: name,
+      apiKey: configForm.apiKey,
       apiKeyMasked: maskedKey,
       baseUrl: configForm.baseUrl,
       models: configModalProvider.models.filter((m) =>
@@ -580,19 +600,21 @@ export default function ModelsView() {
       const payload = {};
       if (slotKey === "LLM") {
         payload.llm = {
-          provider: provider.id || provider.providerId,
+          provider: provider.providerId || provider.id,
           openai_model: model.id,
           model: model.id,
         };
+        if (provider.apiKey) payload.llm.api_key = provider.apiKey;
+        if (provider.baseUrl) payload.llm.base_url = provider.baseUrl;
       } else if (slotKey === "Embedding") {
         payload.embedding = {
-          provider: provider.id || provider.providerId,
+          provider: provider.providerId || provider.id,
           model: model.id,
         };
       } else if (slotKey === "Rerank") {
         payload.reranker = {
           enabled: true,
-          provider: (provider.id || provider.providerId).includes("cohere") ? "cohere" : "cross-encoder",
+          provider: (provider.providerId || provider.id).includes("cohere") ? "cohere" : "cross-encoder",
           model: model.id,
         };
       }

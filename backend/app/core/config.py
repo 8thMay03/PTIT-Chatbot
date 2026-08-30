@@ -287,7 +287,15 @@ def update_runtime_config(payload: dict) -> dict:
     if "openai_compatible_model" in llm and llm["openai_compatible_model"]:
         settings.openai_compatible_model = str(llm["openai_compatible_model"]).strip()
 
-    # Generic api_key / model field mapping to current active provider
+    # Generic api_key / base_url / model field mapping to current active provider
+    if "base_url" in llm and llm["base_url"]:
+        b_val = str(llm["base_url"]).strip()
+        curr_provider = settings.llm_provider.lower()
+        if curr_provider in ("openai",):
+            settings.openai_base_url = b_val
+        elif curr_provider in ("openai_compatible", "local", "ollama", "vllm", "deepseek", "moonshot", "tongyi", "qwen", "zhipu", "xai"):
+            settings.openai_compatible_base_url = b_val
+
     if "api_key" in llm and llm["api_key"] is not None and llm["api_key"] != "":
         key_val = str(llm["api_key"]).strip()
         curr_provider = settings.llm_provider.lower()
@@ -297,7 +305,7 @@ def update_runtime_config(payload: dict) -> dict:
             settings.gemini_api_key = key_val
         elif curr_provider in ("azure", "azure_openai"):
             settings.azure_openai_api_key = key_val
-        elif curr_provider in ("openai_compatible", "local", "ollama", "vllm"):
+        elif curr_provider in ("openai_compatible", "local", "ollama", "vllm", "deepseek", "moonshot", "tongyi", "qwen", "zhipu", "xai"):
             settings.openai_compatible_api_key = key_val
 
     if "model" in llm and llm["model"]:
@@ -309,7 +317,7 @@ def update_runtime_config(payload: dict) -> dict:
             settings.gemini_model = model_val
         elif curr_provider in ("azure", "azure_openai"):
             settings.azure_openai_deployment_name = model_val
-        elif curr_provider in ("openai_compatible", "local", "ollama", "vllm"):
+        elif curr_provider in ("openai_compatible", "local", "ollama", "vllm", "deepseek", "moonshot", "tongyi", "qwen", "zhipu", "xai"):
             settings.openai_compatible_model = model_val
 
     # Retrieval

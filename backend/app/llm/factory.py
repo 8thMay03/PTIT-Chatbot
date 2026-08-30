@@ -61,6 +61,19 @@ def create_openai_compatible_provider() -> OpenAICompatibleProvider:
     )
 
 
+PROVIDER_DEFAULT_BASE_URLS: dict[str, str] = {
+    "openai": "https://api.openai.com/v1",
+    "deepseek": "https://api.deepseek.com/v1",
+    "moonshot": "https://api.moonshot.cn/v1",
+    "tongyi": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "qwen": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "zhipu": "https://open.bigmodel.cn/api/paas/v4",
+    "xai": "https://api.x.ai/v1",
+    "ollama": "http://localhost:11434/v1",
+    "local": "http://localhost:11434/v1",
+    "vllm": "http://localhost:8000/v1",
+}
+
 # Register default providers
 register_llm_provider("openai", create_openai_provider)
 register_llm_provider("gemini", create_gemini_provider)
@@ -71,6 +84,12 @@ register_llm_provider("openai_compatible", create_openai_compatible_provider)
 register_llm_provider("local", create_openai_compatible_provider)
 register_llm_provider("ollama", create_openai_compatible_provider)
 register_llm_provider("vllm", create_openai_compatible_provider)
+register_llm_provider("deepseek", create_openai_compatible_provider)
+register_llm_provider("moonshot", create_openai_compatible_provider)
+register_llm_provider("tongyi", create_openai_compatible_provider)
+register_llm_provider("qwen", create_openai_compatible_provider)
+register_llm_provider("zhipu", create_openai_compatible_provider)
+register_llm_provider("xai", create_openai_compatible_provider)
 
 
 def get_llm_provider(provider_name: str | None = None) -> BaseLLMProvider:
@@ -97,7 +116,8 @@ def create_llm_provider_from_config(
 ) -> BaseLLMProvider:
     """Create a temporary provider instance with explicit credentials for testing/dry-run."""
     name = provider.strip().lower()
-    
+    default_base = PROVIDER_DEFAULT_BASE_URLS.get(name)
+
     if name in ("gemini", "google"):
         return GeminiProvider(
             api_key=api_key or settings.gemini_api_key,
@@ -114,9 +134,20 @@ def create_llm_provider_from_config(
             timeout=timeout,
             max_retries=1,
         )
-    elif name in ("openai_compatible", "local", "ollama", "vllm"):
+    elif name in (
+        "openai_compatible",
+        "local",
+        "ollama",
+        "vllm",
+        "deepseek",
+        "moonshot",
+        "tongyi",
+        "qwen",
+        "zhipu",
+        "xai",
+    ):
         return OpenAICompatibleProvider(
-            base_url=base_url or settings.openai_compatible_base_url,
+            base_url=base_url or default_base or settings.openai_compatible_base_url,
             api_key=api_key or settings.openai_compatible_api_key,
             model_name=model or settings.openai_compatible_model,
             timeout=timeout,
