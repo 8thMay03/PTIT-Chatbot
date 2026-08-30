@@ -1,9 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  BookOpen,
   ChevronDown,
-  Clock,
-  Cpu,
   Disc,
   Github,
   Home,
@@ -195,46 +192,6 @@ export default function App() {
           </button>
 
           <div className="sidebar-section">
-            <span className="sidebar-label">Kho tri thức</span>
-            <button className="panel panel-button" onClick={() => setView("documents")}>
-              <div className="panel-icon">
-                <BookOpen size={18} />
-              </div>
-              <div>
-                <strong>Tài liệu đã nạp</strong>
-                <span>
-                  {docCount == null
-                    ? "Quản lý file PDF, MD và TXT"
-                    : `${docCount} tài liệu trong chatbot`}
-                </span>
-              </div>
-            </button>
-          </div>
-
-          <div className="sidebar-section">
-            <span className="sidebar-label">Cấu hình & Mô hình</span>
-            <button className="panel panel-button" onClick={() => setView("config")}>
-              <div className="panel-icon">
-                <Sliders size={18} />
-              </div>
-              <div>
-                <strong>Cấu hình RAG</strong>
-                <span>Temperature, Top-K, Threshold</span>
-              </div>
-            </button>
-
-            <button className="panel panel-button" onClick={() => setView("models")} style={{ marginTop: "8px" }}>
-              <div className="panel-icon">
-                <Cpu size={18} />
-              </div>
-              <div>
-                <strong>Quản lý Mô hình</strong>
-                <span>Chọn LLM, Embedding, Rerank</span>
-              </div>
-            </button>
-          </div>
-
-          <div className="sidebar-section">
             <span className="sidebar-label">Mẹo sử dụng</span>
             <ul className="tip-list">
               {SIDEBAR_TIPS.map((tip, index) => (
@@ -246,9 +203,6 @@ export default function App() {
             </ul>
           </div>
 
-          <div className="sidebar-footer">
-            Hệ thống <strong>RAG</strong> hybrid retrieval · trả lời kèm citation từ tài liệu chính thức.
-          </div>
         </aside>
       )}
 
