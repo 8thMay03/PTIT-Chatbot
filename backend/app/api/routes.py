@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.api.schemas import (
     ChatRequest,
     ChatResponse,
+    ChunkItem,
+    DocumentChunksResponse,
     DocumentDeleteResponse,
     DocumentDetail,
     DocumentItem,
@@ -26,6 +28,7 @@ from app.db.repositories import (
     add_message,
     add_message_sources,
     ensure_conversation,
+    get_document_chunks,
     get_document_preview_text,
     get_document_with_chunk_count,
     get_recent_conversation_history,
@@ -143,8 +146,45 @@ def get_document(document_id: str, session: Session = Depends(get_session)) -> D
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
 
     document, chunk_count = row
+    source_p = resolve_source_path(document.source_path)
+    full_text = None
+    if source_p is not None and source_p.is_file():
+        try:
+            full_text = source_p.read_text(encoding="utf-8")
+        except Exception:
+            full_text = None
     preview = read_preview(document.source_path) or get_document_preview_text(session, document.id)
-    return DocumentDetail(**_document_payload(document, chunk_count), preview=preview)
+    if full_text is None:
+        full_text = preview
+    return DocumentDetail(**_document_payload(document, chunk_count), preview=preview, full_text=full_text)
+
+
+@router.get("/documents/{document_id}/chunks", response_model=DocumentChunksResponse)
+def get_document_chunks_api(
+    document_id: str,
+    offset: int = 0,
+    limit: int = 200,
+    session: Session = Depends(get_session),
+) -> DocumentChunksResponse:
+    row = get_document_with_chunk_count(session, document_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
+
+    document, chunk_count = row
+    chunk_models = get_document_chunks(session, document_id, offset=offset, limit=limit)
+    items = [
+        ChunkItem(
+            id=c.id,
+            document_id=c.document_id,
+            chunk_index=c.chunk_index,
+            text=c.text,
+            token_count=c.token_count,
+            chunk_metadata=c.chunk_metadata,
+            created_at=c.created_at,
+        )
+        for c in chunk_models
+    ]
+    return DocumentChunksResponse(total=chunk_count, chunks=items)
 
 
 @router.get("/documents/{document_id}/file")

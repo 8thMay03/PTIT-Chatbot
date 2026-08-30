@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowUpDown,
   ChevronDown,
   ChevronLeft,
@@ -28,9 +29,9 @@ import { API_BASE_URL } from "./api";
 const ACCEPTED_TYPES = ".md,.txt,.pdf,text/markdown,text/plain,application/pdf";
 
 function formatDate(value) {
-  if (!value) return "10/08/2026 16:27:57";
+  if (!value) return "10/08/2026 09:27:57";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "10/08/2026 16:27:57";
+  if (Number.isNaN(date.getTime())) return "10/08/2026 09:27:57";
 
   const pad = (n) => String(n).padStart(2, "0");
   const day = pad(date.getDate());
@@ -52,7 +53,7 @@ function formatDateOnly(value) {
 }
 
 function formatSize(bytes) {
-  if (bytes == null || Number.isNaN(bytes)) return "527 KB";
+  if (bytes == null || Number.isNaN(bytes)) return "515 KB";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -63,8 +64,54 @@ function apiError(payload, fallback) {
   return fallback;
 }
 
+function renderFormattedMarkdown(text) {
+  if (!text) return "";
+  const lines = text.split(/\r?\n/);
+  return lines.map((line, index) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("### ")) {
+      return (
+        <h4 key={index} className="doc-md-h4">
+          {trimmed.replace(/^###\s+/, "")}
+        </h4>
+      );
+    }
+    if (trimmed.startsWith("## ")) {
+      return (
+        <h3 key={index} className="doc-md-h3">
+          {trimmed.replace(/^##\s+/, "")}
+        </h3>
+      );
+    }
+    if (trimmed.startsWith("# ")) {
+      return (
+        <h2 key={index} className="doc-md-h2">
+          {trimmed.replace(/^#\s+/, "")}
+        </h2>
+      );
+    }
+    if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      return (
+        <li key={index} className="doc-md-li">
+          {trimmed.replace(/^[-*]\s+/, "")}
+        </li>
+      );
+    }
+    if (!trimmed) {
+      return <div key={index} className="doc-md-spacer" />;
+    }
+    return (
+      <p key={index} className="doc-md-p">
+        {line}
+      </p>
+    );
+  });
+}
+
 export default function DocumentsView({ onChanged }) {
   const [activeTab, setActiveTab] = useState("files"); // files | retrieval | logs | config
+  const [selectedDocId, setSelectedDocId] = useState(null); // When not null, opens Document Viewer matching image.png
+
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -78,14 +125,21 @@ export default function DocumentsView({ onChanged }) {
   const [pageSize, setPageSize] = useState(50);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Modals & previews
-  const [previewId, setPreviewId] = useState(null);
-  const [detail, setDetail] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  // Document Chunk Detail View State
+  const [docDetail, setDocDetail] = useState(null);
+  const [docDetailLoading, setDocDetailLoading] = useState(false);
+  const [docChunks, setDocChunks] = useState([]);
+  const [docChunksLoading, setDocChunksLoading] = useState(false);
+  const [chunkMode, setChunkMode] = useState("full"); // "full" | "ellipse"
+  const [chunkQuery, setChunkQuery] = useState("");
+  const [selectedChunkIds, setSelectedChunkIds] = useState(new Set());
+  const [enabledChunks, setEnabledChunks] = useState({});
+  const [chunkPage, setChunkPage] = useState(1);
+  const [chunkPageSize, setChunkPageSize] = useState(50);
 
+  // Modals
   const [editingDoc, setEditingDoc] = useState(null);
   const [editTitle, setEditTitle] = useState("");
-
   const [pendingDelete, setPendingDelete] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [reindexing, setReindexing] = useState(false);
@@ -161,27 +215,86 @@ export default function DocumentsView({ onChanged }) {
   }, []);
 
   useEffect(() => {
-    if (!previewId) {
-      setDetail(null);
+    if (!selectedDocId) {
+      setDocDetail(null);
+      setDocChunks([]);
       return;
     }
     let cancelled = false;
-    setDetailLoading(true);
-    fetch(`${API_BASE_URL}/documents/${previewId}`)
+    setDocDetailLoading(true);
+    setDocChunksLoading(true);
+
+    fetch(`${API_BASE_URL}/documents/${selectedDocId}`)
       .then((response) => (response.ok ? response.json() : Promise.reject()))
       .then((payload) => {
-        if (!cancelled) setDetail(payload);
+        if (!cancelled) setDocDetail(payload);
       })
       .catch(() => {
-        if (!cancelled) setDetail(null);
+        if (!cancelled) setDocDetail(null);
       })
       .finally(() => {
-        if (!cancelled) setDetailLoading(false);
+        if (!cancelled) setDocDetailLoading(false);
       });
+
+    fetch(`${API_BASE_URL}/documents/${selectedDocId}/chunks?limit=500`)
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((payload) => {
+        if (!cancelled) {
+          const list = payload.chunks ?? [];
+          setDocChunks(list);
+          setEnabledChunks((prev) => {
+            const next = { ...prev };
+            list.forEach((c) => {
+              if (next[c.id] === undefined) next[c.id] = true;
+            });
+            return next;
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setDocChunks([]);
+      })
+      .finally(() => {
+        if (!cancelled) setDocChunksLoading(false);
+      });
+
     return () => {
       cancelled = true;
     };
-  }, [previewId]);
+  }, [selectedDocId]);
+
+  const filteredChunks = useMemo(() => {
+    let list = [...docChunks];
+    const q = chunkQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((c) => c.text && c.text.toLowerCase().includes(q));
+    }
+    return list;
+  }, [docChunks, chunkQuery]);
+
+  function toggleSelectAllChunks() {
+    if (selectedChunkIds.size === filteredChunks.length) {
+      setSelectedChunkIds(new Set());
+    } else {
+      setSelectedChunkIds(new Set(filteredChunks.map((c) => c.id)));
+    }
+  }
+
+  function toggleSelectChunk(id) {
+    setSelectedChunkIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleEnableChunk(id) {
+    setEnabledChunks((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  }
 
   const filtered = useMemo(() => {
     let list = [...documents];
@@ -327,9 +440,9 @@ export default function DocumentsView({ onChanged }) {
         const payload = await response.json().catch(() => ({}));
         throw new Error(apiError(payload, "Không xóa được tài liệu."));
       }
-      if (previewId === pendingDelete.id) {
-        setPreviewId(null);
-        setDetail(null);
+      if (selectedDocId === pendingDelete.id) {
+        setSelectedDocId(null);
+        setDocDetail(null);
       }
       setLogs((prev) => [
         {
@@ -431,6 +544,274 @@ export default function DocumentsView({ onChanged }) {
     event.preventDefault();
     setDragOver(false);
     uploadFiles(event.dataTransfer.files);
+  }
+
+  // ----------------------------------------------------
+  // DOCUMENT DETAIL VIEW (Matching image.png Document View)
+  // ----------------------------------------------------
+  if (selectedDocId) {
+    const pagedChunks = filteredChunks.slice(
+      (chunkPage - 1) * chunkPageSize,
+      chunkPage * chunkPageSize
+    );
+    const totalChunkPages = Math.ceil(filteredChunks.length / chunkPageSize) || 1;
+
+    return (
+      <div className="doc-view-page">
+        {/* Top Back Button */}
+        <div className="doc-view-top-bar">
+          <button
+            type="button"
+            className="btn-back-dataset"
+            onClick={() => setSelectedDocId(null)}
+          >
+            <ArrowLeft size={14} />
+            <span>Back</span>
+          </button>
+        </div>
+
+        {/* 2-Column Split Layout */}
+        <div className="doc-view-split-layout">
+          {/* Left Column: Document Preview */}
+          <div className="doc-view-left-col">
+            <div className="doc-view-meta-header">
+              <h2 className="doc-view-filename">
+                {docDetail?.file_name || docDetail?.title || "so-tay-sinh-vien-d21.md"}
+              </h2>
+              <div className="doc-view-meta-info">
+                <span>Size: {formatSize(docDetail?.size_bytes)}</span>
+                <span className="doc-meta-sep">
+                  Uploaded time: {formatDate(docDetail?.created_at)}
+                </span>
+              </div>
+            </div>
+
+            <div className="doc-view-content-pane">
+              {docDetailLoading ? (
+                <div className="doc-view-loading">
+                  <Loader2 size={24} className="spin" />
+                  <p>Loading document...</p>
+                </div>
+              ) : (
+                <div className="doc-markdown-content">
+                  {renderFormattedMarkdown(
+                    docDetail?.full_text || docDetail?.preview || "No content available."
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Chunk Result */}
+          <div className="doc-view-right-col">
+            <div className="chunk-result-header">
+              <div className="chunk-result-title-group">
+                <h3>Chunk result</h3>
+                <p>View the chunked segments used for embedding and retrieval.</p>
+              </div>
+
+              {/* Toolbar */}
+              <div className="chunk-result-toolbar">
+                <label className="chunk-select-all-label">
+                  <input
+                    type="checkbox"
+                    checked={
+                      filteredChunks.length > 0 &&
+                      selectedChunkIds.size === filteredChunks.length
+                    }
+                    onChange={toggleSelectAllChunks}
+                  />
+                  <span>Select all</span>
+                </label>
+
+                <div className="chunk-toolbar-right">
+                  {/* Segmented Mode Button */}
+                  <div className="chunk-mode-toggle">
+                    <button
+                      type="button"
+                      className={`chunk-mode-btn ${chunkMode === "full" ? "active" : ""}`}
+                      onClick={() => setChunkMode("full")}
+                    >
+                      Full text
+                    </button>
+                    <button
+                      type="button"
+                      className={`chunk-mode-btn ${chunkMode === "ellipse" ? "active" : ""}`}
+                      onClick={() => setChunkMode("ellipse")}
+                    >
+                      Ellipse
+                    </button>
+                  </div>
+
+                  {/* Search box */}
+                  <div className="chunk-search-field">
+                    <Search size={14} className="search-icon" />
+                    <input
+                      type="text"
+                      placeholder="Search"
+                      value={chunkQuery}
+                      onChange={(e) => setChunkQuery(e.target.value)}
+                    />
+                    {chunkQuery && (
+                      <button
+                        type="button"
+                        className="search-clear-btn"
+                        onClick={() => setChunkQuery("")}
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Filter / Sort Button */}
+                  <button type="button" className="chunk-tool-btn" title="Filter chunks">
+                    <SlidersHorizontal size={14} />
+                  </button>
+
+                  {/* Add chunk Button */}
+                  <button
+                    type="button"
+                    className="chunk-tool-btn"
+                    title="Add chunk"
+                    onClick={() => setNotice("Tính năng tạo chunk thủ công.")}
+                  >
+                    <Plus size={15} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Chunks List */}
+            <div className="chunk-cards-container">
+              {docChunksLoading ? (
+                <div className="doc-view-loading">
+                  <Loader2 size={24} className="spin" />
+                  <p>Loading chunks...</p>
+                </div>
+              ) : pagedChunks.length === 0 ? (
+                <div className="doc-empty-chunks">
+                  <FileText size={32} />
+                  <p>No chunks found.</p>
+                </div>
+              ) : (
+                <div className="chunk-cards-list">
+                  {pagedChunks.map((chunk) => {
+                    const isSelected = selectedChunkIds.has(chunk.id);
+                    const isEnabled = enabledChunks[chunk.id] !== false;
+
+                    return (
+                      <div
+                        key={chunk.id}
+                        className={`chunk-card-item ${isSelected ? "selected" : ""}`}
+                      >
+                        {/* Top Header of Card */}
+                        <div className="chunk-card-top">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectChunk(chunk.id)}
+                            className="chunk-checkbox"
+                          />
+                          <div className="chunk-card-top-right">
+                            <span className="chunk-type-tag">Text</span>
+                            <button
+                              type="button"
+                              className={`pill-switch ${isEnabled ? "on" : "off"}`}
+                              onClick={() => toggleEnableChunk(chunk.id)}
+                              title={isEnabled ? "Enabled" : "Disabled"}
+                              aria-label="Toggle chunk status"
+                            >
+                              <span className="pill-switch-thumb" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Body Content */}
+                        <div
+                          className={`chunk-card-text ${
+                            chunkMode === "ellipse" ? "is-ellipse" : ""
+                          }`}
+                        >
+                          {chunk.text}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Pagination Footer */}
+            <div className="chunk-pagination-footer">
+              <div className="pagination-info">
+                <span>Total {filteredChunks.length}</span>
+              </div>
+
+              <div className="pagination-controls">
+                <button
+                  type="button"
+                  className="page-nav-btn"
+                  disabled={chunkPage <= 1}
+                  onClick={() => setChunkPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft size={14} />
+                </button>
+
+                <span className="page-current-badge">{chunkPage}</span>
+
+                {totalChunkPages > 1 && (
+                  <button
+                    type="button"
+                    className={`page-num-btn ${chunkPage === 2 ? "active" : ""}`}
+                    onClick={() => setChunkPage(2)}
+                  >
+                    2
+                  </button>
+                )}
+
+                {totalChunkPages > 2 && (
+                  <button
+                    type="button"
+                    className={`page-num-btn ${chunkPage === 3 ? "active" : ""}`}
+                    onClick={() => setChunkPage(3)}
+                  >
+                    3
+                  </button>
+                )}
+
+                {totalChunkPages > 4 && <span className="page-ellipsis">...</span>}
+
+                {totalChunkPages > 3 && (
+                  <button
+                    type="button"
+                    className={`page-num-btn ${
+                      chunkPage === totalChunkPages ? "active" : ""
+                    }`}
+                    onClick={() => setChunkPage(totalChunkPages)}
+                  >
+                    {totalChunkPages}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="page-nav-btn"
+                  disabled={chunkPage >= totalChunkPages}
+                  onClick={() => setChunkPage((p) => Math.min(totalChunkPages, p + 1))}
+                >
+                  <ChevronRight size={14} />
+                </button>
+
+                <div className="page-size-selector">
+                  <span>{chunkPageSize} / Page</span>
+                  <ChevronDown size={13} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -718,7 +1099,7 @@ export default function DocumentsView({ onChanged }) {
                               </div>
                               <span
                                 className="file-name-text"
-                                onClick={() => setPreviewId(doc.id)}
+                                onClick={() => setSelectedDocId(doc.id)}
                                 title={fileName}
                               >
                                 {fileName}
@@ -785,8 +1166,8 @@ export default function DocumentsView({ onChanged }) {
                               <button
                                 type="button"
                                 className="act-btn"
-                                title="Preview file"
-                                onClick={() => setPreviewId(doc.id)}
+                                title="View document chunks"
+                                onClick={() => setSelectedDocId(doc.id)}
                               >
                                 <Eye size={14} />
                               </button>
@@ -1233,53 +1614,6 @@ export default function DocumentsView({ onChanged }) {
           </div>
         )}
       </main>
-
-      {/* Preview Modal */}
-      {previewId && (
-        <div className="modal-backdrop" onClick={() => setPreviewId(null)}>
-          <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="preview-modal-header">
-              <h3>{detail?.file_name || "File Preview"}</h3>
-              <button
-                type="button"
-                className="icon-btn"
-                onClick={() => setPreviewId(null)}
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="preview-modal-body">
-              {detailLoading ? (
-                <div className="dataset-empty-state">
-                  <Loader2 size={20} className="spin" />
-                  <p>Loading file preview...</p>
-                </div>
-              ) : (
-                <pre>{detail?.preview || "No content preview available."}</pre>
-              )}
-            </div>
-            <div className="preview-modal-footer">
-              <button
-                type="button"
-                className="ghost-btn"
-                onClick={() => setPreviewId(null)}
-              >
-                Close
-              </button>
-              {detail && (
-                <button
-                  type="button"
-                  className="primary-btn"
-                  onClick={() => downloadDocument(detail)}
-                >
-                  <Download size={15} />
-                  Download
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Edit Modal */}
       {editingDoc && (

@@ -164,6 +164,23 @@ def get_document_preview_text(session: Session, document_id: str, limit: int = 2
     return joined[:limit].rstrip() + "…"
 
 
+def get_document_chunks(
+    session: Session,
+    document_id: str,
+    offset: int = 0,
+    limit: int = 100,
+) -> list[Chunk]:
+    return list(
+        session.scalars(
+            select(Chunk)
+            .where(Chunk.document_id == document_id)
+            .order_by(Chunk.chunk_index)
+            .offset(offset)
+            .limit(limit)
+        )
+    )
+
+
 def serialize_document(document: Document, chunk_count: int, size_bytes: int | None = None) -> dict:
     metadata = document.document_metadata or {}
     file_name = Path(document.source_path).name

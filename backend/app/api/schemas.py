@@ -76,6 +76,22 @@ class DocumentItem(BaseModel):
 
 class DocumentDetail(DocumentItem):
     preview: str | None = None
+    full_text: str | None = None
+
+
+class ChunkItem(BaseModel):
+    id: str
+    document_id: str
+    chunk_index: int
+    text: str
+    token_count: int | None = None
+    chunk_metadata: dict | None = None
+    created_at: datetime | None = None
+
+
+class DocumentChunksResponse(BaseModel):
+    total: int
+    chunks: list[ChunkItem]
 
 
 class DocumentListResponse(BaseModel):
