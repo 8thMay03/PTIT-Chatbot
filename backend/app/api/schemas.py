@@ -44,6 +44,17 @@ class ChatResponse(BaseModel):
     sources: list[Source]
 
 
+class RetrievalTestRequest(BaseModel):
+    query: str
+    top_k: int = 10
+    similarity_threshold: float | None = None
+    vector_similarity_weight: float | None = None
+    rerank_model: str | None = None
+    use_knowledge_graph: bool = False
+    cross_language_search: str | None = None
+    meta_data: str | None = None
+
+
 class IngestResponse(BaseModel):
     documents: int
     chunks: int
@@ -65,6 +76,22 @@ class DocumentItem(BaseModel):
 
 class DocumentDetail(DocumentItem):
     preview: str | None = None
+    full_text: str | None = None
+
+
+class ChunkItem(BaseModel):
+    id: str
+    document_id: str
+    chunk_index: int
+    text: str
+    token_count: int | None = None
+    chunk_metadata: dict | None = None
+    created_at: datetime | None = None
+
+
+class DocumentChunksResponse(BaseModel):
+    total: int
+    chunks: list[ChunkItem]
 
 
 class DocumentListResponse(BaseModel):
@@ -129,9 +156,15 @@ class GuardrailsConfigPayload(BaseModel):
     min_bm25_score: float = 2.0
 
 
+class EmbeddingConfigPayload(BaseModel):
+    provider: str = "openai"
+    model: str = "text-embedding-3-small"
+
+
 class AvailableProviders(BaseModel):
-    llm: list[str] = ["openai", "gemini", "azure", "openai_compatible"]
-    reranker: list[str] = ["heuristic", "cross-encoder"]
+    llm: list[str] = ["openai", "gemini", "azure", "openai_compatible", "anthropic", "deepseek", "cohere", "qwen"]
+    embedding: list[str] = ["openai", "sentence-transformers", "cohere", "gemini"]
+    reranker: list[str] = ["heuristic", "cross-encoder", "cohere"]
 
 
 class FullConfigResponse(BaseModel):
@@ -139,6 +172,7 @@ class FullConfigResponse(BaseModel):
     retrieval: RetrievalConfigPayload
     reranker: RerankerConfigPayload
     guardrails: GuardrailsConfigPayload
+    embedding: EmbeddingConfigPayload = Field(default_factory=EmbeddingConfigPayload)
     available_providers: AvailableProviders
 
 
@@ -162,6 +196,11 @@ class UpdateLLMConfig(BaseModel):
     openai_compatible_base_url: str | None = None
     openai_compatible_api_key: str | None = None
     openai_compatible_model: str | None = None
+
+
+class UpdateEmbeddingConfig(BaseModel):
+    provider: str | None = None
+    model: str | None = None
 
 
 class UpdateRetrievalConfig(BaseModel):
@@ -188,6 +227,7 @@ class UpdateGuardrailsConfig(BaseModel):
 
 class UpdateConfigRequest(BaseModel):
     llm: UpdateLLMConfig | None = None
+    embedding: UpdateEmbeddingConfig | None = None
     retrieval: UpdateRetrievalConfig | None = None
     reranker: UpdateRerankerConfig | None = None
     guardrails: UpdateGuardrailsConfig | None = None

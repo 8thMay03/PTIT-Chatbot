@@ -234,9 +234,14 @@ def get_runtime_config_dict() -> dict:
             "min_vector_score": settings.retrieval_min_vector_score,
             "min_bm25_score": settings.retrieval_min_bm25_score,
         },
+        "embedding": {
+            "provider": settings.embedding_provider,
+            "model": settings.embedding_model,
+        },
         "available_providers": {
-            "llm": ["openai", "gemini", "azure", "openai_compatible"],
-            "reranker": ["heuristic", "cross-encoder"],
+            "llm": ["openai", "gemini", "azure", "openai_compatible", "anthropic", "deepseek", "cohere", "qwen"],
+            "embedding": ["openai", "sentence-transformers", "cohere", "gemini"],
+            "reranker": ["heuristic", "cross-encoder", "cohere"],
         },
     }
 
@@ -321,6 +326,13 @@ def update_runtime_config(payload: dict) -> dict:
         settings.retrieval_default_top_k = max(1, min(20, int(retrieval["top_k"])))
     if "hybrid_vector_weight" in retrieval and retrieval["hybrid_vector_weight"] is not None:
         settings.hybrid_vector_weight = max(0.0, min(1.0, float(retrieval["hybrid_vector_weight"])))
+
+    # Embedding
+    embedding = payload.get("embedding") or {}
+    if "provider" in embedding and embedding["provider"]:
+        settings.embedding_provider = str(embedding["provider"]).strip().lower()
+    if "model" in embedding and embedding["model"]:
+        settings.embedding_model = str(embedding["model"]).strip()
 
     # Reranker
     reranker = payload.get("reranker") or {}
