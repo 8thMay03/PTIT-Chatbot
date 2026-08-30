@@ -15,6 +15,7 @@ from app.api.schemas import (
     DocumentListResponse,
     FullConfigResponse,
     IngestResponse,
+    RetrievalTestRequest,
     TestLLMRequest,
     TestLLMResponse,
     UpdateConfigRequest,
@@ -105,6 +106,19 @@ def test_llm(request: TestLLMRequest) -> TestLLMResponse:
             latency_ms=latency_ms,
         )
 
+
+
+@router.post("/retrieval/test")
+def test_retrieval(request: RetrievalTestRequest) -> dict:
+    if not request.query.strip():
+        raise HTTPException(status_code=400, detail="Query must not be empty.")
+    result = rag_chain.retrieve_context(request.query, top_k=request.top_k)
+    return {
+        "query": request.query,
+        "contexts": result.get("contexts", []),
+        "retrieval_debug": result.get("retrieval_debug", {}),
+        "strong_context": result.get("strong_context", False),
+    }
 
 
 @router.post("/ingest", response_model=IngestResponse)

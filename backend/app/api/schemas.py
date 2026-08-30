@@ -44,6 +44,11 @@ class ChatResponse(BaseModel):
     sources: list[Source]
 
 
+class RetrievalTestRequest(BaseModel):
+    query: str
+    top_k: int = 4
+
+
 class IngestResponse(BaseModel):
     documents: int
     chunks: int
