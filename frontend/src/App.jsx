@@ -25,13 +25,49 @@ const SIDEBAR_TIPS = [
   "Tùy chỉnh LLM & Reranker trong tab Cấu hình.",
 ];
 
+const VALID_VIEWS = ["chat", "documents", "settings"];
+
+function getInitialView() {
+  if (typeof window !== "undefined") {
+    const hash = window.location.hash.replace(/^#\/?/, "");
+    if (VALID_VIEWS.includes(hash)) {
+      return hash;
+    }
+    const saved = localStorage.getItem("ptit_chatbot_view");
+    if (VALID_VIEWS.includes(saved)) {
+      return saved;
+    }
+  }
+  return "chat";
+}
+
 export default function App() {
-  const [view, setView] = useState("chat");
+  const [view, setView] = useState(getInitialView);
   const [docCount, setDocCount] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
   const [lang, setLang] = useState("Tiếng Việt");
   const [theme, setTheme] = useState("light");
   const chatRef = useRef(null);
+
+  // Sync view state to localStorage and URL hash
+  useEffect(() => {
+    localStorage.setItem("ptit_chatbot_view", view);
+    if (window.location.hash.replace(/^#\/?/, "") !== view) {
+      window.history.replaceState(null, "", `#${view}`);
+    }
+  }, [view]);
+
+  // Listen to browser hash changes (Back / Forward)
+  useEffect(() => {
+    function handleHashChange() {
+      const hash = window.location.hash.replace(/^#\/?/, "");
+      if (VALID_VIEWS.includes(hash)) {
+        setView(hash);
+      }
+    }
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
 
   const refreshDocCount = useCallback(() => {
     fetch(`${API_BASE_URL}/documents`)

@@ -226,8 +226,13 @@ function renderMarkdownHtml(rawText) {
 
 
 export default function DocumentsView({ onChanged }) {
-  const [activeTab, setActiveTab] = useState("files"); // files | retrieval | logs | config
-  const [selectedDocId, setSelectedDocId] = useState(null); // When not null, opens Document Viewer matching image.png
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = localStorage.getItem("ptit_dataset_tab");
+    return ["files", "retrieval", "logs", "config"].includes(saved) ? saved : "files";
+  });
+  const [selectedDocId, setSelectedDocId] = useState(() => {
+    return localStorage.getItem("ptit_selected_doc_id") || null;
+  });
 
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -247,12 +252,31 @@ export default function DocumentsView({ onChanged }) {
   const [docDetailLoading, setDocDetailLoading] = useState(false);
   const [docChunks, setDocChunks] = useState([]);
   const [docChunksLoading, setDocChunksLoading] = useState(false);
-  const [chunkMode, setChunkMode] = useState("full"); // "full" | "ellipse"
+  const [chunkMode, setChunkMode] = useState(() => {
+    const saved = localStorage.getItem("ptit_chunk_mode");
+    return ["full", "ellipse", "markdown"].includes(saved) ? saved : "full";
+  });
   const [chunkQuery, setChunkQuery] = useState("");
   const [selectedChunkIds, setSelectedChunkIds] = useState(new Set());
   const [enabledChunks, setEnabledChunks] = useState({});
   const [chunkPage, setChunkPage] = useState(1);
   const [chunkPageSize, setChunkPageSize] = useState(50);
+
+  useEffect(() => {
+    localStorage.setItem("ptit_dataset_tab", activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (selectedDocId) {
+      localStorage.setItem("ptit_selected_doc_id", selectedDocId);
+    } else {
+      localStorage.removeItem("ptit_selected_doc_id");
+    }
+  }, [selectedDocId]);
+
+  useEffect(() => {
+    localStorage.setItem("ptit_chunk_mode", chunkMode);
+  }, [chunkMode]);
 
   // Modals
   const [editingDoc, setEditingDoc] = useState(null);
