@@ -46,7 +46,13 @@ class ChatResponse(BaseModel):
 
 class RetrievalTestRequest(BaseModel):
     query: str
-    top_k: int = 4
+    top_k: int = 10
+    similarity_threshold: float | None = None
+    vector_similarity_weight: float | None = None
+    rerank_model: str | None = None
+    use_knowledge_graph: bool = False
+    cross_language_search: str | None = None
+    meta_data: str | None = None
 
 
 class IngestResponse(BaseModel):

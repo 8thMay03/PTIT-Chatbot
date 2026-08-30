@@ -93,9 +93,15 @@ export default function DocumentsView({ onChanged }) {
   const [dragOver, setDragOver] = useState(false);
   const [notice, setNotice] = useState("");
 
-  // Retrieval Testing State
+  // Retrieval Testing State (Matching reference parameters)
   const [testQuery, setTestQuery] = useState("");
-  const [testTopK, setTestTopK] = useState(4);
+  const [testSimilarityThreshold, setTestSimilarityThreshold] = useState(0.2);
+  const [testVectorWeight, setTestVectorWeight] = useState(0.3);
+  const [testRerankModel, setTestRerankModel] = useState("");
+  const [testUseKg, setTestUseKg] = useState(false);
+  const [testCrossLang, setTestCrossLang] = useState("");
+  const [testMetadata, setTestMetadata] = useState("");
+  const [testTopK, setTestTopK] = useState(10);
   const [testLoading, setTestLoading] = useState(false);
   const [testResults, setTestResults] = useState(null);
 
@@ -398,7 +404,16 @@ export default function DocumentsView({ onChanged }) {
       const response = await fetch(`${API_BASE_URL}/retrieval/test`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: testQuery, top_k: Number(testTopK) || 4 }),
+        body: JSON.stringify({
+          query: testQuery,
+          top_k: Number(testTopK) || 10,
+          similarity_threshold: testSimilarityThreshold,
+          vector_similarity_weight: testVectorWeight,
+          rerank_model: testRerankModel || null,
+          use_knowledge_graph: testUseKg,
+          cross_language_search: testCrossLang || null,
+          meta_data: testMetadata || null,
+        }),
       });
       if (!response.ok) {
         throw new Error("Không thực hiện được truy vấn thử nghiệm.");
@@ -837,92 +852,281 @@ export default function DocumentsView({ onChanged }) {
           </div>
         )}
 
-        {/* TAB 2: RETRIEVAL TESTING */}
+        {/* TAB 2: RETRIEVAL TESTING (Matching image.png) */}
         {activeTab === "retrieval" && (
-          <div className="dataset-sub-view">
-            <header className="dataset-view-header">
-              <div className="dataset-view-title">
-                <h2>Retrieval testing</h2>
-                <p>Test hybrid semantic and lexical retrieval against the dataset in real-time.</p>
-              </div>
+          <div className="dataset-retrieval-screen">
+            {/* Top Title & Full Description */}
+            <header className="retrieval-top-header">
+              <h2>Retrieval testing</h2>
+              <p>
+                Conduct a retrieval test to check if RAGFlow can recover the intended content for the LLM. If you have adjusted the default settings, such as keyword similarity weight or similarity threshold, to achieve the optimal results, be aware that these changes will not be automatically saved. You must apply them to your chat assistant settings or the Retrieval agent component settings.
+              </p>
             </header>
 
-            <div className="retrieval-test-box">
-              <div className="retrieval-input-row">
-                <div className="test-input-wrapper">
-                  <Search size={16} className="search-icon" />
-                  <input
-                    type="text"
-                    placeholder="Nhập câu hỏi hoặc từ khóa thử nghiệm (ví dụ: điều kiện tốt nghiệp, quy định học vụ...)"
-                    value={testQuery}
-                    onChange={(e) => setTestQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleRunRetrievalTest()}
-                  />
-                </div>
+            {/* 2-Column Split Layout */}
+            <div className="retrieval-two-col-layout">
+              {/* Left Column: Setting & Input */}
+              <div className="retrieval-col-left">
+                <div className="retrieval-settings-card">
+                  <h3 className="retrieval-settings-title">Setting</h3>
 
-                <div className="topk-selector-group">
-                  <label>Top K:</label>
-                  <select
-                    value={testTopK}
-                    onChange={(e) => setTestTopK(Number(e.target.value))}
-                  >
-                    <option value={2}>2 chunks</option>
-                    <option value={4}>4 chunks</option>
-                    <option value={6}>6 chunks</option>
-                    <option value={8}>8 chunks</option>
-                  </select>
-                </div>
-
-                <button
-                  type="button"
-                  className="btn-test-run"
-                  onClick={handleRunRetrievalTest}
-                  disabled={testLoading || !testQuery.trim()}
-                >
-                  {testLoading ? <Loader2 size={15} className="spin" /> : <Play size={14} />}
-                  <span>Test Retrieval</span>
-                </button>
-              </div>
-
-              {testResults && (
-                <div className="retrieval-results-pane">
-                  <div className="results-header">
-                    <h4>
-                      Kết quả truy xuất ({testResults.contexts?.length || 0} đoạn trích)
-                    </h4>
-                    <span className="badge-strong">
-                      {testResults.strong_context ? "High Confidence" : "Standard Context"}
-                    </span>
+                  {/* Similarity threshold */}
+                  <div className="ret-form-group">
+                    <div className="ret-field-label">
+                      <span>Similarity threshold</span>
+                      <span className="ret-info-icon" title="Ngưỡng tương đồng tối thiểu để giữ lại chunk">ⓘ</span>
+                    </div>
+                    <div className="ret-slider-row">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={testSimilarityThreshold}
+                        onChange={(e) => setTestSimilarityThreshold(parseFloat(e.target.value))}
+                        className="ret-cyan-slider"
+                      />
+                      <span className="ret-val-box">
+                        {testSimilarityThreshold.toFixed(1).replace(".", ",")}
+                      </span>
+                    </div>
                   </div>
 
-                  {testResults.contexts?.length === 0 ? (
-                    <div className="dataset-empty-state">
-                      <p>Không tìm thấy đoạn trích phù hợp với ngưỡng tương đồng.</p>
+                  {/* Vector similarity weight */}
+                  <div className="ret-form-group">
+                    <div className="ret-field-label">
+                      <span>Vector similarity weight</span>
+                      <span className="ret-info-icon" title="Trọng số tìm kiếm vector ngữ nghĩa vs full-text BM25">ⓘ</span>
+                    </div>
+                    <div className="ret-weight-indicators">
+                      <span className="ret-ind-left">vector {testVectorWeight.toFixed(2)}</span>
+                      <span className="ret-ind-right">full-text {(1 - testVectorWeight).toFixed(2)}</span>
+                    </div>
+                    <div className="ret-slider-row">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={testVectorWeight}
+                        onChange={(e) => setTestVectorWeight(parseFloat(e.target.value))}
+                        className="ret-cyan-slider"
+                      />
+                      <span className="ret-val-box">
+                        {testVectorWeight.toFixed(1).replace(".", ",")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Rerank model */}
+                  <div className="ret-form-group">
+                    <div className="ret-field-label">
+                      <span>Rerank model</span>
+                      <span className="ret-info-icon" title="Mô hình Reranker xếp hạng lại đoạn trích">ⓘ</span>
+                    </div>
+                    <div className="ret-select-box">
+                      <select
+                        value={testRerankModel}
+                        onChange={(e) => setTestRerankModel(e.target.value)}
+                      >
+                        <option value="">Select value</option>
+                        <option value="cross-encoder/mmarco-mMiniLMv2-L12-H384-v1">cross-encoder/mmarco-mMiniLMv2-L12-H384-v1</option>
+                        <option value="BAAI/bge-reranker-base">BAAI/bge-reranker-base</option>
+                        <option value="BAAI/bge-reranker-large">BAAI/bge-reranker-large</option>
+                      </select>
+                      <ChevronDown size={14} className="ret-select-chevron" />
+                    </div>
+                  </div>
+
+                  {/* Use knowledge graph */}
+                  <div className="ret-form-group">
+                    <div className="ret-field-label">
+                      <span>Use knowledge graph</span>
+                      <span className="ret-info-icon" title="Sử dụng Knowledge Graph">ⓘ</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={`ret-kg-switch ${testUseKg ? "on" : "off"}`}
+                      onClick={() => setTestUseKg(!testUseKg)}
+                      aria-label="Toggle knowledge graph"
+                    >
+                      <span className="ret-kg-thumb" />
+                    </button>
+                  </div>
+
+                  {/* Cross-language search */}
+                  <div className="ret-form-group">
+                    <div className="ret-field-label">
+                      <span>Cross-language search</span>
+                      <span className="ret-info-icon" title="Tìm kiếm đa ngôn ngữ">ⓘ</span>
+                    </div>
+                    <div className="ret-select-box">
+                      <select
+                        value={testCrossLang}
+                        onChange={(e) => setTestCrossLang(e.target.value)}
+                      >
+                        <option value="">Select value</option>
+                        <option value="en">English</option>
+                        <option value="vi">Vietnamese</option>
+                        <option value="auto">Auto detect</option>
+                      </select>
+                      <ChevronDown size={14} className="ret-select-chevron" />
+                    </div>
+                  </div>
+
+                  {/* Meta data */}
+                  <div className="ret-form-group">
+                    <div className="ret-field-label">
+                      <span>Meta data</span>
+                      <span className="ret-info-icon" title="Bộ lọc trường metadata">ⓘ</span>
+                    </div>
+                    <div className="ret-select-box">
+                      <select
+                        value={testMetadata}
+                        onChange={(e) => setTestMetadata(e.target.value)}
+                      >
+                        <option value="">Select value</option>
+                        <option value="all">All Metadata</option>
+                        <option value="file_name">Filter by File Name</option>
+                      </select>
+                      <ChevronDown size={14} className="ret-select-chevron" />
+                    </div>
+                  </div>
+
+                  {/* Top */}
+                  <div className="ret-form-group">
+                    <div className="ret-field-label">
+                      <span>Top</span>
+                    </div>
+                    <div className="ret-select-box">
+                      <select
+                        value={testTopK}
+                        onChange={(e) => setTestTopK(Number(e.target.value))}
+                      >
+                        <option value={5}>Top 5</option>
+                        <option value={10}>Top 10</option>
+                        <option value={15}>Top 15</option>
+                        <option value={20}>Top 20</option>
+                        <option value={30}>Top 30</option>
+                      </select>
+                      <ChevronDown size={14} className="ret-select-chevron" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Query Input Box */}
+                <div className="ret-query-box">
+                  <textarea
+                    rows={4}
+                    placeholder=""
+                    value={testQuery}
+                    onChange={(e) => setTestQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleRunRetrievalTest();
+                      }
+                    }}
+                  />
+                  <div className="ret-query-actions">
+                    <button
+                      type="button"
+                      className="btn-run-retrieval"
+                      onClick={handleRunRetrievalTest}
+                      disabled={testLoading || !testQuery.trim()}
+                    >
+                      {testLoading ? (
+                        <Loader2 size={13} className="spin" />
+                      ) : (
+                        <span>Run</span>
+                      )}
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ marginLeft: 4 }}
+                      >
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Results */}
+              <div className="retrieval-col-right">
+                <div className="ret-results-header">
+                  <div className="ret-results-title">
+                    <h3>Results</h3>
+                    <span className="ret-total-tag">
+                      Total: {testResults ? (testResults.contexts?.length ?? 0) : 0}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="ret-filter-btn"
+                    title="Filter test results"
+                  >
+                    <Filter size={14} />
+                  </button>
+                </div>
+
+                <div className="ret-results-container">
+                  {!testResults || (testResults.contexts?.length ?? 0) === 0 ? (
+                    <div className="ret-empty-placeholder">
+                      {/* Document Scroll Outline Icon */}
+                      <div className="ret-empty-icon">
+                        <svg
+                          width="46"
+                          height="46"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#cbd5e1"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                          <line x1="16" y1="13" x2="8" y2="13"></line>
+                          <line x1="16" y1="17" x2="8" y2="17"></line>
+                          <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                      </div>
+                      <p>No test has been run yet. Results will appear here.</p>
                     </div>
                   ) : (
-                    <div className="chunks-list">
+                    <div className="ret-results-list">
                       {testResults.contexts.map((ctx, idx) => (
-                        <div key={idx} className="chunk-card">
-                          <div className="chunk-card-header">
-                            <div className="chunk-rank">#{idx + 1}</div>
-                            <div className="chunk-meta-title">
-                              <strong>{ctx.heading || ctx.source_name || "Trích đoạn"}</strong>
-                              {ctx.section_path && <span> · {ctx.section_path}</span>}
-                            </div>
-                            <div className="chunk-scores">
+                        <div key={idx} className="ret-chunk-item">
+                          <div className="ret-chunk-header">
+                            <span className="ret-chunk-rank">#{idx + 1}</span>
+                            <strong className="ret-chunk-title">
+                              {ctx.heading || ctx.source_name || "Đoạn trích"}
+                            </strong>
+                            {ctx.section_path && (
+                              <span className="ret-chunk-sec">· {ctx.section_path}</span>
+                            )}
+                            <div className="ret-chunk-badges">
                               {ctx.combined_score != null && (
-                                <span className="score-tag">
+                                <span className="ret-badge rerank">
                                   Rerank: {(ctx.combined_score * 100).toFixed(1)}%
                                 </span>
                               )}
                               {ctx.score != null && (
-                                <span className="score-tag">
+                                <span className="ret-badge sim">
                                   Sim: {(ctx.score * 100).toFixed(1)}%
                                 </span>
                               )}
                             </div>
                           </div>
-                          <div className="chunk-card-body">
+                          <div className="ret-chunk-content">
                             <p>{ctx.text || ctx.content}</p>
                           </div>
                         </div>
@@ -930,10 +1134,11 @@ export default function DocumentsView({ onChanged }) {
                     </div>
                   )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
         )}
+
 
         {/* TAB 3: LOGS VIEW */}
         {activeTab === "logs" && (
