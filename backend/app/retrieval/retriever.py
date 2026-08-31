@@ -3,7 +3,7 @@ from app.embeddings import EmbeddingModel, create_embedding_model
 from app.retrieval.bm25 import BM25Search
 from app.retrieval.hybrid import reciprocal_rank_fusion
 from app.retrieval.parent_child import collapse_parent_results
-from app.vectordb import ChromaVectorStore, VectorStore
+from app.vectordb import VectorStore, create_vector_store
 
 
 class Retriever:
@@ -14,7 +14,7 @@ class Retriever:
         keyword_search: BM25Search | None = None,
     ) -> None:
         self.embedding_model = embedding_model or create_embedding_model()
-        self.vector_store = vector_store or ChromaVectorStore(settings.vector_db_path)
+        self.vector_store = vector_store or create_vector_store()
         self.keyword_search = keyword_search or BM25Search()
 
     def retrieve(self, query: str, top_k: int = 4) -> list[dict]:

@@ -68,6 +68,8 @@ class Settings(BaseSettings):
     )
 
     vector_db_path: Path = Field(default=Path("backend/storage/chroma"), alias="VECTOR_DB_PATH")
+    vector_store_type: str = Field(default="pgvector", alias="VECTOR_STORE_TYPE")
+    vector_dim: int = Field(default=1536, ge=1, alias="VECTOR_DIM")
     database_url: str = Field(
         default="sqlite:///backend/storage/ptit_chatbot.db",
         alias="DATABASE_URL",

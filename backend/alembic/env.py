@@ -78,10 +78,11 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        is_postgres = connection.dialect.name == "postgresql"
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            compare_type=True,
+            compare_type=is_postgres,
         )
 
         with context.begin_transaction():

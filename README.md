@@ -27,9 +27,9 @@ Thay vì để mô hình trả lời hoàn toàn từ kiến thức có sẵn, c
 | Backend API | Python 3.10+, FastAPI, Uvicorn, Pydantic |
 | LLM | Đa provider: OpenAI (`gpt-4.1-mini`), Google Gemini, Azure OpenAI, OpenAI-Compatible (Ollama, vLLM) |
 | Embedding | OpenAI `text-embedding-3-small`; hỗ trợ Sentence Transformers hoặc hash embedding |
-| Vector database | ChromaDB |
+| Vector database | **`pgvector`** (Tích hợp trực tiếp trong PostgreSQL 16 với HNSW Index) |
 | Keyword retrieval | BM25 với `rank-bm25` |
-| Data storage & Migration | PostgreSQL 16 (Production) / SQLite (Dev), SQLAlchemy 2.0, Alembic, Psycopg 3 |
+| Data storage & Migration | PostgreSQL 16 với `pgvector` (Production) / SQLite (Dev), SQLAlchemy 2.0, Alembic, Psycopg 3 |
 | Reranking | Heuristic reranker hoặc CrossEncoder |
 | Evaluation | Ragas, pytest |
 | Deployment | Docker, Docker Compose, Nginx |
@@ -43,15 +43,14 @@ flowchart LR
     A["Tài liệu PTIT<br/>Markdown / TXT"] --> B["Loader & Cleaner"]
     B --> C["Parent-child Chunking"]
     C --> D["Embedding"]
-    D --> E[("ChromaDB")]
-    C --> F[("PostgreSQL<br/>(Alembic Migration)")]
-    C --> G["BM25 Index"]
+    D --> E[("PostgreSQL 16<br/>All-in-One: Metadata + pgvector HNSW")]
+    C --> F["BM25 Index"]
 ```
 
 - Tài liệu trong thư mục `data/` được đọc và làm sạch.
 - Nội dung được chia thành parent chunk và child chunk, giữ metadata về tiêu đề và vị trí.
-- Child chunk được embedding và lưu trong ChromaDB.
-- Nội dung cùng metadata được lưu trong PostgreSQL (hoặc SQLite khi chạy cục bộ) để hỗ trợ BM25, citation và debug.
+- Child chunk được embedding và lưu trực tiếp vào cột `embedding` (kiểu `vector(1536)`) trên bảng `chunks` trong PostgreSQL.
+- Toàn bộ tài liệu, metadata, trích dẫn và vector embeddings được ghi trong một **transaction duy nhất** của PostgreSQL (đồng bộ tuyệt đối).
 
 ### Luồng xử lý câu hỏi
 
@@ -64,7 +63,7 @@ flowchart TD
     GR -->|"Ngoài phạm vi"| REFUSE["Câu từ chối cố định"]
     GR -->|"Hợp lệ"| QR["Query Rewrite & Multi-query"]
 
-    QR --> VS["Vector Search"]
+    QR --> VS["Vector Search (pgvector HNSW)"]
     QR --> BM["BM25 Search"]
     VS --> RRF["Reciprocal Rank Fusion"]
     BM --> RRF
@@ -78,7 +77,7 @@ flowchart TD
     CIT --> API
     API -->|"NDJSON Streaming"| UI
 
-    API --> DB[("PostgreSQL<br/>Hội thoại & Debug")]
+    API --> DB[("PostgreSQL<br/>Hội thoại, Tin nhắn, Trích dẫn")]
 ```
 
 Quy trình chính:
