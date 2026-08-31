@@ -2,7 +2,8 @@
 set -eu
 
 echo "Applying database migrations..."
-alembic upgrade head
+python -m alembic upgrade head
+
 
 storage_dir="/app/backend/storage"
 chroma_dir="$storage_dir/chroma"

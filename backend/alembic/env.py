@@ -3,7 +3,8 @@ from logging.config import fileConfig
 from pathlib import Path
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
+
 
 # Ensure backend root is on sys.path
 backend_dir = Path(__file__).resolve().parents[1]
@@ -70,11 +71,10 @@ def run_migrations_online() -> None:
     configuration = config.get_section(config.config_ini_section) or {}
     configuration["sqlalchemy.url"] = url
 
-    connectable = engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
+    connectable = create_engine(
+        url,
         poolclass=pool.NullPool,
-        **get_engine_options(url),
+        future=True,
     )
 
     with connectable.connect() as connection:
