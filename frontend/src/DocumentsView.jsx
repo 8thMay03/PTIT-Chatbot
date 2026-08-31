@@ -284,6 +284,7 @@ export default function DocumentsView({ onChanged }) {
   const [pendingDelete, setPendingDelete] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [reindexing, setReindexing] = useState(false);
+  const [parsingDocId, setParsingDocId] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [notice, setNotice] = useState("");
@@ -634,6 +635,39 @@ export default function DocumentsView({ onChanged }) {
     }
   }
 
+  async function parseSingleDoc(doc) {
+    if (!doc || parsingDocId || reindexing) return;
+    setParsingDocId(doc.id);
+    setError("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/documents/${doc.id}/parse`, {
+        method: "POST",
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(apiError(payload, "Không parse được tài liệu."));
+      setNotice(`Đã parse thành công “${payload.title || payload.file_name}” (${payload.chunk_count ?? 0} chunks).`);
+      setLogs((prev) => [
+        {
+          id: `log-${Date.now()}`,
+          timestamp: formatDate(new Date()),
+          event: "Document Parsed",
+          status: "Success",
+          detail: `Parsed ${payload.file_name || payload.title} into ${payload.chunk_count ?? 0} chunks`,
+        },
+        ...prev,
+      ]);
+      await loadDocuments();
+      if (selectedDocId === doc.id) {
+        await loadDocDetail(doc.id);
+      }
+      onChanged?.();
+    } catch (err) {
+      setError(err.message || "Lỗi khi parse tài liệu.");
+    } finally {
+      setParsingDocId(null);
+    }
+  }
+
   async function downloadDocument(doc) {
     try {
       const response = await fetch(`${API_BASE_URL}/documents/${doc.id}/file`);
@@ -699,7 +733,7 @@ export default function DocumentsView({ onChanged }) {
 
     return (
       <div className="doc-view-page">
-        {/* Top Back Button */}
+        {/* Top Back Button & Re-parse Action */}
         <div className="doc-view-top-bar">
           <button
             type="button"
@@ -709,6 +743,24 @@ export default function DocumentsView({ onChanged }) {
             <ArrowLeft size={14} />
             <span>Back</span>
           </button>
+
+          {docDetail && (
+            <button
+              type="button"
+              className="btn-parse-dataset"
+              style={{ marginLeft: "auto" }}
+              onClick={() => parseSingleDoc(docDetail)}
+              disabled={parsingDocId === docDetail.id || reindexing}
+              title="Re-parse file này và cập nhật vector embeddings"
+            >
+              {parsingDocId === docDetail.id ? (
+                <Loader2 size={14} className="spin" />
+              ) : (
+                <Play size={13} fill="currentColor" />
+              )}
+              <span>{parsingDocId === docDetail.id ? "Đang Parse..." : "Re-parse File"}</span>
+            </button>
+          )}
         </div>
 
         {/* 2-Column Split Layout */}
@@ -1071,21 +1123,17 @@ export default function DocumentsView({ onChanged }) {
               <div className="dataset-view-toolbar">
                 <button
                   type="button"
-                  className="tb-icon-btn"
-                  title="Parse / Re-index all files"
+                  className="btn-parse-dataset"
+                  title="Thực hiện pipeline Parse & Ingest toàn bộ tài liệu trong thư mục data"
                   onClick={reindexAll}
-                  disabled={reindexing}
+                  disabled={reindexing || Boolean(parsingDocId)}
                 >
-                  {reindexing ? <Loader2 size={15} className="spin" /> : <Wand2 size={15} />}
-                </button>
-
-                <button
-                  type="button"
-                  className="tb-icon-btn"
-                  title="Filter files"
-                  onClick={() => setNotice("Bộ lọc file đang áp dụng.")}
-                >
-                  <Filter size={15} />
+                  {reindexing ? (
+                    <Loader2 size={14} className="spin" />
+                  ) : (
+                    <Play size={13} fill="currentColor" />
+                  )}
+                  <span>{reindexing ? "Đang Parse..." : "Parse Documents"}</span>
                 </button>
 
                 <div className="dataset-search-field">
@@ -1290,17 +1338,51 @@ export default function DocumentsView({ onChanged }) {
                           </td>
 
                           <td className="td-parse">
-                            <div className="parse-status-cell">
-                              <span className="parse-text">General</span>
+                            <button
+                              type="button"
+                              className={`parse-status-btn ${parsingDocId === doc.id ? "is-parsing" : ""}`}
+                              title={`Click để parse file “${fileName}”`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                parseSingleDoc(doc);
+                              }}
+                              disabled={parsingDocId === doc.id || reindexing}
+                            >
+                              <span className="parse-text">
+                                {parsingDocId === doc.id ? "Parsing..." : "General"}
+                              </span>
                               <div className="parse-icons">
-                                <Play size={10} className="parse-play-icon" fill="currentColor" />
+                                {parsingDocId === doc.id ? (
+                                  <Loader2 size={11} className="spin parse-play-icon" />
+                                ) : (
+                                  <Play size={10} className="parse-play-icon" fill="currentColor" />
+                                )}
                                 <span className="parse-dot-indicator" />
                               </div>
-                            </div>
+                            </button>
                           </td>
 
                           <td className="td-action">
                             <div className="action-button-group">
+                              <button
+                                type="button"
+                                className="act-btn"
+                                style={{ color: "#14b8a6" }}
+                                title="Parse tài liệu này"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  parseSingleDoc(doc);
+                                }}
+                                disabled={parsingDocId === doc.id || reindexing}
+                              >
+                                {parsingDocId === doc.id ? (
+                                  <Loader2 size={14} className="spin" />
+                                ) : (
+                                  <Play size={13} fill="currentColor" />
+                                )}
+                              </button>
                               <button
                                 type="button"
                                 className="act-btn"

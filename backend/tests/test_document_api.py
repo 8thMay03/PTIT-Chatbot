@@ -82,3 +82,12 @@ def test_delete_document_returns_404_when_missing(monkeypatch) -> None:
     response = client.delete("/api/documents/missing")
 
     assert response.status_code == 404
+
+
+def test_parse_single_document_returns_404_when_missing(monkeypatch) -> None:
+    monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda session, doc_id: None)
+
+    response = client.post("/api/documents/missing/parse")
+
+    assert response.status_code == 404
+
