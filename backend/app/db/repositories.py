@@ -39,6 +39,7 @@ def replace_knowledge_base(
     chunks: list[ChunkRecord],
 ) -> None:
     session.execute(delete(Document))
+    session.flush()
 
     session.add_all(
         Document(
@@ -52,6 +53,7 @@ def replace_knowledge_base(
         )
         for document in documents
     )
+    session.flush()
     session.add_all(
         Chunk(
             id=chunk.id,
@@ -64,6 +66,8 @@ def replace_knowledge_base(
         )
         for chunk in chunks
     )
+    session.flush()
+
 
 
 def list_documents(session: Session) -> list[tuple[Document, int]]:

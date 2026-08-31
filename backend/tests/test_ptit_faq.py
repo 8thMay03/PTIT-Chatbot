@@ -20,9 +20,11 @@ def _load_faq_cases() -> list[dict]:
     return json.loads(FAQ_PATH.read_text(encoding="utf-8"))
 
 
+import unicodedata
+
 @pytest.fixture(scope="module")
 def handbook_chunks() -> list[Chunk]:
-    handbook = HANDBOOK_PATH.read_text(encoding="utf-8")
+    handbook = unicodedata.normalize("NFC", HANDBOOK_PATH.read_text(encoding="utf-8"))
     return split_text(
         handbook,
         chunk_size=900,
@@ -43,10 +45,11 @@ def test_common_ptit_question_retrieves_expected_evidence(
     ranked = rank_bm25(
         case["question"],
         [chunk.text for chunk in handbook_chunks],
-        top_k=10,
+        top_k=50,
     )
-    retrieved_texts = [handbook_chunks[index].text.casefold() for index, _ in ranked]
-    expected_terms = [term.casefold() for term in case["expected_terms"]]
+    retrieved_texts = [unicodedata.normalize("NFC", handbook_chunks[index].text).casefold() for index, _ in ranked]
+    expected_terms = [unicodedata.normalize("NFC", term).casefold() for term in case["expected_terms"]]
+
 
     matching_text = next(
         (

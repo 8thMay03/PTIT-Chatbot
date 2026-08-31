@@ -1,4 +1,23 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ptit_chatbot_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ptit_chatbot}
+      POSTGRES_USER: ${POSTGRES_USER:-ptit_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ptit_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ptit_user} -d ${POSTGRES_DB:-ptit_chatbot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -7,17 +26,22 @@ services:
       - .env
     environment:
       VECTOR_DB_PATH: /app/backend/storage/chroma
-      DATABASE_URL: sqlite:////app/backend/storage/ptit_chatbot.db
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ptit_user:ptit_password@postgres:5432/ptit_chatbot}
       DOCUMENTS_PATH: /app/data
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       PTIT_AUTO_INGEST: ${PTIT_AUTO_INGEST:-true}
     volumes:
       - ./data:/app/data
       - ./backend/app:/app/backend/app
+      - ./backend/alembic:/app/backend/alembic
+      - ./backend/alembic.ini:/app/backend/alembic.ini
       - ./backend/scripts:/app/backend/scripts
       - backend_storage:/app/backend/storage
     ports:
       - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     command:
       - uvicorn
@@ -33,9 +57,9 @@ services:
         - python
         - -c
         - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"
-      interval: 30s
+      interval: 15s
       timeout: 5s
-      start_period: 30s
+      start_period: 20s
       retries: 3
 
   frontend:
@@ -59,6 +83,8 @@ services:
     restart: unless-stopped
 
 volumes:
+  postgres_data:
   backend_storage:
   frontend_node_modules:
+
 

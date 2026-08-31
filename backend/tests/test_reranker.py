@@ -1,7 +1,10 @@
 from app.retrieval.reranker import heuristic_rerank
 
 
-def test_heuristic_reranker_promotes_exact_query_coverage() -> None:
+def test_heuristic_reranker_promotes_exact_query_coverage(monkeypatch) -> None:
+    monkeypatch.setattr("app.retrieval.reranker.settings.reranker_vector_weight", 0.45)
+    monkeypatch.setattr("app.retrieval.reranker.settings.reranker_bm25_weight", 0.35)
+    monkeypatch.setattr("app.retrieval.reranker.settings.reranker_lexical_weight", 0.20)
     contexts = [
         {
             "chunk_id": "semantic",
