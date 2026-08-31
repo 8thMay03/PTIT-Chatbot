@@ -223,6 +223,20 @@ async def upload_document(file: UploadFile = File(...)) -> DocumentItem:
     return DocumentItem(**payload)
 
 
+@router.post("/documents/{document_id}/parse", response_model=DocumentItem)
+def parse_single_document(document_id: str, session: Session = Depends(get_session)) -> DocumentItem:
+    row = get_document_with_chunk_count(session, document_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
+    document, _chunk_count = row
+    path = resolve_source_path(document.source_path)
+    if path is None or not path.is_file():
+        raise HTTPException(status_code=404, detail="File nguồn không tồn tại trên đĩa.")
+
+    result = ingestion_pipeline.ingest_path(path)
+    return DocumentItem(**result)
+
+
 @router.delete("/documents/{document_id}", response_model=DocumentDeleteResponse)
 def remove_document(document_id: str) -> DocumentDeleteResponse:
     result = ingestion_pipeline.delete_ingested_document(document_id)
