@@ -27,9 +27,9 @@ Thay vì để mô hình trả lời hoàn toàn từ kiến thức có sẵn, c
 | Backend API | Python 3.10+, FastAPI, Uvicorn, Pydantic |
 | LLM | Đa provider: OpenAI (`gpt-4.1-mini`), Google Gemini, Azure OpenAI, OpenAI-Compatible (Ollama, vLLM) |
 | Embedding | OpenAI `text-embedding-3-small`; hỗ trợ Sentence Transformers hoặc hash embedding |
-| Vector database | ChromaDB |
+| Vector database | **`pgvector`** (Tích hợp trực tiếp trong PostgreSQL 16 với HNSW Index) |
 | Keyword retrieval | BM25 với `rank-bm25` |
-| Data storage | SQLite, SQLAlchemy |
+| Data storage & Migration | PostgreSQL 16 với `pgvector` (Production) / SQLite (Dev), SQLAlchemy 2.0, Alembic, Psycopg 3 |
 | Reranking | Heuristic reranker hoặc CrossEncoder |
 | Evaluation | Ragas, pytest |
 | Deployment | Docker, Docker Compose, Nginx |
@@ -43,15 +43,14 @@ flowchart LR
     A["Tài liệu PTIT<br/>Markdown / TXT"] --> B["Loader & Cleaner"]
     B --> C["Parent-child Chunking"]
     C --> D["Embedding"]
-    D --> E[("ChromaDB")]
-    C --> F[("SQLite")]
-    C --> G["BM25 Index"]
+    D --> E[("PostgreSQL 16<br/>All-in-One: Metadata + pgvector HNSW")]
+    C --> F["BM25 Index"]
 ```
 
 - Tài liệu trong thư mục `data/` được đọc và làm sạch.
 - Nội dung được chia thành parent chunk và child chunk, giữ metadata về tiêu đề và vị trí.
-- Child chunk được embedding và lưu trong ChromaDB.
-- Nội dung cùng metadata được lưu trong SQLite để hỗ trợ BM25, citation và debug.
+- Child chunk được embedding và lưu trực tiếp vào cột `embedding` (kiểu `vector(1536)`) trên bảng `chunks` trong PostgreSQL.
+- Toàn bộ tài liệu, metadata, trích dẫn và vector embeddings được ghi trong một **transaction duy nhất** của PostgreSQL (đồng bộ tuyệt đối).
 
 ### Luồng xử lý câu hỏi
 
@@ -64,7 +63,7 @@ flowchart TD
     GR -->|"Ngoài phạm vi"| REFUSE["Câu từ chối cố định"]
     GR -->|"Hợp lệ"| QR["Query Rewrite & Multi-query"]
 
-    QR --> VS["Vector Search"]
+    QR --> VS["Vector Search (pgvector HNSW)"]
     QR --> BM["BM25 Search"]
     VS --> RRF["Reciprocal Rank Fusion"]
     BM --> RRF
@@ -78,7 +77,7 @@ flowchart TD
     CIT --> API
     API -->|"NDJSON Streaming"| UI
 
-    API --> DB[("SQLite<br/>Hội thoại & Debug")]
+    API --> DB[("PostgreSQL<br/>Hội thoại, Tin nhắn, Trích dẫn")]
 ```
 
 Quy trình chính:
@@ -96,22 +95,26 @@ Quy trình chính:
 ```text
 PTIT Chatbot/
 ├── backend/
+│   ├── alembic/          # Alembic schema migrations
+│   │   ├── versions/     # Các revision migration (0001_initial_schema...)
+│   │   └── env.py        # Cấu hình dynamic DB URL và metadata
+│   ├── alembic.ini       # File cấu hình Alembic
 │   ├── app/
 │   │   ├── api/          # API routes và request/response schema
-│   │   ├── core/         # Cấu hình hệ thống
-│   │   ├── db/           # SQLite, SQLAlchemy models và repositories
+│   │   ├── core/         # Cấu hình hệ thống & connection pooling
+│   │   ├── db/           # PostgreSQL/SQLAlchemy models, repositories, session
 │   │   ├── embeddings/   # Các embedding provider
 │   │   ├── generation/   # RAG chain, prompt, LLM và citation
 │   │   ├── guardrails/   # Scope filter và prompt-injection protection
 │   │   ├── ingestion/    # Đọc, làm sạch và chia tài liệu
 │   │   ├── retrieval/    # BM25, hybrid retrieval, RRF và reranker
 │   │   └── vectordb/     # ChromaDB adapter
-│   ├── scripts/          # Ingest và evaluation
-│   └── tests/            # Unit test và evaluation dataset
+│   ├── scripts/          # Ingest, data migration (SQLite -> Postgres) và evaluation
+│   └── tests/            # Unit test, integration test và evaluation dataset
 ├── data/                 # Tài liệu PTIT
 ├── frontend/             # React/Vite web application
-├── docker-compose.yml
-├── .env.example
+├── docker-compose.yml    # Compose orchestration (PostgreSQL, Backend, Frontend)
+├── .env.example          # Mẫu biến môi trường Production & Dev
 └── README.md
 ```
 
@@ -210,22 +213,23 @@ Nếu backend không chạy tại địa chỉ mặc định, tạo `frontend/.e
 VITE_API_BASE_URL=http://localhost:8000/api
 ```
 
-### Chạy bằng Docker
+### Chạy bằng Docker Compose (PostgreSQL Production Ready)
+
+Hệ thống đi kèm cấu hình Docker Compose đầy đủ bao gồm **PostgreSQL 16**, **FastAPI Backend** (tự động chạy Alembic migrations khi khởi động), và **React Frontend**:
 
 ```powershell
 Copy-Item .env.example .env
 docker compose up --build
 ```
 
-Sau khi khởi động:
+Sau khi các service khởi động thành công (PostgreSQL đạt trạng thái `healthy` trước khi backend khởi chạy):
 
 - Frontend: `http://localhost:5173`
-- Backend: `http://localhost:8000`
+- Backend API: `http://localhost:8000`
 - Swagger UI: `http://localhost:8000/docs`
+- Health check (bao gồm trạng thái kết nối DB): `http://localhost:8000/api/health`
 
-Backend tự ingest dữ liệu trong lần chạy đầu nếu storage chưa có dữ liệu.
-
-Nạp lại tài liệu:
+Nạp lại tài liệu khi có thay đổi:
 
 ```powershell
 docker compose exec backend python -m scripts.ingest
@@ -237,11 +241,108 @@ Dừng hệ thống:
 docker compose down
 ```
 
-Xóa cả dữ liệu ChromaDB và SQLite:
+Xóa toàn bộ dữ liệu (PostgreSQL volume `postgres_data` và ChromaDB storage):
 
 ```powershell
 docker compose down -v
 ```
+
+---
+
+## Quản lý Database & Migrations (Alembic)
+
+Dự án sử dụng **Alembic** để quản lý phiên bản cơ sở dữ liệu (schema migrations).
+
+### 1. Áp dụng migrations (Upgrade)
+
+Chạy migration lên phiên bản mới nhất:
+
+```powershell
+cd backend
+alembic upgrade head
+```
+
+Hoặc qua Docker:
+
+```powershell
+docker compose exec backend alembic upgrade head
+```
+
+### 2. Tạo migration mới (Autogenerate)
+
+Khi chỉnh sửa SQLAlchemy models trong `backend/app/db/models.py`:
+
+```powershell
+cd backend
+alembic revision --autogenerate -m "ten_migration_mo_ta"
+```
+
+### 3. Kiểm tra trạng thái và lịch sử migration
+
+```powershell
+cd backend
+alembic current
+alembic history --verbose
+```
+
+---
+
+## Chuyển dữ liệu từ SQLite sang PostgreSQL
+
+Nếu bạn đã có dữ liệu lịch sử hội thoại, tin nhắn hoặc tài liệu trong SQLite (`backend/storage/ptit_chatbot.db`) và muốn chuyển sang PostgreSQL:
+
+```powershell
+cd backend
+# 1. Quét thử và thống kê dữ liệu nguồn (Dry-run):
+python -m scripts.migrate_sqlite_to_postgres --dry-run
+
+# 2. Thực hiện chuyển dữ liệu thực tế:
+python -m scripts.migrate_sqlite_to_postgres `
+  --sqlite-path storage/ptit_chatbot.db `
+  --postgres-url postgresql+psycopg://ptit_user:ptit_password@localhost:5432/ptit_chatbot
+```
+
+Tham số tùy chọn:
+- `--truncate-target`: Xóa trắng các bảng target trên PostgreSQL trước khi insert.
+- `--dry-run`: Chỉ quét và in số lượng bản ghi mà không ghi vào PostgreSQL.
+
+---
+
+## Hướng dẫn Backup & Restore PostgreSQL
+
+### 1. Sao lưu cơ sở dữ liệu (Backup)
+
+**Cách 1: Sao lưu qua Docker Compose (Khuyên dùng)**
+
+```powershell
+# Tạo bản backup nhị phân nén (custom format .dump)
+docker compose exec -T postgres pg_dump -U ptit_user -d ptit_chatbot -F c -b -v > backup_ptit_chatbot.dump
+
+# Hoặc tạo bản backup dạng Plain SQL text (.sql)
+docker compose exec -T postgres pg_dump -U ptit_user -d ptit_chatbot --clean --if-exists > backup_ptit_chatbot.sql
+```
+
+**Cách 2: Sao lưu trực tiếp bằng CLI (khi có pg_dump cục bộ)**
+
+```powershell
+pg_dump -h localhost -p 5432 -U ptit_user -d ptit_chatbot -F c -b -v -f backup_ptit_chatbot.dump
+```
+
+### 2. Phục hồi cơ sở dữ liệu (Restore)
+
+**Cách 1: Phục hồi từ file .dump qua Docker Compose**
+
+```powershell
+# Phục hồi từ bản dump nén (.dump)
+cat backup_ptit_chatbot.dump | docker compose exec -T postgres pg_restore -U ptit_user -d ptit_chatbot --clean --if-exists --no-owner --no-privileges
+```
+
+**Cách 2: Phục hồi từ file Plain SQL (.sql)**
+
+```powershell
+cat backup_ptit_chatbot.sql | docker compose exec -T postgres psql -U ptit_user -d ptit_chatbot
+```
+
 
 ## Kiểm thử
 

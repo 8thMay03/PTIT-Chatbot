@@ -1,4 +1,11 @@
-from app.vectordb.base import VectorStore
-from app.vectordb.chroma_store import ChromaVectorStore
+from __future__ import annotations
 
-__all__ = ["ChromaVectorStore", "VectorStore"]
+from app.vectordb.base import VectorStore
+from app.vectordb.pgvector_store import PgVectorStore
+
+
+def create_vector_store() -> VectorStore:
+    return PgVectorStore()
+
+
+__all__ = ["PgVectorStore", "VectorStore", "create_vector_store"]

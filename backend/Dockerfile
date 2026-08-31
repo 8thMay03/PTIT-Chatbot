@@ -9,6 +9,8 @@ WORKDIR /app/backend
 COPY backend/pyproject.toml ./
 COPY backend/app ./app
 COPY backend/scripts ./scripts
+COPY backend/alembic ./alembic
+COPY backend/alembic.ini ./alembic.ini
 COPY data /app/data
 COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 

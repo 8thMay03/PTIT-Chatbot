@@ -1,6 +1,7 @@
 import json
 import time
 from collections.abc import Iterator
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
@@ -22,7 +23,7 @@ from app.api.schemas import (
     TestLLMResponse,
     UpdateConfigRequest,
 )
-from app.db import get_session
+from app.db import check_db_health, get_session
 from app.core.config import get_runtime_config_dict, reset_runtime_config, settings, update_runtime_config
 from app.db.repositories import (
     add_message,
@@ -47,8 +48,15 @@ router = APIRouter()
 
 
 @router.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict[str, Any]:
+    db_health = check_db_health()
+    is_ok = db_health.get("status") == "ok"
+    return {
+        "status": "ok" if is_ok else "degraded",
+        "database": db_health.get("database", "unknown"),
+        "database_type": db_health.get("dialect", "unknown"),
+    }
+
 
 
 @router.get("/config", response_model=FullConfigResponse)

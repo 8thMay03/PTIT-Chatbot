@@ -42,11 +42,18 @@ class OpenAIEmbeddingModel(EmbeddingModel):
         if not texts:
             return []
 
-        response = self.client.embeddings.create(
-            input=texts,
-            model=self.model_name,
-        )
-        return [item.embedding for item in sorted(response.data, key=lambda item: item.index)]
+        batch_size = 500
+        all_embeddings: list[list[float]] = []
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            response = self.client.embeddings.create(
+                input=batch,
+                model=self.model_name,
+            )
+            batch_embeddings = [item.embedding for item in sorted(response.data, key=lambda item: item.index)]
+            all_embeddings.extend(batch_embeddings)
+        return all_embeddings
+
 
 
 class SentenceTransformerEmbeddingModel(EmbeddingModel):

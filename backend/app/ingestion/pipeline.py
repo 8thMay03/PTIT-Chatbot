@@ -17,7 +17,7 @@ from app.ingestion.chunker import Chunk, ParentChildChunk, split_parent_child, s
 from app.ingestion.loaders import SourceDocument, load_documents
 from app.ingestion.uploads import delete_source_file, prepare_upload
 from app.retrieval.bm25 import invalidate_bm25_cache
-from app.vectordb import ChromaVectorStore, VectorStore
+from app.vectordb import VectorStore, create_vector_store
 
 
 class IngestionPipeline:
@@ -27,20 +27,37 @@ class IngestionPipeline:
         vector_store: VectorStore | None = None,
     ) -> None:
         self.embedding_model = embedding_model or create_embedding_model()
-        self.vector_store = vector_store or ChromaVectorStore(settings.vector_db_path)
+        self.vector_store = vector_store or create_vector_store()
 
     def ingest_documents(self) -> dict:
         init_db()
         document_records, chunk_records, chunks_payload = self.build_chunks()
 
-        self.vector_store.reset()
+        embeddings: list[list[float]] = []
         if chunks_payload:
             embeddings = self.embedding_model.embed([item["text"] for item in chunks_payload])
-            self.vector_store.add(chunks_payload, embeddings)
+            chunk_records = [
+                ChunkRecord(
+                    id=record.id,
+                    document_id=record.document_id,
+                    chunk_index=record.chunk_index,
+                    text=record.text,
+                    vector_id=record.vector_id,
+                    token_count=record.token_count,
+                    metadata=record.metadata,
+                    embedding=emb,
+                )
+                for record, emb in zip(chunk_records, embeddings)
+            ]
 
         with SessionLocal() as session:
             replace_knowledge_base(session, document_records, chunk_records)
             session.commit()
+
+        if hasattr(self.vector_store, "add") and not hasattr(self.vector_store, "session_factory"):
+            self.vector_store.reset()
+            if chunks_payload and embeddings:
+                self.vector_store.add(chunks_payload, embeddings)
 
         # The next keyword search lazily rebuilds one shared in-memory BM25 index.
         invalidate_bm25_cache()
@@ -62,6 +79,23 @@ class IngestionPipeline:
             SourceDocument(path=path, text=text)
         )
 
+        embeddings: list[list[float]] = []
+        if chunks_payload:
+            embeddings = self.embedding_model.embed([chunk["text"] for chunk in chunks_payload])
+            chunk_records = [
+                ChunkRecord(
+                    id=record.id,
+                    document_id=record.document_id,
+                    chunk_index=record.chunk_index,
+                    text=record.text,
+                    vector_id=record.vector_id,
+                    token_count=record.token_count,
+                    metadata=record.metadata,
+                    embedding=emb,
+                )
+                for record, emb in zip(chunk_records, embeddings)
+            ]
+
         with SessionLocal() as session:
             existing_ids = get_document_vector_ids(session, document_record.id)
             if existing_ids:
@@ -71,9 +105,9 @@ class IngestionPipeline:
             session.refresh(stored)
             document_item = serialize_document(stored, len(chunk_records), _file_size(path))
 
-        if chunks_payload:
-            embeddings = self.embedding_model.embed([chunk["text"] for chunk in chunks_payload])
-            self.vector_store.add(chunks_payload, embeddings)
+        if hasattr(self.vector_store, "add") and not hasattr(self.vector_store, "session_factory"):
+            if chunks_payload and embeddings:
+                self.vector_store.add(chunks_payload, embeddings)
 
         invalidate_bm25_cache()
         return document_item

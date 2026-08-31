@@ -31,6 +31,7 @@ class ChunkRecord:
     vector_id: str
     token_count: int | None = None
     metadata: dict | None = None
+    embedding: list[float] | None = None
 
 
 def replace_knowledge_base(
@@ -39,6 +40,7 @@ def replace_knowledge_base(
     chunks: list[ChunkRecord],
 ) -> None:
     session.execute(delete(Document))
+    session.flush()
 
     session.add_all(
         Document(
@@ -52,6 +54,7 @@ def replace_knowledge_base(
         )
         for document in documents
     )
+    session.flush()
     session.add_all(
         Chunk(
             id=chunk.id,
@@ -60,10 +63,13 @@ def replace_knowledge_base(
             text=chunk.text,
             token_count=chunk.token_count,
             vector_id=chunk.vector_id,
+            embedding=chunk.embedding,
             chunk_metadata=chunk.metadata,
         )
         for chunk in chunks
     )
+    session.flush()
+
 
 
 def list_documents(session: Session) -> list[tuple[Document, int]]:
@@ -130,6 +136,7 @@ def upsert_document(
             text=chunk.text,
             token_count=chunk.token_count,
             vector_id=chunk.vector_id,
+            embedding=chunk.embedding,
             chunk_metadata=chunk.metadata,
         )
         for chunk in chunks

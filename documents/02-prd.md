@@ -131,7 +131,7 @@ Nhu cầu:
 **Acceptance Criteria**
 
 * Upload thành công file `.md` / `.txt`.
-* Hệ thống tự động làm sạch, chunking, embedding và lưu vào ChromaDB + SQLite + BM25.
+* Hệ thống tự động làm sạch, chunking, embedding và lưu vào PostgreSQL (pgvector + BM25).
 * Có thể xóa tài liệu và tự động làm sạch vector store.
 
 ---
@@ -168,7 +168,7 @@ Mỗi câu trả lời phải hiển thị danh sách bằng chứng:
 
 ## 7.3 Lịch sử hội thoại
 
-* Lưu các cuộc trò chuyện trong SQLite database.
+* Lưu các cuộc trò chuyện trong PostgreSQL database.
 * Hiển thị danh sách hội thoại ở thanh bên (Sidebar).
 * Cho phép chọn lại hội thoại cũ để xem tiếp.
 
@@ -187,7 +187,7 @@ Mỗi câu trả lời phải hiển thị danh sách bằng chứng:
 * **Danh sách tài liệu:** Hiển thị tên, số lượng chunk, dung lượng file.
 * **Tải tài liệu mới (Upload):** Kéo thả hoặc chọn file `.md`/`.txt` để nạp trực tiếp vào kho tri thức.
 * **Xem trước & Tải về:** Xem nội dung file text/markdown hoặc tải file gốc về máy.
-* **Xóa tài liệu:** Xóa tài liệu khỏi hệ thống backend, tự động đồng bộ gỡ bỏ khỏi ChromaDB và SQLite.
+* **Xóa tài liệu:** Xóa tài liệu khỏi hệ thống backend, tự động đồng bộ gỡ bỏ khỏi PostgreSQL (metadata + pgvector).
 
 ---
 
@@ -196,7 +196,7 @@ Mỗi câu trả lời phải hiển thị danh sách bằng chứng:
 1. Sinh viên mở chatbot.
 2. Nhập câu hỏi.
 3. Hệ thống chạy Guardrail kiểm tra an toàn.
-4. Chạy Hybrid Search (Vector ChromaDB + BM25) + RRF + Reranker.
+4. Chạy Hybrid Search (Vector pgvector + BM25) + RRF + Reranker.
 5. Kiểm tra Confidence Gate.
 6. AI sinh câu trả lời dạng Streaming (NDJSON) kèm nguồn trích dẫn.
 7. Người dùng đọc đáp án, kiểm tra nguồn trích dẫn và tiếp tục hỏi đáp.
@@ -218,7 +218,7 @@ Mỗi câu trả lời phải hiển thị danh sách bằng chứng:
 ## Bảo mật
 
 * Không lưu thông tin nhạy cảm cá nhân trong prompt.
-* Lưu trữ an toàn trong cơ sở dữ liệu nội bộ (SQLite).
+* Lưu trữ an toàn trong cơ sở dữ liệu nội bộ (PostgreSQL).
 
 ---
 
@@ -240,7 +240,7 @@ Mỗi câu trả lời phải hiển thị danh sách bằng chứng:
 | P0 | Hybrid RAG (Vector + BM25 + Parent-child) | **Đã hoàn thành** |
 | P0 | Trích dẫn nguồn (Tên tài liệu, Điều/Khoản) | **Đã hoàn thành** |
 | P0 | Guardrails (Chống injection & Lọc scope) | **Đã hoàn thành** |
-| P1 | Lưu lịch sử hội thoại (SQLite) | **Đã hoàn thành** |
+| P1 | Lưu lịch sử hội thoại (PostgreSQL) | **Đã hoàn thành** |
 | P1 | Quản lý tài liệu trên Web UI (Upload/Delete) | **Đã hoàn thành** |
 | P1 | Hỗ trợ dữ liệu Markdown (`.md`) và TXT (`.txt`) | **Đã hoàn thành** |
 | P2 | Tự động đọc file PDF/DOCX thô | Roadmap (P2) |
