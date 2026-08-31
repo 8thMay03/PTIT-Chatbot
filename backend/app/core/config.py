@@ -67,11 +67,9 @@ class Settings(BaseSettings):
         alias="EMBEDDING_MODEL",
     )
 
-    vector_db_path: Path = Field(default=Path("backend/storage/chroma"), alias="VECTOR_DB_PATH")
-    vector_store_type: str = Field(default="pgvector", alias="VECTOR_STORE_TYPE")
     vector_dim: int = Field(default=1536, ge=1, alias="VECTOR_DIM")
     database_url: str = Field(
-        default="sqlite:///backend/storage/ptit_chatbot.db",
+        default="postgresql+psycopg://ptit_user:ptit_password@127.0.0.1:5433/ptit_chatbot",
         alias="DATABASE_URL",
     )
     db_pool_size: int = Field(default=10, ge=1, alias="DB_POOL_SIZE")
@@ -131,13 +129,9 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.cors_origins_raw.split(",") if origin.strip()]
 
     def model_post_init(self, __context: object) -> None:
-        self.vector_db_path = _resolve_project_path(self.vector_db_path)
         self.documents_path = _resolve_project_path(self.documents_path)
         url = self.database_url.strip()
-        if url.startswith("sqlite:///"):
-            database_path = _resolve_project_path(Path(url.removeprefix("sqlite:///")))
-            self.database_url = f"sqlite:///{database_path.as_posix()}"
-        elif url.startswith("postgres://"):
+        if url.startswith("postgres://"):
             self.database_url = "postgresql+psycopg://" + url.removeprefix("postgres://")
         elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
             self.database_url = "postgresql+psycopg://" + url.removeprefix("postgresql://")
@@ -145,18 +139,16 @@ class Settings(BaseSettings):
             self.database_url = url
 
     @property
-    def is_sqlite(self) -> bool:
-        return self.database_url.startswith("sqlite")
-
-    @property
     def is_postgres(self) -> bool:
         return "postgres" in self.database_url
 
     @property
+    def is_sqlite(self) -> bool:
+        return self.database_url.startswith("sqlite")
+
+    @property
     def database_path(self) -> Path:
-        if not self.database_url.startswith("sqlite:///"):
-            return PROJECT_ROOT / "backend/storage"
-        return Path(self.database_url.removeprefix("sqlite:///"))
+        return PROJECT_ROOT / "backend/storage"
 
 
 

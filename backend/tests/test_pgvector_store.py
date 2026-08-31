@@ -75,5 +75,5 @@ def test_pgvector_store_add_search_and_delete(memory_session_factory) -> None:
 
 
 def test_create_vector_store_factory() -> None:
-    pg_store = create_vector_store("pgvector")
+    pg_store = create_vector_store()
     assert isinstance(pg_store, PgVectorStore)

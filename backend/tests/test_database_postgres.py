@@ -31,7 +31,6 @@ from app.db.repositories import (
 )
 from app.db.session import check_db_health, create_app_engine, get_engine_options
 from app.main import app
-from scripts.migrate_sqlite_to_postgres import migrate_data
 
 
 @pytest.fixture
@@ -256,62 +255,3 @@ def test_repository_replace_knowledge_base(memory_db: Session) -> None:
     assert len(listed) == 1
     assert listed[0][0].id == "doc-b"
 
-
-def test_sqlite_to_postgres_migration_flow(tmp_path: Path) -> None:
-    src_db_file = tmp_path / "src.db"
-    dst_db_file = tmp_path / "dst.db"
-    src_url = f"sqlite:///{src_db_file.as_posix()}"
-    dst_url = f"sqlite:///{dst_db_file.as_posix()}"
-
-    # Setup source data
-    src_engine = create_engine(src_url)
-    Base.metadata.create_all(src_engine)
-
-    with Session(src_engine) as session:
-        conv = Conversation(id="conv-mig-1", user_id="u1", title="Test Mig")
-        session.add(conv)
-        msg = Message(id="msg-mig-1", conversation_id="conv-mig-1", role="user", content="Hello")
-        session.add(msg)
-        doc = Document(
-            id="doc-mig-1",
-            source_path="data/test.md",
-            title="Test",
-            file_type="md",
-            content_hash="hash",
-            status="active",
-        )
-        session.add(doc)
-        chunk = Chunk(
-            id="chunk-mig-1",
-            document_id="doc-mig-1",
-            chunk_index=0,
-            text="Chunk content",
-            vector_id="vec-mig-1",
-        )
-        session.add(chunk)
-        src = MessageSource(
-            id="src-mig-1",
-            message_id="msg-mig-1",
-            chunk_id="chunk-mig-1",
-            score=0.9,
-            excerpt="Chunk excerpt",
-        )
-        session.add(src)
-        session.commit()
-
-    # Run migration
-    stats = migrate_data(src_url, dst_url)
-    assert stats["conversations"] == 1
-    assert stats["messages"] == 1
-    assert stats["documents"] == 1
-    assert stats["chunks"] == 1
-    assert stats["message_sources"] == 1
-
-    # Verify target data
-    dst_engine = create_engine(dst_url)
-    with Session(dst_engine) as dst_session:
-        assert dst_session.get(Conversation, "conv-mig-1") is not None
-        assert dst_session.get(Message, "msg-mig-1") is not None
-        assert dst_session.get(Document, "doc-mig-1") is not None
-        assert dst_session.get(Chunk, "chunk-mig-1") is not None
-        assert dst_session.get(MessageSource, "src-mig-1") is not None

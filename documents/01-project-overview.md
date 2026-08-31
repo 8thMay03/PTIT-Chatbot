@@ -68,7 +68,7 @@ Hệ thống sử dụng kiến trúc **Advanced Hybrid RAG (Retrieval-Augmented
 
 1. **Guardrails:** Kiểm tra an toàn, chống prompt injection và lọc câu hỏi ngoài phạm vi PTIT.
 2. **Multi-query & Rewriter:** Chuẩn hóa câu hỏi tiếng Việt và mở rộng các truy vấn tương đương.
-3. **Hybrid Retriever:** Kết hợp tìm kiếm ngữ nghĩa (**Vector Search với ChromaDB**) và tìm kiếm từ khóa (**BM25 Search**).
+3. **Hybrid Retriever:** Kết hợp tìm kiếm ngữ nghĩa (**Vector Search với pgvector HNSW**) và tìm kiếm từ khóa (**BM25 Search**).
 4. **Reciprocal Rank Fusion (RRF) & Reranker:** Hợp nhất và sắp xếp lại thứ tự ưu tiên của các đoạn văn bản.
 5. **Parent-Child Context Restoration:** Tìm kiếm trên các thẻ thông tin nhỏ (child chunks) nhưng khôi phục toàn bộ ngữ cảnh đoạn lớn (parent chunk) kèm tiêu đề/Điều/Khoản.
 6. **Confidence Gate:** Kiểm tra độ tin cậy của bằng chứng trước khi chuyển tới mô hình ngôn ngữ.
@@ -109,9 +109,9 @@ Quy trình hoạt động:
 | Frontend        | React 18, Vite 5, Lucide React     |
 | Backend API     | Python 3.10+, FastAPI, Uvicorn     |
 | Embedding       | OpenAI `text-embedding-3-small` (hỗ trợ SentenceTransformers / Hash fallback) |
-| Vector Database | ChromaDB                           |
+| Vector Database | **`pgvector`** (HNSW Index trong PostgreSQL 16) |
 | Keyword Search  | BM25 (`rank-bm25`)                 |
-| Data Storage    | SQLite, SQLAlchemy                 |
+| Data Storage    | PostgreSQL 16, SQLAlchemy 2.0, Alembic |
 | LLM             | OpenAI `gpt-4.1-mini`              |
 | RAG Pipeline    | Parent-Child Chunking, RRF, Reranker, Scope & Injection Guardrails |
 | Evaluation      | Ragas, pytest                      |

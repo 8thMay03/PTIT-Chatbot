@@ -25,7 +25,6 @@ services:
     env_file:
       - .env
     environment:
-      VECTOR_DB_PATH: /app/backend/storage/chroma
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ptit_user}:${POSTGRES_PASSWORD:-ptit_password}@postgres:5432/${POSTGRES_DB:-ptit_chatbot}
       DOCUMENTS_PATH: /app/data
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173

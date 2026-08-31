@@ -35,17 +35,6 @@ engine = create_app_engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 
-import sqlite3
-
-@event.listens_for(Engine, "connect")
-def _enable_sqlite_foreign_keys(dbapi_connection, connection_record) -> None:
-    if isinstance(dbapi_connection, sqlite3.Connection):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
-
-
-
 def check_db_health() -> dict[str, Any]:
     """Execute a lightweight query to check database connectivity."""
     try:
@@ -66,15 +55,11 @@ def check_db_health() -> dict[str, Any]:
 
 
 def init_db() -> None:
-    if settings.database_url.startswith("sqlite"):
-        settings.database_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
         Base.metadata.create_all(bind=engine)
-    else:
-        try:
-            Base.metadata.create_all(bind=engine)
-        except Exception as exc:
-            import logging
-            logging.getLogger("app.db").warning("Could not auto-create tables during init_db: %s", exc)
+    except Exception as exc:
+        import logging
+        logging.getLogger("app.db").warning("Could not auto-create tables during init_db: %s", exc)
 
 
 
