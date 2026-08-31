@@ -3,6 +3,13 @@ import re
 
 from app.ingestion.cleaner import clean_text
 
+_HR_ONLY = re.compile(r"^(\*\s*){3,}$|^(-\s*){3,}$|^(_\s*){3,}$")
+_HTML_TABLE_START = re.compile(r"<table\b", re.IGNORECASE)
+_HTML_TABLE_END = re.compile(r"</table\s*>", re.IGNORECASE)
+_HTML_THEAD = re.compile(r"<thead\b[^>]*>.*?</thead\s*>", re.IGNORECASE | re.DOTALL)
+_HTML_TR = re.compile(r"<tr\b[^>]*>.*?</tr\s*>", re.IGNORECASE | re.DOTALL)
+_HTML_TBODY = re.compile(r"<tbody\b[^>]*>.*?</tbody\s*>", re.IGNORECASE | re.DOTALL)
+
 
 @dataclass(frozen=True)
 class Chunk:
@@ -84,9 +91,11 @@ def split_parent_child(
                     parent_text=parent.text,
                     parent_index=parent.index,
                     child_index=child_index,
-                    heading=child.heading or parent.heading,
-                    heading_level=child.heading_level or parent.heading_level,
-                    section_path=child.section_path or parent.section_path,
+                    # Always inherit hierarchy from the parent split — re-chunking
+                    # parent.text only sees the leaf heading and would drop ancestors.
+                    heading=parent.heading,
+                    heading_level=parent.heading_level,
+                    section_path=parent.section_path,
                 )
             )
 
@@ -102,13 +111,27 @@ def _enforce_child_size(
     output: list[Chunk] = []
     for child in children:
         if len(child.text) <= child_size:
-            output.append(child)
-            continue
-
-        for piece in _split_long_block(child.text, child_size, child_overlap):
             output.append(
                 Chunk(
-                    text=piece,
+                    text=child.text,
+                    index=len(output),
+                    heading=child.heading,
+                    heading_level=child.heading_level,
+                    section_path=child.section_path,
+                )
+            )
+            continue
+
+        section = Section(
+            text=child.text,
+            heading=child.heading,
+            heading_level=child.heading_level,
+            section_path=child.section_path,
+        )
+        for piece in _split_section(section, child_size, child_overlap, start_index=0):
+            output.append(
+                Chunk(
+                    text=piece.text,
                     index=len(output),
                     heading=child.heading,
                     heading_level=child.heading_level,
@@ -181,21 +204,59 @@ def _split_section(
         heading_context = ""
         body_chunk_size = chunk_size
 
-    if len(body) <= body_chunk_size:
-        return [_build_chunk(f"{heading_context}{body}".strip(), section, start_index)]
+    blocks = _split_blocks(body)
+    if not blocks:
+        return []
+
+    compact = "\n\n".join(blocks)
+    if len(compact) <= body_chunk_size:
+        return [_build_chunk(f"{heading_context}{compact}".strip(), section, start_index)]
 
     pieces: list[str] = []
     current = ""
+    intro_threshold = min(200, max(1, body_chunk_size // 4))
 
-    for block in _split_blocks(body):
+    for block in blocks:
+        if _is_markdown_table(block) or _is_html_table(block):
+            table_budget = body_chunk_size
+            prefix = ""
+            if current and not _is_markdown_table(current) and not _is_html_table(current):
+                if len(current) <= intro_threshold:
+                    prefix = current
+                    table_budget = body_chunk_size - len(prefix) - (2 if prefix else 0)
+                    current = ""
+                else:
+                    pieces.append(current)
+                    current = ""
+
+            if table_budget <= 0:
+                table_budget = body_chunk_size
+                if prefix:
+                    pieces.append(prefix)
+                    prefix = ""
+
+            if len(block) > table_budget:
+                table_pieces = _split_oversized_table_block(block, table_budget, chunk_overlap)
+                if prefix and table_pieces:
+                    table_pieces[0] = f"{prefix}\n\n{table_pieces[0]}".strip()
+                elif prefix:
+                    pieces.append(prefix)
+                pieces.extend(table_pieces)
+            else:
+                merged = f"{prefix}\n\n{block}".strip() if prefix else block
+                if len(merged) <= body_chunk_size:
+                    pieces.append(merged)
+                else:
+                    if prefix:
+                        pieces.append(prefix)
+                    pieces.append(block)
+            continue
+
         if len(block) > body_chunk_size:
             if current:
                 pieces.append(current)
                 current = ""
-            if _is_markdown_table(block):
-                pieces.extend(_split_long_table(block, body_chunk_size))
-            else:
-                pieces.extend(_split_long_block(block, body_chunk_size, chunk_overlap))
+            pieces.extend(_split_long_block(block, body_chunk_size, chunk_overlap))
             continue
 
         candidate = f"{current}\n\n{block}".strip() if current else block
@@ -226,7 +287,7 @@ def _separate_heading(section: Section) -> tuple[str, str]:
 
 
 def _split_blocks(text: str) -> list[str]:
-    """Split paragraphs and keep each Markdown table as a distinct block."""
+    """Split paragraphs and keep each Markdown/HTML table as a distinct block."""
     lines = text.splitlines()
     blocks: list[str] = []
     current: list[str] = []
@@ -234,17 +295,54 @@ def _split_blocks(text: str) -> list[str]:
 
     def flush_current() -> None:
         block = "\n".join(current).strip()
-        if block:
+        if block and not _is_horizontal_rule(block):
             blocks.append(block)
         current.clear()
 
     while index < len(lines):
+        html_table = _extract_html_table(lines, index)
+        if html_table is not None:
+            flush_current()
+            table_text, next_index = html_table
+            blocks.append(table_text)
+            index = next_index
+            continue
+
         if _starts_markdown_table(lines, index):
             flush_current()
             table_lines = [lines[index].strip(), lines[index + 1].strip()]
             index += 2
-            while index < len(lines) and _looks_like_table_row(lines[index]):
-                table_lines.append(lines[index].strip())
+            while index < len(lines):
+                line = lines[index]
+                if _parse_heading(line) or _HTML_TABLE_START.search(line):
+                    break
+
+                stripped = line.strip()
+                last = table_lines[-1]
+                last_incomplete = last.startswith("|") and not last.endswith("|")
+
+                if last_incomplete:
+                    # Absorb blank lines and text until the open row closes with "|".
+                    if stripped:
+                        table_lines[-1] = f"{last} {stripped}"
+                    index += 1
+                    continue
+
+                if _looks_like_table_row(line):
+                    table_lines.append(stripped)
+                    index += 1
+                    continue
+
+                if stripped.startswith("|") and not stripped.endswith("|"):
+                    table_lines.append(stripped)
+                    index += 1
+                    continue
+
+                if not stripped:
+                    break
+
+                # Soft wrap inside an otherwise closed row.
+                table_lines[-1] = f"{last} {stripped}"
                 index += 1
             blocks.append("\n".join(table_lines))
             continue
@@ -259,11 +357,35 @@ def _split_blocks(text: str) -> list[str]:
     return blocks
 
 
+def _is_horizontal_rule(text: str) -> bool:
+    return bool(_HR_ONLY.match(text.strip()))
+
+
+def _extract_html_table(lines: list[str], index: int) -> tuple[str, int] | None:
+    """Return an HTML table block starting at index, or None."""
+    line = lines[index]
+    if not _HTML_TABLE_START.search(line):
+        return None
+
+    collected = [line]
+    if _HTML_TABLE_END.search(line):
+        return "\n".join(collected).strip(), index + 1
+
+    next_index = index + 1
+    while next_index < len(lines):
+        collected.append(lines[next_index])
+        if _HTML_TABLE_END.search(lines[next_index]):
+            return "\n".join(collected).strip(), next_index + 1
+        next_index += 1
+
+    return "\n".join(collected).strip(), next_index
+
+
 def _starts_markdown_table(lines: list[str], index: int) -> bool:
     """Return whether two lines form a Markdown table header and delimiter."""
     if index + 1 >= len(lines) or not _looks_like_table_row(lines[index]):
         return False
-    cells = _table_cells(lines[index + 1])
+    cells = _table_cells_safe(lines[index + 1])
     return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell.strip()) for cell in cells)
 
 
@@ -277,8 +399,90 @@ def _table_cells(line: str) -> list[str]:
     return stripped.split("|") if stripped else []
 
 
+def _table_cells_safe(line: str) -> list[str]:
+    """Split a table row into cells while ignoring escaped and fenced pipes."""
+    stripped = line.strip()
+    if stripped.startswith("|"):
+        stripped = stripped[1:]
+    if stripped.endswith("|") and not stripped.endswith("\\|"):
+        stripped = stripped[:-1]
+
+    cells: list[str] = []
+    current: list[str] = []
+    in_backticks = False
+    in_math = False
+    index = 0
+    while index < len(stripped):
+        char = stripped[index]
+        if char == "\\" and index + 1 < len(stripped):
+            current.append(stripped[index : index + 2])
+            index += 2
+            continue
+        if char == "`":
+            in_backticks = not in_backticks
+            current.append(char)
+            index += 1
+            continue
+        if char == "$" and not in_backticks:
+            in_math = not in_math
+            current.append(char)
+            index += 1
+            continue
+        if char == "|" and not in_backticks and not in_math:
+            cells.append("".join(current))
+            current = []
+            index += 1
+            continue
+        current.append(char)
+        index += 1
+
+    cells.append("".join(current))
+    return cells
+
+
 def _is_markdown_table(text: str) -> bool:
     return _starts_markdown_table(text.splitlines(), 0)
+
+
+def _is_html_table(text: str) -> bool:
+    return bool(_HTML_TABLE_START.match(text.lstrip()))
+
+
+def _split_oversized_table_block(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
+    if _is_markdown_table(text):
+        return _split_long_table(text, chunk_size)
+    if _is_html_table(text):
+        return _split_long_html_table(text, chunk_size)
+    return _split_long_block(text, chunk_size, chunk_overlap)
+
+
+def _table_split_limits(chunk_size: int) -> tuple[int, int]:
+    """Return (soft_limit, hard_limit) for packing table rows.
+
+    Repeated headers are useful context but should not force one-row chunks when
+    child_size is only modestly larger than the header itself.
+    """
+    soft = max(1, chunk_size)
+    hard = max(soft * 2, soft + 200)
+    return soft, hard
+
+
+def _should_flush_table_rows(
+    current_rows: list[str],
+    candidate_len: int,
+    soft_limit: int,
+    hard_limit: int,
+    *,
+    min_rows: int = 3,
+) -> bool:
+    """Flush when over budget, but keep packing until min_rows unless hard-capped."""
+    if not current_rows:
+        return False
+    if candidate_len <= soft_limit:
+        return False
+    if len(current_rows) >= min_rows:
+        return True
+    return candidate_len > hard_limit
 
 
 def _split_long_table(text: str, chunk_size: int) -> list[str]:
@@ -293,11 +497,12 @@ def _split_long_table(text: str, chunk_size: int) -> list[str]:
     if not rows:
         return [header_text]
 
+    soft_limit, hard_limit = _table_split_limits(chunk_size)
     pieces: list[str] = []
     current_rows: list[str] = []
     for row in rows:
         candidate = "\n".join([*header, *current_rows, row])
-        if current_rows and len(candidate) > chunk_size:
+        if _should_flush_table_rows(current_rows, len(candidate), soft_limit, hard_limit):
             pieces.append("\n".join([*header, *current_rows]))
             current_rows = [row]
         else:
@@ -305,6 +510,102 @@ def _split_long_table(text: str, chunk_size: int) -> list[str]:
 
     if current_rows:
         pieces.append("\n".join([*header, *current_rows]))
+    return _merge_short_table_tail(pieces, header, hard_limit)
+
+
+def _merge_short_table_tail(
+    pieces: list[str],
+    header: list[str],
+    hard_limit: int,
+    *,
+    min_rows: int = 3,
+) -> list[str]:
+    """Fold a trailing undersized table fragment into the previous piece when possible."""
+    if len(pieces) < 2:
+        return pieces
+
+    header_len = len(header)
+    def data_rows(piece: str) -> list[str]:
+        lines = [line for line in piece.splitlines() if line.strip()]
+        return lines[header_len:]
+
+    last_rows = data_rows(pieces[-1])
+    if len(last_rows) >= min_rows:
+        return pieces
+
+    prev_rows = data_rows(pieces[-2])
+    merged = "\n".join([*header, *prev_rows, *last_rows])
+    if len(merged) > hard_limit:
+        return pieces
+
+    return [*pieces[:-2], merged]
+
+
+def _split_long_html_table(text: str, chunk_size: int) -> list[str]:
+    """Split an HTML table between body rows and repeat thead in every piece."""
+    thead_match = _HTML_THEAD.search(text)
+    thead = thead_match.group(0) if thead_match else ""
+
+    tbody_match = _HTML_TBODY.search(text)
+    body_region = tbody_match.group(0) if tbody_match else text
+    rows = _HTML_TR.findall(body_region)
+    if thead:
+        # Prefer body rows; if thead rows were included, drop duplicates that match thead trs.
+        thead_rows = set(_HTML_TR.findall(thead))
+        rows = [row for row in rows if row not in thead_rows]
+
+    if not rows:
+        return [text]
+
+    open_tag_match = re.search(r"<table\b[^>]*>", text, flags=re.IGNORECASE)
+    open_tag = open_tag_match.group(0) if open_tag_match else "<table>"
+    close_tag = "</table>"
+
+    def render(body_rows: list[str]) -> str:
+        parts = [open_tag]
+        if thead:
+            parts.append(thead)
+        parts.append("<tbody>")
+        parts.extend(body_rows)
+        parts.append("</tbody>")
+        parts.append(close_tag)
+        return "\n".join(parts)
+
+    soft_limit, hard_limit = _table_split_limits(chunk_size)
+    pieces: list[str] = []
+    current_rows: list[str] = []
+    for row in rows:
+        candidate_rows = [*current_rows, row]
+        if _should_flush_table_rows(
+            current_rows,
+            len(render(candidate_rows)),
+            soft_limit,
+            hard_limit,
+        ):
+            pieces.append(render(current_rows))
+            current_rows = [row]
+        else:
+            current_rows.append(row)
+
+    if current_rows:
+        pieces.append(render(current_rows))
+    if not pieces:
+        return [text]
+    if len(pieces) < 2:
+        return pieces
+
+    # Merge a short trailing fragment when under the hard cap.
+    last_rows = _HTML_TR.findall(pieces[-1])
+    if thead:
+        thead_rows = set(_HTML_TR.findall(thead))
+        last_rows = [row for row in last_rows if row not in thead_rows]
+    if 0 < len(last_rows) < 3:
+        prev_rows = _HTML_TR.findall(pieces[-2])
+        if thead:
+            prev_rows = [row for row in prev_rows if row not in thead_rows]
+        merged = render([*prev_rows, *last_rows])
+        if len(merged) <= hard_limit:
+            return [*pieces[:-2], merged]
     return pieces
 
 
