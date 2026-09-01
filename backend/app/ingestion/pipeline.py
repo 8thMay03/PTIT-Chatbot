@@ -98,12 +98,14 @@ class IngestionPipeline:
 
         with SessionLocal() as session:
             existing_ids = get_document_vector_ids(session, document_record.id)
-            if existing_ids:
-                self.vector_store.delete(existing_ids)
             stored = upsert_document(session, document_record, chunk_records)
             session.commit()
             session.refresh(stored)
             document_item = serialize_document(stored, len(chunk_records), _file_size(path))
+
+        if hasattr(self.vector_store, "delete") and not hasattr(self.vector_store, "session_factory"):
+            if existing_ids:
+                self.vector_store.delete(existing_ids)
 
         if hasattr(self.vector_store, "add") and not hasattr(self.vector_store, "session_factory"):
             if chunks_payload and embeddings:
@@ -120,8 +122,11 @@ class IngestionPipeline:
             if document is None:
                 return None
             source_path = document.source_path
-            self.vector_store.delete(vector_ids)
             session.commit()
+
+        if hasattr(self.vector_store, "delete") and not hasattr(self.vector_store, "session_factory"):
+            if vector_ids:
+                self.vector_store.delete(vector_ids)
 
         delete_source_file(source_path)
         invalidate_bm25_cache()
