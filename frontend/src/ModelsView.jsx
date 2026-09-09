@@ -70,38 +70,6 @@ function ProviderLogo({ providerId, size = 20, className = "" }) {
     );
   }
 
-  if (p.includes("anthropic") || p.includes("claude")) {
-    return (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
-        <path d="M14.5 4h3.5L12 20h-3.5L14.5 4zM6 20h3.5L15 4H11.5L6 20z" fill="#D97757" />
-      </svg>
-    );
-  }
-
-  if (p.includes("deepseek")) {
-    return (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
-        <path
-          d="M3 14C3 8 8 4 14 4C19 4 21 8 21 11C21 14 18 16 15 16H9C6 16 3 18 3 20"
-          stroke="#0066FF"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-        />
-        <circle cx="15" cy="9" r="1.5" fill="#0066FF" />
-      </svg>
-    );
-  }
-
-  if (p.includes("moonshot") || p.includes("kimi")) {
-    return (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
-        <circle cx="12" cy="12" r="9" fill="#111827" />
-        <path d="M12 3a9 9 0 0 0 0 18V3z" fill="#F3F4F6" opacity="0.4" />
-        <circle cx="12" cy="12" r="7" fill="none" stroke="#F3F4F6" strokeWidth="1.5" strokeDasharray="3 3" />
-      </svg>
-    );
-  }
-
   if (p.includes("tongyi") || p.includes("qwen")) {
     return (
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
@@ -112,43 +80,6 @@ function ProviderLogo({ providerId, size = 20, className = "" }) {
           strokeWidth="1.5"
         />
         <path d="M12 3V21M4 8L20 16M4 16L20 8" stroke="#FFFFFF" strokeWidth="1.2" opacity="0.6" />
-      </svg>
-    );
-  }
-
-  if (p.includes("zhipu") || p.includes("glm")) {
-    return (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
-        <circle cx="12" cy="12" r="3" fill="#2563EB" />
-        <circle cx="6" cy="7" r="2" fill="#3B82F6" />
-        <circle cx="18" cy="7" r="2" fill="#3B82F6" />
-        <circle cx="5" cy="16" r="2" fill="#60A5FA" />
-        <circle cx="19" cy="16" r="2" fill="#60A5FA" />
-        <circle cx="12" cy="20" r="2" fill="#93C5FD" />
-      </svg>
-    );
-  }
-
-  if (p.includes("xai") || p.includes("grok")) {
-    return (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
-        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-      </svg>
-    );
-  }
-
-  if (p.includes("huggingface") || p.includes("hf")) {
-    return (
-      <span style={{ fontSize: `${size}px`, lineHeight: 1 }} role="img" aria-label="HuggingFace">
-        🤗
-      </span>
-    );
-  }
-
-  if (p.includes("azure")) {
-    return (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
-        <path d="M13.5 3L3 18.5h6.5l4-7.5 4 7.5H21L13.5 3z" fill="#0078D4" />
       </svg>
     );
   }
@@ -183,16 +114,6 @@ const AVAILABLE_PROVIDERS = [
     ],
   },
   {
-    id: "anthropic",
-    name: "Anthropic",
-    tags: ["LLM"],
-    models: [
-      { id: "claude-3-5-sonnet-20241022", name: "claude-3-5-sonnet", type: "LLM" },
-      { id: "claude-3-5-haiku-20241022", name: "claude-3-5-haiku", type: "LLM" },
-      { id: "claude-3-opus-20240229", name: "claude-3-opus", type: "LLM" },
-    ],
-  },
-  {
     id: "gemini",
     name: "Gemini",
     tags: ["LLM", "Embedding", "VLM"],
@@ -205,27 +126,8 @@ const AVAILABLE_PROVIDERS = [
     ],
   },
   {
-    id: "deepseek",
-    name: "DeepSeek",
-    tags: ["LLM"],
-    models: [
-      { id: "deepseek-chat", name: "deepseek-chat (V3)", type: "LLM" },
-      { id: "deepseek-reasoner", name: "deepseek-reasoner (R1)", type: "LLM" },
-    ],
-  },
-  {
-    id: "moonshot",
-    name: "Moonshot",
-    tags: ["LLM", "VLM"],
-    models: [
-      { id: "moonshot-v1-8k", name: "moonshot-v1-8k", type: "LLM" },
-      { id: "moonshot-v1-32k", name: "moonshot-v1-32k", type: "LLM" },
-      { id: "moonshot-v1-vision", name: "moonshot-v1-vision", type: "VLM" },
-    ],
-  },
-  {
     id: "tongyi",
-    name: "Tongyi-Qianwen",
+    name: "Qwen (Tongyi-Qianwen)",
     tags: ["LLM", "Embedding", "Rerank", "TTS", "ASR", "VLM", "OCR"],
     models: [
       { id: "qwen-max", name: "qwen-max", type: "LLM" },
@@ -236,37 +138,6 @@ const AVAILABLE_PROVIDERS = [
       { id: "qwen-vl-max", name: "qwen-vl-max", type: "VLM" },
       { id: "cosy-voice-v1", name: "cosy-voice-v1", type: "TTS" },
       { id: "sense-voice-v1", name: "sense-voice-v1", type: "ASR" },
-    ],
-  },
-  {
-    id: "zhipu",
-    name: "ZHIPU-AI",
-    tags: ["LLM", "Embedding", "ASR", "VLM"],
-    models: [
-      { id: "glm-4-plus", name: "glm-4-plus", type: "LLM" },
-      { id: "glm-4-flash", name: "glm-4-flash", type: "LLM" },
-      { id: "embedding-3", name: "embedding-3", type: "Embedding" },
-      { id: "glm-4v-plus", name: "glm-4v-plus", type: "VLM" },
-    ],
-  },
-  {
-    id: "xai",
-    name: "xAI",
-    tags: ["LLM", "VLM"],
-    models: [
-      { id: "grok-2-latest", name: "grok-2-latest", type: "LLM" },
-      { id: "grok-2-vision-latest", name: "grok-2-vision-latest", type: "VLM" },
-    ],
-  },
-  {
-    id: "huggingface",
-    name: "HuggingFace",
-    tags: ["LLM", "Embedding", "Rerank"],
-    models: [
-      { id: "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1", name: "mmarco-mMiniLMv2-L12", type: "Rerank" },
-      { id: "BAAI/bge-m3", name: "BAAI/bge-m3", type: "Embedding" },
-      { id: "BAAI/bge-reranker-large", name: "bge-reranker-large", type: "Rerank" },
-      { id: "sentence-transformers/all-MiniLM-L6-v2", name: "all-MiniLM-L6-v2", type: "Embedding" },
     ],
   },
   {
@@ -292,16 +163,6 @@ const AVAILABLE_PROVIDERS = [
       { id: "nomic-embed-text", name: "nomic-embed-text", type: "Embedding" },
       { id: "bge-m3", name: "bge-m3", type: "Embedding" },
       { id: "heuristic", name: "heuristic (Lexical + BM25)", type: "Rerank" },
-    ],
-  },
-  {
-    id: "azure",
-    name: "Azure OpenAI",
-    tags: ["LLM", "Embedding"],
-    models: [
-      { id: "azure-gpt-4o", name: "gpt-4o-deployment", type: "LLM" },
-      { id: "azure-gpt-4o-mini", name: "gpt-4o-mini-deployment", type: "LLM" },
-      { id: "azure-text-embedding-3-small", name: "text-embedding-3-small", type: "Embedding" },
     ],
   },
 ];
@@ -509,12 +370,8 @@ export default function ModelsView() {
   function handleOpenConfigModal(provider) {
     const defaultBases = {
       openai: "https://api.openai.com/v1",
-      deepseek: "https://api.deepseek.com/v1",
-      moonshot: "https://api.moonshot.cn/v1",
       tongyi: "https://dashscope.aliyuncs.com/compatible-mode/v1",
       qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-      zhipu: "https://open.bigmodel.cn/api/paas/v4",
-      xai: "https://api.x.ai/v1",
       ollama: "http://localhost:11434/v1",
     };
 
@@ -654,16 +511,13 @@ export default function ModelsView() {
     });
   }, [searchQuery, activeCategory]);
 
-  const categoryCounts = useMemo(() => ({
-    All: 63,
-    LLM: 37,
-    Embedding: 25,
-    Rerank: 10,
-    TTS: 8,
-    ASR: 11,
-    VLM: 17,
-    OCR: 4,
-  }), []);
+  const categoryCounts = useMemo(() => {
+    const counts = { All: AVAILABLE_PROVIDERS.length };
+    ["LLM", "Embedding", "Rerank", "TTS", "ASR", "VLM", "OCR"].forEach((cat) => {
+      counts[cat] = AVAILABLE_PROVIDERS.filter((provider) => provider.tags.includes(cat)).length;
+    });
+    return counts;
+  }, []);
 
   function getCandidateModelsForSlot(slotKey) {
     const list = [];
