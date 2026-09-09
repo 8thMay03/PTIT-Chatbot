@@ -12,7 +12,7 @@ import {
   User,
 } from "lucide-react";
 import ChatView from "./ChatView";
-import DocumentsView from "./DocumentsView";
+import DatasetView from "./DatasetView";
 import ConfigView from "./ConfigView";
 import ModelsView from "./ModelsView";
 import { API_BASE_URL } from "./api";
@@ -212,7 +212,7 @@ export default function App() {
           hidden={view !== "chat"}
           onLoadingChange={setChatLoading}
         />
-        {view === "documents" && <DocumentsView onChanged={refreshDocCount} />}
+        {view === "documents" && <DatasetView onChanged={refreshDocCount} />}
         {(view === "config" || view === "settings") && <ConfigView />}
         {view === "models" && <ModelsView />}
       </div>
