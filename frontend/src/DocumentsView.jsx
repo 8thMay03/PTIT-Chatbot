@@ -378,27 +378,40 @@ export default function DocumentsView({ onChanged }) {
         if (!cancelled) setDocDetailLoading(false);
       });
 
-    fetch(`${API_BASE_URL}/documents/${selectedDocId}/chunks?limit=500`)
-      .then((response) => (response.ok ? response.json() : Promise.reject()))
-      .then((payload) => {
-        if (!cancelled) {
+    (async () => {
+      const BATCH_SIZE = 500;
+      const all = [];
+      try {
+        let offset = 0;
+        let total = Infinity;
+        while (offset < total) {
+          const response = await fetch(
+            `${API_BASE_URL}/documents/${selectedDocId}/chunks?offset=${offset}&limit=${BATCH_SIZE}`
+          );
+          if (!response.ok) throw new Error("failed");
+          const payload = await response.json();
           const list = payload.chunks ?? [];
-          setDocChunks(list);
+          all.push(...list);
+          total = payload.total ?? all.length;
+          offset += BATCH_SIZE;
+          if (list.length === 0) break;
+        }
+        if (!cancelled) {
+          setDocChunks(all);
           setEnabledChunks((prev) => {
             const next = { ...prev };
-            list.forEach((c) => {
+            all.forEach((c) => {
               if (next[c.id] === undefined) next[c.id] = true;
             });
             return next;
           });
         }
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setDocChunks([]);
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setDocChunksLoading(false);
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
