@@ -79,12 +79,54 @@ function parseInlineMarkdown(text) {
     (_match, label, url) =>
       `<a href="${safeHref(url)}" target="_blank" rel="noreferrer noopener" class="doc-link">${label}</a>`
   );
+  // Khôi phục các thẻ inline an toàn nếu có (ví dụ <s>, <b>, <i>, <u>, <br>, <sub>, <sup>)
+  res = res.replace(/&lt;(\/?(?:b|strong|i|em|s|del|u|sub|sup|mark|code|br\s*\/?))&gt;/gi, "<$1>");
   return res;
+}
+
+/**
+ * Làm sạch và chuẩn hóa bảng HTML từ tài liệu.
+ * Đảm bảo chỉ giữ các thẻ an toàn, bổ sung class "doc-table" và bọc trong "doc-table-wrapper".
+ */
+function sanitizeHtmlTable(rawTableHtml) {
+  if (!rawTableHtml) return "";
+
+  // 1. Loại bỏ script, style, iframe
+  let clean = rawTableHtml
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "");
+
+  // 2. Loại bỏ event handler onclick, onload, ...
+  clean = clean.replace(/\s+on[a-z]+=(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+
+  // 3. Loại bỏ link javascript:
+  clean = clean.replace(/href\s*=\s*["']\s*javascript:[^"']*["']/gi, 'href="#"');
+
+  // 4. Đảm bảo thẻ <table> có class="doc-table"
+  clean = clean.replace(/<table(\s[^>]*)?>/i, (match, attrs) => {
+    const attrStr = attrs || "";
+    if (/class\s*=/i.test(attrStr)) {
+      return match.replace(/class\s*=\s*["']([^"']*)["']/i, 'class="doc-table $1"');
+    }
+    return `<table class="doc-table"${attrStr}>`;
+  });
+
+  return `<div class="doc-table-wrapper">${clean}</div>`;
 }
 
 export function renderMarkdownHtml(rawText) {
   if (!rawText) return "";
-  const text = escapeHtml(rawText);
+
+  // 1. Tách các bảng HTML (<table>...</table>) ra trước để không bị escapeHtml làm thành text &lt;td&gt;
+  const tableBlocks = [];
+  const textWithPlaceholders = rawText.replace(/<table[\s\S]*?<\/table>/gi, (match) => {
+    const placeholder = `__DOC_HTML_TABLE_BLOCK_${tableBlocks.length}__`;
+    tableBlocks.push(sanitizeHtmlTable(match));
+    return `\n\n${placeholder}\n\n`;
+  });
+
+  const text = escapeHtml(textWithPlaceholders);
   const lines = text.split(/\r?\n/);
   const out = [];
   let inList = false;
@@ -113,6 +155,17 @@ export function renderMarkdownHtml(rawText) {
     if (!trimmed) {
       closeList();
       closeTable();
+      continue;
+    }
+
+    // Khối bảng HTML đã được tách ra từ trước
+    if (trimmed.includes("__DOC_HTML_TABLE_BLOCK_")) {
+      closeList();
+      closeTable();
+      const renderedLine = trimmed.replace(/__DOC_HTML_TABLE_BLOCK_(\d+)__/g, (_m, id) => {
+        return tableBlocks[parseInt(id, 10)] || "";
+      });
+      out.push(renderedLine);
       continue;
     }
 
