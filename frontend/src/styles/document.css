@@ -201,7 +201,8 @@
   border-radius: 6px;
   padding: 12px 14px;
   background: var(--surface);
-  transition: border-color 0.15s ease;
+  transition: all 0.18s ease;
+  cursor: pointer;
 }
 
 .chunk-card-item:hover {
@@ -209,8 +210,15 @@
 }
 
 .chunk-card-item.selected {
-  border-color: var(--border-strong);
-  background: var(--surface-soft);
+  border-color: var(--brand-border);
+  background: var(--brand-subtle);
+}
+
+.chunk-card-item.is-hovered-target {
+  border-color: var(--brand);
+  background: var(--brand-subtle);
+  box-shadow: 0 2px 10px rgba(151, 38, 53, 0.12);
+  transform: translateY(-1px);
 }
 
 .chunk-card-top {
@@ -493,4 +501,60 @@
 .chunk-card-item.selected {
   border-color: var(--brand-border);
   background: var(--brand-subtle);
+}
+
+/* ==========================================================================
+   HIGHLIGHT CHUNK TRÊN TÀI LIỆU GỐC (Auto-scroll & Highlight on hover)
+   ========================================================================== */
+.doc-chunk-highlight {
+  background-color: var(--brand-subtle-strong) !important;
+  box-shadow: 0 0 0 2px var(--brand-border);
+  border-radius: 4px;
+  transition: background-color 0.25s ease, box-shadow 0.25s ease;
+  position: relative;
+}
+
+/* Vạch màu thương hiệu dọc mép trái cho các phần tử văn bản */
+.doc-markdown-rendered-view .doc-p.doc-chunk-highlight,
+.doc-markdown-rendered-view .doc-h1.doc-chunk-highlight,
+.doc-markdown-rendered-view .doc-h2.doc-chunk-highlight,
+.doc-markdown-rendered-view .doc-h3.doc-chunk-highlight,
+.doc-markdown-rendered-view .doc-h4.doc-chunk-highlight,
+.doc-markdown-rendered-view .doc-h5.doc-chunk-highlight,
+.doc-markdown-rendered-view .doc-h6.doc-chunk-highlight,
+.doc-markdown-rendered-view .doc-blockquote.doc-chunk-highlight {
+  border-left: 3px solid var(--brand) !important;
+  padding-left: 8px;
+  border-radius: 0 4px 4px 0;
+  animation: doc-chunk-pulse 0.4s ease-out;
+}
+
+.doc-markdown-rendered-view li.doc-chunk-highlight {
+  border-radius: 3px;
+  padding: 1px 6px;
+  animation: doc-chunk-pulse 0.4s ease-out;
+}
+
+.doc-markdown-rendered-view tr.doc-chunk-highlight td,
+.doc-markdown-rendered-view tr.doc-chunk-highlight th {
+  background-color: var(--brand-subtle-strong) !important;
+  color: var(--text) !important;
+}
+
+.doc-markdown-rendered-view .doc-table-wrapper.doc-chunk-highlight {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px var(--brand-border);
+  animation: doc-chunk-pulse 0.4s ease-out;
+}
+
+@keyframes doc-chunk-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(151, 38, 53, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(151, 38, 53, 0.2);
+  }
+  100% {
+    box-shadow: 0 0 0 2px var(--brand-border);
+  }
 }

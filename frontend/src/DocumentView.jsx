@@ -22,6 +22,88 @@ const VIEW_MODES = [
   { key: "markdown", label: "Markdown" },
 ];
 
+function cleanMarkdown(s) {
+  return s
+    .replace(/^[#*>\-\|\s]+/, "")
+    .replace(/[#*>\-\|\s]+$/, "")
+    .replace(/\*\*|__|\*|_|`|<[^>]+>/g, "")
+    .trim();
+}
+
+function extractChunkSnippets(chunkText) {
+  if (!chunkText) return [];
+  const rawLines = chunkText.split(/\r?\n/);
+  const snippets = [];
+  for (const raw of rawLines) {
+    const clean = cleanMarkdown(raw);
+    if (clean.length >= 3) {
+      snippets.push(clean);
+    }
+  }
+  if (snippets.length === 0) {
+    const t = cleanMarkdown(chunkText);
+    if (t) snippets.push(t.slice(0, 40));
+  }
+  return snippets;
+}
+
+function findMatchingElements(chunkText, chunkIndex, totalChunks, elements) {
+  const snippets = extractChunkSnippets(chunkText);
+  if (snippets.length === 0 || elements.length === 0) return [];
+
+  // Ưu tiên đoạn dài nhất để neo đúng khối văn bản đặc trưng
+  const anchorCandidates = [...snippets].sort((a, b) => b.length - a.length);
+  const approxRatio = totalChunks > 0 ? (chunkIndex ?? 0) / totalChunks : 0;
+  const expectedIdx = Math.floor(approxRatio * elements.length);
+
+  let anchorElIdx = -1;
+  for (const cand of anchorCandidates.slice(0, 5)) {
+    let best = -1;
+    let minDiff = Infinity;
+    for (let i = 0; i < elements.length; i++) {
+      const elText = elements[i].textContent;
+      if (!elText) continue;
+      if (elText.includes(cand) || (cand.length >= 8 && cand.includes(elText))) {
+        const diff = Math.abs(i - expectedIdx);
+        if (diff < minDiff) {
+          minDiff = diff;
+          best = i;
+        }
+      }
+    }
+    if (best !== -1) {
+      anchorElIdx = best;
+      break;
+    }
+  }
+
+  // Nếu không khớp từ khóa nào, dùng vị trí ước lượng theo tỷ lệ văn bản
+  if (anchorElIdx === -1) {
+    const fallback = Math.min(elements.length - 1, Math.max(0, expectedIdx));
+    return [fallback];
+  }
+
+  const matchedIndices = new Set();
+  matchedIndices.add(anchorElIdx);
+
+  // Mở rộng lân cận để lấy toàn bộ các khối thuộc đoạn này
+  const windowStart = Math.max(0, anchorElIdx - 10);
+  const windowEnd = Math.min(elements.length - 1, anchorElIdx + 25);
+
+  for (let i = windowStart; i <= windowEnd; i++) {
+    const elText = elements[i].textContent;
+    if (!elText) continue;
+    for (const snip of snippets) {
+      if (snip.length >= 4 && (elText.includes(snip) || (elText.length >= 6 && snip.includes(elText)))) {
+        matchedIndices.add(i);
+        break;
+      }
+    }
+  }
+
+  return Array.from(matchedIndices).sort((a, b) => a - b);
+}
+
 /** Màn chi tiết, mở khi bấm vào một tài liệu trong danh sách kho. */
 export default function DocumentView({ documentId, onBack, parsingDocId, reindexing, onParse }) {
   const [docDetail, setDocDetail] = useState(null);
@@ -50,6 +132,12 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
   // Khi tìm kiếm, phải có toàn bộ đoạn trong tay vì máy chủ chưa hỗ trợ lọc.
   const [allChunks, setAllChunks] = useState(null);
   const [loadingAll, setLoadingAll] = useState(false);
+
+  // Highlight & auto-scroll khi trỏ chuột vào chunk
+  const [hoveredChunkId, setHoveredChunkId] = useState(null);
+  const hoverTimerRef = useRef(null);
+  const docContentRef = useRef(null);
+  const currentHighlightedElsRef = useRef([]);
 
   const searchTimer = useRef(null);
 
@@ -186,6 +274,95 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
     : chunks;
   const busy = chunksLoading || loadingAll;
 
+  const highlightAndScrollToChunk = useCallback(
+    (chunk) => {
+      if (!chunk) return;
+
+      // Gỡ highlight cũ
+      if (currentHighlightedElsRef.current && currentHighlightedElsRef.current.length > 0) {
+        currentHighlightedElsRef.current.forEach((el) => {
+          el.classList.remove("doc-chunk-highlight");
+        });
+        currentHighlightedElsRef.current = [];
+      }
+
+      const container = docContentRef.current;
+      if (!container) return;
+
+      const renderedView = container.querySelector(".doc-markdown-rendered-view");
+      if (!renderedView) return;
+
+      const allElements = Array.from(
+        renderedView.querySelectorAll(
+          ".doc-p, .doc-h1, .doc-h2, .doc-h3, .doc-h4, .doc-h5, .doc-h6, li, tr, .doc-blockquote, .doc-table-wrapper"
+        )
+      );
+      if (allElements.length === 0) return;
+
+      const total = isSearching ? searchResults?.length ?? 0 : chunkTotal;
+      const matchedIndices = findMatchingElements(chunk.text, chunk.chunk_index, total, allElements);
+      if (matchedIndices.length === 0) return;
+
+      const matchedElements = matchedIndices.map((idx) => allElements[idx]).filter(Boolean);
+      if (matchedElements.length === 0) return;
+
+      matchedElements.forEach((el) => {
+        el.classList.add("doc-chunk-highlight");
+      });
+      currentHighlightedElsRef.current = matchedElements;
+
+      const firstEl = matchedElements[0];
+      if (firstEl) {
+        const containerRect = container.getBoundingClientRect();
+        const targetRect = firstEl.getBoundingClientRect();
+        const relativeTop = targetRect.top - containerRect.top + container.scrollTop;
+        const targetScrollTop = Math.max(0, relativeTop - container.clientHeight / 2 + targetRect.height / 2);
+
+        container.scrollTo({
+          top: targetScrollTop,
+          behavior: "smooth",
+        });
+      }
+    },
+    [isSearching, searchResults, chunkTotal]
+  );
+
+  const handleChunkHover = useCallback(
+    (chunk, immediate = false) => {
+      if (!chunk) return;
+      setHoveredChunkId(chunk.id);
+
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+      }
+
+      if (immediate) {
+        highlightAndScrollToChunk(chunk);
+      } else {
+        hoverTimerRef.current = setTimeout(() => {
+          highlightAndScrollToChunk(chunk);
+        }, 60);
+      }
+    },
+    [highlightAndScrollToChunk]
+  );
+
+  // Xóa highlight khi đổi tài liệu, đổi trang hoặc reload
+  useEffect(() => {
+    setHoveredChunkId(null);
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    if (currentHighlightedElsRef.current && currentHighlightedElsRef.current.length > 0) {
+      currentHighlightedElsRef.current.forEach((el) => el.classList.remove("doc-chunk-highlight"));
+      currentHighlightedElsRef.current = [];
+    }
+  }, [documentId, reloadToken, page]);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
@@ -259,7 +436,7 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
             </div>
           </div>
 
-          <div className="doc-view-content-pane" aria-busy={docDetailLoading}>
+          <div className="doc-view-content-pane" aria-busy={docDetailLoading} ref={docContentRef}>
             {docDetailLoading ? (
               <div style={{ padding: 16 }}>
                 {Array.from({ length: 10 }, (_, i) => (
@@ -390,10 +567,16 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
                 {visibleChunks.map((chunk) => {
                   const isSelected = selectedChunkIds.has(chunk.id);
                   const isEnabled = enabledChunks[chunk.id] !== false;
+                  const isHovered = hoveredChunkId === chunk.id;
                   const label = `Đoạn #${(chunk.chunk_index ?? 0) + 1}`;
 
                   return (
-                  <div key={chunk.id} className={`chunk-card-item ${isSelected ? "selected" : ""}`}>
+                  <div
+                    key={chunk.id}
+                    className={`chunk-card-item ${isSelected ? "selected" : ""} ${isHovered ? "is-hovered-target" : ""}`}
+                    onMouseEnter={() => handleChunkHover(chunk, false)}
+                    onClick={() => handleChunkHover(chunk, true)}
+                  >
                     <div className="chunk-card-top">
                       <input
                         type="checkbox"
