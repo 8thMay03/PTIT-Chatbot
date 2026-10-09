@@ -1,7 +1,10 @@
+/** Ký hiệu dùng khi không có dữ liệu. Không bao giờ bịa giá trị thay thế. */
+export const EMPTY = "—";
+
 export function formatDate(value) {
-  if (!value) return "10/08/2026 09:27:57";
+  if (!value) return EMPTY;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "10/08/2026 09:27:57";
+  if (Number.isNaN(date.getTime())) return EMPTY;
 
   const pad = (n) => String(n).padStart(2, "0");
   const day = pad(date.getDate());
@@ -15,18 +18,19 @@ export function formatDate(value) {
 }
 
 export function formatDateOnly(value) {
-  if (!value) return "10/08/2026";
+  if (!value) return EMPTY;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "10/08/2026";
+  if (Number.isNaN(date.getTime())) return EMPTY;
   const pad = (n) => String(n).padStart(2, "0");
   return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
 }
 
 export function formatSize(bytes) {
-  if (bytes == null || Number.isNaN(bytes)) return "515 KB";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes == null || Number.isNaN(Number(bytes))) return EMPTY;
+  const value = Number(bytes);
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(0)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function apiError(payload, fallback) {
@@ -39,7 +43,20 @@ function escapeHtml(value) {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Chỉ cho phép link http/https/mailto.
+ *
+ * Kết quả được nhét vào innerHTML, nên một link dạng `javascript:` trong nội dung
+ * tài liệu hoặc trong câu trả lời của LLM sẽ chạy được mã trong trang.
+ */
+function safeHref(url) {
+  const trimmed = (url || "").trim();
+  return /^(https?:\/\/|mailto:|#|\/)/i.test(trimmed) ? trimmed : "#";
 }
 
 function parseInlineMarkdown(text) {
@@ -59,7 +76,8 @@ function parseInlineMarkdown(text) {
   // Links
   res = res.replace(
     /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noreferrer" class="doc-link">$1</a>'
+    (_match, label, url) =>
+      `<a href="${safeHref(url)}" target="_blank" rel="noreferrer noopener" class="doc-link">${label}</a>`
   );
   return res;
 }

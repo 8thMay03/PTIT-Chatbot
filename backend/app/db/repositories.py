@@ -316,3 +316,71 @@ def add_message_sources(session: Session, message_id: str, sources: list[dict]) 
         )
         for source in sources
     )
+
+
+# ==========================================
+# Lịch sử hội thoại
+# ==========================================
+def list_conversations(
+    session: Session,
+    limit: int = 50,
+    offset: int = 0,
+    user_id: str | None = None,
+) -> tuple[list[tuple[Conversation, int]], int]:
+    """Trả về các hội thoại kèm số tin nhắn, mới cập nhật trước.
+
+    Bỏ qua hội thoại rỗng: mỗi lần mở màn chat mà không hỏi gì cũng có thể tạo ra
+    một bản ghi, và chúng sẽ làm nhiễu danh sách bên thanh bên.
+    """
+    message_count = (
+        select(Message.conversation_id, func.count(Message.id).label("total"))
+        .group_by(Message.conversation_id)
+        .subquery()
+    )
+
+    base = (
+        select(Conversation, func.coalesce(message_count.c.total, 0))
+        .join(message_count, message_count.c.conversation_id == Conversation.id)
+        .where(message_count.c.total > 0)
+    )
+    if user_id:
+        base = base.where(Conversation.user_id == user_id)
+
+    total = session.scalar(select(func.count()).select_from(base.subquery())) or 0
+    rows = session.execute(
+        base.order_by(Conversation.updated_at.desc()).limit(limit).offset(offset)
+    ).all()
+    return [(row[0], row[1]) for row in rows], total
+
+
+def get_conversation(session: Session, conversation_id: str) -> Conversation | None:
+    return session.get(Conversation, conversation_id)
+
+
+def get_conversation_messages(session: Session, conversation_id: str) -> list[Message]:
+    return list(
+        session.scalars(
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.asc())
+        ).all()
+    )
+
+
+def rename_conversation(session: Session, conversation_id: str, title: str) -> Conversation | None:
+    conversation = session.get(Conversation, conversation_id)
+    if conversation is None:
+        return None
+    conversation.title = title
+    session.flush()
+    return conversation
+
+
+def delete_conversation(session: Session, conversation_id: str) -> bool:
+    conversation = session.get(Conversation, conversation_id)
+    if conversation is None:
+        return False
+    # Message và MessageSource có ondelete="CASCADE" nên bị xoá theo.
+    session.delete(conversation)
+    session.flush()
+    return True

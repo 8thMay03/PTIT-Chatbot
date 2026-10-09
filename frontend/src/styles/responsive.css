@@ -1,0 +1,429 @@
+/* ==========================================================================
+   RESPONSIVE — breakpoint thống nhất toàn hệ thống
+     1200px  desktop hẹp   — thu gọn khoảng cách, layout 2 cột hẹp lại
+      900px  tablet        — mọi layout 2 cột xếp chồng, sidebar thành drawer
+      640px  điện thoại    — bảng thành card, header rút gọn
+   Nạp CUỐI CÙNG để ghi đè được các file component.
+   ========================================================================== */
+
+/* ==========================================================================
+   ≤ 1200px — desktop hẹp
+   ========================================================================== */
+@media (max-width: 1200px) {
+  :root {
+    --sidebar-w: 250px;
+  }
+
+  .model-mgmt-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-5);
+  }
+
+  .doc-view-split-layout {
+    grid-template-columns: 42% 1fr;
+  }
+}
+
+/* ==========================================================================
+   ≤ 900px — tablet: mọi layout 2 cột xếp chồng thành 1 cột
+   ========================================================================== */
+@media (max-width: 900px) {
+  /* ---- Khung ứng dụng: sidebar chat thành drawer trượt ---- */
+  .app-shell,
+  .app-shell.view-chat,
+  .app-shell.view-full {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-shell .sidebar {
+    position: fixed;
+    top: var(--header-h);
+    bottom: 0;
+    left: 0;
+    z-index: 45;
+    width: min(300px, 84vw);
+    transform: translateX(-102%);
+    transition: transform var(--duration-slow) var(--ease),
+                opacity var(--duration-slow) var(--ease);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .app-shell.sidebar-open .sidebar {
+    display: flex;
+    transform: translateX(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .sidebar-scrim {
+    position: fixed;
+    inset: var(--header-h) 0 0 0;
+    z-index: 44;
+    background: var(--scrim);
+    border: 0;
+    animation: fade-in var(--duration) var(--ease);
+  }
+
+  /* Nút hamburger chỉ tồn tại ở khổ hẹp */
+  .sidebar-toggle-btn {
+    display: grid;
+  }
+
+  /* ---- Header ---- */
+  .app-header {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .app-header .brand h1 {
+    font-size: 14px;
+  }
+
+  .app-header .brand-mark {
+    width: 32px;
+    height: 32px;
+  }
+
+  /* Link phụ (Discord/GitHub) nhường chỗ cho điều hướng chính */
+  .header-icon-link {
+    display: none;
+  }
+
+  .top-nav-item {
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  /* ---- Chat ---- */
+  .chat-header {
+    display: none;
+  }
+
+  .chat {
+    grid-template-rows: minmax(0, 1fr) auto;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .messages {
+    padding: var(--space-5) var(--space-4) var(--space-2);
+    gap: 18px;
+  }
+
+  .composer-shell {
+    padding: 10px var(--space-4) 18px;
+    padding-bottom: max(18px, env(safe-area-inset-bottom));
+  }
+
+  .suggestions {
+    grid-template-columns: 1fr;
+  }
+
+  .welcome h2 {
+    font-size: 22px;
+  }
+
+  /* ---- Dataset: sidebar dọc -> thanh tab ngang ---- */
+  .dataset-wrapper {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .dataset-sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    padding: var(--space-3);
+  }
+
+  .dataset-info-card {
+    flex-shrink: 0;
+    margin: 0;
+  }
+
+  .dataset-nav-menu {
+    flex-direction: row;
+    gap: 6px;
+    margin: 0;
+  }
+
+  .dataset-nav-item {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .dataset-view-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+
+  .dataset-view-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .dataset-search-field {
+    flex: 1;
+    min-width: 150px;
+  }
+
+  /* ---- Mọi layout 2 cột xếp chồng ---- */
+  .retrieval-two-col-layout,
+  .config-two-col-grid,
+  .model-mgmt-layout,
+  .doc-view-split-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-5);
+  }
+
+  /* Cột trái của document/retrieval cần chiều cao rõ ràng khi đã xếp chồng */
+  .doc-view-left-col,
+  .doc-view-right-col,
+  .retrieval-col-left,
+  .retrieval-col-right {
+    min-height: 380px;
+  }
+
+  .settings-subtabs-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+
+  .settings-header-actions {
+    justify-content: flex-end;
+  }
+}
+
+/* ==========================================================================
+   ≤ 640px — điện thoại
+   ========================================================================== */
+@media (max-width: 640px) {
+  /* ---- Header: chỉ giữ những gì thiết yếu ---- */
+  .lang-selector {
+    display: none;
+  }
+
+  .top-nav {
+    gap: 2px;
+  }
+
+  .top-nav-item {
+    padding: 0 8px;
+    font-size: 11.5px;
+  }
+
+  .top-nav-home {
+    display: none;
+  }
+
+  /* ---- Chat ---- */
+  .messages {
+    padding: var(--space-4) var(--space-3) var(--space-2);
+  }
+
+  .bubble {
+    max-width: 100%;
+  }
+
+  .message-row .avatar {
+    width: 28px;
+    height: 28px;
+  }
+
+  .welcome h2 {
+    font-size: 19px;
+  }
+
+  .welcome p {
+    font-size: var(--text-base);
+  }
+
+  .composer-shell {
+    padding: var(--space-2) var(--space-3) 14px;
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+  }
+
+  .composer-hint {
+    font-size: 10.5px;
+  }
+
+  .source-chips {
+    grid-template-columns: 1fr;
+  }
+
+  /* ------------------------------------------------------------------
+     Bảng Files 8 cột -> danh sách card.
+     Mỗi ô lấy nhãn từ thuộc tính data-label trong JSX.
+     ------------------------------------------------------------------ */
+  .dataset-table-card {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .dataset-main-table,
+  .dataset-main-table tbody,
+  .dataset-main-table tr,
+  .dataset-main-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .dataset-main-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .dataset-main-table tr {
+    margin-bottom: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    box-shadow: var(--shadow-xs);
+  }
+
+  .dataset-main-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 7px 0;
+    border: 0;
+    text-align: right;
+  }
+
+  .dataset-main-table td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-faint);
+    text-align: left;
+  }
+
+  /* Ô tên file chiếm trọn dòng đầu, không cần nhãn */
+  .dataset-main-table td.td-name {
+    justify-content: flex-start;
+    padding-top: 0;
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border-subtle);
+    text-align: left;
+  }
+
+  .dataset-main-table td.td-name::before {
+    content: none;
+  }
+
+  .dataset-main-table td.td-checkbox {
+    justify-content: flex-start;
+  }
+
+  .dataset-main-table td.td-action {
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .action-button-group {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  /* ---- Phân trang ---- */
+  .dataset-pagination-footer,
+  .chunk-pagination-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .pagination-controls {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* ---- Modal ---- */
+  .modal {
+    width: 100%;
+    padding: 18px;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .modal-actions button {
+    width: 100%;
+  }
+
+  /* ---- Toast ---- */
+  .toast-viewport {
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+
+  /* ---- Cấu hình: nhãn và ô số xuống dòng ---- */
+  .config-label-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .config-toggle-header {
+    flex-direction: row;
+    gap: var(--space-3);
+  }
+
+  .settings-header-actions {
+    flex-wrap: wrap;
+  }
+
+  .settings-header-actions button {
+    flex: 1;
+  }
+
+  /* ---- Document: thanh công cụ chunk xuống dòng ---- */
+  .chunk-result-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .chunk-toolbar-right {
+    flex-wrap: wrap;
+  }
+
+  .chunk-mode-toggle {
+    width: 100%;
+  }
+
+  .chunk-mode-btn {
+    flex: 1;
+  }
+}
+
+/* ==========================================================================
+   Màn hình rất hẹp (≤ 380px)
+   ========================================================================== */
+@media (max-width: 380px) {
+  .app-header .brand h1 {
+    display: none;
+  }
+
+  .top-nav-item {
+    padding: 0 6px;
+    font-size: 11px;
+  }
+}

@@ -1,0 +1,360 @@
+/* ==========================================================================
+   DESIGN TOKENS — PTIT RAG Chatbot
+   --------------------------------------------------------------------------
+   Hai tầng token:
+     1. PRIMITIVE  — giá trị thô, KHÔNG đổi theo theme (--gray-500, --brand-600)
+     2. SEMANTIC   — ý nghĩa sử dụng, ĐỔI theo theme (--surface, --text, --border)
+
+   Quy tắc: các file component chỉ được dùng token SEMANTIC.
+   Đây là file DUY NHẤT được phép chứa mã màu thô.
+
+   Dark mode có 3 trạng thái:
+     :root                                       -> bảng sáng (mặc định)
+     @media (prefers-color-scheme: dark) + guard -> theo hệ điều hành
+     :root[data-theme="dark"]                    -> người dùng chọn tay, thắng cả hai
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. PRIMITIVE — không đổi theo theme
+   -------------------------------------------------------------------------- */
+:root {
+  /* Brand: maroon PTIT (thống nhất từ #972635 và #dc2626 trước đây) */
+  --brand-50: #fdf3f4;
+  --brand-100: #fbe3e6;
+  --brand-200: #f6c7cd;
+  --brand-300: #eb98a3;
+  --brand-400: #dc6476;
+  --brand-500: #c53d52;
+  --brand-600: #972635;
+  --brand-700: #7d1f2c;
+  --brand-800: #661a25;
+  --brand-900: #4d141c;
+
+  /* Thang xám duy nhất (thay thế việc trộn slate + gray trước đây) */
+  --gray-0: #ffffff;
+  --gray-25: #fcfcfd;
+  --gray-50: #f8fafc;
+  --gray-100: #f1f5f9;
+  --gray-150: #e9edf2;
+  --gray-200: #e2e8f0;
+  --gray-300: #cbd5e1;
+  --gray-400: #94a3b8;
+  --gray-500: #5b6878;
+  --gray-600: #475569;
+  --gray-700: #334155;
+  --gray-800: #1e293b;
+  --gray-850: #171f2e;
+  --gray-900: #0f172a;
+  --gray-950: #0a0f1a;
+
+  /* Xám cho nền tối (hơi ấm để hợp với maroon) */
+  --dark-0: #0d0f13;
+  --dark-50: #14171c;
+  --dark-100: #1a1e25;
+  --dark-200: #21262f;
+  --dark-300: #2a303b;
+  --dark-400: #363d4a;
+  --dark-500: #4a5364;
+
+  /* Màu trạng thái */
+  --teal-400: #2dd4bf;
+  --teal-500: #14b8a6;
+  --teal-600: #0d9488;
+  --teal-700: #0f766e;
+
+  --green-300: #6ee7b7;
+  --green-400: #34d399;
+  --green-500: #10b981;
+  --green-600: #059669;
+  --green-700: #047857;
+
+  --amber-300: #fcd34d;
+  --amber-400: #fbbf24;
+  --amber-600: #d97706;
+  --amber-700: #b45309;
+
+  --red-300: #fca5a5;
+  --red-400: #f87171;
+  --red-500: #ef4444;
+  --red-600: #dc2626;
+  --red-700: #b91c1c;
+
+  --blue-300: #93c5fd;
+  --blue-400: #60a5fa;
+  --blue-500: #3b82f6;
+  --blue-600: #2563eb;
+  --blue-700: #1d4ed8;
+
+  --purple-400: #c084fc;
+  --purple-500: #a855f7;
+  --purple-600: #9333ea;
+
+  /* --------------------------------------------------------------------
+     Token KHÔNG phụ thuộc theme: bo góc, khoảng cách, chữ, chuyển động
+     -------------------------------------------------------------------- */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
+  --radius-pill: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --text-xs: 11px;
+  --text-sm: 12.5px;
+  --text-base: 13.5px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+
+  --duration-fast: 120ms;
+  --duration: 180ms;
+  --duration-slow: 280ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --sidebar-w: 290px;
+  --header-h: 60px;
+
+  /* Trắng thuần: dùng cho chữ/icon nằm TRÊN nền màu đậm (brand, danger...).
+     Không đổi theo theme — nếu không, chữ trắng trên nút đỏ sẽ biến mất ở dark mode. */
+  --on-solid: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   2. SEMANTIC — bảng SÁNG (mặc định)
+   -------------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+
+  /* Nền & bề mặt */
+  --bg: #f6f7f9;
+  --bg-gradient: radial-gradient(1200px 600px at 80% -10%, rgba(151, 38, 53, 0.06), transparent 60%),
+    radial-gradient(900px 500px at 0% 0%, rgba(151, 38, 53, 0.04), transparent 55%);
+  --surface: var(--gray-0);
+  --surface-soft: var(--gray-50);
+  --surface-sunken: var(--gray-100);
+  --surface-sunken-strong: var(--gray-200);
+  --surface-overlay: var(--gray-0);
+  --scrim: rgba(15, 23, 42, 0.45);
+
+  /* Chữ */
+  --text: var(--gray-900);
+  --text-secondary: var(--gray-700);
+  --text-muted: var(--gray-500);
+  --text-faint: var(--gray-400);
+  --text-inverse: var(--gray-0);
+
+  /* Viền */
+  --border: #e8ebf0;
+  --border-strong: var(--gray-300);
+  --border-subtle: var(--gray-100);
+
+  /* Brand */
+  --brand: var(--brand-600);
+  --brand-hover: var(--brand-700);
+  --brand-active: var(--brand-800);
+  --brand-text: var(--brand-600);
+  --brand-subtle: var(--brand-50);
+  --brand-subtle-strong: var(--brand-100);
+  --brand-border: var(--brand-200);
+  --brand-gradient: linear-gradient(135deg, var(--brand-500), var(--brand-700));
+
+  /* Accent (hành động phụ ở màn Dataset) */
+  --accent: var(--teal-500);
+  --accent-hover: var(--teal-600);
+  --accent-text: var(--teal-700);
+  --accent-subtle: #f0fdfa;
+  --accent-border: #ccfbf1;
+
+  /* Trạng thái */
+  --success: var(--green-500);
+  --success-solid: var(--green-700);
+  --success-text: var(--green-700);
+  --success-subtle: #f0fdf4;
+  --success-border: #bbf7d0;
+
+  --warning: var(--amber-600);
+  --warning-text: var(--amber-700);
+  --warning-subtle: #fffbeb;
+  --warning-border: #fde68a;
+
+  --danger: var(--red-600);
+  --danger-hover: var(--red-700);
+  --danger-text: var(--red-700);
+  --danger-subtle: #fef2f2;
+  --danger-border: #fecaca;
+
+  --info: var(--blue-600);
+  --info-text: var(--blue-700);
+  --info-subtle: #eff6ff;
+  --info-border: #bfdbfe;
+
+  /* Đổ bóng */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 18px 40px rgba(15, 23, 42, 0.12);
+
+  /* Vòng focus — dùng chung cho toàn hệ thống */
+  --ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand-400);
+  --ring-brand: 0 0 0 4px rgba(151, 38, 53, 0.16);
+  --ring-danger: 0 0 0 4px rgba(220, 38, 38, 0.16);
+}
+
+/* --------------------------------------------------------------------------
+   3. SEMANTIC — bảng TỐI
+   Định nghĩa một lần trong @mixin-style rồi áp cho cả hai selector.
+   -------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: var(--dark-0);
+    --bg-gradient: radial-gradient(1200px 600px at 80% -10%, rgba(197, 61, 82, 0.10), transparent 60%),
+      radial-gradient(900px 500px at 0% 0%, rgba(151, 38, 53, 0.08), transparent 55%);
+    --surface: var(--dark-50);
+    --surface-soft: var(--dark-100);
+    --surface-sunken: var(--dark-200);
+    --surface-sunken-strong: var(--dark-300);
+    --surface-overlay: var(--dark-100);
+    --scrim: rgba(0, 0, 0, 0.65);
+
+    --text: #e8eaee;
+    --text-secondary: #c2c8d2;
+    --text-muted: #97a0ad;
+    --text-faint: #6f7884;
+    --text-inverse: var(--gray-900);
+
+    --border: var(--dark-300);
+    --border-strong: var(--dark-400);
+    --border-subtle: var(--dark-200);
+
+    --brand: var(--brand-500);
+    --brand-hover: var(--brand-400);
+    --brand-active: var(--brand-300);
+    --brand-text: var(--brand-300);
+    --brand-subtle: #2a161a;
+    --brand-subtle-strong: #3a1d24;
+    --brand-border: #52262f;
+    --brand-gradient: linear-gradient(135deg, var(--brand-500), var(--brand-700));
+
+    --accent: var(--teal-500);
+    --accent-hover: var(--teal-400);
+    --accent-text: var(--teal-400);
+    --accent-subtle: #0f2724;
+    --accent-border: #1b453f;
+
+    --success: var(--green-500);
+    --success-solid: var(--green-700);
+    --success-text: var(--green-400);
+    --success-subtle: #11241c;
+    --success-border: #1d4435;
+
+    --warning: var(--amber-400);
+    --warning-text: var(--amber-300);
+    --warning-subtle: #2a2010;
+    --warning-border: #4a3a17;
+
+    --danger: var(--red-600);
+    --danger-hover: var(--red-500);
+    --danger-text: var(--red-400);
+    --danger-subtle: #2c1618;
+    --danger-border: #4d2427;
+
+    --info: var(--blue-500);
+    --info-text: var(--blue-400);
+    --info-subtle: #131f33;
+    --info-border: #1f3557;
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 18px 40px rgba(0, 0, 0, 0.6);
+
+    --ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand-400);
+    --ring-brand: 0 0 0 4px rgba(220, 100, 118, 0.24);
+    --ring-danger: 0 0 0 4px rgba(248, 113, 113, 0.24);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: var(--dark-0);
+  --bg-gradient: radial-gradient(1200px 600px at 80% -10%, rgba(197, 61, 82, 0.10), transparent 60%),
+    radial-gradient(900px 500px at 0% 0%, rgba(151, 38, 53, 0.08), transparent 55%);
+  --surface: var(--dark-50);
+  --surface-soft: var(--dark-100);
+  --surface-sunken: var(--dark-200);
+  --surface-sunken-strong: var(--dark-300);
+  --surface-overlay: var(--dark-100);
+  --scrim: rgba(0, 0, 0, 0.65);
+
+  --text: #e8eaee;
+  --text-secondary: #c2c8d2;
+  --text-muted: #97a0ad;
+  --text-faint: #6f7884;
+  --text-inverse: var(--gray-900);
+
+  --border: var(--dark-300);
+  --border-strong: var(--dark-400);
+  --border-subtle: var(--dark-200);
+
+  --brand: var(--brand-500);
+  --brand-hover: var(--brand-400);
+  --brand-active: var(--brand-300);
+  --brand-text: var(--brand-300);
+  --brand-subtle: #2a161a;
+  --brand-subtle-strong: #3a1d24;
+  --brand-border: #52262f;
+  --brand-gradient: linear-gradient(135deg, var(--brand-500), var(--brand-700));
+
+  --accent: var(--teal-500);
+  --accent-hover: var(--teal-400);
+  --accent-text: var(--teal-400);
+  --accent-subtle: #0f2724;
+  --accent-border: #1b453f;
+
+  --success: var(--green-500);
+  --success-solid: var(--green-700);
+  --success-text: var(--green-400);
+  --success-subtle: #11241c;
+  --success-border: #1d4435;
+
+  --warning: var(--amber-400);
+  --warning-text: var(--amber-300);
+  --warning-subtle: #2a2010;
+  --warning-border: #4a3a17;
+
+  --danger: var(--red-600);
+  --danger-hover: var(--red-500);
+  --danger-text: var(--red-400);
+  --danger-subtle: #2c1618;
+  --danger-border: #4d2427;
+
+  --info: var(--blue-500);
+  --info-text: var(--blue-400);
+  --info-subtle: #131f33;
+  --info-border: #1f3557;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 18px 40px rgba(0, 0, 0, 0.6);
+
+  --ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand-400);
+  --ring-brand: 0 0 0 4px rgba(220, 100, 118, 0.24);
+  --ring-danger: 0 0 0 4px rgba(248, 113, 113, 0.24);
+}

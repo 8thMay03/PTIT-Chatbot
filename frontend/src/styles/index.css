@@ -1,0 +1,19 @@
+/* ==========================================================================
+   PTIT RAG Chatbot — điểm vào của toàn bộ stylesheet
+   --------------------------------------------------------------------------
+   Thứ tự nạp có ý nghĩa: token trước, rồi base, rồi layout, rồi component,
+   cuối cùng là responsive để ghi đè được mọi thứ phía trên.
+
+   Quy tắc: CHỈ tokens.css được chứa mã màu thô. Mọi file khác dùng var().
+   ========================================================================== */
+
+@import "./tokens.css";
+@import "./base.css";
+@import "./layout.css";
+@import "./components.css";
+@import "./chat.css";
+@import "./dataset.css";
+@import "./document.css";
+@import "./config.css";
+@import "./models.css";
+@import "./responsive.css";

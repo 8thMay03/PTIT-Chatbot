@@ -1,16 +1,16 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowUpDown,
+  Edit3,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
-  Edit3,
   Eye,
   FileText,
-  Filter,
   Folder,
+  Info,
   List,
   Loader2,
   Play,
@@ -23,95 +23,95 @@ import {
   X,
 } from "lucide-react";
 import { API_BASE_URL } from "./api";
-import { apiError, formatDate, formatDateOnly, formatSize } from "./lib/format";
+import { apiError, EMPTY, formatDate, formatDateOnly, formatSize } from "./lib/format";
 import DocumentView from "./DocumentView";
+import Modal from "./components/Modal";
+import { useToast } from "./components/Toast";
 
 const ACCEPTED_TYPES = ".md,.txt,.pdf,text/markdown,text/plain,application/pdf";
+const PAGE_SIZES = [10, 20, 50, 100];
+
+const TABS = [
+  { key: "files", label: "Tài liệu", icon: Folder },
+  { key: "retrieval", label: "Thử nghiệm truy xuất", icon: SlidersHorizontal },
+  { key: "logs", label: "Nhật ký", icon: List },
+  { key: "config", label: "Thông số xử lý", icon: Settings },
+];
 
 export default function DatasetView({ onChanged }) {
+  const toast = useToast();
+
   const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem("ptit_dataset_tab");
-    return ["files", "retrieval", "logs", "config"].includes(saved) ? saved : "files";
+    return TABS.some((t) => t.key === saved) ? saved : "files";
   });
   const [selectedDocId, setSelectedDocId] = useState(null);
 
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [query, setQuery] = useState("");
   const [sortField, setSortField] = useState("created_at");
   const [sortAsc, setSortAsc] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  // Trạng thái bật/tắt và tiêu đề sửa tại chỗ: backend chưa có trường `enable`
+  // lẫn endpoint đổi tiêu đề, nên cả hai chỉ tồn tại trong phiên làm việc này.
   const [enabledDocs, setEnabledDocs] = useState({});
-
-  // Pagination state
-  const [pageSize, setPageSize] = useState(50);
-  const [currentPage, setCurrentPage] = useState(1);
-
-  useEffect(() => {
-    localStorage.setItem("ptit_dataset_tab", activeTab);
-  }, [activeTab]);
-
-  // Modals
   const [editingDoc, setEditingDoc] = useState(null);
   const [editTitle, setEditTitle] = useState("");
+  const [localTitles, setLocalTitles] = useState({});
+
+  const [pageSize, setPageSize] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
+
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [reindexing, setReindexing] = useState(false);
   const [parsingDocId, setParsingDocId] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [notice, setNotice] = useState("");
 
-  // Retrieval Testing State (Matching reference parameters)
+  // Thử nghiệm truy xuất
   const [testQuery, setTestQuery] = useState("");
   const [testSimilarityThreshold, setTestSimilarityThreshold] = useState(0.2);
   const [testVectorWeight, setTestVectorWeight] = useState(0.3);
   const [testRerankModel, setTestRerankModel] = useState("");
-  const [testUseKg, setTestUseKg] = useState(false);
-  const [testCrossLang, setTestCrossLang] = useState("");
-  const [testMetadata, setTestMetadata] = useState("");
   const [testTopK, setTestTopK] = useState(10);
   const [testLoading, setTestLoading] = useState(false);
+  const [testError, setTestError] = useState("");
   const [testResults, setTestResults] = useState(null);
 
-  // Logs State
-  const [logs, setLogs] = useState([
-    {
-      id: "log-1",
-      timestamp: "10/08/2026 16:27:57",
-      event: "Dataset Initialized",
-      status: "Success",
-      detail: "Loaded so-tay-sinh-vien-d21.md (527 KB, 142 chunks)",
-    },
-    {
-      id: "log-2",
-      timestamp: "10/08/2026 16:28:10",
-      event: "Vector Index Created",
-      status: "Success",
-      detail: "Generated embeddings with text-embedding-3-small",
-    },
-    {
-      id: "log-3",
-      timestamp: "10/08/2026 16:28:15",
-      event: "BM25 Sparse Index Built",
-      status: "Success",
-      detail: "Indexed terms for hybrid lexical search",
-    },
-  ]);
+  // Nhật ký: chỉ ghi các thao tác THẬT diễn ra trong phiên này.
+  // Backend chưa có bảng log, nên không có gì để tải lại sau khi làm mới trang.
+  const [logs, setLogs] = useState([]);
+
+  // Thông số xử lý đọc từ backend
+  const [processingConfig, setProcessingConfig] = useState(null);
+  const [configError, setConfigError] = useState("");
 
   const fileRef = useRef(null);
 
-  async function loadDocuments() {
+  useEffect(() => {
+    localStorage.setItem("ptit_dataset_tab", activeTab);
+  }, [activeTab]);
+
+  const addLog = useCallback((event, detail, status = "Thành công") => {
+    setLogs((prev) => [
+      { id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, timestamp: formatDate(new Date()), event, status, detail },
+      ...prev,
+    ]);
+  }, []);
+
+  const loadDocuments = useCallback(async () => {
     setLoading(true);
-    setError("");
+    setLoadError("");
     try {
       const response = await fetch(`${API_BASE_URL}/documents`);
-      if (!response.ok) throw new Error("Không tải được danh sách tài liệu.");
+      if (!response.ok) throw new Error("Máy chủ trả về lỗi khi lấy danh sách tài liệu.");
       const payload = await response.json();
       const docs = payload.documents ?? [];
       setDocuments(docs);
-
       setEnabledDocs((prev) => {
         const next = { ...prev };
         docs.forEach((doc) => {
@@ -120,15 +120,31 @@ export default function DatasetView({ onChanged }) {
         return next;
       });
     } catch (err) {
-      setError(err.message || "Không tải được danh sách tài liệu.");
+      setDocuments([]);
+      setLoadError(
+        err instanceof TypeError
+          ? "Không kết nối được máy chủ. Kiểm tra server FastAPI đã chạy chưa."
+          : err.message || "Không tải được danh sách tài liệu."
+      );
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     loadDocuments();
-  }, []);
+  }, [loadDocuments]);
+
+  // Thông số xử lý lấy từ cấu hình thật, không phải văn bản viết cứng trong giao diện
+  useEffect(() => {
+    if (activeTab !== "config" || processingConfig) return;
+    fetch(`${API_BASE_URL}/config`)
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("lỗi"))))
+      .then(setProcessingConfig)
+      .catch(() =>
+        setConfigError("Không đọc được cấu hình từ máy chủ. Các giá trị dưới đây chưa khả dụng.")
+      );
+  }, [activeTab, processingConfig]);
 
   const filtered = useMemo(() => {
     let list = [...documents];
@@ -156,42 +172,50 @@ export default function DatasetView({ onChanged }) {
     return list;
   }, [documents, query, sortField, sortAsc]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+
+  // Lọc hoặc đổi cỡ trang có thể khiến trang hiện tại vượt quá số trang thật
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const paged = useMemo(
+    () => filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filtered, currentPage, pageSize]
+  );
+
   const totalSizeFormatted = useMemo(() => {
+    if (!documents.length) return EMPTY;
     const totalBytes = documents.reduce((sum, doc) => sum + (doc.size_bytes || 0), 0);
-    return totalBytes > 0 ? formatSize(totalBytes) : "527 KB";
+    return totalBytes > 0 ? formatSize(totalBytes) : EMPTY;
   }, [documents]);
 
   const earliestCreatedDate = useMemo(() => {
-    if (!documents.length) return "10/08/2026";
     const dates = documents
       .map((d) => (d.created_at ? new Date(d.created_at).getTime() : null))
       .filter(Boolean);
-    if (!dates.length) return "10/08/2026";
-    return formatDateOnly(Math.min(...dates));
+    return dates.length ? formatDateOnly(Math.min(...dates)) : EMPTY;
   }, [documents]);
 
   const datasetTitle = useMemo(() => {
-    if (!documents.length) return "sổ tay sinh viên";
+    if (!documents.length) return "Kho tài liệu PTIT";
     const first = documents[0];
-    const raw = first.title || first.file_name || "sổ tay sinh viên";
+    const raw = first.title || first.file_name || "Kho tài liệu PTIT";
     return raw.replace(/\.[^/.]+$/, "");
   }, [documents]);
 
-  function handleSort(field) {
-    if (sortField === field) {
-      setSortAsc(!sortAsc);
-    } else {
-      setSortField(field);
-      setSortAsc(true);
-    }
-  }
+  // Chọn theo TRANG HIỆN TẠI, không phải toàn bộ kết quả lọc: người dùng chỉ
+  // nhìn thấy các dòng của trang này nên "chọn tất cả" phải khớp với thứ họ thấy.
+  const pageIds = useMemo(() => paged.map((d) => d.id), [paged]);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
 
   function toggleSelectAll() {
-    if (selectedIds.size === filtered.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filtered.map((d) => d.id)));
-    }
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
   }
 
   function toggleSelect(id) {
@@ -204,10 +228,25 @@ export default function DatasetView({ onChanged }) {
   }
 
   function toggleEnable(id) {
-    setEnabledDocs((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
+    setEnabledDocs((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function saveDocTitle() {
+    if (!editingDoc) return;
+    const title = editTitle.trim();
+    if (!title) return;
+    setLocalTitles((prev) => ({ ...prev, [editingDoc.id]: title }));
+    addLog("Đổi tiêu đề tài liệu", `${editingDoc.file_name} → “${title}” (chỉ trong phiên này)`);
+    toast.warning(`Đã đổi tiêu đề thành “${title}”. Máy chủ chưa hỗ trợ lưu, tên sẽ trở lại sau khi tải lại trang.`);
+    setEditingDoc(null);
+  }
+
+  function handleSort(field) {
+    if (sortField === field) setSortAsc(!sortAsc);
+    else {
+      setSortField(field);
+      setSortAsc(true);
+    }
   }
 
   async function uploadFiles(fileList) {
@@ -215,7 +254,6 @@ export default function DatasetView({ onChanged }) {
     if (!files.length || uploading) return;
 
     setUploading(true);
-    setError("");
     const failures = [];
     let uploaded = 0;
 
@@ -223,28 +261,18 @@ export default function DatasetView({ onChanged }) {
       const form = new FormData();
       form.append("file", file);
       try {
-        const response = await fetch(`${API_BASE_URL}/documents`, {
-          method: "POST",
-          body: form,
-        });
+        const response = await fetch(`${API_BASE_URL}/documents`, { method: "POST", body: form });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
           failures.push(`${file.name}: ${apiError(payload, "không tải lên được")}`);
+          addLog("Tải lên tài liệu", `${file.name} — ${apiError(payload, "thất bại")}`, "Thất bại");
           continue;
         }
         uploaded += 1;
-        setLogs((prev) => [
-          {
-            id: `log-${Date.now()}-${file.name}`,
-            timestamp: formatDate(new Date()),
-            event: "File Upload & Parse",
-            status: "Success",
-            detail: `Uploaded ${file.name} (${formatSize(file.size)})`,
-          },
-          ...prev,
-        ]);
+        addLog("Tải lên tài liệu", `${file.name} (${formatSize(file.size)})`);
       } catch {
         failures.push(`${file.name}: không kết nối được máy chủ`);
+        addLog("Tải lên tài liệu", `${file.name} — không kết nối được máy chủ`, "Thất bại");
       }
     }
 
@@ -253,74 +281,93 @@ export default function DatasetView({ onChanged }) {
     setUploading(false);
 
     if (uploaded && !failures.length) {
-      setNotice(`Đã nạp ${uploaded} file vào danh sách dataset.`);
+      toast.success(`Đã nạp ${uploaded} tài liệu vào kho.`);
     } else if (uploaded) {
-      setNotice(`Đã nạp ${uploaded} file. Một số file bị lỗi.`);
-      setError(failures.join(" · "));
+      toast.warning(`Đã nạp ${uploaded} tài liệu. ${failures.length} file bị lỗi: ${failures.join(" · ")}`);
     } else {
-      setError(failures.join(" · ") || "Không tải lên được file.");
+      toast.error(failures.join(" · ") || "Không tải lên được tài liệu nào.");
+    }
+  }
+
+  async function deleteDocument(doc) {
+    const response = await fetch(`${API_BASE_URL}/documents/${doc.id}`, { method: "DELETE" });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(apiError(payload, `Không xóa được “${doc.title || doc.file_name}”.`));
     }
   }
 
   async function confirmDelete() {
     if (!pendingDelete || deleting) return;
     setDeleting(true);
-    setError("");
+    const label = pendingDelete.title || pendingDelete.file_name;
     try {
-      const response = await fetch(`${API_BASE_URL}/documents/${pendingDelete.id}`, {
-        method: "DELETE",
+      await deleteDocument(pendingDelete);
+      if (selectedDocId === pendingDelete.id) setSelectedDocId(null);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(pendingDelete.id);
+        return next;
       });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(apiError(payload, "Không xóa được tài liệu."));
-      }
-      if (selectedDocId === pendingDelete.id) {
-        setSelectedDocId(null);
-      }
-      setLogs((prev) => [
-        {
-          id: `log-${Date.now()}`,
-          timestamp: formatDate(new Date()),
-          event: "File Deleted",
-          status: "Success",
-          detail: `Removed ${pendingDelete.title || pendingDelete.file_name}`,
-        },
-        ...prev,
-      ]);
-      setNotice(`Đã xóa “${pendingDelete.title || pendingDelete.file_name}”.`);
+      addLog("Xóa tài liệu", label);
+      toast.success(`Đã xóa “${label}”.`);
       setPendingDelete(null);
       await loadDocuments();
       onChanged?.();
     } catch (err) {
-      setError(err.message || "Không xóa được tài liệu.");
+      addLog("Xóa tài liệu", `${label} — ${err.message}`, "Thất bại");
+      toast.error(err.message);
     } finally {
       setDeleting(false);
     }
   }
 
+  async function confirmBulkDelete() {
+    if (deleting) return;
+    setDeleting(true);
+    const targets = documents.filter((d) => selectedIds.has(d.id));
+    let done = 0;
+    const failures = [];
+
+    for (const doc of targets) {
+      try {
+        await deleteDocument(doc);
+        done += 1;
+      } catch (err) {
+        failures.push(err.message);
+      }
+    }
+
+    addLog(
+      "Xóa nhiều tài liệu",
+      `Đã xóa ${done}/${targets.length} tài liệu`,
+      failures.length ? "Thất bại một phần" : "Thành công"
+    );
+    if (failures.length) toast.warning(`Đã xóa ${done}/${targets.length}. Lỗi: ${failures.join(" · ")}`);
+    else toast.success(`Đã xóa ${done} tài liệu.`);
+
+    setSelectedIds(new Set());
+    setBulkDeleteOpen(false);
+    setDeleting(false);
+    await loadDocuments();
+    onChanged?.();
+  }
+
   async function reindexAll() {
     if (reindexing) return;
     setReindexing(true);
-    setError("");
     try {
       const response = await fetch(`${API_BASE_URL}/ingest`, { method: "POST" });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(apiError(payload, "Không nạp lại được kho tri thức."));
-      setNotice(`Đã nạp lại ${payload.documents ?? 0} tài liệu · ${payload.chunks ?? 0} đoạn.`);
-      setLogs((prev) => [
-        {
-          id: `log-${Date.now()}`,
-          timestamp: formatDate(new Date()),
-          event: "Full Re-indexing",
-          status: "Success",
-          detail: `Reindexed ${payload.documents ?? 0} docs, ${payload.chunks ?? 0} chunks`,
-        },
-        ...prev,
-      ]);
+      const detail = `${payload.documents ?? 0} tài liệu · ${payload.chunks ?? 0} đoạn`;
+      addLog("Nạp lại toàn bộ kho", detail);
+      toast.success(`Đã nạp lại ${detail}.`);
       await loadDocuments();
       onChanged?.();
     } catch (err) {
-      setError(err.message || "Không nạp lại được kho tri thức.");
+      addLog("Nạp lại toàn bộ kho", err.message, "Thất bại");
+      toast.error(err.message || "Không nạp lại được kho tri thức.");
     } finally {
       setReindexing(false);
     }
@@ -329,28 +376,18 @@ export default function DatasetView({ onChanged }) {
   async function parseDocument(doc) {
     if (!doc || parsingDocId || reindexing) return;
     setParsingDocId(doc.id);
-    setError("");
     try {
-      const response = await fetch(`${API_BASE_URL}/documents/${doc.id}/parse`, {
-        method: "POST",
-      });
+      const response = await fetch(`${API_BASE_URL}/documents/${doc.id}/parse`, { method: "POST" });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(apiError(payload, "Không parse được tài liệu."));
-      setNotice(`Đã parse thành công “${payload.title || payload.file_name}” (${payload.chunk_count ?? 0} chunks).`);
-      setLogs((prev) => [
-        {
-          id: `log-${Date.now()}`,
-          timestamp: formatDate(new Date()),
-          event: "Document Parsed",
-          status: "Success",
-          detail: `Parsed ${payload.file_name || payload.title} into ${payload.chunk_count ?? 0} chunks`,
-        },
-        ...prev,
-      ]);
+      const label = payload.title || payload.file_name || doc.file_name;
+      addLog("Parse tài liệu", `${label} → ${payload.chunk_count ?? 0} đoạn`);
+      toast.success(`Đã parse “${label}” thành ${payload.chunk_count ?? 0} đoạn.`);
       await loadDocuments();
       onChanged?.();
     } catch (err) {
-      setError(err.message || "Lỗi khi parse tài liệu.");
+      addLog("Parse tài liệu", `${doc.file_name} — ${err.message}`, "Thất bại");
+      toast.error(err.message || "Lỗi khi parse tài liệu.");
     } finally {
       setParsingDocId(null);
     }
@@ -364,17 +401,18 @@ export default function DatasetView({ onChanged }) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = doc.file_name || "file";
+      link.download = doc.file_name || "tai-lieu";
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err.message || "Không tải được file nguồn.");
+      toast.error(err.message || "Không tải được file nguồn.");
     }
   }
 
   async function handleRunRetrievalTest() {
     if (!testQuery.trim() || testLoading) return;
     setTestLoading(true);
+    setTestError("");
     setTestResults(null);
     try {
       const response = await fetch(`${API_BASE_URL}/retrieval/test`, {
@@ -386,18 +424,16 @@ export default function DatasetView({ onChanged }) {
           similarity_threshold: testSimilarityThreshold,
           vector_similarity_weight: testVectorWeight,
           rerank_model: testRerankModel || null,
-          use_knowledge_graph: testUseKg,
-          cross_language_search: testCrossLang || null,
-          meta_data: testMetadata || null,
         }),
       });
-      if (!response.ok) {
-        throw new Error("Không thực hiện được truy vấn thử nghiệm.");
-      }
-      const data = await response.json();
-      setTestResults(data);
+      if (!response.ok) throw new Error("Máy chủ trả về lỗi khi chạy truy vấn thử.");
+      setTestResults(await response.json());
     } catch (err) {
-      setError(err.message || "Lỗi khi kiểm tra truy xuất.");
+      setTestError(
+        err instanceof TypeError
+          ? "Không kết nối được máy chủ."
+          : err.message || "Lỗi khi kiểm tra truy xuất."
+      );
     } finally {
       setTestLoading(false);
     }
@@ -409,9 +445,7 @@ export default function DatasetView({ onChanged }) {
     uploadFiles(event.dataTransfer.files);
   }
 
-  // ----------------------------------------------------
-  // DOCUMENT DETAIL VIEW: shown when a file is opened from the list below
-  // ----------------------------------------------------
+  // Màn chi tiết tài liệu, mở từ danh sách bên dưới
   if (selectedDocId) {
     return (
       <DocumentView
@@ -420,14 +454,14 @@ export default function DatasetView({ onChanged }) {
         parsingDocId={parsingDocId}
         reindexing={reindexing}
         onParse={parseDocument}
-        onNotice={setNotice}
       />
     );
   }
 
+  const selectedCount = selectedIds.size;
+
   return (
     <div className="dataset-wrapper">
-      {/* Hidden File Input */}
       <input
         ref={fileRef}
         type="file"
@@ -440,66 +474,43 @@ export default function DatasetView({ onChanged }) {
         }}
       />
 
-      {/* Left Sidebar (Dataset Panel) */}
       <aside className="dataset-sidebar">
-        {/* Dataset Header Card */}
         <div className="dataset-info-card">
-          <div className="dataset-card-avatar" title={datasetTitle}>
-            <span>{datasetTitle.charAt(0).toUpperCase() || "S"}</span>
+          <div className="dataset-card-avatar" title={datasetTitle} aria-hidden="true">
+            <span>{datasetTitle.charAt(0).toUpperCase()}</span>
           </div>
           <div className="dataset-card-meta">
             <h3 className="dataset-card-name" title={datasetTitle}>
-              {datasetTitle.length > 15 ? `${datasetTitle.slice(0, 14)}...` : datasetTitle}
+              {datasetTitle.length > 15 ? `${datasetTitle.slice(0, 14)}…` : datasetTitle}
             </h3>
             <div className="dataset-card-stat">
-              <span>{documents.length} files</span>
+              <span>{documents.length} tài liệu</span>
               <span className="stat-separator">{totalSizeFormatted}</span>
             </div>
-            <div className="dataset-card-date">Created {earliestCreatedDate}</div>
+            <div className="dataset-card-date">Tạo ngày {earliestCreatedDate}</div>
           </div>
         </div>
 
-        {/* Dataset Navigation Menu */}
-        <nav className="dataset-nav-menu" aria-label="Dataset navigation">
-          <button
-            type="button"
-            className={`dataset-nav-item ${activeTab === "files" ? "active" : ""}`}
-            onClick={() => setActiveTab("files")}
-          >
-            <Folder size={16} className="dataset-nav-icon" />
-            <span>Files</span>
-          </button>
-
-          <button
-            type="button"
-            className={`dataset-nav-item ${activeTab === "retrieval" ? "active" : ""}`}
-            onClick={() => setActiveTab("retrieval")}
-          >
-            <SlidersHorizontal size={16} className="dataset-nav-icon" />
-            <span>Retrieval testing</span>
-          </button>
-
-          <button
-            type="button"
-            className={`dataset-nav-item ${activeTab === "logs" ? "active" : ""}`}
-            onClick={() => setActiveTab("logs")}
-          >
-            <List size={16} className="dataset-nav-icon" />
-            <span>Logs</span>
-          </button>
-
-          <button
-            type="button"
-            className={`dataset-nav-item ${activeTab === "config" ? "active" : ""}`}
-            onClick={() => setActiveTab("config")}
-          >
-            <Settings size={16} className="dataset-nav-icon" />
-            <span>Configuration</span>
-          </button>
+        <nav className="dataset-nav-menu" aria-label="Điều hướng kho tài liệu">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                className={`dataset-nav-item ${active ? "active" : ""}`}
+                aria-current={active ? "page" : undefined}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                <Icon size={16} className="dataset-nav-icon" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </nav>
       </aside>
 
-      {/* Main Content Area */}
       <main
         className={`dataset-main-content ${dragOver ? "is-drag-over" : ""}`}
         onDragOver={(e) => {
@@ -509,45 +520,50 @@ export default function DatasetView({ onChanged }) {
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
       >
-        {/* TAB 1: FILES TABLE VIEW */}
+        {/* ---------------------------------------------------------------
+            TAB 1: DANH SÁCH TÀI LIỆU
+            --------------------------------------------------------------- */}
         {activeTab === "files" && (
           <div className="dataset-files-view">
-            {/* Top Title & Action Toolbar */}
             <header className="dataset-view-header">
               <div className="dataset-view-title">
-                <h2>Files</h2>
-                <p>Please wait for your files to finish parsing before starting an AI-powered chat.</p>
+                <h2>Tài liệu</h2>
+                <p>Hãy đợi tài liệu parse xong trước khi bắt đầu hỏi đáp.</p>
               </div>
 
               <div className="dataset-view-toolbar">
                 <button
                   type="button"
                   className="btn-parse-dataset"
-                  title="Thực hiện pipeline Parse & Ingest toàn bộ tài liệu trong thư mục data"
+                  title="Chạy lại toàn bộ pipeline parse và nạp vector cho mọi tài liệu"
                   onClick={reindexAll}
                   disabled={reindexing || Boolean(parsingDocId)}
                 >
-                  {reindexing ? (
-                    <Loader2 size={14} className="spin" />
-                  ) : (
-                    <Play size={13} fill="currentColor" />
-                  )}
-                  <span>{reindexing ? "Đang Parse..." : "Parse Documents"}</span>
+                  {reindexing ? <Loader2 size={14} className="spin" /> : <Play size={13} fill="currentColor" />}
+                  <span>{reindexing ? "Đang nạp lại..." : "Nạp lại toàn bộ"}</span>
                 </button>
 
                 <div className="dataset-search-field">
-                  <Search size={14} className="search-icon" />
+                  <Search size={14} className="search-icon" aria-hidden="true" />
+                  <label className="sr-only" htmlFor="dataset-search">
+                    Tìm tài liệu theo tên
+                  </label>
                   <input
+                    id="dataset-search"
                     type="text"
-                    placeholder="Search"
+                    placeholder="Tìm tài liệu"
                     value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    onChange={(e) => {
+                      setQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
                   />
                   {query && (
                     <button
                       type="button"
                       className="search-clear-btn"
                       onClick={() => setQuery("")}
+                      aria-label="Xóa từ khóa tìm kiếm"
                     >
                       <X size={12} />
                     </button>
@@ -560,55 +576,66 @@ export default function DatasetView({ onChanged }) {
                   onClick={() => fileRef.current?.click()}
                   disabled={uploading}
                 >
-                  {uploading ? (
-                    <Loader2 size={14} className="spin" />
-                  ) : (
-                    <Plus size={15} strokeWidth={2.5} />
-                  )}
-                  <span>Add file</span>
+                  {uploading ? <Loader2 size={14} className="spin" /> : <Plus size={15} strokeWidth={2.5} />}
+                  <span>Thêm tài liệu</span>
                 </button>
               </div>
             </header>
 
-            {/* Notification Banners */}
-            {notice && (
-              <div className="dataset-banner notice">
-                <span>{notice}</span>
-                <button type="button" onClick={() => setNotice("")}>
-                  <X size={14} />
-                </button>
-              </div>
-            )}
-            {error && (
-              <div className="dataset-banner error">
-                <span>{error}</span>
-                <button type="button" onClick={() => setError("")}>
-                  <X size={14} />
-                </button>
+            {loadError && (
+              <div className="inline-alert is-error" role="alert" style={{ marginBottom: 12 }}>
+                <AlertTriangle size={16} />
+                <span>{loadError}</span>
               </div>
             )}
 
-            {/* Data Table */}
-            <div className="dataset-table-card">
-              {loading ? (
-                <div className="dataset-empty-state">
-                  <Loader2 size={24} className="spin" />
-                  <p>Loading files...</p>
-                </div>
-              ) : filtered.length === 0 ? (
-                <div className="dataset-empty-state">
-                  <FileText size={36} />
-                  <h3>No files found</h3>
-                  <p>Upload .md, .txt, or .pdf files to build your AI dataset.</p>
+            {selectedCount > 0 && (
+              <div className="bulk-bar">
+                <span className="bulk-bar-count">Đã chọn {selectedCount} tài liệu</span>
+                <div className="bulk-bar-actions">
+                  <button type="button" className="bulk-btn" onClick={() => setSelectedIds(new Set())}>
+                    Bỏ chọn
+                  </button>
                   <button
                     type="button"
-                    className="btn-add-file"
-                    style={{ marginTop: 12 }}
-                    onClick={() => fileRef.current?.click()}
+                    className="bulk-btn is-danger"
+                    onClick={() => setBulkDeleteOpen(true)}
+                    disabled={deleting}
                   >
-                    <Plus size={15} />
-                    <span>Add file</span>
+                    <Trash2 size={13} />
+                    Xóa đã chọn
                   </button>
+                </div>
+              </div>
+            )}
+
+            <div className="dataset-table-card">
+              {loading ? (
+                <div className="state-block" aria-busy="true">
+                  <div style={{ width: "100%", padding: "0 16px" }}>
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <div key={i} className="skeleton skeleton-row" />
+                    ))}
+                  </div>
+                  <p>Đang tải danh sách tài liệu...</p>
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="state-block">
+                  <span className="state-icon">
+                    <FileText size={24} />
+                  </span>
+                  <h3>{query ? "Không có tài liệu nào khớp" : "Kho tài liệu đang trống"}</h3>
+                  <p>
+                    {query
+                      ? "Thử từ khóa khác, hoặc xóa ô tìm kiếm để xem toàn bộ."
+                      : "Tải lên file .md, .txt hoặc .pdf để xây dựng kho tri thức cho trợ lý."}
+                  </p>
+                  {!query && (
+                    <button type="button" className="btn-add-file" onClick={() => fileRef.current?.click()}>
+                      <Plus size={15} />
+                      <span>Thêm tài liệu</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 <table className="dataset-main-table">
@@ -617,34 +644,38 @@ export default function DatasetView({ onChanged }) {
                       <th className="th-checkbox">
                         <input
                           type="checkbox"
-                          checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                          checked={allPageSelected}
                           onChange={toggleSelectAll}
+                          aria-label="Chọn tất cả tài liệu trên trang này"
                         />
                       </th>
-                      <th className="th-name sortable" onClick={() => handleSort("file_name")}>
-                        <div className="th-sort-wrapper">
-                          <span>Name</span>
+                      <th className="th-name sortable">
+                        <button type="button" className="th-sort-wrapper" onClick={() => handleSort("file_name")}>
+                          <span>Tên tài liệu</span>
                           <ArrowUpDown size={12} className="th-sort-icon" />
-                        </div>
+                        </button>
                       </th>
-                      <th className="th-date sortable" onClick={() => handleSort("created_at")}>
-                        <div className="th-sort-wrapper">
-                          <span>Upload date</span>
+                      <th className="th-date sortable">
+                        <button type="button" className="th-sort-wrapper" onClick={() => handleSort("created_at")}>
+                          <span>Ngày tải lên</span>
                           <ArrowUpDown size={12} className="th-sort-icon" />
-                        </div>
+                        </button>
                       </th>
-                      <th className="th-enable">Enable</th>
-                      <th className="th-chunks">Chunks</th>
-                      <th className="th-metadata">Metadata</th>
-                      <th className="th-parse">Parse</th>
-                      <th className="th-action">Action</th>
+                      <th className="th-enable" title="Chỉ có tác dụng trong phiên làm việc này">
+                        Bật/Tắt
+                      </th>
+                      <th className="th-status">Trạng thái</th>
+                      <th className="th-chunks">Số đoạn</th>
+                      <th className="th-size">Dung lượng</th>
+                      <th className="th-action">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((doc) => {
+                    {paged.map((doc) => {
                       const isSelected = selectedIds.has(doc.id);
+                      const fileName = localTitles[doc.id] || doc.file_name || doc.title || "tài liệu";
+                      const isParsing = parsingDocId === doc.id;
                       const isEnabled = enabledDocs[doc.id] !== false;
-                      const fileName = doc.file_name || doc.title || "document";
 
                       return (
                         <tr key={doc.id} className={isSelected ? "is-selected-row" : ""}>
@@ -653,161 +684,75 @@ export default function DatasetView({ onChanged }) {
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleSelect(doc.id)}
+                              aria-label={`Chọn ${fileName}`}
                             />
                           </td>
 
                           <td className="td-name">
                             <div className="file-entry">
-                              {/* Green Document Icon */}
-                              <div className="green-file-icon" title="Document">
-                                <svg
-                                  width="16"
-                                  height="18"
-                                  viewBox="0 0 16 18"
-                                  fill="none"
-                                  xmlns="http://www.w3.org/2000/svg"
-                                >
-                                  <path
-                                    d="M2 2C2 0.895431 2.89543 0 4 0H10.5L15 4.5V16C15 17.1046 14.1046 18 13 18H4C2.89543 18 2 17.1046 2 16V2Z"
-                                    fill="#10b981"
-                                  />
-                                  <path
-                                    d="M10.5 0V4.5H15L10.5 0Z"
-                                    fill="#059669"
-                                  />
-                                  <line
-                                    x1="4.5"
-                                    y1="7.5"
-                                    x2="11.5"
-                                    y2="7.5"
-                                    stroke="white"
-                                    strokeWidth="1.2"
-                                    strokeLinecap="round"
-                                  />
-                                  <line
-                                    x1="4.5"
-                                    y1="10.5"
-                                    x2="11.5"
-                                    y2="10.5"
-                                    stroke="white"
-                                    strokeWidth="1.2"
-                                    strokeLinecap="round"
-                                  />
-                                  <line
-                                    x1="4.5"
-                                    y1="13.5"
-                                    x2="8.5"
-                                    y2="13.5"
-                                    stroke="white"
-                                    strokeWidth="1.2"
-                                    strokeLinecap="round"
-                                  />
-                                </svg>
-                              </div>
-                              <span
+                              <span className="file-type-icon" aria-hidden="true">
+                                <FileText size={15} />
+                              </span>
+                              <button
+                                type="button"
                                 className="file-name-text"
                                 onClick={() => setSelectedDocId(doc.id)}
-                                title={fileName}
+                                title={`Mở ${fileName}`}
                               >
                                 {fileName}
-                              </span>
+                              </button>
                             </div>
                           </td>
 
-                          <td className="td-date">
+                          <td className="td-date" data-label="Ngày tải lên">
                             {formatDate(doc.created_at || doc.updated_at)}
                           </td>
 
-                          <td className="td-enable">
+                          <td className="td-enable" data-label="Bật/Tắt">
                             <button
                               type="button"
+                              role="switch"
+                              aria-checked={isEnabled}
                               className={`pill-switch ${isEnabled ? "on" : "off"}`}
                               onClick={() => toggleEnable(doc.id)}
-                              title={isEnabled ? "Enabled" : "Disabled"}
-                              aria-label="Toggle document enable state"
+                              title={`${isEnabled ? "Đang bật" : "Đang tắt"} — trạng thái này chưa được máy chủ lưu lại`}
+                              aria-label={`Bật/tắt ${fileName}`}
                             >
                               <span className="pill-switch-thumb" />
                             </button>
                           </td>
 
-                          <td className="td-chunks">{doc.chunk_count ?? 0}</td>
-
-                          <td className="td-metadata">
-                            {doc.metadata_count ? `${doc.metadata_count} fields` : "0 fields"}
+                          <td className="td-status" data-label="Trạng thái">
+                            <span className={`doc-status-badge is-${doc.status || "active"}`}>
+                              {doc.status === "active" ? "Đã nạp" : doc.status || EMPTY}
+                            </span>
                           </td>
 
-                          <td className="td-parse">
-                            <button
-                              type="button"
-                              className={`parse-status-btn ${parsingDocId === doc.id ? "is-parsing" : ""}`}
-                              title={`Click để parse file “${fileName}”`}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                parseDocument(doc);
-                              }}
-                              disabled={parsingDocId === doc.id || reindexing}
-                            >
-                              <span className="parse-text">
-                                {parsingDocId === doc.id ? "Parsing..." : "General"}
-                              </span>
-                              <div className="parse-icons">
-                                {parsingDocId === doc.id ? (
-                                  <Loader2 size={11} className="spin parse-play-icon" />
-                                ) : (
-                                  <Play size={10} className="parse-play-icon" fill="currentColor" />
-                                )}
-                                <span className="parse-dot-indicator" />
-                              </div>
-                            </button>
+                          <td className="td-chunks" data-label="Số đoạn">
+                            {doc.chunk_count ?? 0}
                           </td>
 
-                          <td className="td-action">
+                          <td className="td-size" data-label="Dung lượng">
+                            {formatSize(doc.size_bytes)}
+                          </td>
+
+                          <td className="td-action" data-label="Thao tác">
                             <div className="action-button-group">
                               <button
                                 type="button"
                                 className="act-btn"
-                                style={{ color: "#14b8a6" }}
-                                title="Parse tài liệu này"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  parseDocument(doc);
-                                }}
-                                disabled={parsingDocId === doc.id || reindexing}
+                                title={`Parse lại ${fileName}`}
+                                aria-label={`Parse lại ${fileName}`}
+                                onClick={() => parseDocument(doc)}
+                                disabled={isParsing || reindexing}
                               >
-                                {parsingDocId === doc.id ? (
-                                  <Loader2 size={14} className="spin" />
-                                ) : (
-                                  <Play size={13} fill="currentColor" />
-                                )}
+                                {isParsing ? <Loader2 size={14} className="spin" /> : <Play size={13} fill="currentColor" />}
                               </button>
                               <button
                                 type="button"
                                 className="act-btn"
-                                title="Run vector test"
-                                onClick={() => {
-                                  setActiveTab("retrieval");
-                                  setTestQuery(doc.title || doc.file_name);
-                                }}
-                              >
-                                <SlidersHorizontal size={14} />
-                              </button>
-                              <button
-                                type="button"
-                                className="act-btn"
-                                title="Edit document title"
-                                onClick={() => {
-                                  setEditingDoc(doc);
-                                  setEditTitle(doc.title || doc.file_name || "");
-                                }}
-                              >
-                                <Edit3 size={14} />
-                              </button>
-                              <button
-                                type="button"
-                                className="act-btn"
-                                title="View document chunks"
+                                title={`Xem các đoạn của ${fileName}`}
+                                aria-label={`Xem các đoạn của ${fileName}`}
                                 onClick={() => setSelectedDocId(doc.id)}
                               >
                                 <Eye size={14} />
@@ -815,7 +760,20 @@ export default function DatasetView({ onChanged }) {
                               <button
                                 type="button"
                                 className="act-btn"
-                                title="Download file"
+                                title={`Đổi tiêu đề ${fileName}`}
+                                aria-label={`Đổi tiêu đề ${fileName}`}
+                                onClick={() => {
+                                  setEditingDoc(doc);
+                                  setEditTitle(localTitles[doc.id] || doc.title || doc.file_name || "");
+                                }}
+                              >
+                                <Edit3 size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className="act-btn"
+                                title={`Tải xuống ${fileName}`}
+                                aria-label={`Tải xuống ${fileName}`}
                                 onClick={() => downloadDocument(doc)}
                               >
                                 <Download size={14} />
@@ -823,7 +781,8 @@ export default function DatasetView({ onChanged }) {
                               <button
                                 type="button"
                                 className="act-btn delete"
-                                title="Delete file"
+                                title={`Xóa ${fileName}`}
+                                aria-label={`Xóa ${fileName}`}
                                 onClick={() => setPendingDelete(doc)}
                               >
                                 <Trash2 size={14} />
@@ -838,68 +797,93 @@ export default function DatasetView({ onChanged }) {
               )}
             </div>
 
-            {/* Pagination Footer */}
-            <div className="dataset-pagination-footer">
-              <div className="pagination-info">
-                <span>Total {filtered.length}</span>
-              </div>
+            {filtered.length > 0 && (
+              <div className="dataset-pagination-footer">
+                <div className="pagination-info">
+                  <span>
+                    Hiển thị {(currentPage - 1) * pageSize + 1}–
+                    {Math.min(currentPage * pageSize, filtered.length)} trên {filtered.length} tài liệu
+                  </span>
+                </div>
 
-              <div className="pagination-controls">
-                <button
-                  type="button"
-                  className="page-nav-btn"
-                  disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                >
-                  <ChevronLeft size={14} />
-                </button>
+                <div className="pagination-controls">
+                  <button
+                    type="button"
+                    className="page-nav-btn"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    aria-label="Trang trước"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
 
-                <span className="page-current-badge">{currentPage}</span>
+                  <span className="page-current-badge" aria-live="polite">
+                    {currentPage} / {totalPages}
+                  </span>
 
-                <button
-                  type="button"
-                  className="page-nav-btn"
-                  disabled={currentPage * pageSize >= filtered.length}
-                  onClick={() => setCurrentPage((p) => p + 1)}
-                >
-                  <ChevronRight size={14} />
-                </button>
+                  <button
+                    type="button"
+                    className="page-nav-btn"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    aria-label="Trang sau"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
 
-                <div className="page-size-selector">
-                  <span>{pageSize} / Page</span>
-                  <ChevronDown size={13} />
+                  <label className="sr-only" htmlFor="dataset-page-size">
+                    Số tài liệu mỗi trang
+                  </label>
+                  <select
+                    id="dataset-page-size"
+                    className="page-size-select"
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    {PAGE_SIZES.map((size) => (
+                      <option key={size} value={size}>
+                        {size} / trang
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
-        {/* TAB 2: RETRIEVAL TESTING (Matching image.png) */}
+        {/* ---------------------------------------------------------------
+            TAB 2: THỬ NGHIỆM TRUY XUẤT
+            --------------------------------------------------------------- */}
         {activeTab === "retrieval" && (
           <div className="dataset-retrieval-screen">
-            {/* Top Title & Full Description */}
             <header className="retrieval-top-header">
-              <h2>Retrieval testing</h2>
+              <h2>Thử nghiệm truy xuất</h2>
               <p>
-                Conduct a retrieval test to check if RAGFlow can recover the intended content for the LLM. If you have adjusted the default settings, such as keyword similarity weight or similarity threshold, to achieve the optimal results, be aware that these changes will not be automatically saved. You must apply them to your chat assistant settings or the Retrieval agent component settings.
+                Chạy thử một câu hỏi để xem hệ thống lấy ra những đoạn văn bản nào trước khi đưa vào LLM.
+                Các tham số dưới đây chỉ áp dụng cho lần chạy thử này và{" "}
+                <strong>không được lưu</strong> — muốn đổi vĩnh viễn, hãy vào màn Cấu hình.
               </p>
             </header>
 
-            {/* 2-Column Split Layout */}
             <div className="retrieval-two-col-layout">
-              {/* Left Column: Setting & Input */}
               <div className="retrieval-col-left">
                 <div className="retrieval-settings-card">
-                  <h3 className="retrieval-settings-title">Setting</h3>
+                  <h3 className="retrieval-settings-title">Tham số</h3>
 
-                  {/* Similarity threshold */}
                   <div className="ret-form-group">
-                    <div className="ret-field-label">
-                      <span>Similarity threshold</span>
-                      <span className="ret-info-icon" title="Ngưỡng tương đồng tối thiểu để giữ lại chunk">ⓘ</span>
-                    </div>
+                    <label className="ret-field-label" htmlFor="ret-threshold">
+                      <span>Ngưỡng tương đồng</span>
+                      <span className="ret-info-icon" title="Điểm tương đồng tối thiểu để giữ lại một đoạn">
+                        <Info size={13} />
+                      </span>
+                    </label>
                     <div className="ret-slider-row">
                       <input
+                        id="ret-threshold"
                         type="range"
                         min="0"
                         max="1"
@@ -908,24 +892,24 @@ export default function DatasetView({ onChanged }) {
                         onChange={(e) => setTestSimilarityThreshold(parseFloat(e.target.value))}
                         className="ret-cyan-slider"
                       />
-                      <span className="ret-val-box">
-                        {testSimilarityThreshold.toFixed(1).replace(".", ",")}
-                      </span>
+                      <span className="ret-val-box">{testSimilarityThreshold.toFixed(2)}</span>
                     </div>
                   </div>
 
-                  {/* Vector similarity weight */}
                   <div className="ret-form-group">
-                    <div className="ret-field-label">
-                      <span>Vector similarity weight</span>
-                      <span className="ret-info-icon" title="Trọng số tìm kiếm vector ngữ nghĩa vs full-text BM25">ⓘ</span>
-                    </div>
+                    <label className="ret-field-label" htmlFor="ret-weight">
+                      <span>Tỷ trọng vector</span>
+                      <span className="ret-info-icon" title="Cân bằng giữa tìm kiếm ngữ nghĩa (vector) và khớp từ khóa (BM25)">
+                        <Info size={13} />
+                      </span>
+                    </label>
                     <div className="ret-weight-indicators">
-                      <span className="ret-ind-left">vector {testVectorWeight.toFixed(2)}</span>
-                      <span className="ret-ind-right">full-text {(1 - testVectorWeight).toFixed(2)}</span>
+                      <span className="ret-ind-left">Vector {testVectorWeight.toFixed(2)}</span>
+                      <span className="ret-ind-right">BM25 {(1 - testVectorWeight).toFixed(2)}</span>
                     </div>
                     <div className="ret-slider-row">
                       <input
+                        id="ret-weight"
                         type="range"
                         min="0"
                         max="1"
@@ -934,113 +918,56 @@ export default function DatasetView({ onChanged }) {
                         onChange={(e) => setTestVectorWeight(parseFloat(e.target.value))}
                         className="ret-cyan-slider"
                       />
-                      <span className="ret-val-box">
-                        {testVectorWeight.toFixed(1).replace(".", ",")}
-                      </span>
+                      <span className="ret-val-box">{testVectorWeight.toFixed(2)}</span>
                     </div>
                   </div>
 
-                  {/* Rerank model */}
                   <div className="ret-form-group">
-                    <div className="ret-field-label">
-                      <span>Rerank model</span>
-                      <span className="ret-info-icon" title="Mô hình Reranker xếp hạng lại đoạn trích">ⓘ</span>
-                    </div>
+                    <label className="ret-field-label" htmlFor="ret-rerank">
+                      <span>Mô hình tái xếp hạng</span>
+                    </label>
                     <div className="ret-select-box">
                       <select
+                        id="ret-rerank"
                         value={testRerankModel}
                         onChange={(e) => setTestRerankModel(e.target.value)}
                       >
-                        <option value="">Select value</option>
-                        <option value="cross-encoder/mmarco-mMiniLMv2-L12-H384-v1">cross-encoder/mmarco-mMiniLMv2-L12-H384-v1</option>
+                        <option value="">Dùng cấu hình mặc định</option>
+                        <option value="cross-encoder/mmarco-mMiniLMv2-L12-H384-v1">
+                          cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+                        </option>
                         <option value="BAAI/bge-reranker-base">BAAI/bge-reranker-base</option>
                         <option value="BAAI/bge-reranker-large">BAAI/bge-reranker-large</option>
                       </select>
-                      <ChevronDown size={14} className="ret-select-chevron" />
+                      <ChevronDown size={14} className="ret-select-chevron" aria-hidden="true" />
                     </div>
                   </div>
 
-                  {/* Use knowledge graph */}
                   <div className="ret-form-group">
-                    <div className="ret-field-label">
-                      <span>Use knowledge graph</span>
-                      <span className="ret-info-icon" title="Sử dụng Knowledge Graph">ⓘ</span>
-                    </div>
-                    <button
-                      type="button"
-                      className={`ret-kg-switch ${testUseKg ? "on" : "off"}`}
-                      onClick={() => setTestUseKg(!testUseKg)}
-                      aria-label="Toggle knowledge graph"
-                    >
-                      <span className="ret-kg-thumb" />
-                    </button>
-                  </div>
-
-                  {/* Cross-language search */}
-                  <div className="ret-form-group">
-                    <div className="ret-field-label">
-                      <span>Cross-language search</span>
-                      <span className="ret-info-icon" title="Tìm kiếm đa ngôn ngữ">ⓘ</span>
-                    </div>
+                    <label className="ret-field-label" htmlFor="ret-topk">
+                      <span>Số đoạn lấy ra</span>
+                    </label>
                     <div className="ret-select-box">
-                      <select
-                        value={testCrossLang}
-                        onChange={(e) => setTestCrossLang(e.target.value)}
-                      >
-                        <option value="">Select value</option>
-                        <option value="en">English</option>
-                        <option value="vi">Vietnamese</option>
-                        <option value="auto">Auto detect</option>
+                      <select id="ret-topk" value={testTopK} onChange={(e) => setTestTopK(Number(e.target.value))}>
+                        {[5, 10, 15, 20, 30].map((n) => (
+                          <option key={n} value={n}>
+                            {n} đoạn
+                          </option>
+                        ))}
                       </select>
-                      <ChevronDown size={14} className="ret-select-chevron" />
-                    </div>
-                  </div>
-
-                  {/* Meta data */}
-                  <div className="ret-form-group">
-                    <div className="ret-field-label">
-                      <span>Meta data</span>
-                      <span className="ret-info-icon" title="Bộ lọc trường metadata">ⓘ</span>
-                    </div>
-                    <div className="ret-select-box">
-                      <select
-                        value={testMetadata}
-                        onChange={(e) => setTestMetadata(e.target.value)}
-                      >
-                        <option value="">Select value</option>
-                        <option value="all">All Metadata</option>
-                        <option value="file_name">Filter by File Name</option>
-                      </select>
-                      <ChevronDown size={14} className="ret-select-chevron" />
-                    </div>
-                  </div>
-
-                  {/* Top */}
-                  <div className="ret-form-group">
-                    <div className="ret-field-label">
-                      <span>Top</span>
-                    </div>
-                    <div className="ret-select-box">
-                      <select
-                        value={testTopK}
-                        onChange={(e) => setTestTopK(Number(e.target.value))}
-                      >
-                        <option value={5}>Top 5</option>
-                        <option value={10}>Top 10</option>
-                        <option value={15}>Top 15</option>
-                        <option value={20}>Top 20</option>
-                        <option value={30}>Top 30</option>
-                      </select>
-                      <ChevronDown size={14} className="ret-select-chevron" />
+                      <ChevronDown size={14} className="ret-select-chevron" aria-hidden="true" />
                     </div>
                   </div>
                 </div>
 
-                {/* Query Input Box */}
                 <div className="ret-query-box">
+                  <label className="sr-only" htmlFor="ret-query">
+                    Câu hỏi thử nghiệm
+                  </label>
                   <textarea
+                    id="ret-query"
                     rows={4}
-                    placeholder=""
+                    placeholder="Nhập câu hỏi để thử, ví dụ: điều kiện xét tốt nghiệp..."
                     value={testQuery}
                     onChange={(e) => setTestQuery(e.target.value)}
                     onKeyDown={(e) => {
@@ -1057,71 +984,49 @@ export default function DatasetView({ onChanged }) {
                       onClick={handleRunRetrievalTest}
                       disabled={testLoading || !testQuery.trim()}
                     >
-                      {testLoading ? (
-                        <Loader2 size={13} className="spin" />
-                      ) : (
-                        <span>Run</span>
-                      )}
-                      <svg
-                        width="13"
-                        height="13"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        style={{ marginLeft: 4 }}
-                      >
-                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                      </svg>
+                      {testLoading ? <Loader2 size={13} className="spin" /> : <Play size={12} fill="currentColor" />}
+                      <span>{testLoading ? "Đang chạy..." : "Chạy thử"}</span>
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Right Column: Results */}
               <div className="retrieval-col-right">
                 <div className="ret-results-header">
                   <div className="ret-results-title">
-                    <h3>Results</h3>
+                    <h3>Kết quả</h3>
                     <span className="ret-total-tag">
-                      Total: {testResults ? (testResults.contexts?.length ?? 0) : 0}
+                      {testResults ? `${testResults.contexts?.length ?? 0} đoạn` : "Chưa chạy"}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    className="ret-filter-btn"
-                    title="Filter test results"
-                  >
-                    <Filter size={14} />
-                  </button>
                 </div>
 
-                <div className="ret-results-container">
-                  {!testResults || (testResults.contexts?.length ?? 0) === 0 ? (
-                    <div className="ret-empty-placeholder">
-                      {/* Document Scroll Outline Icon */}
-                      <div className="ret-empty-icon">
-                        <svg
-                          width="46"
-                          height="46"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#cbd5e1"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                          <polyline points="14 2 14 8 20 8"></polyline>
-                          <line x1="16" y1="13" x2="8" y2="13"></line>
-                          <line x1="16" y1="17" x2="8" y2="17"></line>
-                          <polyline points="10 9 9 9 8 9"></polyline>
-                        </svg>
-                      </div>
-                      <p>No test has been run yet. Results will appear here.</p>
+                <div className="ret-results-container" aria-busy={testLoading}>
+                  {testError ? (
+                    <div className="state-block is-error">
+                      <span className="state-icon">
+                        <AlertTriangle size={24} />
+                      </span>
+                      <h3>Không chạy được truy vấn</h3>
+                      <p>{testError}</p>
+                    </div>
+                  ) : testLoading ? (
+                    <div style={{ padding: 16 }}>
+                      {[0, 1, 2].map((i) => (
+                        <div key={i} className="skeleton" style={{ height: 78, marginBottom: 12 }} />
+                      ))}
+                    </div>
+                  ) : !testResults || (testResults.contexts?.length ?? 0) === 0 ? (
+                    <div className="state-block">
+                      <span className="state-icon">
+                        <FileText size={24} />
+                      </span>
+                      <h3>{testResults ? "Không tìm thấy đoạn nào" : "Chưa có kết quả"}</h3>
+                      <p>
+                        {testResults
+                          ? "Thử hạ ngưỡng tương đồng hoặc dùng từ khóa gần với nội dung tài liệu hơn."
+                          : "Nhập câu hỏi bên trái và bấm “Chạy thử” để xem các đoạn được truy xuất."}
+                      </p>
                     </div>
                   ) : (
                     <div className="ret-results-list">
@@ -1132,19 +1037,15 @@ export default function DatasetView({ onChanged }) {
                             <strong className="ret-chunk-title">
                               {ctx.heading || ctx.source_name || "Đoạn trích"}
                             </strong>
-                            {ctx.section_path && (
-                              <span className="ret-chunk-sec">· {ctx.section_path}</span>
-                            )}
+                            {ctx.section_path && <span className="ret-chunk-sec">· {ctx.section_path}</span>}
                             <div className="ret-chunk-badges">
                               {ctx.combined_score != null && (
                                 <span className="ret-badge rerank">
-                                  Rerank: {(ctx.combined_score * 100).toFixed(1)}%
+                                  Xếp hạng lại: {(ctx.combined_score * 100).toFixed(1)}%
                                 </span>
                               )}
                               {ctx.score != null && (
-                                <span className="ret-badge sim">
-                                  Sim: {(ctx.score * 100).toFixed(1)}%
-                                </span>
+                                <span className="ret-badge sim">Tương đồng: {(ctx.score * 100).toFixed(1)}%</span>
                               )}
                             </div>
                           </div>
@@ -1161,94 +1062,152 @@ export default function DatasetView({ onChanged }) {
           </div>
         )}
 
-
-        {/* TAB 3: LOGS VIEW */}
+        {/* ---------------------------------------------------------------
+            TAB 3: NHẬT KÝ
+            --------------------------------------------------------------- */}
         {activeTab === "logs" && (
           <div className="dataset-sub-view">
             <header className="dataset-view-header">
               <div className="dataset-view-title">
-                <h2>Logs</h2>
-                <p>Ingestion and document parsing event logs for this knowledge base.</p>
+                <h2>Nhật ký</h2>
+                <p>Các thao tác trên kho tài liệu bạn đã thực hiện trong phiên làm việc này.</p>
               </div>
               <button
                 type="button"
                 className="tb-icon-btn"
-                title="Refresh logs"
-                onClick={loadDocuments}
+                title="Xóa nhật ký"
+                aria-label="Xóa nhật ký"
+                onClick={() => setLogs([])}
+                disabled={logs.length === 0}
               >
                 <RefreshCw size={15} />
               </button>
             </header>
 
+            <div className="inline-alert is-info" style={{ marginBottom: 12 }}>
+              <Info size={16} />
+              <span>
+                Nhật ký chỉ tồn tại trong phiên hiện tại. Máy chủ chưa lưu lịch sử thao tác, nên
+                danh sách sẽ trống lại sau khi tải lại trang.
+              </span>
+            </div>
+
             <div className="dataset-table-card">
-              <table className="dataset-main-table">
-                <thead>
-                  <tr>
-                    <th>Timestamp</th>
-                    <th>Event</th>
-                    <th>Status</th>
-                    <th>Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.map((log) => (
-                    <tr key={log.id}>
-                      <td className="td-date">{log.timestamp}</td>
-                      <td>
-                        <strong>{log.event}</strong>
-                      </td>
-                      <td>
-                        <span className="log-status-badge success">{log.status}</span>
-                      </td>
-                      <td style={{ color: "#4b5563" }}>{log.detail}</td>
+              {logs.length === 0 ? (
+                <div className="state-block">
+                  <span className="state-icon">
+                    <List size={24} />
+                  </span>
+                  <h3>Chưa có thao tác nào</h3>
+                  <p>Tải lên, parse hoặc xóa tài liệu — mọi thao tác sẽ được ghi lại ở đây.</p>
+                </div>
+              ) : (
+                <table className="dataset-main-table">
+                  <thead>
+                    <tr>
+                      <th>Thời điểm</th>
+                      <th>Sự kiện</th>
+                      <th>Kết quả</th>
+                      <th>Chi tiết</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {logs.map((log) => (
+                      <tr key={log.id}>
+                        <td className="td-date" data-label="Thời điểm">
+                          {log.timestamp}
+                        </td>
+                        <td data-label="Sự kiện">
+                          <strong>{log.event}</strong>
+                        </td>
+                        <td data-label="Kết quả">
+                          <span
+                            className={`log-status-badge ${
+                              log.status === "Thành công" ? "success" : "failure"
+                            }`}
+                          >
+                            {log.status}
+                          </span>
+                        </td>
+                        <td data-label="Chi tiết" className="td-log-detail">
+                          {log.detail}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         )}
 
-        {/* TAB 4: CONFIGURATION VIEW */}
+        {/* ---------------------------------------------------------------
+            TAB 4: THÔNG SỐ XỬ LÝ (đọc từ cấu hình thật của máy chủ)
+            --------------------------------------------------------------- */}
         {activeTab === "config" && (
           <div className="dataset-sub-view">
             <header className="dataset-view-header">
               <div className="dataset-view-title">
-                <h2>Configuration</h2>
-                <p>Dataset parsing strategy, chunking boundaries, and vectorizer parameters.</p>
+                <h2>Thông số xử lý</h2>
+                <p>Tham số nhúng và truy xuất mà máy chủ đang áp dụng cho kho tài liệu này.</p>
               </div>
             </header>
 
+            {configError && (
+              <div className="inline-alert is-warning" role="alert" style={{ marginBottom: 12 }}>
+                <AlertTriangle size={16} />
+                <span>{configError}</span>
+              </div>
+            )}
+
             <div className="dataset-config-grid">
               <div className="config-card">
-                <h3>Document Parser</h3>
+                <h3>Nhúng &amp; lập chỉ mục</h3>
                 <div className="config-item">
-                  <label>Default Parser</label>
-                  <div className="config-val">General (Markdown & Text Chunking)</div>
+                  <label>Mô hình embedding</label>
+                  <div className="config-val">{processingConfig?.embedding?.model ?? EMPTY}</div>
                 </div>
                 <div className="config-item">
-                  <label>Chunk Size</label>
-                  <div className="config-val">512 tokens (~1800 chars)</div>
+                  <label>Nhà cung cấp</label>
+                  <div className="config-val">{processingConfig?.embedding?.provider ?? EMPTY}</div>
                 </div>
                 <div className="config-item">
-                  <label>Chunk Overlap</label>
-                  <div className="config-val">64 tokens (~220 chars)</div>
+                  <label>Tìm kiếm lai (Hybrid)</label>
+                  <div className="config-val">
+                    {processingConfig?.retrieval
+                      ? `Vector ${Math.round((processingConfig.retrieval.hybrid_vector_weight ?? 0) * 100)}% · BM25 ${Math.round(
+                          (1 - (processingConfig.retrieval.hybrid_vector_weight ?? 0)) * 100
+                        )}%`
+                      : EMPTY}
+                  </div>
                 </div>
               </div>
 
               <div className="config-card">
-                <h3>Indexing & Vectorizer</h3>
+                <h3>Truy xuất &amp; tái xếp hạng</h3>
                 <div className="config-item">
-                  <label>Embedding Model</label>
-                  <div className="config-val">text-embedding-3-small (1536 dims)</div>
+                  <label>Số đoạn nạp vào LLM (Top-K)</label>
+                  <div className="config-val">{processingConfig?.retrieval?.top_k ?? EMPTY}</div>
                 </div>
                 <div className="config-item">
-                  <label>Hybrid Search</label>
-                  <div className="config-val">Vector (Dense) + BM25 (Sparse)</div>
+                  <label>Mở rộng câu hỏi đa hướng</label>
+                  <div className="config-val">
+                    {processingConfig?.retrieval
+                      ? processingConfig.retrieval.multi_query_enabled
+                        ? `Bật · ${processingConfig.retrieval.multi_query_count ?? EMPTY} truy vấn phụ`
+                        : "Tắt"
+                      : EMPTY}
+                  </div>
                 </div>
                 <div className="config-item">
-                  <label>Reranker</label>
-                  <div className="config-val">Enabled (Heuristic / Cross-Encoder)</div>
+                  <label>Tái xếp hạng (Reranker)</label>
+                  <div className="config-val">
+                    {processingConfig?.reranker
+                      ? processingConfig.reranker.enabled
+                        ? `Bật · ${processingConfig.reranker.model || "mặc định"}`
+                        : "Tắt"
+                      : EMPTY}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1256,75 +1215,96 @@ export default function DatasetView({ onChanged }) {
         )}
       </main>
 
-      {/* Edit Modal */}
-      {editingDoc && (
-        <div className="modal-backdrop" onClick={() => setEditingDoc(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Edit Document</h3>
-            <div className="edit-form-group">
-              <label>Title</label>
-              <input
-                type="text"
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-              />
-            </div>
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="ghost-btn"
-                onClick={() => setEditingDoc(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="primary-btn"
-                onClick={() => {
-                  setNotice(`Updated "${editTitle}"`);
-                  setEditingDoc(null);
-                }}
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Xóa một tài liệu */}
+      <Modal
+        open={Boolean(pendingDelete)}
+        onClose={() => !deleting && setPendingDelete(null)}
+        title="Xóa tài liệu?"
+        description={
+          pendingDelete
+            ? `“${pendingDelete.title || pendingDelete.file_name}” và toàn bộ đoạn văn bản đã nhúng sẽ bị xóa khỏi kho. Không thể hoàn tác.`
+            : ""
+        }
+        icon={<AlertTriangle size={20} />}
+        tone="danger"
+        actions={
+          <>
+            <button type="button" className="ghost-btn" onClick={() => setPendingDelete(null)} disabled={deleting}>
+              Hủy
+            </button>
+            <button type="button" className="danger-btn" onClick={confirmDelete} disabled={deleting}>
+              {deleting ? <Loader2 size={15} className="spin" /> : <Trash2 size={15} />}
+              Xóa
+            </button>
+          </>
+        }
+      />
 
-      {/* Delete Confirmation Modal */}
-      {pendingDelete && (
-        <div className="modal-backdrop" onClick={() => !deleting && setPendingDelete(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-icon">
-              <AlertTriangle size={20} />
-            </div>
-            <h3>Delete file?</h3>
-            <p>
-              “{pendingDelete.title || pendingDelete.file_name}” will be removed from the dataset.
-            </p>
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="ghost-btn"
-                onClick={() => setPendingDelete(null)}
-                disabled={deleting}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="danger-btn"
-                onClick={confirmDelete}
-                disabled={deleting}
-              >
-                {deleting ? <Loader2 size={15} className="spin" /> : <Trash2 size={15} />}
-                Delete
-              </button>
-            </div>
-          </div>
+      {/* Đổi tiêu đề tài liệu.
+          Backend chưa có endpoint PATCH /documents/{id}, nên tên mới chỉ áp dụng
+          trong phiên này. Hộp thoại nói thẳng điều đó thay vì im lặng như bản cũ. */}
+      <Modal
+        open={Boolean(editingDoc)}
+        onClose={() => setEditingDoc(null)}
+        title="Đổi tiêu đề tài liệu"
+        icon={<Edit3 size={20} />}
+        actions={
+          <>
+            <button type="button" className="ghost-btn" onClick={() => setEditingDoc(null)}>
+              Hủy
+            </button>
+            <button
+              type="button"
+              className="primary-btn"
+              onClick={saveDocTitle}
+              disabled={!editTitle.trim()}
+            >
+              Áp dụng
+            </button>
+          </>
+        }
+      >
+        <div className="edit-form-group">
+          <label htmlFor="doc-title-input">Tiêu đề</label>
+          <input
+            id="doc-title-input"
+            type="text"
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                saveDocTitle();
+              }
+            }}
+          />
+          <span className="field-hint">
+            Máy chủ chưa hỗ trợ lưu tiêu đề. Tên mới chỉ hiển thị trong phiên làm việc này
+            và sẽ trở lại như cũ sau khi tải lại trang.
+          </span>
         </div>
-      )}
+      </Modal>
+
+      {/* Xóa nhiều tài liệu */}
+      <Modal
+        open={bulkDeleteOpen}
+        onClose={() => !deleting && setBulkDeleteOpen(false)}
+        title={`Xóa ${selectedCount} tài liệu?`}
+        description="Toàn bộ tài liệu đã chọn cùng các đoạn văn bản đã nhúng sẽ bị xóa khỏi kho. Không thể hoàn tác."
+        icon={<AlertTriangle size={20} />}
+        tone="danger"
+        actions={
+          <>
+            <button type="button" className="ghost-btn" onClick={() => setBulkDeleteOpen(false)} disabled={deleting}>
+              Hủy
+            </button>
+            <button type="button" className="danger-btn" onClick={confirmBulkDelete} disabled={deleting}>
+              {deleting ? <Loader2 size={15} className="spin" /> : <Trash2 size={15} />}
+              Xóa {selectedCount} tài liệu
+            </button>
+          </>
+        }
+      />
     </div>
   );
 }

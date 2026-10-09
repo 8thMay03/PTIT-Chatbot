@@ -1,101 +1,125 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlertCircle,
-  CheckCircle2,
+  AlertTriangle,
   Flame,
   Gauge,
-  Info,
   Layers,
+  Loader2,
   RotateCcw,
   Save,
   ShieldCheck,
   Sliders,
 } from "lucide-react";
 import { API_BASE_URL } from "./api";
+import Modal from "./components/Modal";
+import { useToast } from "./components/Toast";
+
+const DEFAULTS = {
+  temperature: 0.0,
+  llmTimeout: 30,
+  maxRetries: 2,
+  topK: 4,
+  hybridVectorWeight: 0.65,
+  multiQueryEnabled: true,
+  multiQueryCount: 3,
+  multiQueryUseLlm: false,
+  scopeEnabled: true,
+  minVectorScore: 0.3,
+  minBm25Score: 2.0,
+  rerankerEnabled: true,
+  candidateMultiplier: 3,
+};
 
 export default function ConfigView() {
+  const toast = useToast();
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
-  const [toastMessage, setToastMessage] = useState(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
-  // CONFIGURATION / PARAMETERS STATE
-  const [temperature, setTemperature] = useState(0.0);
-  const [llmTimeout, setLlmTimeout] = useState(30);
-  const [maxRetries, setMaxRetries] = useState(2);
+  const [values, setValues] = useState(DEFAULTS);
+  // Ảnh chụp giá trị lần đọc gần nhất từ máy chủ, dùng để biết có thay đổi chưa lưu.
+  const savedSnapshot = useRef(DEFAULTS);
 
-  const [topK, setTopK] = useState(4);
-  const [hybridVectorWeight, setHybridVectorWeight] = useState(0.65);
-  const [multiQueryEnabled, setMultiQueryEnabled] = useState(true);
-  const [multiQueryCount, setMultiQueryCount] = useState(3);
-  const [multiQueryUseLlm, setMultiQueryUseLlm] = useState(false);
-
-  const [scopeEnabled, setScopeEnabled] = useState(true);
-  const [minVectorScore, setMinVectorScore] = useState(0.30);
-  const [minBm25Score, setMinBm25Score] = useState(2.0);
-
-  const [rerankerEnabled, setRerankerEnabled] = useState(true);
-  const [candidateMultiplier, setCandidateMultiplier] = useState(3);
-
-  useEffect(() => {
-    fetchBackendConfig();
+  const set = useCallback((key, value) => {
+    setValues((current) => ({ ...current, [key]: value }));
   }, []);
 
-  function showToast(text, type = "success") {
-    setToastMessage({ text, type });
-    setTimeout(() => setToastMessage(null), 4000);
-  }
+  const isDirty = useMemo(
+    () => JSON.stringify(values) !== JSON.stringify(savedSnapshot.current),
+    [values]
+  );
 
-  async function fetchBackendConfig() {
+  const fetchBackendConfig = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const res = await fetch(`${API_BASE_URL}/config`);
-      if (!res.ok) throw new Error("Không thể tải cấu hình từ máy chủ");
+      if (!res.ok) throw new Error("Máy chủ trả về lỗi khi đọc cấu hình.");
       const data = await res.json();
 
-      if (data.llm) {
-        setTemperature(data.llm.temperature ?? 0.0);
-        setLlmTimeout(data.llm.timeout ?? 30);
-        setMaxRetries(data.llm.max_retries ?? 2);
-      }
+      const next = {
+        temperature: data.llm?.temperature ?? DEFAULTS.temperature,
+        llmTimeout: data.llm?.timeout ?? DEFAULTS.llmTimeout,
+        maxRetries: data.llm?.max_retries ?? DEFAULTS.maxRetries,
+        topK: data.retrieval?.top_k ?? DEFAULTS.topK,
+        hybridVectorWeight: data.retrieval?.hybrid_vector_weight ?? DEFAULTS.hybridVectorWeight,
+        multiQueryEnabled: Boolean(data.retrieval?.multi_query_enabled),
+        multiQueryCount: data.retrieval?.multi_query_count ?? DEFAULTS.multiQueryCount,
+        multiQueryUseLlm: Boolean(data.retrieval?.multi_query_use_llm),
+        scopeEnabled: Boolean(data.guardrails?.scope_enabled),
+        minVectorScore: data.guardrails?.min_vector_score ?? DEFAULTS.minVectorScore,
+        minBm25Score: data.guardrails?.min_bm25_score ?? DEFAULTS.minBm25Score,
+        rerankerEnabled: Boolean(data.reranker?.enabled),
+        candidateMultiplier: data.reranker?.candidate_multiplier ?? DEFAULTS.candidateMultiplier,
+      };
 
-      if (data.reranker) {
-        setRerankerEnabled(Boolean(data.reranker.enabled));
-        setCandidateMultiplier(data.reranker.candidate_multiplier ?? 3);
-      }
-
-      if (data.retrieval) {
-        setMultiQueryEnabled(Boolean(data.retrieval.multi_query_enabled));
-        setMultiQueryCount(data.retrieval.multi_query_count ?? 3);
-        setMultiQueryUseLlm(Boolean(data.retrieval.multi_query_use_llm));
-        setTopK(data.retrieval.top_k ?? 4);
-        setHybridVectorWeight(data.retrieval.hybrid_vector_weight ?? 0.65);
-      }
-
-      if (data.guardrails) {
-        setScopeEnabled(Boolean(data.guardrails.scope_enabled));
-        setMinVectorScore(data.guardrails.min_vector_score ?? 0.30);
-        setMinBm25Score(data.guardrails.min_bm25_score ?? 2.0);
-      }
+      setValues(next);
+      savedSnapshot.current = next;
     } catch (err) {
-      console.warn("Using local configuration fallback:", err.message);
+      // Bản trước chỉ console.warn rồi hiện giá trị mặc định như thể đó là cấu
+      // hình thật của hệ thống — người dùng không có cách nào biết là đã lỗi.
+      setLoadError(
+        err instanceof TypeError
+          ? "Không kết nối được máy chủ. Các giá trị bên dưới là mặc định của giao diện, KHÔNG phải cấu hình đang chạy."
+          : `${err.message} Các giá trị bên dưới là mặc định của giao diện, KHÔNG phải cấu hình đang chạy.`
+      );
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    fetchBackendConfig();
+  }, [fetchBackendConfig]);
+
+  // Cảnh báo khi rời trang mà còn thay đổi chưa lưu
+  useEffect(() => {
+    if (!isDirty) return undefined;
+    function onBeforeUnload(event) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isDirty]);
 
   async function handleResetConfig() {
-    if (!window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ cấu hình về mặc định ban đầu?")) {
-      return;
-    }
     setResetting(true);
     try {
       const res = await fetch(`${API_BASE_URL}/config/reset`, { method: "POST" });
-      if (!res.ok) throw new Error("Khôi phục thất bại");
+      if (!res.ok) throw new Error("Máy chủ từ chối yêu cầu khôi phục.");
       await fetchBackendConfig();
-      showToast("Đã khôi phục toàn bộ cấu hình về mặc định.");
+      toast.success("Đã khôi phục toàn bộ cấu hình về mặc định.");
+      setResetOpen(false);
     } catch (err) {
-      showToast(`Lỗi: ${err.message}`, "error");
+      toast.error(
+        err instanceof TypeError
+          ? "Không kết nối được máy chủ. Cấu hình chưa được khôi phục."
+          : err.message || "Khôi phục cấu hình thất bại."
+      );
     } finally {
       setResetting(false);
     }
@@ -106,25 +130,25 @@ export default function ConfigView() {
     try {
       const payload = {
         llm: {
-          temperature: parseFloat(temperature),
-          timeout: parseFloat(llmTimeout),
-          max_retries: parseInt(maxRetries, 10),
+          temperature: Number(values.temperature),
+          timeout: Number(values.llmTimeout),
+          max_retries: Number(values.maxRetries),
         },
         reranker: {
-          enabled: rerankerEnabled,
-          candidate_multiplier: parseInt(candidateMultiplier, 10),
+          enabled: values.rerankerEnabled,
+          candidate_multiplier: Number(values.candidateMultiplier),
         },
         retrieval: {
-          multi_query_enabled: multiQueryEnabled,
-          multi_query_count: parseInt(multiQueryCount, 10),
-          multi_query_use_llm: multiQueryUseLlm,
-          top_k: parseInt(topK, 10),
-          hybrid_vector_weight: parseFloat(hybridVectorWeight),
+          multi_query_enabled: values.multiQueryEnabled,
+          multi_query_count: Number(values.multiQueryCount),
+          multi_query_use_llm: values.multiQueryUseLlm,
+          top_k: Number(values.topK),
+          hybrid_vector_weight: Number(values.hybridVectorWeight),
         },
         guardrails: {
-          scope_enabled: scopeEnabled,
-          min_vector_score: parseFloat(minVectorScore),
-          min_bm25_score: parseFloat(minBm25Score),
+          scope_enabled: values.scopeEnabled,
+          min_vector_score: Number(values.minVectorScore),
+          min_bm25_score: Number(values.minBm25Score),
         },
       };
 
@@ -134,10 +158,22 @@ export default function ConfigView() {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Cập nhật thất bại trên máy chủ");
-      showToast("Đã lưu toàn bộ cấu hình RAG thành công!");
+      if (!res.ok) {
+        const detail = await res.json().catch(() => ({}));
+        throw new Error(detail?.detail || "Máy chủ từ chối cập nhật cấu hình.");
+      }
+
+      savedSnapshot.current = values;
+      setLoadError("");
+      toast.success("Đã lưu cấu hình RAG lên máy chủ.");
     } catch (err) {
-      showToast("Đã lưu cấu hình cục bộ.", "success");
+      // Bản trước bắt lỗi rồi hiện toast MÀU XANH "Đã lưu cấu hình cục bộ",
+      // trong khi không hề có cơ chế lưu cục bộ nào — cấu hình đã mất trắng.
+      toast.error(
+        err instanceof TypeError
+          ? "Không kết nối được máy chủ. Cấu hình CHƯA được lưu."
+          : `${err.message} Cấu hình CHƯA được lưu.`
+      );
     } finally {
       setSaving(false);
     }
@@ -145,337 +181,369 @@ export default function ConfigView() {
 
   if (loading) {
     return (
-      <div className="model-mgmt-loading">
+      <div className="model-mgmt-loading" aria-busy="true">
         <div className="model-mgmt-spinner" />
         <p>Đang tải cấu hình hệ thống...</p>
       </div>
     );
   }
 
+  const { temperature, llmTimeout, maxRetries, topK, hybridVectorWeight } = values;
+
   return (
     <div className="config-page-wrapper">
-      {toastMessage && (
-        <div className={`model-mgmt-toast toast-${toastMessage.type}`}>
-          {toastMessage.type === "success" ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-          <span>{toastMessage.text}</span>
-        </div>
-      )}
-
-      {/* Top Header Bar */}
       <div className="settings-subtabs-header">
         <div className="config-header-title-box">
           <div className="config-header-icon-box">
             <Sliders size={18} />
           </div>
           <div>
-            <h2 className="config-main-title">Cấu hình Hệ thống & Tham số RAG</h2>
+            <h2 className="config-main-title">Cấu hình hệ thống &amp; tham số RAG</h2>
             <p className="config-main-desc">
-              Tinh chỉnh nhiệt độ sinh (Temperature), số đoạn văn bản (Top-K), ngưỡng tương đồng (Similarity Threshold) và tỷ trọng Hybrid Search.
+              Tinh chỉnh độ ngẫu nhiên, số đoạn nạp vào LLM, ngưỡng tương đồng và tỷ trọng tìm kiếm lai.
             </p>
           </div>
         </div>
 
         <div className="settings-header-actions">
+          {isDirty && (
+            <span className="unsaved-badge" role="status">
+              Có thay đổi chưa lưu
+            </span>
+          )}
+
           <button
             type="button"
             className="btn btn-outline-reset"
-            onClick={handleResetConfig}
+            onClick={() => setResetOpen(true)}
             disabled={resetting || saving}
-            title="Khôi phục cài đặt mặc định"
           >
-            <RotateCcw size={14} className={resetting ? "spin-icon" : ""} />
-            <span>{resetting ? "Đang khôi phục..." : "Mặc định"}</span>
+            <RotateCcw size={14} />
+            <span>Mặc định</span>
           </button>
 
           <button
             type="button"
             className="btn btn-primary-save"
             onClick={handleSaveAll}
-            disabled={saving || resetting}
+            disabled={saving || resetting || !isDirty}
           >
-            {saving ? <div className="spinner-sm" /> : <Save size={15} />}
+            {saving ? <Loader2 size={15} className="spin" /> : <Save size={15} />}
             <span>{saving ? "Đang lưu..." : "Lưu cấu hình"}</span>
           </button>
         </div>
       </div>
 
+      {loadError && (
+        <div className="inline-alert is-warning" role="alert" style={{ margin: "0 24px 16px" }}>
+          <AlertTriangle size={16} />
+          <span>{loadError}</span>
+        </div>
+      )}
+
       <div className="config-view-container">
         <div className="config-two-col-grid">
-          {/* Column 1: LLM Generation & Reranker Tuning */}
+          {/* -------------------- Cột trái -------------------- */}
           <div className="config-col-left">
-            {/* CARD 1: THAM SỐ MÔ HÌNH SINH (LLM) */}
-            <div className="config-panel-card">
+            <section className="config-panel-card">
               <div className="config-card-header">
                 <div className="config-card-icon red">
                   <Flame size={17} />
                 </div>
                 <div>
-                  <h3 className="config-card-title">Tham số Mô hình Sinh (LLM Generation)</h3>
-                  <p className="config-card-subtitle">Độ sáng tạo, thời gian phản hồi và số lần thử lại</p>
+                  <h3 className="config-card-title">Tham số mô hình sinh (LLM)</h3>
+                  <p className="config-card-subtitle">Độ sáng tạo, thời gian chờ và số lần thử lại</p>
                 </div>
               </div>
 
               <div className="config-card-body">
-                {/* Temperature */}
                 <div className="config-field-group">
                   <div className="config-label-row">
-                    <label className="config-field-label">
-                      <span>Độ ngẫu nhiên / sáng tạo (Temperature)</span>
-                      <span className="config-badge-val">{temperature.toFixed(2)}</span>
+                    <label className="config-field-label" htmlFor="cfg-temperature">
+                      <span>Độ ngẫu nhiên (Temperature)</span>
+                      <span className="config-badge-val">{Number(temperature).toFixed(2)}</span>
                     </label>
                     <span className="config-hint-text">
                       {temperature === 0
-                        ? "🎯 0.0: Chính xác tuyệt đối, trung thực với quy chế"
+                        ? "Chính xác tuyệt đối, bám sát quy chế"
                         : temperature < 0.5
-                        ? "📘 Thấp: Ổn định, bám sát ngữ cảnh"
-                        : "🎨 Cao: Tự do, sáng tạo hơn"}
+                        ? "Thấp: ổn định, bám sát ngữ cảnh"
+                        : "Cao: tự do và sáng tạo hơn"}
                     </span>
                   </div>
                   <div className="slider-with-number">
                     <input
+                      id="cfg-temperature"
                       type="range"
-                      min="0.0"
+                      min="0"
                       max="1.5"
                       step="0.05"
                       className="custom-range-slider"
                       value={temperature}
-                      onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                      onChange={(e) => set("temperature", parseFloat(e.target.value))}
                     />
                     <input
                       type="number"
-                      min="0.0"
+                      min="0"
                       max="1.5"
                       step="0.05"
                       className="number-input-box"
+                      aria-label="Giá trị Temperature"
                       value={temperature}
-                      onChange={(e) => setTemperature(Math.max(0, Math.min(1.5, parseFloat(e.target.value) || 0)))}
+                      onChange={(e) =>
+                        set("temperature", Math.max(0, Math.min(1.5, parseFloat(e.target.value) || 0)))
+                      }
                     />
                   </div>
                 </div>
 
-                {/* LLM Timeout */}
                 <div className="config-field-group">
                   <div className="config-label-row">
-                    <label className="config-field-label">
-                      <span>Thời gian chờ tối đa (LLM Timeout)</span>
+                    <label className="config-field-label" htmlFor="cfg-timeout">
+                      <span>Thời gian chờ tối đa</span>
                       <span className="config-badge-val">{llmTimeout}s</span>
                     </label>
-                    <span className="config-hint-text">Tự động ngắt khi gọi model quá thời gian</span>
+                    <span className="config-hint-text">Tự ngắt khi gọi mô hình quá lâu</span>
                   </div>
                   <div className="slider-with-number">
                     <input
+                      id="cfg-timeout"
                       type="range"
                       min="5"
                       max="90"
                       step="5"
                       className="custom-range-slider"
                       value={llmTimeout}
-                      onChange={(e) => setLlmTimeout(parseInt(e.target.value, 10))}
+                      onChange={(e) => set("llmTimeout", parseInt(e.target.value, 10))}
                     />
                     <input
                       type="number"
                       min="5"
                       max="90"
                       className="number-input-box"
+                      aria-label="Thời gian chờ tối đa, tính bằng giây"
                       value={llmTimeout}
-                      onChange={(e) => setLlmTimeout(parseInt(e.target.value, 10) || 30)}
+                      onChange={(e) => set("llmTimeout", parseInt(e.target.value, 10) || 30)}
                     />
                   </div>
                 </div>
 
-                {/* Max Retries */}
-                <div className="config-field-group">
-                  <div className="config-label-row">
-                    <label className="config-field-label">
-                      <span>Số lần thử lại khi gặp sự cố mạng (Max Retries)</span>
-                      <span className="config-badge-val">{maxRetries} lần</span>
-                    </label>
-                  </div>
+                <fieldset className="config-field-group">
+                  <legend className="config-field-label">
+                    <span>Số lần thử lại khi lỗi mạng</span>
+                    <span className="config-badge-val">{maxRetries} lần</span>
+                  </legend>
                   <div className="pill-selector-group">
                     {[0, 1, 2, 3, 5].map((val) => (
                       <button
                         key={val}
                         type="button"
                         className={`pill-sel-btn ${maxRetries === val ? "active" : ""}`}
-                        onClick={() => setMaxRetries(val)}
+                        aria-pressed={maxRetries === val}
+                        onClick={() => set("maxRetries", val)}
                       >
                         {val} lần
                       </button>
                     ))}
                   </div>
-                </div>
+                </fieldset>
               </div>
-            </div>
+            </section>
 
-            {/* CARD 4: TÁI XẾP HẠNG TÀI LIỆU (RERANKER TUNING) */}
-            <div className="config-panel-card">
+            <section className="config-panel-card">
               <div className="config-card-header">
                 <div className="config-card-icon purple">
                   <Gauge size={17} />
                 </div>
                 <div>
-                  <h3 className="config-card-title">Tái xếp hạng tài liệu (Reranker Tuning)</h3>
-                  <p className="config-card-subtitle">Sắp xếp lại các ứng viên truy xuất theo độ tương quan chính xác</p>
+                  <h3 className="config-card-title">Tái xếp hạng tài liệu (Reranker)</h3>
+                  <p className="config-card-subtitle">
+                    Sắp xếp lại các đoạn ứng viên theo độ liên quan chính xác hơn
+                  </p>
                 </div>
               </div>
 
               <div className="config-card-body">
                 <div className="config-toggle-header">
                   <div>
-                    <span className="config-toggle-title">Kích hoạt Reranker</span>
-                    <p className="config-toggle-desc">Sử dụng Cross-Encoder / Cohere Rerank để sắp xếp lại danh sách tài liệu</p>
+                    <span className="config-toggle-title" id="cfg-reranker-label">
+                      Kích hoạt Reranker
+                    </span>
+                    <p className="config-toggle-desc">
+                      Dùng Cross-Encoder hoặc Cohere Rerank để xếp lại danh sách đoạn
+                    </p>
                   </div>
                   <button
                     type="button"
-                    className={`pill-switch ${rerankerEnabled ? "on" : "off"}`}
-                    onClick={() => setRerankerEnabled(!rerankerEnabled)}
+                    role="switch"
+                    aria-checked={values.rerankerEnabled}
+                    aria-labelledby="cfg-reranker-label"
+                    className={`pill-switch ${values.rerankerEnabled ? "on" : "off"}`}
+                    onClick={() => set("rerankerEnabled", !values.rerankerEnabled)}
                   >
                     <span className="pill-switch-thumb" />
                   </button>
                 </div>
 
-                {rerankerEnabled && (
-                  <div className="sub-settings-panel" style={{ marginTop: "12px" }}>
+                {values.rerankerEnabled && (
+                  <div className="sub-settings-panel" style={{ marginTop: 12 }}>
                     <div className="sub-setting-row">
-                      <label>Hệ số ứng viên sơ bộ (Candidate Multiplier): <strong>{candidateMultiplier}x</strong> (Lấy {topK * candidateMultiplier} chunks trước khi Rerank)</label>
+                      <label htmlFor="cfg-candidate">
+                        Hệ số ứng viên sơ bộ: <strong>{values.candidateMultiplier}×</strong> (lấy{" "}
+                        {topK * values.candidateMultiplier} đoạn trước khi xếp lại)
+                      </label>
                       <input
+                        id="cfg-candidate"
                         type="range"
                         min="1"
                         max="6"
                         step="1"
                         className="custom-range-slider compact"
-                        value={candidateMultiplier}
-                        onChange={(e) => setCandidateMultiplier(parseInt(e.target.value, 10))}
+                        value={values.candidateMultiplier}
+                        onChange={(e) => set("candidateMultiplier", parseInt(e.target.value, 10))}
                       />
                     </div>
                   </div>
                 )}
               </div>
-            </div>
+            </section>
           </div>
 
-          {/* Column 2: Retrieval & Guardrails */}
+          {/* -------------------- Cột phải -------------------- */}
           <div className="config-col-right">
-            {/* CARD 2: THAM SỐ TRUY XUẤT & TÌM KIẾM (RETRIEVAL) */}
-            <div className="config-panel-card">
+            <section className="config-panel-card">
               <div className="config-card-header">
                 <div className="config-card-icon blue">
                   <Layers size={17} />
                 </div>
                 <div>
-                  <h3 className="config-card-title">Tham số Truy xuất & Tìm kiếm (Retrieval & Search)</h3>
-                  <p className="config-card-subtitle">Số đoạn văn bản nạp vào prompt và tỷ trọng Hybrid Search</p>
+                  <h3 className="config-card-title">Truy xuất &amp; tìm kiếm</h3>
+                  <p className="config-card-subtitle">Số đoạn nạp vào prompt và tỷ trọng tìm kiếm lai</p>
                 </div>
               </div>
 
               <div className="config-card-body">
-                {/* Top-K */}
                 <div className="config-field-group">
                   <div className="config-label-row">
-                    <label className="config-field-label">
-                      <span>Số đoạn văn bản nạp vào LLM (Top-K Chunks)</span>
-                      <span className="config-badge-val">{topK} chunks</span>
+                    <label className="config-field-label" htmlFor="cfg-topk">
+                      <span>Số đoạn nạp vào LLM (Top-K)</span>
+                      <span className="config-badge-val">{topK} đoạn</span>
                     </label>
-                    <span className="config-hint-text">Số trích dẫn liên quan nhất đưa vào prompt sinh câu trả lời</span>
+                    <span className="config-hint-text">
+                      Số trích dẫn liên quan nhất đưa vào prompt sinh câu trả lời
+                    </span>
                   </div>
                   <div className="slider-with-number">
                     <input
+                      id="cfg-topk"
                       type="range"
                       min="1"
                       max="10"
                       step="1"
                       className="custom-range-slider"
                       value={topK}
-                      onChange={(e) => setTopK(parseInt(e.target.value, 10))}
+                      onChange={(e) => set("topK", parseInt(e.target.value, 10))}
                     />
                     <input
                       type="number"
                       min="1"
                       max="10"
                       className="number-input-box"
+                      aria-label="Số đoạn nạp vào LLM"
                       value={topK}
-                      onChange={(e) => setTopK(Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 4)))}
+                      onChange={(e) =>
+                        set("topK", Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 4)))
+                      }
                     />
                   </div>
                 </div>
 
-                {/* Hybrid Search Weight */}
                 <div className="config-field-group">
                   <div className="config-label-row">
-                    <label className="config-field-label">
-                      <span>Tỷ trọng Hybrid Search (Vector Dense vs BM25 Sparse)</span>
+                    <label className="config-field-label" htmlFor="cfg-hybrid">
+                      <span>Tỷ trọng tìm kiếm lai (Vector so với BM25)</span>
+                      <span className="config-badge-val">{Math.round(hybridVectorWeight * 100)}%</span>
                     </label>
                   </div>
 
-                  <div className="hybrid-ratio-bar">
-                    <div
-                      className="hybrid-segment vector"
-                      style={{ width: `${Math.round(hybridVectorWeight * 100)}%` }}
-                    >
-                      <span>Vector: {Math.round(hybridVectorWeight * 100)}%</span>
+                  <div className="hybrid-ratio-bar" aria-hidden="true">
+                    <div className="hybrid-segment vector" style={{ width: `${Math.round(hybridVectorWeight * 100)}%` }}>
+                      <span>Vector {Math.round(hybridVectorWeight * 100)}%</span>
                     </div>
                     <div
                       className="hybrid-segment bm25"
                       style={{ width: `${Math.round((1 - hybridVectorWeight) * 100)}%` }}
                     >
-                      <span>BM25: {Math.round((1 - hybridVectorWeight) * 100)}%</span>
+                      <span>BM25 {Math.round((1 - hybridVectorWeight) * 100)}%</span>
                     </div>
                   </div>
 
-                  <div className="slider-with-number" style={{ marginTop: "8px" }}>
+                  <div className="slider-with-number" style={{ marginTop: 8 }}>
                     <input
+                      id="cfg-hybrid"
                       type="range"
-                      min="0.0"
-                      max="1.0"
+                      min="0"
+                      max="1"
                       step="0.05"
                       className="custom-range-slider"
                       value={hybridVectorWeight}
-                      onChange={(e) => setHybridVectorWeight(parseFloat(e.target.value))}
+                      onChange={(e) => set("hybridVectorWeight", parseFloat(e.target.value))}
                     />
-                    <span className="config-badge-val">{(hybridVectorWeight * 100).toFixed(0)}%</span>
                   </div>
                   <p className="config-micro-help">
-                    Vector giúp hiểu ngữ nghĩa tự nhiên; BM25 giúp tìm kiếm chính xác số điều khoản, tên môn học, học phí.
+                    Vector giúp hiểu ngữ nghĩa tự nhiên; BM25 giúp tìm chính xác số điều khoản, tên môn học, mức học phí.
                   </p>
                 </div>
 
-                {/* Multi-Query Expansion */}
                 <div className="config-field-group bordered-group">
                   <div className="config-toggle-header">
                     <div>
-                      <span className="config-toggle-title">Mở rộng câu hỏi đa hướng (Multi-Query Expansion)</span>
-                      <p className="config-toggle-desc">Tự động phân tách và tạo các câu hỏi phụ để tìm kiếm toàn diện hơn</p>
+                      <span className="config-toggle-title" id="cfg-mq-label">
+                        Mở rộng câu hỏi đa hướng
+                      </span>
+                      <p className="config-toggle-desc">
+                        Tự sinh thêm các câu hỏi phụ để tìm kiếm toàn diện hơn
+                      </p>
                     </div>
                     <button
                       type="button"
-                      className={`pill-switch ${multiQueryEnabled ? "on" : "off"}`}
-                      onClick={() => setMultiQueryEnabled(!multiQueryEnabled)}
+                      role="switch"
+                      aria-checked={values.multiQueryEnabled}
+                      aria-labelledby="cfg-mq-label"
+                      className={`pill-switch ${values.multiQueryEnabled ? "on" : "off"}`}
+                      onClick={() => set("multiQueryEnabled", !values.multiQueryEnabled)}
                     >
                       <span className="pill-switch-thumb" />
                     </button>
                   </div>
 
-                  {multiQueryEnabled && (
+                  {values.multiQueryEnabled && (
                     <div className="sub-settings-panel">
                       <div className="sub-setting-row">
-                        <label>Số lượng câu truy vấn phụ sinh ra (Count): <strong>{multiQueryCount}</strong></label>
+                        <label htmlFor="cfg-mq-count">
+                          Số truy vấn phụ sinh ra: <strong>{values.multiQueryCount}</strong>
+                        </label>
                         <input
+                          id="cfg-mq-count"
                           type="range"
                           min="2"
                           max="6"
                           step="1"
                           className="custom-range-slider compact"
-                          value={multiQueryCount}
-                          onChange={(e) => setMultiQueryCount(parseInt(e.target.value, 10))}
+                          value={values.multiQueryCount}
+                          onChange={(e) => set("multiQueryCount", parseInt(e.target.value, 10))}
                         />
                       </div>
 
                       <div className="sub-setting-row-inline">
-                        <span>Sử dụng LLM để viết lại truy vấn (Query Rewrite LLM)</span>
+                        <span id="cfg-mq-llm-label">Dùng LLM để viết lại truy vấn</span>
                         <button
                           type="button"
-                          className={`pill-switch ${multiQueryUseLlm ? "on" : "off"}`}
-                          onClick={() => setMultiQueryUseLlm(!multiQueryUseLlm)}
+                          role="switch"
+                          aria-checked={values.multiQueryUseLlm}
+                          aria-labelledby="cfg-mq-llm-label"
+                          className={`pill-switch ${values.multiQueryUseLlm ? "on" : "off"}`}
+                          onClick={() => set("multiQueryUseLlm", !values.multiQueryUseLlm)}
                         >
                           <span className="pill-switch-thumb" />
                         </button>
@@ -484,106 +552,135 @@ export default function ConfigView() {
                   )}
                 </div>
               </div>
-            </div>
+            </section>
 
-            {/* CARD 3: NGƯỠNG TƯƠNG ĐỒNG & BẢO VỆ (GUARDRAILS & THRESHOLDS) */}
-            <div className="config-panel-card">
+            <section className="config-panel-card">
               <div className="config-card-header">
                 <div className="config-card-icon green">
                   <ShieldCheck size={17} />
                 </div>
                 <div>
-                  <h3 className="config-card-title">Ngưỡng tương đồng & Kiểm soát an toàn (Guardrails)</h3>
-                  <p className="config-card-subtitle">Bộ lọc phạm vi quy chế PTIT và ngưỡng Similarity Threshold</p>
+                  <h3 className="config-card-title">Ngưỡng tương đồng &amp; kiểm soát an toàn</h3>
+                  <p className="config-card-subtitle">Bộ lọc phạm vi quy chế PTIT và ngưỡng chấp nhận đoạn</p>
                 </div>
               </div>
 
               <div className="config-card-body">
-                {/* Guardrail Scope */}
                 <div className="config-field-group bordered-group">
                   <div className="config-toggle-header">
                     <div>
-                      <span className="config-toggle-title">Kiểm soát phạm vi PTIT (Scope Guardrail)</span>
-                      <p className="config-toggle-desc">Tự động từ chối lịch sự nếu câu hỏi hoàn toàn không liên quan đến Học viện PTIT</p>
+                      <span className="config-toggle-title" id="cfg-scope-label">
+                        Kiểm soát phạm vi PTIT
+                      </span>
+                      <p className="config-toggle-desc">
+                        Từ chối lịch sự khi câu hỏi không liên quan đến Học viện
+                      </p>
                     </div>
                     <button
                       type="button"
-                      className={`pill-switch ${scopeEnabled ? "on" : "off"}`}
-                      onClick={() => setScopeEnabled(!scopeEnabled)}
+                      role="switch"
+                      aria-checked={values.scopeEnabled}
+                      aria-labelledby="cfg-scope-label"
+                      className={`pill-switch ${values.scopeEnabled ? "on" : "off"}`}
+                      onClick={() => set("scopeEnabled", !values.scopeEnabled)}
                     >
                       <span className="pill-switch-thumb" />
                     </button>
                   </div>
                 </div>
 
-                {/* Similarity Threshold */}
                 <div className="config-field-group">
                   <div className="config-label-row">
-                    <label className="config-field-label">
-                      <span>Ngưỡng tương đồng Vector tối thiểu (Similarity Threshold)</span>
-                      <span className="config-badge-val">{minVectorScore.toFixed(2)}</span>
+                    <label className="config-field-label" htmlFor="cfg-minvec">
+                      <span>Ngưỡng tương đồng vector tối thiểu</span>
+                      <span className="config-badge-val">{Number(values.minVectorScore).toFixed(2)}</span>
                     </label>
-                    <span className="config-hint-text">Cosine Similarity tối thiểu để chấp nhận chunk</span>
+                    <span className="config-hint-text">Cosine similarity tối thiểu để chấp nhận một đoạn</span>
                   </div>
                   <div className="slider-with-number">
                     <input
+                      id="cfg-minvec"
                       type="range"
-                      min="0.10"
-                      max="0.80"
+                      min="0.1"
+                      max="0.8"
                       step="0.02"
                       className="custom-range-slider"
-                      value={minVectorScore}
-                      onChange={(e) => setMinVectorScore(parseFloat(e.target.value))}
+                      value={values.minVectorScore}
+                      onChange={(e) => set("minVectorScore", parseFloat(e.target.value))}
                     />
                     <input
                       type="number"
-                      min="0.10"
-                      max="0.80"
+                      min="0.1"
+                      max="0.8"
                       step="0.02"
                       className="number-input-box"
-                      value={minVectorScore}
-                      onChange={(e) => setMinVectorScore(Math.max(0.1, Math.min(0.8, parseFloat(e.target.value) || 0.3)))}
+                      aria-label="Ngưỡng tương đồng vector tối thiểu"
+                      value={values.minVectorScore}
+                      onChange={(e) =>
+                        set("minVectorScore", Math.max(0.1, Math.min(0.8, parseFloat(e.target.value) || 0.3)))
+                      }
                     />
                   </div>
                   <p className="config-micro-help">
-                    Đoạn văn có điểm tương đồng dưới {minVectorScore.toFixed(2)} sẽ bị lọc bỏ để tránh trả lời sai sự thật (Hallucination).
+                    Đoạn có điểm dưới {Number(values.minVectorScore).toFixed(2)} sẽ bị loại để tránh trả lời sai sự thật.
                   </p>
                 </div>
 
-                {/* BM25 Minimum Score */}
                 <div className="config-field-group">
                   <div className="config-label-row">
-                    <label className="config-field-label">
+                    <label className="config-field-label" htmlFor="cfg-minbm25">
                       <span>Điểm khớp từ khóa BM25 tối thiểu</span>
-                      <span className="config-badge-val">{minBm25Score.toFixed(1)}</span>
+                      <span className="config-badge-val">{Number(values.minBm25Score).toFixed(1)}</span>
                     </label>
                   </div>
                   <div className="slider-with-number">
                     <input
+                      id="cfg-minbm25"
                       type="range"
                       min="0.5"
-                      max="6.0"
+                      max="6"
                       step="0.5"
                       className="custom-range-slider"
-                      value={minBm25Score}
-                      onChange={(e) => setMinBm25Score(parseFloat(e.target.value))}
+                      value={values.minBm25Score}
+                      onChange={(e) => set("minBm25Score", parseFloat(e.target.value))}
                     />
                     <input
                       type="number"
                       min="0.5"
-                      max="6.0"
+                      max="6"
                       step="0.5"
                       className="number-input-box"
-                      value={minBm25Score}
-                      onChange={(e) => setMinBm25Score(parseFloat(e.target.value) || 2.0)}
+                      aria-label="Điểm khớp từ khóa BM25 tối thiểu"
+                      value={values.minBm25Score}
+                      onChange={(e) => set("minBm25Score", parseFloat(e.target.value) || 2.0)}
                     />
                   </div>
                 </div>
               </div>
-            </div>
+            </section>
           </div>
         </div>
       </div>
+
+      <Modal
+        open={resetOpen}
+        onClose={() => !resetting && setResetOpen(false)}
+        title="Khôi phục cấu hình mặc định?"
+        description="Toàn bộ tham số RAG trên máy chủ sẽ trở về giá trị ban đầu. Thao tác này không thể hoàn tác."
+        icon={<AlertTriangle size={20} />}
+        tone="danger"
+        actions={
+          <>
+            <button type="button" className="ghost-btn" onClick={() => setResetOpen(false)} disabled={resetting}>
+              Hủy
+            </button>
+            <button type="button" className="danger-btn" onClick={handleResetConfig} disabled={resetting}>
+              {resetting ? <Loader2 size={15} className="spin" /> : <RotateCcw size={15} />}
+              Khôi phục
+            </button>
+          </>
+        }
+      />
     </div>
   );
 }

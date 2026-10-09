@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowUpRight,
   Check,
   CheckCircle2,
@@ -11,15 +12,14 @@ import {
   EyeOff,
   Info,
   Key,
-  Plus,
-  RotateCcw,
-  Save,
   Search,
   Trash2,
   X,
   Zap,
 } from "lucide-react";
 import { API_BASE_URL } from "./api";
+import Modal from "./components/Modal";
+import { useToast } from "./components/Toast";
 
 // =============================================================================
 // Provider Logos (SVGs & Brand Marks)
@@ -167,37 +167,10 @@ const AVAILABLE_PROVIDERS = [
   },
 ];
 
-const INITIAL_ADDED_PROVIDERS = [
-  {
-    id: "added-openai-1",
-    providerId: "openai",
-    providerName: "OpenAI",
-    instanceName: "test",
-    apiKeyMasked: "sk-proj-••••••••89ab",
-    baseUrl: "https://api.openai.com/v1",
-    models: [
-      { id: "gpt-4o-mini", name: "gpt-4o-mini", type: "LLM" },
-      { id: "gpt-4o", name: "gpt-4o", type: "LLM" },
-      { id: "text-embedding-3-small", name: "text-embedding-3-small", type: "Embedding" },
-      { id: "tts-1", name: "tts-1", type: "TTS" },
-      { id: "whisper-1", name: "whisper-1", type: "ASR" },
-    ],
-  },
-  {
-    id: "added-cohere-1",
-    providerId: "cohere",
-    providerName: "Cohere",
-    instanceName: "test111",
-    apiKeyMasked: "coh-••••••••321a",
-    baseUrl: "https://api.cohere.com/v2",
-    models: [
-      { id: "command-r-plus", name: "command-r-plus", type: "LLM" },
-      { id: "embed-multilingual-v3.0", name: "embed-multilingual-v3.0", type: "Embedding" },
-      { id: "rerank-multilingual-v3.0", name: "rerank-multilingual-v3.0", type: "Rerank" },
-      { id: "rerank-english-v3.0", name: "rerank-english-v3.0", type: "Rerank" },
-    ],
-  },
-];
+// Không seed dữ liệu mẫu: bản trước cài sẵn hai nhà cung cấp giả kèm API key giả
+// ("sk-proj-••••89ab", tên "test"/"test111") và ghi thẳng vào localStorage, khiến
+// người dùng tưởng hệ thống đã được cấu hình sẵn.
+const INITIAL_ADDED_PROVIDERS = [];
 
 const SLOTS = [
   { key: "LLM", label: "LLM", required: true, tooltip: "Mô hình ngôn ngữ sinh câu trả lời chính (GPT-4o, Claude, Gemini...)" },
@@ -209,8 +182,10 @@ const SLOTS = [
 ];
 
 export default function ModelsView() {
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState(null);
+  const [loadError, setLoadError] = useState("");
+  const [pendingDeleteProvider, setPendingDeleteProvider] = useState(null);
 
   // Added providers list (saved to localStorage & backend)
   const [addedProviders, setAddedProviders] = useState(() => {
@@ -225,24 +200,13 @@ export default function ModelsView() {
 
   const [expandedProviderIds, setExpandedProviderIds] = useState({});
 
+  // Trạng thái ban đầu là RỖNG; giá trị thật được đọc từ GET /api/config bên dưới.
   const [defaultModels, setDefaultModels] = useState({
-    LLM: {
-      modelId: "gpt-4o-mini",
-      providerId: "openai",
-      instanceName: "test",
-    },
-    Embedding: {
-      modelId: "embed-multilingual-v3.0",
-      providerId: "cohere",
-      instanceName: "test111",
-    },
+    LLM: null,
+    Embedding: null,
     VLM: null,
     ASR: null,
-    Rerank: {
-      modelId: "rerank-multilingual-v3.0",
-      providerId: "cohere",
-      instanceName: "test111",
-    },
+    Rerank: null,
     TTS: null,
   });
 
@@ -263,25 +227,20 @@ export default function ModelsView() {
   const [testingConnection, setTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
+  // API key KHÔNG được ghi xuống localStorage: nó nằm nguyên văn trong ổ đĩa và
+  // mọi script chạy trên trang đều đọc được. Chỉ lưu phần đã che cùng metadata.
   useEffect(() => {
     try {
-      localStorage.setItem("ptit_added_providers", JSON.stringify(addedProviders));
+      const safe = addedProviders.map(({ apiKey, ...rest }) => rest);
+      localStorage.setItem("ptit_added_providers", JSON.stringify(safe));
     } catch (e) {
-      // ignore
+      // Storage bị chặn — cấu hình vẫn dùng được trong phiên hiện tại.
     }
   }, [addedProviders]);
 
   useEffect(() => {
     fetchBackendConfig();
   }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("ptit_added_providers", JSON.stringify(addedProviders));
-    } catch (e) {
-      // ignore
-    }
-  }, [addedProviders]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -292,11 +251,6 @@ export default function ModelsView() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  function showToast(text, type = "success") {
-    setToastMessage({ text, type });
-    setTimeout(() => setToastMessage(null), 4000);
-  }
 
   async function fetchBackendConfig() {
     setLoading(true);
@@ -314,7 +268,7 @@ export default function ModelsView() {
             LLM: {
               modelId: m,
               providerId: p,
-              instanceName: p === "openai" ? "test" : "default",
+              instanceName: "Cấu hình máy chủ",
             },
           }));
         }
@@ -326,8 +280,8 @@ export default function ModelsView() {
             ...prev,
             Embedding: {
               modelId: data.embedding.model,
-              providerId: data.embedding.provider || "cohere",
-              instanceName: "test111",
+              providerId: data.embedding.provider || "unknown",
+              instanceName: "Cấu hình máy chủ",
             },
           }));
         }
@@ -339,14 +293,20 @@ export default function ModelsView() {
             ...prev,
             Rerank: {
               modelId: data.reranker.model,
-              providerId: data.reranker.provider || "cohere",
-              instanceName: "test111",
+              providerId: data.reranker.provider || "unknown",
+              instanceName: "Cấu hình máy chủ",
             },
           }));
         }
       }
     } catch (err) {
-      console.warn("Using local configuration fallback:", err.message);
+      // Bản trước chỉ console.warn: giao diện hiện danh sách trống như thể máy chủ
+      // chưa cấu hình gì, trong khi thực ra là không đọc được.
+      setLoadError(
+        err instanceof TypeError
+          ? "Không kết nối được máy chủ. Chưa đọc được mô hình đang dùng."
+          : err.message || "Không đọc được cấu hình mô hình từ máy chủ."
+      );
     } finally {
       setLoading(false);
     }
@@ -359,12 +319,12 @@ export default function ModelsView() {
     }));
   }
 
-  function handleDeleteProvider(id, name) {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa nhà cung cấp "${name}"?`)) {
-      return;
-    }
+  function confirmDeleteProvider() {
+    if (!pendingDeleteProvider) return;
+    const { id, instanceName } = pendingDeleteProvider;
     setAddedProviders((prev) => prev.filter((p) => p.id !== id));
-    showToast(`Đã xóa cấu hình "${name}".`);
+    setPendingDeleteProvider(null);
+    toast.success(`Đã xóa cấu hình “${instanceName}”.`);
   }
 
   function handleOpenConfigModal(provider) {
@@ -438,7 +398,7 @@ export default function ModelsView() {
 
     setAddedProviders((prev) => [newEntry, ...prev]);
     setConfigModalProvider(null);
-    showToast(`Đã thêm cấu hình thành công: "${name}"`);
+    toast.success(`Đã thêm cấu hình thành công: "${name}"`);
   }
 
   async function handleSelectDefaultModel(slotKey, model, provider, instanceName) {
@@ -476,15 +436,23 @@ export default function ModelsView() {
         };
       }
 
-      await fetch(`${API_BASE_URL}/config`, {
+      const res = await fetch(`${API_BASE_URL}/config`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      if (!res.ok) throw new Error("Máy chủ từ chối cập nhật.");
 
-      showToast(`Đã chọn mặc định cho ${slotKey}: ${model.name}`);
+      toast.success(`Đã đặt ${model.name} làm mô hình ${slotKey} mặc định.`);
     } catch (e) {
-      showToast(`Đã chọn ${slotKey}: ${model.name}`);
+      // Lựa chọn chỉ nằm trên giao diện nếu máy chủ không nhận — phải nói rõ,
+      // nếu không người dùng tưởng đã đổi được mô hình.
+      setDefaultModels(defaultModels);
+      toast.error(
+        `Không lưu được lựa chọn ${slotKey} lên máy chủ. ${
+          e instanceof TypeError ? "Không kết nối được máy chủ." : e.message
+        }`
+      );
     }
   }
 
@@ -494,7 +462,7 @@ export default function ModelsView() {
       ...prev,
       [slotKey]: null,
     }));
-    showToast(`Đã hủy chọn mặc định cho ${slotKey}`);
+    toast.success(`Đã hủy chọn mặc định cho ${slotKey}`);
   }
 
   const filteredProviders = useMemo(() => {
@@ -559,13 +527,6 @@ export default function ModelsView() {
 
   return (
     <div className="models-page-wrapper">
-      {toastMessage && (
-        <div className={`model-mgmt-toast toast-${toastMessage.type}`}>
-          {toastMessage.type === "success" ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-          <span>{toastMessage.text}</span>
-        </div>
-      )}
-
       {/* Header Bar */}
       <div className="settings-subtabs-header">
         <div className="config-header-title-box">
@@ -580,6 +541,13 @@ export default function ModelsView() {
           </div>
         </div>
       </div>
+
+      {loadError && (
+        <div className="inline-alert is-warning" role="alert" style={{ margin: "0 24px 16px" }}>
+          <AlertTriangle size={16} />
+          <span>{loadError}</span>
+        </div>
+      )}
 
       <div className="model-mgmt-page">
         <div className="model-mgmt-layout">
@@ -752,7 +720,7 @@ export default function ModelsView() {
                           <button
                             type="button"
                             className="btn-delete-provider"
-                            onClick={() => handleDeleteProvider(provider.id, provider.instanceName)}
+                            onClick={() => setPendingDeleteProvider(provider)}
                             title="Xóa cấu hình"
                           >
                             <Trash2 size={16} />
@@ -912,10 +880,17 @@ export default function ModelsView() {
                     type="button"
                     className="btn-toggle-eye"
                     onClick={() => setShowApiKey(!showApiKey)}
+                    aria-label={showApiKey ? "Ẩn API key" : "Hiện API key"}
+                    aria-pressed={showApiKey}
                   >
                     {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+                <p className="form-help">
+                  Khóa chỉ được giữ trong phiên làm việc này và gửi tới máy chủ khi bạn chọn mô hình
+                  mặc định. Trình duyệt không lưu khóa xuống ổ đĩa, nên sau khi tải lại trang bạn sẽ
+                  cần nhập lại.
+                </p>
               </div>
 
               <div className="form-group">
@@ -999,6 +974,30 @@ export default function ModelsView() {
           </div>
         </div>
       )}
+
+      <Modal
+        open={Boolean(pendingDeleteProvider)}
+        onClose={() => setPendingDeleteProvider(null)}
+        title="Xóa cấu hình nhà cung cấp?"
+        description={
+          pendingDeleteProvider
+            ? `Cấu hình “${pendingDeleteProvider.instanceName}” (${pendingDeleteProvider.providerName}) sẽ bị gỡ khỏi danh sách. Các mô hình mặc định đang trỏ tới nó sẽ cần chọn lại.`
+            : ""
+        }
+        icon={<AlertTriangle size={20} />}
+        tone="danger"
+        actions={
+          <>
+            <button type="button" className="ghost-btn" onClick={() => setPendingDeleteProvider(null)}>
+              Hủy
+            </button>
+            <button type="button" className="danger-btn" onClick={confirmDeleteProvider}>
+              <Trash2 size={15} />
+              Xóa cấu hình
+            </button>
+          </>
+        }
+      />
     </div>
   );
 }

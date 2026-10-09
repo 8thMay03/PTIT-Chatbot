@@ -248,3 +248,35 @@ class TestLLMResponse(BaseModel):
     message: str
     latency_ms: float | None = None
     sample_output: str | None = None
+
+
+# ==========================================
+# Conversation history schemas
+# ==========================================
+class ConversationItem(BaseModel):
+    id: str
+    title: str | None = None
+    message_count: int = 0
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class ConversationListResponse(BaseModel):
+    total: int
+    conversations: list[ConversationItem]
+
+
+class ConversationMessage(BaseModel):
+    id: str
+    role: str
+    content: str
+    sources: list[Source] = Field(default_factory=list)
+    created_at: datetime | None = None
+
+
+class ConversationDetail(ConversationItem):
+    messages: list[ConversationMessage] = Field(default_factory=list)
+
+
+class RenameConversationRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)

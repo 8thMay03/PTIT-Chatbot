@@ -2,8 +2,27 @@
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="Trợ lý hỏi đáp quy chế, học phí và thủ tục sinh viên PTIT, trả lời kèm trích dẫn nguồn."
+    />
     <title>PTIT Chatbot</title>
+    <script>
+      // Gắn theme TRƯỚC khi React render, nếu không trang sẽ loé sáng một nhịp
+      // rồi mới chuyển sang tối. Phải khớp với logic trong src/lib/theme.js.
+      (function () {
+        try {
+          var saved = localStorage.getItem("ptit_chatbot_theme");
+          if (saved === "light" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          }
+        } catch (e) {
+          /* storage bị chặn — để CSS tự quyết theo prefers-color-scheme */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

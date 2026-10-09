@@ -11,6 +11,10 @@ from app.api.schemas import (
     ChatRequest,
     ChatResponse,
     ChunkItem,
+    ConversationDetail,
+    ConversationItem,
+    ConversationListResponse,
+    ConversationMessage,
     DocumentChunksResponse,
     DocumentDeleteResponse,
     DocumentDetail,
@@ -18,6 +22,7 @@ from app.api.schemas import (
     DocumentListResponse,
     FullConfigResponse,
     IngestResponse,
+    RenameConversationRequest,
     RetrievalTestRequest,
     TestLLMRequest,
     TestLLMResponse,
@@ -28,12 +33,17 @@ from app.core.config import get_runtime_config_dict, reset_runtime_config, setti
 from app.db.repositories import (
     add_message,
     add_message_sources,
+    delete_conversation,
     ensure_conversation,
+    get_conversation,
+    get_conversation_messages,
     get_document_chunks,
     get_document_preview_text,
     get_document_with_chunk_count,
     get_recent_conversation_history,
+    list_conversations,
     list_documents,
+    rename_conversation,
     serialize_document,
 )
 from app.generation.rag_chain import rag_chain
@@ -281,7 +291,13 @@ def chat(request: ChatRequest, session: Session = Depends(get_session)) -> ChatR
         request.message,
         metadata={"retrieval_debug": result["retrieval_debug"]},
     )
-    assistant_message = add_message(session, conversation.id, "assistant", result["answer"])
+    assistant_message = add_message(
+        session,
+        conversation.id,
+        "assistant",
+        result["answer"],
+        metadata={"sources": [s.model_dump() if hasattr(s, "model_dump") else dict(s) for s in result["sources"]]},
+    )
     add_message_sources(session, assistant_message.id, result["contexts"])
     session.commit()
 
@@ -343,7 +359,13 @@ def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -
             request.message,
             metadata={"retrieval_debug": retrieval["retrieval_debug"]},
         )
-        assistant_message = add_message(session, conversation.id, "assistant", answer)
+        assistant_message = add_message(
+            session,
+            conversation.id,
+            "assistant",
+            answer,
+            metadata={"sources": [s.model_dump() if hasattr(s, "model_dump") else dict(s) for s in sources]},
+        )
         add_message_sources(session, assistant_message.id, contexts)
         session.commit()
         yield _ndjson({
@@ -362,3 +384,88 @@ def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -
 
 def _ndjson(payload: dict) -> str:
     return json.dumps(payload, ensure_ascii=False) + "\n"
+
+
+# ==========================================
+# Lịch sử hội thoại
+# ==========================================
+def _serialize_conversation(conversation, message_count: int) -> ConversationItem:
+    return ConversationItem(
+        id=conversation.id,
+        title=conversation.title,
+        message_count=message_count,
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+    )
+
+
+@router.get("/conversations", response_model=ConversationListResponse)
+def list_conversation_history(
+    limit: int = 50,
+    offset: int = 0,
+    user_id: str | None = None,
+    session: Session = Depends(get_session),
+) -> ConversationListResponse:
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+    rows, total = list_conversations(session, limit=limit, offset=offset, user_id=user_id)
+    return ConversationListResponse(
+        total=total,
+        conversations=[_serialize_conversation(c, count) for c, count in rows],
+    )
+
+
+@router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
+def get_conversation_detail(
+    conversation_id: str,
+    session: Session = Depends(get_session),
+) -> ConversationDetail:
+    conversation = get_conversation(session, conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
+
+    messages = get_conversation_messages(session, conversation_id)
+    return ConversationDetail(
+        id=conversation.id,
+        title=conversation.title,
+        message_count=len(messages),
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+        messages=[
+            ConversationMessage(
+                id=message.id,
+                role=message.role,
+                content=message.content,
+                # Citation được lưu trong metadata lúc sinh câu trả lời; hội thoại
+                # cũ (trước khi có trường này) sẽ trả về danh sách rỗng.
+                sources=(message.message_metadata or {}).get("sources", []) or [],
+                created_at=message.created_at,
+            )
+            for message in messages
+        ],
+    )
+
+
+@router.patch("/conversations/{conversation_id}", response_model=ConversationItem)
+def rename_conversation_title(
+    conversation_id: str,
+    request: RenameConversationRequest,
+    session: Session = Depends(get_session),
+) -> ConversationItem:
+    conversation = rename_conversation(session, conversation_id, request.title.strip())
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
+    session.commit()
+    messages = get_conversation_messages(session, conversation_id)
+    return _serialize_conversation(conversation, len(messages))
+
+
+@router.delete("/conversations/{conversation_id}")
+def remove_conversation(
+    conversation_id: str,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    if not delete_conversation(session, conversation_id):
+        raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
+    session.commit()
+    return {"id": conversation_id, "deleted": True}

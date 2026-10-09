@@ -1,0 +1,481 @@
+/* ==========================================================================
+   DOCUMENT DETAIL & CHUNK RESULT VIEW (Matching image.png)
+   ========================================================================== */
+.doc-view-page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--surface-soft);
+  padding: 12px 18px 18px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.doc-view-top-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.btn-back-dataset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-back-dataset:hover {
+  background: var(--surface-sunken);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.doc-view-split-layout {
+  display: grid;
+  grid-template-columns: 38% 1fr;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Left Column: Document Preview */
+.doc-view-left-col {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 18px;
+  min-height: 0;
+}
+
+.doc-view-meta-header {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.doc-view-filename {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px 0;
+  word-break: break-all;
+}
+
+.doc-view-meta-info {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.doc-meta-sep {
+  color: var(--text-muted);
+}
+
+.doc-view-content-pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+/* Right Column: Chunk Result */
+.doc-view-right-col {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 18px 12px;
+  min-height: 0;
+}
+
+.chunk-result-header {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.chunk-result-title-group h3 {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 2px 0;
+}
+
+.chunk-result-title-group p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 10px 0;
+}
+
+.chunk-result-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.chunk-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chunk-mode-toggle {
+  display: inline-flex;
+  background: var(--surface-sunken);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.chunk-mode-btn {
+  border: 0;
+  background: transparent;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chunk-mode-btn.active {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.chunk-search-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  width: 140px;
+}
+
+.chunk-search-field input {
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+  width: 100%;
+}
+
+.chunk-cards-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.chunk-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chunk-card-item {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  background: var(--surface);
+  transition: border-color 0.15s ease;
+}
+
+.chunk-card-item:hover {
+  border-color: var(--border-strong);
+}
+
+.chunk-card-item.selected {
+  border-color: var(--border-strong);
+  background: var(--surface-soft);
+}
+
+.chunk-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.chunk-card-text {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chunk-card-text.is-ellipse {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+}
+
+/* ==========================================================================
+   MARKDOWN RENDERED STYLES (Document View & Chunk Cards)
+   ========================================================================== */
+.doc-markdown-rendered-view,
+.chunk-card-markdown-view {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.doc-markdown-rendered-view .doc-h1,
+.chunk-card-markdown-view .doc-h1 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 14px 0 6px 0;
+  line-height: 1.35;
+}
+
+.doc-markdown-rendered-view .doc-h2,
+.chunk-card-markdown-view .doc-h2 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 12px 0 6px 0;
+  line-height: 1.4;
+}
+
+.doc-markdown-rendered-view .doc-h3,
+.chunk-card-markdown-view .doc-h3 {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 10px 0 4px 0;
+  line-height: 1.4;
+}
+
+.doc-markdown-rendered-view .doc-h4,
+.chunk-card-markdown-view .doc-h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 8px 0 4px 0;
+}
+
+.doc-markdown-rendered-view .doc-p,
+.chunk-card-markdown-view .doc-p {
+  margin: 0 0 6px 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.doc-markdown-rendered-view .doc-ul,
+.chunk-card-markdown-view .doc-ul {
+  margin: 4px 0 8px 18px;
+  padding: 0;
+  list-style-type: disc;
+}
+
+.doc-markdown-rendered-view .doc-ol,
+.chunk-card-markdown-view .doc-ol {
+  margin: 4px 0 8px 18px;
+  padding: 0;
+  list-style-type: decimal;
+}
+
+.doc-markdown-rendered-view li,
+.chunk-card-markdown-view li {
+  margin-bottom: 3px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.doc-markdown-rendered-view strong,
+.chunk-card-markdown-view strong {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.doc-markdown-rendered-view em,
+.chunk-card-markdown-view em {
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.doc-inline-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
+  background: var(--surface-sunken);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.doc-blockquote {
+  margin: 8px 0;
+  padding: 6px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+  border-radius: 0 4px 4px 0;
+  font-size: 12.5px;
+}
+
+.doc-table-wrapper {
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.doc-table th,
+.doc-table td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.doc-table th {
+  background: var(--surface-soft);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.doc-hr {
+  border: 0;
+  height: 1px;
+  background: var(--surface-sunken-strong);
+  margin: 12px 0;
+}
+
+.doc-link {
+  color: var(--info-text);
+  text-decoration: underline;
+}
+
+.chunk-pagination-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Nhãn trên thẻ đoạn văn bản
+   Thay cho checkbox chọn và công tắc bật/tắt cũ: backend không có khái niệm
+   bật/tắt từng đoạn, và không có hành động hàng loạt nào để việc chọn có nghĩa.
+   ========================================================================== */
+.chunk-card-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.chunk-index-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-subtle);
+  color: var(--brand-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.chunk-token-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.chunk-count-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Chọn và bật/tắt từng đoạn
+   Cũng chỉ tồn tại trong phiên: backend chưa lưu trạng thái theo từng đoạn.
+   ========================================================================== */
+.chunk-select-all-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chunk-checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--brand);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.chunk-card-top-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.chunk-type-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.chunk-card-item.selected {
+  border-color: var(--brand-border);
+  background: var(--brand-subtle);
+}
