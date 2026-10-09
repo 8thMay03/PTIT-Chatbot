@@ -172,6 +172,12 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
     return allChunks.filter((c) => c.text && c.text.toLowerCase().includes(needle));
   }, [searchTerm, allChunks]);
 
+  const renderedDocHtml = useMemo(() => {
+    const content = docDetail?.full_text || docDetail?.preview;
+    if (!content) return "<p><em>Tài liệu chưa có nội dung văn bản.</em></p>";
+    return renderMarkdownHtml(content);
+  }, [docDetail?.full_text, docDetail?.preview]);
+
   const isSearching = Boolean(searchTerm);
   const visibleTotal = isSearching ? searchResults?.length ?? 0 : chunkTotal;
   const totalPages = Math.max(1, Math.ceil(visibleTotal / pageSize));
@@ -276,9 +282,7 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
               <div
                 className="doc-markdown-rendered-view"
                 dangerouslySetInnerHTML={{
-                  __html: renderMarkdownHtml(
-                    docDetail?.full_text || docDetail?.preview || "*Tài liệu chưa có nội dung văn bản.*"
-                  ),
+                  __html: renderedDocHtml,
                 }}
               />
             )}

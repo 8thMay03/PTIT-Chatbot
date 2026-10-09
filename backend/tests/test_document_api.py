@@ -91,3 +91,50 @@ def test_parse_single_document_returns_404_when_missing(monkeypatch) -> None:
 
     assert response.status_code == 404
 
+
+def test_get_document_returns_full_text(monkeypatch, tmp_path) -> None:
+    doc_file = tmp_path / "full-doc.md"
+    doc_file.write_text("# Full Document Content\nDetailed paragraphs.", encoding="utf-8")
+
+    document = SimpleNamespace(
+        id="doc-full",
+        title="full-doc",
+        source_path="full-doc.md",
+        file_type="md",
+        status="active",
+        document_metadata=None,
+        created_at=None,
+        updated_at=None,
+    )
+    monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 10))
+    monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: doc_file)
+
+    response = client.get("/api/documents/doc-full")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["full_text"] == "# Full Document Content\nDetailed paragraphs."
+    assert data["file_name"] == "full-doc.md"
+
+
+def test_get_document_falls_back_to_chunks_when_source_missing(monkeypatch) -> None:
+    document = SimpleNamespace(
+        id="doc-chunks",
+        title="chunks-doc",
+        source_path="data/missing.md",
+        file_type="md",
+        status="active",
+        document_metadata=None,
+        created_at=None,
+        updated_at=None,
+    )
+    monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 3))
+    monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: None)
+    monkeypatch.setattr(routes, "get_document_full_text", lambda session, doc_id: "Chunk 1\n\nChunk 2\n\nChunk 3")
+
+    response = client.get("/api/documents/doc-chunks")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["full_text"] == "Chunk 1\n\nChunk 2\n\nChunk 3"
+

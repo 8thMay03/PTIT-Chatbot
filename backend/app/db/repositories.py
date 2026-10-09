@@ -171,6 +171,20 @@ def get_document_preview_text(session: Session, document_id: str, limit: int = 2
     return joined[:limit].rstrip() + "…"
 
 
+def get_document_full_text(session: Session, document_id: str) -> str | None:
+    """Tái tạo toàn văn tài liệu từ tất cả các đoạn (chunks) trong cơ sở dữ liệu."""
+    texts = list(
+        session.scalars(
+            select(Chunk.text)
+            .where(Chunk.document_id == document_id)
+            .order_by(Chunk.chunk_index.asc())
+        ).all()
+    )
+    if not texts:
+        return None
+    return "\n\n".join(texts)
+
+
 def get_document_chunks(
     session: Session,
     document_id: str,

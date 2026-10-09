@@ -29,7 +29,13 @@ from app.api.schemas import (
     UpdateConfigRequest,
 )
 from app.db import check_db_health, get_session
-from app.core.config import get_runtime_config_dict, reset_runtime_config, settings, update_runtime_config
+from app.core.config import (
+    PROJECT_ROOT,
+    get_runtime_config_dict,
+    reset_runtime_config,
+    settings,
+    update_runtime_config,
+)
 from app.db.repositories import (
     add_message,
     add_message_sources,
@@ -38,6 +44,7 @@ from app.db.repositories import (
     get_conversation,
     get_conversation_messages,
     get_document_chunks,
+    get_document_full_text,
     get_document_preview_text,
     get_document_with_chunk_count,
     get_recent_conversation_history,
@@ -171,9 +178,24 @@ def get_document(document_id: str, session: Session = Depends(get_session)) -> D
             full_text = source_p.read_text(encoding="utf-8")
         except Exception:
             full_text = None
+
+    if not full_text:
+        full_text = get_document_full_text(session, document.id)
+
     preview = read_preview(document.source_path) or get_document_preview_text(session, document.id)
-    if full_text is None:
+    if not full_text:
         full_text = preview
+
+    # Tự động đồng bộ lại source_path nếu file nằm ở thư mục con khác với đường dẫn cũ trong DB
+    if source_p is not None and source_p.is_file():
+        try:
+            rel_posix = source_p.relative_to(PROJECT_ROOT.resolve()).as_posix()
+            if rel_posix != document.source_path:
+                document.source_path = rel_posix
+                session.commit()
+        except Exception:
+            pass
+
     return DocumentDetail(**_document_payload(document, chunk_count), preview=preview, full_text=full_text)
 
 
