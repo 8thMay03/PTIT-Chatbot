@@ -531,7 +531,7 @@
 
 .composer:focus-within {
   border-color: var(--brand-border);
-  box-shadow: var(--shadow-md), var(--ring-brand);
+  box-shadow: var(--shadow-md), 0 0 0 1px var(--brand-border);
 }
 
 .composer textarea {
@@ -551,6 +551,12 @@
 
 .composer textarea::placeholder {
   color: var(--text-faint);
+}
+
+/* Khung composer đã hiển thị focus, tránh thêm quầng quanh textarea. */
+.composer textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 .send-btn {
