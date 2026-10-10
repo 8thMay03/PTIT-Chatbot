@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Github,
   Database,
-  MessageSquare,
   Settings,
   Plus,
   Menu,
@@ -19,11 +18,6 @@ import { useTheme } from "./lib/theme";
 import { API_BASE_URL } from "./api";
 
 const REPO_URL = "https://github.com/8thMay03/PTIT-Chatbot";
-
-const NAV_ITEMS = [
-  { key: "chat", label: "Chat", icon: MessageSquare },
-  { key: "documents", label: "Dataset", icon: Database },
-];
 
 function readRoute(value) {
   const route = String(value || "").replace(/^#\/?/, "");
@@ -241,27 +235,9 @@ export default function App() {
             </button>
           </div>
           <nav className="sidebar-nav" aria-label="Điều hướng chính">
-            {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                type="button"
-                className={`sidebar-nav-item ${view === key ? "active" : ""}`}
-                aria-current={view === key ? "page" : undefined}
-                title={label}
-                onClick={() => {
-                  setView(key);
-                  setMobileSidebarOpen(false);
-                }}
-              >
-                <Icon size={18} />
-                <span className="sidebar-nav-label">{label}</span>
-              </button>
-            ))}
-          </nav>
-          <div className="sidebar-chat-area">
             <button
               type="button"
-              className="new-chat-btn"
+              className={`sidebar-nav-item ${view === "chat" && !activeConversationId ? "active" : ""}`}
               onClick={startNewChat}
               disabled={chatLoading}
               title="Cuộc trò chuyện mới"
@@ -270,6 +246,21 @@ export default function App() {
               <Plus size={18} />
               <span className="sidebar-nav-label">Cuộc trò chuyện mới</span>
             </button>
+            <button
+              type="button"
+              className={`sidebar-nav-item ${view === "documents" ? "active" : ""}`}
+              aria-current={view === "documents" ? "page" : undefined}
+              title="Dataset"
+              onClick={() => {
+                setView("documents");
+                setMobileSidebarOpen(false);
+              }}
+            >
+              <Database size={18} />
+              <span className="sidebar-nav-label">Dataset</span>
+            </button>
+          </nav>
+          <div className="sidebar-chat-area">
             <ConversationList
               activeId={view === "chat" ? activeConversationId : null}
               onOpen={openConversation}
