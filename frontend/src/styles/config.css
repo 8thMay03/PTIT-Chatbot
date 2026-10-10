@@ -1,6 +1,7 @@
 /* ==========================================================================
    MÀN HÌNH CẤU HÌNH RAG & QUẢN LÝ MÔ HÌNH (SETTINGS & MODELS)
-   ========================================================================== */.config-page-wrapper
+   ========================================================================== */
+.config-page-wrapper,
 .models-page-wrapper {
   height: 100%;
   min-height: 0;
@@ -417,4 +418,35 @@
   font-size: var(--text-xs);
   font-weight: 600;
   white-space: nowrap;
+}
+
+/* Trang Settings tập trung. */
+.settings-page { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--surface); }
+.settings-page-heading { padding: 24px 32px 18px; flex-shrink: 0; }
+.settings-page-heading h1 { margin: 0; font-size: 24px; letter-spacing: -0.03em; }
+.settings-page-heading p { margin: 7px 0 0; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
+.settings-tabs { display: flex; gap: 22px; padding: 0 32px; border-bottom: 1px solid var(--border); flex-shrink: 0; overflow-x: auto; }
+.settings-tab { display: flex; align-items: center; gap: 8px; padding: 12px 0; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); font-size: 13px; white-space: nowrap; cursor: pointer; }
+.settings-tab.active { color: var(--brand-text); border-bottom-color: var(--brand); font-weight: 600; }
+.settings-tab:hover { color: var(--text); }
+.settings-panel { flex: 1; min-height: 0; overflow: hidden; }
+.settings-panel[hidden] { display: none; }
+.settings-panel .config-page-wrapper, .settings-panel .models-page-wrapper { height: 100%; }
+.settings-panel .settings-subtabs-header { padding-top: 22px; padding-bottom: 18px; box-shadow: none; border-bottom: 0; }
+.settings-panel .config-main-title { font-size: 17px; }
+.appearance-panel { padding: 28px 32px; overflow-y: auto; }
+.appearance-panel h2 { margin: 0; font-size: 18px; }
+.appearance-panel p { color: var(--text-muted); font-size: 13px; }
+.theme-options { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.theme-option { display: flex; flex-direction: column; gap: 16px; align-items: flex-start; min-width: 148px; padding: 22px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text-secondary); font-size: 13px; cursor: pointer; }
+.theme-option.active { border-color: var(--brand); background: var(--brand-subtle); color: var(--brand-text); }
+.settings-language { display: flex; justify-content: space-between; gap: 20px; max-width: 500px; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-muted); }
+.settings-language strong { color: var(--text); font-weight: 500; }
+@media (max-width: 900px) {
+  .settings-page-heading { padding: 18px 16px 18px 62px; }
+  .settings-tabs { padding: 0 16px; gap: 20px; }
+  .appearance-panel { padding: 24px 16px; }
+  .settings-panel .settings-subtabs-header { padding-left: 16px; padding-right: 16px; }
+  .config-view-container { padding: 20px 16px 40px; }
+  .model-mgmt-page { padding: 20px 16px 40px; }
 }

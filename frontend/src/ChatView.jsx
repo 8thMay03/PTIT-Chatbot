@@ -6,7 +6,6 @@ import {
   Copy,
   GraduationCap,
   Lightbulb,
-  PanelLeftOpen,
   RefreshCw,
   RotateCcw,
   Send,
@@ -100,7 +99,7 @@ function injectCitations(html, sources) {
 }
 
 const ChatView = forwardRef(function ChatView(
-  { hidden, onLoadingChange, onConversationSaved, isSidebarCollapsed, onToggleSidebar },
+  { hidden, onLoadingChange, onConversationSaved },
   ref
 ) {
   const [messages, setMessages] = useState([
@@ -360,17 +359,6 @@ const ChatView = forwardRef(function ChatView(
     <section className="chat" hidden={hidden} aria-hidden={hidden}>
       <header className="chat-header">
         <div className="title">
-          {isSidebarCollapsed && onToggleSidebar && (
-            <button
-              type="button"
-              className="chat-sidebar-expand-btn"
-              onClick={onToggleSidebar}
-              title="Mở thanh bên (Ctrl+B)"
-              aria-label="Mở thanh bên (Ctrl+B)"
-            >
-              <PanelLeftOpen size={16} />
-            </button>
-          )}
           <span className="status-dot" />
           <span>{loading ? "Đang trả lời..." : "Sẵn sàng hỗ trợ"}</span>
         </div>

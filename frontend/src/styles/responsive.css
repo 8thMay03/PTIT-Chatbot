@@ -28,82 +28,23 @@
    ≤ 900px — tablet: mọi layout 2 cột xếp chồng thành 1 cột
    ========================================================================== */
 @media (max-width: 900px) {
-  /* ---- Khung ứng dụng: sidebar chat thành drawer trượt ---- */
-  .app-shell,
-  .app-shell.view-chat,
-  .app-shell.view-full {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
+  .app-shell, .app-shell.sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
   .app-shell .sidebar {
     position: fixed;
-    top: var(--header-h);
-    bottom: 0;
-    left: 0;
+    inset: 0 auto 0 0;
     z-index: 45;
     width: min(300px, 84vw);
     transform: translateX(-102%);
-    transition: transform var(--duration-slow) var(--ease),
-                opacity var(--duration-slow) var(--ease);
-    box-shadow: var(--shadow-lg);
+    visibility: hidden;
+    transition: transform var(--duration-slow) var(--ease), visibility var(--duration-slow);
   }
-
-  .app-shell.sidebar-open .sidebar {
-    display: flex;
-    transform: translateX(0);
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-  }
-
-  .sidebar-scrim {
-    position: fixed;
-    inset: var(--header-h) 0 0 0;
-    z-index: 44;
-    background: var(--scrim);
-    border: 0;
-    animation: fade-in var(--duration) var(--ease);
-  }
-
-  /* Nút hamburger chỉ tồn tại ở khổ hẹp */
-  .sidebar-toggle-btn {
-    display: grid;
-  }
-
-  /* ---- Header ---- */
-  .app-header {
-    padding: var(--space-2) var(--space-3);
-  }
-
-  .app-header .brand h1 {
-    font-size: 14px;
-  }
-
-  .app-header .brand-mark {
-    width: 32px;
-    height: 32px;
-  }
-
-  /* Link phụ (Discord/GitHub) nhường chỗ cho điều hướng chính */
-  .header-icon-link {
-    display: none;
-  }
-
-  .top-nav-item {
-    padding: 0 10px;
-    font-size: 12px;
-  }
-
-  /* ---- Chat ---- */
-  .chat-header {
-    display: none;
-  }
-
-  .chat {
-    grid-template-rows: minmax(0, 1fr) auto;
-    height: 100%;
-    min-height: 0;
-  }
+  .app-shell.sidebar-open .sidebar { transform: translateX(0); visibility: visible; }
+  .sidebar-scrim { display: block; position: fixed; inset: 0; z-index: 44; background: var(--scrim); border: 0; cursor: pointer; }
+  .mobile-menu-btn { display: grid; place-items: center; position: absolute; top: 14px; left: 14px; z-index: 21; width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); cursor: pointer; }
+  .chat-header { padding: 14px 16px 14px 62px; }
+  .chat { min-height: 0; }
+  .doc-view-top-bar { min-height: 38px; padding-left: 44px; }
+  .settings-page-heading { padding-left: 62px; }
 
   .messages {
     padding: var(--space-5) var(--space-4) var(--space-2);
@@ -138,6 +79,7 @@
     border-right: 0;
     border-bottom: 1px solid var(--border);
     padding: var(--space-3);
+    padding-left: 62px;
   }
 
   .dataset-info-card {
@@ -203,24 +145,6 @@
    ≤ 640px — điện thoại
    ========================================================================== */
 @media (max-width: 640px) {
-  /* ---- Header: chỉ giữ những gì thiết yếu ---- */
-  .lang-selector {
-    display: none;
-  }
-
-  .top-nav {
-    gap: 2px;
-  }
-
-  .top-nav-item {
-    padding: 0 8px;
-    font-size: 11.5px;
-  }
-
-  .top-nav-home {
-    display: none;
-  }
-
   /* ---- Chat ---- */
   .messages {
     padding: var(--space-4) var(--space-3) var(--space-2);
@@ -411,19 +335,5 @@
 
   .chunk-mode-btn {
     flex: 1;
-  }
-}
-
-/* ==========================================================================
-   Màn hình rất hẹp (≤ 380px)
-   ========================================================================== */
-@media (max-width: 380px) {
-  .app-header .brand h1 {
-    display: none;
-  }
-
-  .top-nav-item {
-    padding: 0 6px;
-    font-size: 11px;
   }
 }

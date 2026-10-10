@@ -1,413 +1,217 @@
-/* ---------------- Bố cục tổng ---------------- */
+/* Khung ứng dụng: sidebar cố định cho mọi trang, không có top navbar. */
 .app-shell {
   display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   height: 100vh;
-  min-height: 100vh;
-  background: var(--bg-gradient);
+  height: 100dvh;
+  min-height: 0;
+  background: var(--bg);
   overflow: hidden;
   transition: grid-template-columns var(--duration-slow) var(--ease);
 }
 
-.app-shell.view-full {
-  grid-template-columns: minmax(0, 1fr);
+.app-shell.sidebar-collapsed {
+  grid-template-columns: 72px minmax(0, 1fr);
 }
-
-.app-shell.view-full .sidebar {
-  display: none;
-}
-
-.app-shell.view-chat.sidebar-collapsed {
-  grid-template-columns: 0px minmax(0, 1fr);
-}
-
-.app-shell.view-chat.sidebar-collapsed .sidebar {
-  transform: translateX(-100%);
-  opacity: 0;
-  pointer-events: none;
-  visibility: hidden;
-}
-
 .main-pane {
+  position: relative;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
-
-/* ---------------- Navbar trên ---------------- */
-.app-header {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 24px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  z-index: 20;
-}
-
-.app-header-left,
-.app-header-right {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
-
-.app-header-right {
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.header-brand {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  padding: 0;
-}
-
-.app-header .brand-mark {
-  width: 34px;
-  height: 34px;
-  color: var(--brand-text);
-  background: var(--brand-subtle);
-  border: 1px solid var(--brand-border);
-  box-shadow: none;
-  border-radius: 8px;
-}
-
-.app-header .brand h1 {
-  font-size: 15px;
-  color: var(--text);
-}
-
-.app-header .brand p {
-  color: var(--text-muted);
-}
-
-.top-nav {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-}
-
-.top-nav-home {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-pill);
-  border: 0;
-  background: transparent;
-  color: var(--brand-text);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.top-nav-home:hover {
-  background: var(--surface-sunken-strong);
-  color: var(--brand-text);
-}
-
-.top-nav-item {
-  border: 0;
-  cursor: pointer;
-  font: inherit;
-  color: var(--brand-text);
-  background: transparent;
-  height: 32px;
-  padding: 0 16px;
-  border-radius: var(--radius-pill);
-  font-size: 13px;
-  font-weight: 500;
-  transition: all 0.15s ease;
-}
-
-.top-nav-item:hover {
-  color: var(--text);
-  background: var(--surface-sunken-strong);
-}
-
-.top-nav-item.active {
-  color: var(--on-solid);
-  background: var(--brand);
-  font-weight: 600;
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.3);
-}
-
-.header-icon-link,
-.header-icon-btn {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  border-radius: 50%;
-  cursor: pointer;
-  text-decoration: none;
-  transition: all 0.15s ease;
-}
-
-.header-icon-link:hover,
-.header-icon-btn:hover {
-  color: var(--text);
-  background: var(--surface-sunken);
-}
-
-/* Nhãn tĩnh, không phải nút: hệ thống chỉ có tiếng Việt nên không có gì để chọn. */
-.lang-selector {
-  display: flex;
-  align-items: center;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--text-muted);
-  user-select: none;
-  white-space: nowrap;
-}
-
-/* ---------------- Thanh bên ---------------- */
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  padding: 26px 22px;
+  gap: 20px;
+  padding: 20px 16px 14px;
   color: var(--on-solid);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0)),
-    linear-gradient(160deg, var(--brand-700) 0%, var(--brand-800) 55%, var(--brand-900) 100%);
-  position: relative;
-  overflow: hidden;
-  width: var(--sidebar-w);
+  background: var(--brand-800);
   min-width: 0;
-  box-sizing: border-box;
-  transform: translateX(0);
-  transition: transform var(--duration-slow) var(--ease),
-              opacity var(--duration-slow) var(--ease),
-              visibility var(--duration-slow);
+  min-height: 0;
+  overflow: hidden;
 }
-
-.sidebar::after {
-  content: "";
-  position: absolute;
-  inset: auto -40% -30% auto;
-  width: 70%;
-  height: 60%;
-  background: radial-gradient(closest-side, rgba(254, 202, 202, 0.25), transparent 70%);
-  filter: blur(20px);
-  pointer-events: none;
+.sidebar-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
 }
-
 .brand {
   display: flex;
   align-items: center;
-  gap: 13px;
-  position: relative;
+  gap: 10px;
 }
-
+.sidebar-brand {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
 .brand-mark {
   display: grid;
-  width: 44px;
-  height: 44px;
   place-items: center;
-  color: var(--brand-text);
-  background: var(--surface);
-  border-radius: 12px;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--brand-700);
+  color: var(--on-solid);
 }
-
-.brand h1 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
+.sidebar-brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  white-space: nowrap;
 }
-
-.brand p {
-  margin: 3px 0 0;
-  font-size: 12px;
+.sidebar-brand-copy strong {
+  font-size: 14px;
+  letter-spacing: -0.02em;
+}
+.sidebar-brand-copy small {
+  font-size: 11px;
   color: var(--brand-100);
-  letter-spacing: 0.02em;
 }
-
-.sidebar-top-bar {
+.sidebar-collapse-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 34px;
+  padding: 0;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--brand-100);
+  cursor: pointer;
+}
+.sidebar-collapse-btn:hover {
+  background: var(--brand-700);
+  color: var(--on-solid);
+}
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.sidebar-nav-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 11px;
   width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--brand-100);
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
 }
-
-.sidebar-top-bar .new-chat-btn {
+.sidebar-nav-item svg {
+  flex-shrink: 0;
+}
+.sidebar-nav-item:hover {
+  background: var(--brand-700);
+  color: var(--on-solid);
+}
+.sidebar-nav-item.active {
+  background: var(--surface);
+  color: var(--brand-text);
+  font-weight: 600;
+}
+.sidebar-nav-item.active:focus-visible {
+  outline-color: var(--brand-200);
+}
+.sidebar-chat-area {
+  display: flex;
+  flex-direction: column;
   flex: 1;
+  gap: 20px;
+  min-height: 0;
 }
-
 .new-chat-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 11px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: var(--radius);
+  padding: 10px 12px;
+  flex-shrink: 0;
+  border: 1px solid var(--brand-600);
+  border-radius: 9px;
+  background: transparent;
   color: var(--on-solid);
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(6px);
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: background 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
 }
-
-.new-chat-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.45);
+.new-chat-btn:hover:not(:disabled) {
+  background: var(--brand-700);
 }
-
-.new-chat-btn:active {
-  transform: scale(0.98);
-}
-
 .new-chat-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
-
-.sidebar-collapse-btn {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: var(--radius);
-  color: var(--on-solid);
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(6px);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
-}
-
-.sidebar-collapse-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.45);
-}
-
-.sidebar-collapse-btn:active {
-  transform: scale(0.96);
-}
-
 .sidebar-section {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  position: relative;
 }
-
 .sidebar-label {
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: var(--brand-100);
-  padding: 0 2px;
 }
-
-.panel {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.panel strong {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.panel span {
-  display: block;
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--brand-100);
-  overflow-wrap: anywhere;
-  line-height: 1.45;
-}
-
-.tip-list {
+.sidebar-footer {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.tip-list li {
-  display: flex;
-  gap: 9px;
-  align-items: flex-start;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--brand-100);
-  list-style: none;
-}
-
-.tip-list .tip-dot {
-  margin-top: 5px;
-  width: 6px;
-  height: 6px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--surface);
-  opacity: 0.7;
-}
-
-/* --------------------------------------------------------------------------
-   Nút mở/thu gọn thanh bên (trượt ra/vào)
-   -------------------------------------------------------------------------- */
-.sidebar-toggle-btn {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  margin-right: 8px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--surface);
-  color: var(--text-secondary);
-  cursor: pointer;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--brand-700);
   flex-shrink: 0;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
-
-.sidebar-toggle-btn:hover {
-  background: var(--surface-sunken);
-  color: var(--brand-text);
-  border-color: var(--border-strong);
+.sidebar-source-link {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 12px;
+  color: var(--brand-200);
+  text-decoration: none;
+  font-size: 10px;
 }
-
-.sidebar-toggle-btn:active {
-  transform: scale(0.96);
+.sidebar-source-link:hover {
+  color: var(--on-solid);
 }
-
-/* Lớp phủ sau drawer. Là <button> để bấm được bằng bàn phím, không chỉ bằng chuột. */
+.mobile-menu-btn,
 .sidebar-scrim {
   display: none;
-  cursor: pointer;
+}
+
+@media (min-width: 901px) {
+  .sidebar-collapsed .sidebar {
+    padding: 20px 10px 14px;
+  }
+  .sidebar-collapsed .sidebar-brand-copy,
+  .sidebar-collapsed .sidebar-nav-label,
+  .sidebar-collapsed .sidebar-chat-area .conversation-section {
+    display: none;
+  }
+  .sidebar-collapsed .sidebar-brand-row {
+    flex-direction: column;
+  }
+  .sidebar-collapsed .sidebar-nav-item,
+  .sidebar-collapsed .new-chat-btn,
+  .sidebar-collapsed .sidebar-source-link {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
 
 /* ==========================================================================
@@ -581,30 +385,11 @@
 }
 
 @keyframes conv-pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-
-/* Mẹo sử dụng thu gọn thành <details> để nhường chỗ cho danh sách hội thoại */
-.sidebar-tips {
-  flex-shrink: 0;
-}
-
-.sidebar-tips > summary {
-  cursor: pointer;
-  list-style: none;
-  margin-bottom: 8px;
-}
-
-.sidebar-tips > summary::-webkit-details-marker {
-  display: none;
-}
-
-.sidebar-tips > summary::after {
-  content: " ▾";
-  opacity: 0.6;
-}
-
-.sidebar-tips[open] > summary::after {
-  content: " ▴";
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
 }

@@ -1,21 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Github,
-  Home,
+  Database,
+  MessageSquare,
+  Settings,
+  Plus,
   Menu,
-  Monitor,
-  Moon,
   PanelLeftClose,
   PanelLeftOpen,
-  RefreshCw,
-  Sliders,
   Sparkles,
-  Sun,
 } from "lucide-react";
 import ChatView from "./ChatView";
 import DatasetView from "./DatasetView";
-import ConfigView from "./ConfigView";
-import ModelsView from "./ModelsView";
+import SettingsView from "./SettingsView";
 import ConversationList from "./components/ConversationList";
 import { ToastProvider } from "./components/Toast";
 import { useTheme } from "./lib/theme";
@@ -23,43 +20,41 @@ import { API_BASE_URL } from "./api";
 
 const REPO_URL = "https://github.com/8thMay03/PTIT-Chatbot";
 
-const SIDEBAR_TIPS = [
-  "Hỏi cụ thể một quy định, ví dụ \"điều kiện tốt nghiệp\".",
-  "Có thể hỏi tiếp để làm rõ câu trả lời trước đó.",
-  "Mỗi câu trả lời kèm nguồn trích từ sổ tay sinh viên.",
-  "Tùy chỉnh LLM & Reranker trong màn Cấu hình hoặc Mô hình.",
-];
-
-const VALID_VIEWS = ["chat", "documents", "config", "models", "settings"];
-
 const NAV_ITEMS = [
-  { key: "documents", label: "Dataset" },
-  { key: "chat", label: "Chat" },
-  { key: "config", label: "Cấu hình" },
-  { key: "models", label: "Mô hình" },
+  { key: "chat", label: "Chat", icon: MessageSquare },
+  { key: "documents", label: "Dataset", icon: Database },
 ];
 
-const THEME_LABELS = {
-  light: "Đang dùng giao diện sáng. Chuyển sang tối.",
-  dark: "Đang dùng giao diện tối. Chuyển sang sáng.",
-};
-
-function getInitialView() {
-  if (typeof window !== "undefined") {
-    const hash = window.location.hash.replace(/^#\/?/, "");
-    if (VALID_VIEWS.includes(hash)) {
-      return hash;
-    }
-    const saved = localStorage.getItem("ptit_chatbot_view");
-    if (VALID_VIEWS.includes(saved)) {
-      return saved;
-    }
+function readRoute(value) {
+  const route = String(value || "").replace(/^#\/?/, "");
+  if (route === "config") return { view: "settings", tab: "config" };
+  if (route === "models") return { view: "settings", tab: "models" };
+  if (route === "settings" || route.startsWith("settings/")) {
+    const tab = route.split("/")[1];
+    return {
+      view: "settings",
+      tab: ["config", "models", "appearance"].includes(tab) ? tab : "config",
+    };
   }
-  return "chat";
+  if (route === "chat" || route === "documents")
+    return { view: route, tab: "config" };
+  return null;
+}
+
+function getInitialRoute() {
+  return (
+    readRoute(window.location.hash) ||
+    readRoute(localStorage.getItem("ptit_chatbot_view")) || {
+      view: "chat",
+      tab: "config",
+    }
+  );
 }
 
 export default function App() {
-  const [view, setView] = useState(getInitialView);
+  const [initialRoute] = useState(getInitialRoute);
+  const [view, setView] = useState(initialRoute.view);
+  const [settingsTab, setSettingsTab] = useState(initialRoute.tab);
   const [chatLoading, setChatLoading] = useState(false);
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
@@ -77,7 +72,7 @@ export default function App() {
   const [activeConversationId, setActiveConversationId] = useState(null);
   // Tăng lên mỗi khi một lượt hỏi đáp kết thúc, để danh sách hội thoại tải lại.
   const [conversationsToken, setConversationsToken] = useState(0);
-  const { theme, resolvedTheme, setTheme, toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const chatRef = useRef(null);
 
   // Theo dõi kích thước màn hình
@@ -103,32 +98,33 @@ export default function App() {
     }
   }, []);
 
-  // Phím tắt Ctrl+B / Cmd+B bật/tắt thanh bên trong tab Chat
+  // Phím tắt Ctrl+B / Cmd+B bật/tắt thanh bên trên mọi trang
   useEffect(() => {
     function handleKeyDown(event) {
-      if (view === "chat" && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "b") {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "b") {
         event.preventDefault();
         toggleSidebar();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [view, toggleSidebar]);
+  }, [toggleSidebar]);
 
-  // Đồng bộ view sang localStorage và hash trên URL
+  // Giữ URL cũ #config / #models tương thích với trang Settings mới.
   useEffect(() => {
-    localStorage.setItem("ptit_chatbot_view", view);
-    if (window.location.hash.replace(/^#\/?/, "") !== view) {
-      window.history.replaceState(null, "", `#${view}`);
+    const route = view === "settings" ? `settings/${settingsTab}` : view;
+    localStorage.setItem("ptit_chatbot_view", route);
+    if (window.location.hash.slice(1) !== route) {
+      window.history.replaceState(null, "", `#${route}`);
     }
-  }, [view]);
+  }, [view, settingsTab]);
 
-  // Theo dõi nút Back / Forward của trình duyệt
   useEffect(() => {
     function handleHashChange() {
-      const hash = window.location.hash.replace(/^#\/?/, "");
-      if (VALID_VIEWS.includes(hash)) {
-        setView(hash);
+      const route = readRoute(window.location.hash);
+      if (route) {
+        setView(route.view);
+        setSettingsTab(route.tab);
       }
     }
     window.addEventListener("hashchange", handleHashChange);
@@ -179,8 +175,6 @@ export default function App() {
     setConversationsToken((token) => token + 1);
   }, []);
 
-  const isSettingsView = view === "config" || view === "models" || view === "settings";
-
   return (
     <ToastProvider>
       <a className="skip-link" href="#main-content">
@@ -192,183 +186,157 @@ export default function App() {
           mobileSidebarOpen ? "sidebar-open" : ""
         } ${desktopSidebarCollapsed ? "sidebar-collapsed" : ""}`}
       >
-        <header className="app-header">
-          <div className="app-header-left">
-            {view === "chat" && (
-              <button
-                type="button"
-                className={`sidebar-toggle-btn ${isSidebarOpen ? "is-open" : "is-collapsed"}`}
-                onClick={toggleSidebar}
-                aria-label={isSidebarOpen ? "Thu gọn thanh bên (Ctrl+B)" : "Mở thanh bên (Ctrl+B)"}
-                aria-expanded={isSidebarOpen}
-                aria-controls="chat-sidebar"
-                title={isSidebarOpen ? "Thu gọn thanh bên (Ctrl+B)" : "Mở thanh bên (Ctrl+B)"}
-              >
-                {isSidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
-              </button>
-            )}
-
-            <button className="brand header-brand" onClick={() => setView("chat")} type="button">
-              <div className="brand-mark">
-                <Sparkles size={18} />
-              </div>
-              <div>
-                <h1>PTIT Chatbot</h1>
-              </div>
+        {isMobile && mobileSidebarOpen && (
+          <button
+            type="button"
+            className="sidebar-scrim"
+            aria-label="Đóng thanh bên"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+        )}
+        <aside
+          className="sidebar"
+          id="app-sidebar"
+          aria-label="Điều hướng và hội thoại"
+          aria-hidden={isMobile && !mobileSidebarOpen}
+          inert={isMobile && !mobileSidebarOpen ? "" : undefined}
+        >
+          <div className="sidebar-brand-row">
+            <button
+              className="brand sidebar-brand"
+              onClick={() => setView("chat")}
+              type="button"
+              aria-label="PTIT Chatbot — Chat"
+            >
+              <span className="brand-mark">
+                <Sparkles size={19} />
+              </span>
+              <span className="sidebar-brand-copy">
+                <strong>PTIT Chatbot</strong>
+                <small>Trợ lý học vụ</small>
+              </span>
             </button>
-          </div>
-
-          <nav className="top-nav" aria-label="Điều hướng chính">
             <button
               type="button"
-              className="top-nav-home"
-              onClick={() => setView("chat")}
-              aria-label="Trang chủ"
-              title="Trang chủ"
+              className="sidebar-collapse-btn"
+              onClick={toggleSidebar}
+              aria-label={
+                isSidebarOpen
+                  ? "Thu gọn thanh bên (Ctrl+B)"
+                  : "Mở rộng thanh bên (Ctrl+B)"
+              }
+              title={
+                isSidebarOpen
+                  ? "Thu gọn thanh bên (Ctrl+B)"
+                  : "Mở rộng thanh bên (Ctrl+B)"
+              }
+              aria-expanded={isSidebarOpen}
+              aria-controls="app-sidebar"
             >
-              <Home size={15} />
+              {isSidebarOpen ? (
+                <PanelLeftClose size={18} />
+              ) : (
+                <PanelLeftOpen size={18} />
+              )}
             </button>
-            {NAV_ITEMS.map((item) => {
-              const active =
-                view === item.key || (item.key === "config" && view === "settings");
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  className={`top-nav-item ${active ? "active" : ""}`}
-                  aria-current={active ? "page" : undefined}
-                  onClick={() => setView(item.key)}
-                >
-                  {item.label}
-                </button>
-              );
-            })}
+          </div>
+          <nav className="sidebar-nav" aria-label="Điều hướng chính">
+            {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                type="button"
+                className={`sidebar-nav-item ${view === key ? "active" : ""}`}
+                aria-current={view === key ? "page" : undefined}
+                title={label}
+                onClick={() => {
+                  setView(key);
+                  setMobileSidebarOpen(false);
+                }}
+              >
+                <Icon size={18} />
+                <span className="sidebar-nav-label">{label}</span>
+              </button>
+            ))}
           </nav>
-
-          <div className="app-header-right">
+          <div className="sidebar-chat-area">
+            <button
+              type="button"
+              className="new-chat-btn"
+              onClick={startNewChat}
+              disabled={chatLoading}
+              title="Cuộc trò chuyện mới"
+              aria-label="Cuộc trò chuyện mới"
+            >
+              <Plus size={18} />
+              <span className="sidebar-nav-label">Cuộc trò chuyện mới</span>
+            </button>
+            <ConversationList
+              activeId={view === "chat" ? activeConversationId : null}
+              onOpen={openConversation}
+              reloadToken={conversationsToken}
+            />
+          </div>
+          <div className="sidebar-footer">
+            <button
+              type="button"
+              className={`sidebar-nav-item ${view === "settings" ? "active" : ""}`}
+              aria-current={view === "settings" ? "page" : undefined}
+              onClick={() => {
+                setView("settings");
+                setMobileSidebarOpen(false);
+              }}
+              title="Settings"
+            >
+              <Settings size={18} />
+              <span className="sidebar-nav-label">Settings</span>
+            </button>
             <a
               href={REPO_URL}
               target="_blank"
               rel="noreferrer"
-              className="header-icon-link"
-              title="Mã nguồn trên GitHub"
+              className="sidebar-source-link"
               aria-label="Mã nguồn trên GitHub"
+              title="Mã nguồn trên GitHub"
             >
-              <Github size={16} />
+              <Github size={15} />
+              <span className="sidebar-nav-label">Mã nguồn · PTIT Chatbot</span>
             </a>
-
-            {/* Nhãn tĩnh: hệ thống hiện chỉ phục vụ tiếng Việt, không hứa hẹn lựa chọn chưa có */}
-            <span className="lang-selector" title="Ngôn ngữ giao diện">
-              Tiếng Việt
-            </span>
-
-            <button
-              type="button"
-              className={`header-icon-btn ${isSettingsView ? "active" : ""}`}
-              title="Cấu hình hệ thống"
-              aria-label="Cấu hình hệ thống"
-              aria-current={isSettingsView ? "page" : undefined}
-              onClick={() => setView("config")}
-            >
-              <Sliders size={15} />
-            </button>
-
-            <button
-              type="button"
-              className="header-icon-btn"
-              title={THEME_LABELS[resolvedTheme]}
-              aria-label={THEME_LABELS[resolvedTheme]}
-              onClick={toggleTheme}
-            >
-              {resolvedTheme === "dark" ? <Moon size={15} /> : <Sun size={15} />}
-            </button>
-
-            <button
-              type="button"
-              className={`header-icon-btn ${theme === "system" ? "active" : ""}`}
-              title={
-                theme === "system"
-                  ? "Đang theo giao diện hệ điều hành"
-                  : "Theo giao diện hệ điều hành"
-              }
-              aria-label={
-                theme === "system"
-                  ? "Đang theo giao diện hệ điều hành"
-                  : "Theo giao diện hệ điều hành"
-              }
-              aria-pressed={theme === "system"}
-              onClick={() => setTheme("system")}
-            >
-              <Monitor size={15} />
-            </button>
           </div>
-        </header>
+        </aside>
 
-        {view === "chat" && (
-          <>
-            {mobileSidebarOpen && (
-              <button
-                type="button"
-                className="sidebar-scrim"
-                aria-label="Đóng thanh bên"
-                onClick={() => setMobileSidebarOpen(false)}
-              />
-            )}
-            <aside
-              className="sidebar"
-              id="chat-sidebar"
-              aria-label="Thanh bên hội thoại"
-              aria-hidden={!isSidebarOpen}
+        <div
+          className="main-pane"
+          id="main-content"
+          tabIndex={-1}
+          inert={isMobile && mobileSidebarOpen ? "" : undefined}
+        >
+          {isMobile && (
+            <button
+              type="button"
+              className="mobile-menu-btn"
+              onClick={toggleSidebar}
+              aria-label="Mở menu điều hướng"
+              aria-expanded={mobileSidebarOpen}
+              aria-controls="app-sidebar"
             >
-              <div className="sidebar-top-bar">
-                <button className="new-chat-btn" onClick={startNewChat} disabled={chatLoading}>
-                  <RefreshCw size={16} />
-                  Cuộc trò chuyện mới
-                </button>
-                <button
-                  type="button"
-                  className="sidebar-collapse-btn"
-                  onClick={toggleSidebar}
-                  aria-label="Thu gọn thanh bên (Ctrl+B)"
-                  title="Thu gọn thanh bên (Ctrl+B)"
-                >
-                  <PanelLeftClose size={18} />
-                </button>
-              </div>
-
-              <ConversationList
-                activeId={activeConversationId}
-                onOpen={openConversation}
-                reloadToken={conversationsToken}
-              />
-
-              <details className="sidebar-section sidebar-tips">
-                <summary className="sidebar-label">Mẹo sử dụng</summary>
-                <ul className="tip-list">
-                  {SIDEBAR_TIPS.map((tip, index) => (
-                    <li key={index}>
-                      <span className="tip-dot" />
-                      <span>{tip}</span>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            </aside>
-          </>
-        )}
-
-        <div className="main-pane" id="main-content">
+              <Menu size={20} />
+            </button>
+          )}
           <ChatView
             ref={chatRef}
             hidden={view !== "chat"}
             onLoadingChange={setChatLoading}
             onConversationSaved={handleConversationSaved}
-            isSidebarCollapsed={!isSidebarOpen}
-            onToggleSidebar={toggleSidebar}
           />
           {view === "documents" && <DatasetView onChanged={refreshDocCount} />}
-          {(view === "config" || view === "settings") && <ConfigView />}
-          {view === "models" && <ModelsView />}
+          {view === "settings" && (
+            <SettingsView
+              activeTab={settingsTab}
+              onTabChange={setSettingsTab}
+              theme={theme}
+              onThemeChange={setTheme}
+            />
+          )}
         </div>
       </main>
     </ToastProvider>

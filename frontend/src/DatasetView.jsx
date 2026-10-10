@@ -17,7 +17,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Settings,
   SlidersHorizontal,
   Trash2,
   X,
@@ -35,7 +34,6 @@ const TABS = [
   { key: "files", label: "Tài liệu", icon: Folder },
   { key: "retrieval", label: "Thử nghiệm truy xuất", icon: SlidersHorizontal },
   { key: "logs", label: "Nhật ký", icon: List },
-  { key: "config", label: "Thông số xử lý", icon: Settings },
 ];
 
 export default function DatasetView({ onChanged }) {
@@ -86,10 +84,6 @@ export default function DatasetView({ onChanged }) {
   // Backend chưa có bảng log, nên không có gì để tải lại sau khi làm mới trang.
   const [logs, setLogs] = useState([]);
 
-  // Thông số xử lý đọc từ backend
-  const [processingConfig, setProcessingConfig] = useState(null);
-  const [configError, setConfigError] = useState("");
-
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -134,17 +128,6 @@ export default function DatasetView({ onChanged }) {
   useEffect(() => {
     loadDocuments();
   }, [loadDocuments]);
-
-  // Thông số xử lý lấy từ cấu hình thật, không phải văn bản viết cứng trong giao diện
-  useEffect(() => {
-    if (activeTab !== "config" || processingConfig) return;
-    fetch(`${API_BASE_URL}/config`)
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("lỗi"))))
-      .then(setProcessingConfig)
-      .catch(() =>
-        setConfigError("Không đọc được cấu hình từ máy chủ. Các giá trị dưới đây chưa khả dụng.")
-      );
-  }, [activeTab, processingConfig]);
 
   const filtered = useMemo(() => {
     let list = [...documents];
@@ -1141,78 +1124,6 @@ export default function DatasetView({ onChanged }) {
           </div>
         )}
 
-        {/* ---------------------------------------------------------------
-            TAB 4: THÔNG SỐ XỬ LÝ (đọc từ cấu hình thật của máy chủ)
-            --------------------------------------------------------------- */}
-        {activeTab === "config" && (
-          <div className="dataset-sub-view">
-            <header className="dataset-view-header">
-              <div className="dataset-view-title">
-                <h2>Thông số xử lý</h2>
-                <p>Tham số nhúng và truy xuất mà máy chủ đang áp dụng cho kho tài liệu này.</p>
-              </div>
-            </header>
-
-            {configError && (
-              <div className="inline-alert is-warning" role="alert" style={{ marginBottom: 12 }}>
-                <AlertTriangle size={16} />
-                <span>{configError}</span>
-              </div>
-            )}
-
-            <div className="dataset-config-grid">
-              <div className="config-card">
-                <h3>Nhúng &amp; lập chỉ mục</h3>
-                <div className="config-item">
-                  <label>Mô hình embedding</label>
-                  <div className="config-val">{processingConfig?.embedding?.model ?? EMPTY}</div>
-                </div>
-                <div className="config-item">
-                  <label>Nhà cung cấp</label>
-                  <div className="config-val">{processingConfig?.embedding?.provider ?? EMPTY}</div>
-                </div>
-                <div className="config-item">
-                  <label>Tìm kiếm lai (Hybrid)</label>
-                  <div className="config-val">
-                    {processingConfig?.retrieval
-                      ? `Vector ${Math.round((processingConfig.retrieval.hybrid_vector_weight ?? 0) * 100)}% · BM25 ${Math.round(
-                          (1 - (processingConfig.retrieval.hybrid_vector_weight ?? 0)) * 100
-                        )}%`
-                      : EMPTY}
-                  </div>
-                </div>
-              </div>
-
-              <div className="config-card">
-                <h3>Truy xuất &amp; tái xếp hạng</h3>
-                <div className="config-item">
-                  <label>Số đoạn nạp vào LLM (Top-K)</label>
-                  <div className="config-val">{processingConfig?.retrieval?.top_k ?? EMPTY}</div>
-                </div>
-                <div className="config-item">
-                  <label>Mở rộng câu hỏi đa hướng</label>
-                  <div className="config-val">
-                    {processingConfig?.retrieval
-                      ? processingConfig.retrieval.multi_query_enabled
-                        ? `Bật · ${processingConfig.retrieval.multi_query_count ?? EMPTY} truy vấn phụ`
-                        : "Tắt"
-                      : EMPTY}
-                  </div>
-                </div>
-                <div className="config-item">
-                  <label>Tái xếp hạng (Reranker)</label>
-                  <div className="config-val">
-                    {processingConfig?.reranker
-                      ? processingConfig.reranker.enabled
-                        ? `Bật · ${processingConfig.reranker.model || "mặc định"}`
-                        : "Tắt"
-                      : EMPTY}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
 
       {/* Xóa một tài liệu */}
