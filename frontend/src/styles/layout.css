@@ -270,6 +270,12 @@
   cursor: pointer;
 }
 
+.conv-open-btn > svg {
+  flex: 0 0 13px;
+  width: 13px;
+  height: 13px;
+}
+
 .conv-item.active .conv-open-btn {
   color: var(--on-solid);
   font-weight: 600;
