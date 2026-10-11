@@ -38,4 +38,4 @@
 
 - Tiêu chí đã đạt: <AC-* có bằng chứng>.
 - Tiêu chí chưa đạt/chưa xác minh: <AC-* và lý do>.
-- Đề xuất: <tiếp tục triển khai, xử lý blocker hoặc cho phép coordinator đánh dấu done>.
+- Đề xuất: <tiếp tục triển khai, xử lý blocker hoặc bàn giao reviewer; coordinator chỉ đánh dấu done khi review.md kết luận approved trên bản mới nhất>.

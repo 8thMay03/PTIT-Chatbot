@@ -26,14 +26,22 @@
 
 - <Tên API/schema/interface, bên cung cấp, bên sử dụng, cấu trúc và lỗi dự kiến. Ghi không áp dụng nếu chỉ sửa tài liệu.>
 - File mã nguồn dùng chung và người sửa: <đường dẫn + agent-id>.
-- Lượt ghi bốn file task: <coordinator tổng hợp hoặc thứ tự agent được ghi; không ghi đồng thời>.
+- Lượt ghi năm file task: <coordinator tổng hợp hoặc thứ tự agent được ghi; không ghi đồng thời>.
+
+## Phân công kiểm chứng và review
+
+- Verifier: `<agent-id>`; phạm vi kiểm chứng: <AC-* và kiểm tra liên quan>.
+- Reviewer: `<agent-id>`; phạm vi review: <nhiệm vụ/file cần đánh giá>.
+- Hình thức review: `<independent | self_review>` (chọn một theo người thực hiện thực tế).
+- Người xử lý nhận xét: <agent phụ trách từng phần; reviewer xác nhận sau khi sửa>.
 
 ## Thứ tự tích hợp và kiểm chứng
 
 1. <Các nhiệm vụ có thể chạy độc lập và điều kiện bắt đầu>.
 2. <Coordinator tích hợp, giải quyết file chung và thông báo bản mới>.
 3. <Verifier thực hiện kiểm tra tương ứng AC-* trên bản đã tích hợp>.
-4. <Coordinator đối chiếu tiêu chí và kết luận>.
+4. <Reviewer ghi nhận xét trong review.md; agent phụ trách sửa, verifier kiểm tra lại và reviewer xác nhận trên bản mới>.
+5. <Coordinator đối chiếu tiêu chí, kết luận review approved và không còn nhận xét bắt buộc chưa xử lý rồi đóng task>.
 
 ## Rủi ro và điều chỉnh kế hoạch
 

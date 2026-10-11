@@ -26,6 +26,12 @@
 
 - <Đường dẫn tài liệu, issue hoặc task liên quan; ghi không có nếu không áp dụng.>
 
+## Điều kiện hoàn tất
+
+- Mọi tiêu chí bắt buộc có bằng chứng đạt trong `verification.md`.
+- `review.md` kết luận `approved` trên bản mới nhất; không còn nhận xét bắt buộc chưa xử lý.
+- Không còn blocker hoặc nhiệm vụ bắt buộc chưa xong.
+
 ## Trạng thái hiện tại
 
 - Tóm tắt: <tiến độ hiện tại>.

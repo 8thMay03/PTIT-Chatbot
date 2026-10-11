@@ -2,7 +2,7 @@
 
 ## Tổng quan triển khai
 
-Đã tạo hướng dẫn ở gốc repo, README phối hợp, bộ mẫu bốn file và task minh họa này. Thêm ngoại lệ `.agents` trong `.gitignore`.
+Đã tạo hướng dẫn ở gốc repo, README phối hợp, bộ mẫu và task minh họa này. Cấu trúc hiện tại mở rộng thành năm file với `review.md`; ngoại lệ `.agents` trong `.gitignore` đã có từ lần thiết lập trước.
 
 ## Nhật ký theo nhiệm vụ
 
@@ -18,7 +18,15 @@
 - Phát hiện `.AGENTS` trong `.gitignore` loại trừ thư mục cần chia sẻ.
 - Thêm `!.agents/` và `!.agents/**` để Git theo dõi tài liệu phối hợp.
 - Bằng chứng rà soát ghi trong [verification.md](verification.md).
-- Các thay đổi đang ở working tree, chưa commit.
+- Phần thiết lập ban đầu đã commit tại `3a762c3`.
+
+### S-03 — agent-coordinator
+
+- Thêm `review.md` vào bộ mẫu và task này; cập nhật hướng dẫn thành năm file, phân công reviewer và điều kiện review `approved` trước khi đóng task.
+- Nhận xét review có ID, mức độ, yêu cầu sửa, người xử lý, bằng chứng và xác nhận của reviewer. Giữ lịch sử khi review lại bản mới.
+- Bổ sung liên kết review vào mẫu bàn giao và điều kiện hoàn tất vào mẫu task.
+- Cập nhật kết quả trong [verification.md](verification.md) và kết luận trong [review.md](review.md).
+- Phần bổ sung review đang ở working tree, chưa commit.
 
 ## Trao đổi giữa agents
 
@@ -38,6 +46,7 @@
 - Từ / đến: `agent-coordinator` / chủ repo hoặc agent nhận việc tiếp theo.
 - Đầu ra: hướng dẫn và mẫu đã có trong working tree.
 - Kiểm chứng: [verification.md](verification.md).
+- Review hiện tại: [review.md](review.md), ghi rõ hình thức tự review.
 - Hạn chế: phối hợp dựa trên chủ động đọc file và tuần tự hóa lượt ghi; không có tiến trình theo dõi hay thông báo tự động.
 - Bước tiếp theo: dùng lệnh trong `.agents/README.md` để tạo task theo mục tiêu thực tế.
 - Phản hồi nhận bàn giao: chưa có; không phải điều kiện nghiệm thu của task thiết lập.

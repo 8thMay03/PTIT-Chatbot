@@ -37,6 +37,7 @@ Sao chép khối dưới đây cho mỗi thông báo mới; dùng ID duy nhất.
 - Đã hoàn tất: <phần việc và đầu ra>.
 - File/branch/commit/patch: <tham chiếu; ghi chưa commit nếu phù hợp>.
 - Kiểm chứng: <kết quả và liên kết verification.md>.
+- Review: <liên kết review.md, kết luận và R-* còn cần xử lý>.
 - Hạn chế / còn lại: <vấn đề chưa xử lý>.
 - Bước tiếp theo: <hành động của người nhận>.
 - Phản hồi nhận bàn giao: <người nhận bổ sung tham chiếu MSG-* xác nhận hoặc câu hỏi>.
