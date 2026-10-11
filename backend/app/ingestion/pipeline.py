@@ -17,7 +17,7 @@ from app.db.repositories import (
 from app.db.session import SessionLocal, init_db
 from app.embeddings import EmbeddingModel, create_embedding_model
 from app.ingestion.chunker import Chunk, ParentChildChunk, split_parent_child, split_text
-from app.ingestion.converters import DocumentConversionError, read_document_text
+from app.parsers import DocumentParseError, read_document_text
 from app.ingestion.loaders import SourceDocument, load_documents
 from app.ingestion.uploads import delete_source_file, prepare_upload, publish_upload
 from app.retrieval.bm25 import invalidate_bm25_cache
@@ -79,7 +79,7 @@ class IngestionPipeline:
             staged_path = prepare_upload(filename, content, Path(folder))
             text = read_document_text(staged_path) or ""
             if not text.strip():
-                raise DocumentConversionError(f"{staged_path.name} không có nội dung văn bản.")
+                raise DocumentParseError(f"{staged_path.name} không có nội dung văn bản.")
             path = settings.documents_path / staged_path.name
             return self._ingest_document(SourceDocument(path=path, text=text), staged_path=staged_path)
 

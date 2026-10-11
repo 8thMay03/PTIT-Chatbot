@@ -5,8 +5,7 @@ from pathlib import Path
 import pytest
 
 from app.core.config import settings
-from app.ingestion import converters
-from app.ingestion.converters import DocumentConversionError, read_document_text
+from app.parsers import DocumentParseError, docling, read_document_text
 from app.ingestion.loaders import load_documents
 
 
@@ -32,7 +31,7 @@ class _FakeConverter:
 def fake_converter(monkeypatch, tmp_path: Path) -> _FakeConverter:
     # Decomposed "Điều" (NFD) as emitted by some PDF text layers.
     converter = _FakeConverter("# \u0110ie\u0302\u0300u 1\n\nCT&amp;CTSV\n\n<!-- image -->\n\n\n\n| A | B |\n|---|---|\n| 1 | 2 |")
-    monkeypatch.setattr(converters, "_get_converter", lambda: converter)
+    monkeypatch.setattr(docling, "_get_converter", lambda: converter)
     monkeypatch.setattr(settings, "converted_documents_path", tmp_path / "converted")
     return converter
 
@@ -77,6 +76,19 @@ def test_changed_file_is_reconverted(fake_converter, tmp_path: Path) -> None:
     assert len(fake_converter.calls) == 2
 
 
+def test_pre_extraction_docling_cache_is_read_without_conversion(fake_converter, monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "docling_ocr_enabled", False)
+    source = tmp_path / "legacy.pdf"
+    source.write_bytes(b"%PDF-1.7 legacy")
+    # Existing docling-v2/no-ocr cache filename produced before package extraction.
+    cache = settings.converted_documents_path / "03ac7ad915a49a86bfdef44e4408d17efca6fb67432052aa1e38fafb04da24c1.md"
+    cache.parent.mkdir(parents=True)
+    cache.write_text("# Existing export\n\n| A | B |\n|---|---|\n| 100 | 100 |", encoding="utf-8")
+
+    assert "| 100 | 100 |" in read_document_text(source, convert=False)
+    assert fake_converter.calls == []
+
+
 def test_table_cell_padding_is_compacted(monkeypatch, tmp_path: Path) -> None:
     markdown = (
         "| TT   | Thang điểm 10      |\n"
@@ -84,7 +96,7 @@ def test_table_cell_padding_is_compacted(monkeypatch, tmp_path: Path) -> None:
         "| a) Loại đạt   | a) Loại đạt   |\n"
         "| 1    | 8,5 - 10           |\n"
     )
-    monkeypatch.setattr(converters, "_get_converter", lambda: _FakeConverter(markdown))
+    monkeypatch.setattr(docling, "_get_converter", lambda: _FakeConverter(markdown))
     monkeypatch.setattr(settings, "converted_documents_path", tmp_path / "converted")
     path = tmp_path / "bang-diem.pdf"
     path.write_bytes(b"%PDF table")
@@ -101,7 +113,7 @@ def test_bold_only_lines_become_headings(monkeypatch, tmp_path: Path) -> None:
         "Sinh viên điền mục **BHYT** .\n\n"
         "**2. Hoàn tiền** (đối với sinh viên đã có thẻ)\n"
     )
-    monkeypatch.setattr(converters, "_get_converter", lambda: _FakeConverter(markdown))
+    monkeypatch.setattr(docling, "_get_converter", lambda: _FakeConverter(markdown))
     monkeypatch.setattr(settings, "converted_documents_path", tmp_path / "converted")
     path = tmp_path / "bhyt.docx"
     path.write_bytes(b"PK\x03\x04 bhyt")
@@ -115,12 +127,12 @@ def test_bold_only_lines_become_headings(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_empty_conversion_raises(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(converters, "_get_converter", lambda: _FakeConverter("<!-- image -->"))
+    monkeypatch.setattr(docling, "_get_converter", lambda: _FakeConverter("<!-- image -->"))
     monkeypatch.setattr(settings, "converted_documents_path", tmp_path / "converted")
     path = tmp_path / "scan.pdf"
     path.write_bytes(b"%PDF scan")
 
-    with pytest.raises(DocumentConversionError, match="OCR"):
+    with pytest.raises(DocumentParseError, match="OCR"):
         read_document_text(path)
 
 
@@ -138,25 +150,25 @@ class _FakeTorch:
 def test_resolve_cuda(monkeypatch, device: str, has_cuda: bool, expected: bool) -> None:
     monkeypatch.setitem(sys.modules, "torch", _FakeTorch(has_cuda))
 
-    assert converters._resolve_cuda(device) is expected
+    assert docling._resolve_cuda(device) is expected
 
 
 def test_resolve_cuda_warns_when_gpu_requested_but_torch_is_cpu_only(monkeypatch, caplog) -> None:
     monkeypatch.setitem(sys.modules, "torch", _FakeTorch(False))
     # Migration logging setup in other tests may disable pre-existing loggers.
-    monkeypatch.setattr(converters.logger, "disabled", False)
+    monkeypatch.setattr(docling.logger, "disabled", False)
 
-    with caplog.at_level(logging.WARNING, logger=converters.__name__):
-        assert converters._resolve_cuda("cuda") is False
+    with caplog.at_level(logging.WARNING, logger=docling.__name__):
+        assert docling._resolve_cuda("cuda") is False
 
     assert "CUDA" in caplog.text
 
 
 def test_load_documents_rejects_files_that_fail_conversion(monkeypatch, tmp_path: Path) -> None:
     def broken_converter():
-        raise DocumentConversionError("boom")
+        raise DocumentParseError("boom")
 
-    monkeypatch.setattr(converters, "_get_converter", broken_converter)
+    monkeypatch.setattr(docling, "_get_converter", broken_converter)
     monkeypatch.setattr(settings, "converted_documents_path", tmp_path / "converted")
     data = tmp_path / "data"
     data.mkdir()
@@ -164,7 +176,7 @@ def test_load_documents_rejects_files_that_fail_conversion(monkeypatch, tmp_path
     (data / "broken.pdf").write_bytes(b"%PDF broken")
     (data / "legacy.doc").write_bytes(b"ignored")
 
-    with pytest.raises(DocumentConversionError, match="broken.pdf"):
+    with pytest.raises(DocumentParseError, match="broken.pdf"):
         load_documents(data)
 
 
@@ -185,7 +197,7 @@ def test_equal_table_cells_are_preserved_including_cached_exports(fake_converter
 def test_load_documents_rejects_empty_supported_file(tmp_path):
     (tmp_path / "empty.md").write_text("  \n", encoding="utf-8")
 
-    with pytest.raises(DocumentConversionError, match="empty.md"):
+    with pytest.raises(DocumentParseError, match="empty.md"):
         load_documents(tmp_path)
 
 

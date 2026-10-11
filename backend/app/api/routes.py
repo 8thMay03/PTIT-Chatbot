@@ -58,7 +58,7 @@ from app.guardrails import OUT_OF_SCOPE_ANSWER, filter_safe_history
 from app.generation.citations import public_citations
 from app.generation.llm import _normalize_answer_citations, stream_answer_with_llm
 from app.ingestion import ingestion_pipeline
-from app.ingestion.converters import DocumentConversionError, read_document_text
+from app.parsers import DocumentParseError, read_document_text
 from app.ingestion.uploads import DocumentUploadError, read_preview, resolve_source_path
 from app.llm.factory import create_llm_provider_from_config
 
@@ -154,7 +154,7 @@ def test_retrieval(request: RetrievalTestRequest) -> dict:
 def ingest() -> IngestResponse:
     try:
         result = ingestion_pipeline.ingest_documents()
-    except DocumentConversionError as exc:
+    except DocumentParseError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return IngestResponse(**result)
 
@@ -254,7 +254,7 @@ def upload_document(file: UploadFile = File(...)) -> DocumentItem:
         payload = ingestion_pipeline.ingest_upload(file.filename or "", file.file.read())
     except DocumentUploadError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
-    except DocumentConversionError as exc:
+    except DocumentParseError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return DocumentItem(**payload)
@@ -272,7 +272,7 @@ def parse_single_document(document_id: str, session: Session = Depends(get_sessi
 
     try:
         result = ingestion_pipeline.ingest_path(path, document_id=document.id)
-    except DocumentConversionError as exc:
+    except DocumentParseError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return DocumentItem(**result)
 

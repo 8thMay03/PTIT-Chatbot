@@ -8,8 +8,8 @@ from sqlalchemy.pool import StaticPool
 from app.db.models import Base, Chunk, Document
 from app.core.config import settings
 from app.embeddings.models import HashEmbeddingModel
-from app.ingestion import converters, uploads
-from app.ingestion.converters import DocumentConversionError
+from app.ingestion import uploads
+from app.parsers import DocumentParseError, docling
 from app.ingestion.pipeline import IngestionPipeline
 
 
@@ -167,7 +167,7 @@ def upload_pipeline(tmp_path: Path, monkeypatch):
         parsed_paths.append(path)
         return "# Policy\n\n" + path.read_bytes().decode("utf-8", errors="replace")
 
-    monkeypatch.setattr(converters, "convert_with_docling", convert)
+    monkeypatch.setattr(docling, "convert_with_docling", convert)
     store = RecordingVectorStore()
     pipeline = IngestionPipeline(embedding_model=HashEmbeddingModel(), vector_store=store)
     return pipeline, engine, store, parsed_paths
@@ -200,11 +200,11 @@ def test_failed_upload_preserves_source_and_index(upload_pipeline, monkeypatch, 
     def fail(*args, **kwargs):
         if failure == "conversion":
             parsed_paths.append(args[0])
-            raise DocumentConversionError("injected conversion failure")
+            raise DocumentParseError("injected conversion failure")
         raise RuntimeError("injected failure")
 
     if failure == "conversion":
-        monkeypatch.setattr(converters, "convert_with_docling", fail)
+        monkeypatch.setattr(docling, "convert_with_docling", fail)
     elif failure == "embedding":
         monkeypatch.setattr(pipeline.embedding_model, "embed", fail)
     elif failure == "publish":
@@ -274,13 +274,13 @@ def test_rebuild_parse_failure_preserves_entire_index(upload_pipeline, monkeypat
     (settings.documents_path / "ok.md").write_text("# Changed\nNew text", encoding="utf-8")
 
     def fail(path):
-        raise DocumentConversionError("conversion unavailable")
+        raise DocumentParseError("conversion unavailable")
 
-    monkeypatch.setattr(converters, "convert_with_docling", fail)
+    monkeypatch.setattr(docling, "convert_with_docling", fail)
     embedding_calls = []
     monkeypatch.setattr(pipeline.embedding_model, "embed", lambda texts: embedding_calls.append(texts) or [])
 
-    with pytest.raises(DocumentConversionError, match="broken.pdf"):
+    with pytest.raises(DocumentParseError, match="broken.pdf"):
         pipeline.ingest_documents()
 
     assert _stored_records(engine) == before

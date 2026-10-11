@@ -107,6 +107,7 @@ PTIT Chatbot/
 │   │   ├── generation/   # RAG chain, prompt, LLM và citation
 │   │   ├── guardrails/   # Scope filter và prompt-injection protection
 │   │   ├── ingestion/    # Đọc, làm sạch và chia tài liệu
+│   │   ├── parsers/      # Interface, registry, text parser và Docling parser
 │   │   ├── retrieval/    # BM25, hybrid retrieval, RRF và reranker
 │   │   └── vectordb/     # ChromaDB adapter
 │   ├── scripts/          # Ingest, data migration (SQLite -> Postgres) và evaluation
@@ -187,6 +188,20 @@ Tài liệu hỗ trợ: `.md`, `.txt`, `.pdf`, `.docx`. File PDF/DOCX được [
 Upload được parse và tạo embeddings trong vùng tạm trước khi thay file nguồn. Nếu conversion, embeddings hoặc transaction PostgreSQL thất bại, file cũ và dữ liệu đã index được giữ nguyên; upload mới thất bại không để lại file trong kho tài liệu.
 
 Rebuild toàn bộ chỉ thay knowledge base sau khi mọi tài liệu có định dạng hỗ trợ đã đọc thành công và có nội dung. Nếu một file lỗi hoặc rỗng, rebuild dừng và giữ nguyên dữ liệu đã index; `POST /api/ingest` trả HTTP 422 kèm tên file cần xử lý. Chuẩn hóa bảng chỉ rút gọn khoảng trắng, giữ nguyên các ô có giá trị giống nhau.
+
+Parser nằm riêng trong `backend/app/parsers/`: `base.py` định nghĩa interface `DocumentParser` và lỗi `DocumentParseError`, `registry.py` chọn implementation theo định dạng hoặc tên, `text.py` đọc MD/TXT, `docling.py` parse PDF/DOCX và quản lý cache. Ingestion chỉ gọi `read_document_text()` để nhận text/Markdown, sau đó mới chunking, embedding và lưu dữ liệu.
+
+Để thêm parser, implement `name`, `extensions` (các suffix chữ thường dạng `.pdf`) và `parse(path, *, convert=True) -> str | None`, rồi đăng ký instance trong `app/parsers/__init__.py`. Loader và upload lấy danh sách định dạng từ registry; các định dạng binary mới được parser tự kiểm tra nội dung. Với `convert=False`, parser chỉ đọc trực tiếp hoặc dùng cache, không chạy conversion nặng.
+
+```python
+from app.parsers import read_document_text, registry
+
+registry.register(MyPdfParser())  # Giữ parser mặc định hiện có cho các suffix trùng.
+text = read_document_text(path, parser_name="my_pdf")
+# Khi đăng ký, thêm default=True nếu muốn parser mới trở thành mặc định.
+```
+
+Lựa chọn theo tên hiện có ở API Python; giao diện upload vẫn dùng parser mặc định theo định dạng. `app.ingestion.converters` giữ các public import cũ để tương thích, còn parser mới được triển khai trong `app.parsers`.
 
 Docling chạy nhanh hơn nhiều trên GPU NVIDIA. `pip install` mặc định có thể kéo torch bản CPU, khi đó cài lại torch bản CUDA (chọn bản cu khớp driver, xem `nvidia-smi`), rồi kiểm tra bằng `python -c "import torch; print(torch.cuda.is_available())"`:
 

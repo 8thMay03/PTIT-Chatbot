@@ -8,11 +8,8 @@ from shutil import copy2
 from tempfile import TemporaryDirectory
 
 from app.core.config import PROJECT_ROOT, settings
-from app.ingestion.converters import (
-    DOCLING_EXTENSIONS,
-    SUPPORTED_EXTENSIONS,
-    read_document_text,
-)
+from app.parsers import get_supported_extensions, read_document_text
+from app.parsers.text import TEXT_EXTENSIONS
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 # Cheap signature check so a renamed text file does not reach Docling.
@@ -63,15 +60,17 @@ def prepare_upload(filename: str, content: bytes, documents_path: Path) -> Path:
 
     safe_name = sanitize_filename(filename)
     suffix = Path(safe_name).suffix.lower()
-    if suffix not in SUPPORTED_EXTENSIONS:
-        allowed = ", ".join(sorted(SUPPORTED_EXTENSIONS))
+    supported_extensions = get_supported_extensions()
+    if suffix not in supported_extensions:
+        allowed = ", ".join(sorted(supported_extensions))
         raise DocumentUploadError(f"Chỉ hỗ trợ tài liệu {allowed}.")
 
     documents_path.mkdir(parents=True, exist_ok=True)
     destination = documents_path / safe_name
 
-    if suffix in DOCLING_EXTENSIONS:
-        if not content.startswith(_BINARY_SIGNATURES[suffix]):
+    if suffix not in TEXT_EXTENSIONS:
+        signature = _BINARY_SIGNATURES.get(suffix)
+        if signature is not None and not content.startswith(signature):
             raise DocumentUploadError(f"File {suffix} không hợp lệ hoặc bị hỏng.")
         destination.write_bytes(content)
         return destination

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 from app.api import routes
-from app.ingestion.converters import DocumentConversionError
+from app.parsers import DocumentParseError
 from app.ingestion.uploads import DocumentUploadError
 from app.main import app
 
@@ -13,7 +13,7 @@ client = TestClient(app)
 
 def test_rebuild_maps_conversion_error_to_422(monkeypatch):
     def fail():
-        raise DocumentConversionError("Không parse được tài liệu broken.pdf: conversion unavailable")
+        raise DocumentParseError("Không parse được tài liệu broken.pdf: conversion unavailable")
 
     monkeypatch.setattr(routes.ingestion_pipeline, "ingest_documents", fail)
 
