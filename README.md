@@ -177,10 +177,20 @@ cd backend
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install -e ".[dev]"
+pip install -e ".[dev,docling]"
 python -m scripts.ingest
 uvicorn app.main:app --reload --port 8000
 ```
+
+Tài liệu hỗ trợ: `.md`, `.txt`, `.pdf`, `.docx`. File PDF/DOCX được [Docling](https://github.com/docling-project/docling) chuyển sang Markdown (giữ heading và bảng), kết quả cache tại `backend/storage/converted/` theo hash nội dung file, nên chỉ chuyển đổi lại khi file thay đổi. Lần chạy đầu Docling sẽ tải model layout/bảng từ HuggingFace. PDF scan không có lớp text cần bật `DOCLING_OCR_ENABLED=true`. File `.doc` (Word 97-2003) chưa được hỗ trợ, hãy lưu lại dưới dạng `.docx`.
+
+Docling chạy nhanh hơn nhiều trên GPU NVIDIA. `pip install` mặc định có thể kéo torch bản CPU, khi đó cài lại torch bản CUDA (chọn bản cu khớp driver, xem `nvidia-smi`), rồi kiểm tra bằng `python -c "import torch; print(torch.cuda.is_available())"`:
+
+```powershell
+pip install --force-reinstall --no-deps torch torchvision --index-url https://download.pytorch.org/whl/cu130
+```
+
+`DOCLING_DEVICE=auto` (mặc định) tự dùng GPU khi có; đặt `cpu` để ép chạy CPU.
 
 Backend:
 

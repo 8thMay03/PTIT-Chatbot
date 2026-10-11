@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     db_pool_recycle: int = Field(default=1800, ge=0, alias="DB_POOL_RECYCLE")
     db_echo: bool = Field(default=False, alias="DB_ECHO")
     documents_path: Path = Field(default=Path("data"), alias="DOCUMENTS_PATH")
+    converted_documents_path: Path = Field(
+        default=Path("backend/storage/converted"),
+        alias="CONVERTED_DOCUMENTS_PATH",
+    )
+    docling_ocr_enabled: bool = Field(default=False, alias="DOCLING_OCR_ENABLED")
+    docling_device: str = Field(default="auto", alias="DOCLING_DEVICE")
     chunk_size: int = Field(default=900, alias="CHUNK_SIZE")
     chunk_overlap: int = Field(default=150, alias="CHUNK_OVERLAP")
     parent_child_chunking_enabled: bool = Field(
@@ -130,6 +136,7 @@ class Settings(BaseSettings):
 
     def model_post_init(self, __context: object) -> None:
         self.documents_path = _resolve_project_path(self.documents_path)
+        self.converted_documents_path = _resolve_project_path(self.converted_documents_path)
         url = self.database_url.strip()
         if url.startswith("postgres://"):
             self.database_url = "postgresql+psycopg://" + url.removeprefix("postgres://")

@@ -4,9 +4,15 @@ import re
 from pathlib import Path
 
 from app.core.config import PROJECT_ROOT, settings
-from app.ingestion.loaders import SUPPORTED_EXTENSIONS
+from app.ingestion.converters import (
+    DOCLING_EXTENSIONS,
+    SUPPORTED_EXTENSIONS,
+    read_document_text,
+)
 
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+# Cheap signature check so a renamed text file does not reach Docling.
+_BINARY_SIGNATURES = {".pdf": b"%PDF", ".docx": b"PK\x03\x04"}
 PREVIEW_CHAR_LIMIT = 2500
 
 
@@ -47,7 +53,7 @@ def prepare_upload(filename: str, content: bytes, documents_path: Path) -> Path:
         raise DocumentUploadError("File tải lên đang trống.")
     if len(content) > MAX_UPLOAD_BYTES:
         raise DocumentUploadError(
-            "File vượt quá dung lượng tối đa 10MB.",
+            "File vượt quá dung lượng tối đa 50MB.",
             status_code=413,
         )
 
@@ -57,12 +63,19 @@ def prepare_upload(filename: str, content: bytes, documents_path: Path) -> Path:
         allowed = ", ".join(sorted(SUPPORTED_EXTENSIONS))
         raise DocumentUploadError(f"Chỉ hỗ trợ tài liệu {allowed}.")
 
+    documents_path.mkdir(parents=True, exist_ok=True)
+    destination = documents_path / safe_name
+
+    if suffix in DOCLING_EXTENSIONS:
+        if not content.startswith(_BINARY_SIGNATURES[suffix]):
+            raise DocumentUploadError(f"File {suffix} không hợp lệ hoặc bị hỏng.")
+        destination.write_bytes(content)
+        return destination
+
     text = decode_document_text(content)
     if not text.strip():
         raise DocumentUploadError("Tài liệu không có nội dung.")
 
-    documents_path.mkdir(parents=True, exist_ok=True)
-    destination = documents_path / safe_name
     destination.write_text(text, encoding="utf-8")
     return destination
 
@@ -112,7 +125,9 @@ def read_preview(source_path: str, limit: int = PREVIEW_CHAR_LIMIT) -> str | Non
     if path is None or not path.is_file():
         return None
     try:
-        text = path.read_text(encoding="utf-8")
+        text = read_document_text(path, convert=False)
+        if text is None:
+            return None
         if len(text) <= limit:
             return text
         return text[:limit].rstrip() + "…"

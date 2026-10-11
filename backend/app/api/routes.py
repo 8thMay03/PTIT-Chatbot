@@ -58,6 +58,7 @@ from app.guardrails import OUT_OF_SCOPE_ANSWER, filter_safe_history
 from app.generation.citations import public_citations
 from app.generation.llm import _normalize_answer_citations, stream_answer_with_llm
 from app.ingestion import ingestion_pipeline
+from app.ingestion.converters import DocumentConversionError, read_document_text
 from app.ingestion.uploads import DocumentUploadError, read_preview, resolve_source_path
 from app.llm.factory import create_llm_provider_from_config
 
@@ -175,7 +176,7 @@ def get_document(document_id: str, session: Session = Depends(get_session)) -> D
     full_text = None
     if source_p is not None and source_p.is_file():
         try:
-            full_text = source_p.read_text(encoding="utf-8")
+            full_text = read_document_text(source_p, convert=False)
         except Exception:
             full_text = None
 
@@ -238,19 +239,20 @@ def download_document(document_id: str, session: Session = Depends(get_session))
     if path is None or not path.is_file():
         raise HTTPException(status_code=404, detail="File nguồn không còn trên đĩa.")
 
-    return FileResponse(
-        path,
-        filename=path.name,
-        media_type="text/plain; charset=utf-8",
-    )
+    media_type = "text/plain; charset=utf-8" if path.suffix.lower() in {".md", ".txt"} else None
+    return FileResponse(path, filename=path.name, media_type=media_type)
 
 
 @router.post("/documents", response_model=DocumentItem)
-async def upload_document(file: UploadFile = File(...)) -> DocumentItem:
+def upload_document(file: UploadFile = File(...)) -> DocumentItem:
+    # Sync handler: Docling conversion and embedding run in FastAPI's threadpool
+    # instead of blocking the event loop.
     try:
-        payload = ingestion_pipeline.ingest_upload(file.filename or "", await file.read())
+        payload = ingestion_pipeline.ingest_upload(file.filename or "", file.file.read())
     except DocumentUploadError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except DocumentConversionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return DocumentItem(**payload)
 
@@ -265,7 +267,10 @@ def parse_single_document(document_id: str, session: Session = Depends(get_sessi
     if path is None or not path.is_file():
         raise HTTPException(status_code=404, detail="File nguồn không tồn tại trên đĩa.")
 
-    result = ingestion_pipeline.ingest_path(path)
+    try:
+        result = ingestion_pipeline.ingest_path(path)
+    except DocumentConversionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return DocumentItem(**result)
 
 

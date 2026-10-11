@@ -27,6 +27,10 @@ dev = [
 ml = [
   "sentence-transformers>=3.0.0",
 ]
+docling = [
+  # PDF/DOCX -> Markdown conversion (layout + table structure models).
+  "docling>=2.40.0",
+]
 eval = [
   "ragas>=0.4.3,<0.5.0",
   # Ragas 0.4.3 still imports modules removed from the LangChain 1.x line.

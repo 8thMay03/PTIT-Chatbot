@@ -27,7 +27,8 @@ import DocumentView from "./DocumentView";
 import Modal from "./components/Modal";
 import { useToast } from "./components/Toast";
 
-const ACCEPTED_TYPES = ".md,.txt,.pdf,text/markdown,text/plain,application/pdf";
+const ACCEPTED_TYPES =
+  ".md,.txt,.pdf,.docx,text/markdown,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const PAGE_SIZES = [10, 20, 50, 100];
 
 const TABS = [
@@ -611,7 +612,7 @@ export default function DatasetView({ onChanged }) {
                   <p>
                     {query
                       ? "Thử từ khóa khác, hoặc xóa ô tìm kiếm để xem toàn bộ."
-                      : "Tải lên file .md, .txt hoặc .pdf để xây dựng kho tri thức cho trợ lý."}
+                      : "Tải lên file .md, .txt, .pdf hoặc .docx để xây dựng kho tri thức cho trợ lý."}
                   </p>
                   {!query && (
                     <button type="button" className="btn-add-file" onClick={() => fileRef.current?.click()}>
