@@ -11,3 +11,6 @@ frontend/dist/
 !backend/tests/test_ptit_faq.py
 *report.json
 data/
+.AGENTS
+!.agents/
+!.agents/**
