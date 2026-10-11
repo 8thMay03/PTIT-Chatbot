@@ -268,7 +268,7 @@ def parse_single_document(document_id: str, session: Session = Depends(get_sessi
         raise HTTPException(status_code=404, detail="File nguồn không tồn tại trên đĩa.")
 
     try:
-        result = ingestion_pipeline.ingest_path(path)
+        result = ingestion_pipeline.ingest_path(path, document_id=document.id)
     except DocumentConversionError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return DocumentItem(**result)

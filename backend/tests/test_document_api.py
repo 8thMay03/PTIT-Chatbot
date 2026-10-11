@@ -92,6 +92,38 @@ def test_parse_single_document_returns_404_when_missing(monkeypatch) -> None:
     assert response.status_code == 404
 
 
+def test_parse_single_document_passes_existing_identity(monkeypatch, tmp_path) -> None:
+    source = tmp_path / "moved.docx"
+    source.write_bytes(b"source is parsed by the pipeline")
+    document = SimpleNamespace(id="historical-id", source_path="data/raw/moved.docx")
+    monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 4))
+    monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: source)
+    calls = []
+
+    def ingest_path(path, *, document_id=None):
+        calls.append((path, document_id))
+        return {
+            "id": document_id or "new-path-id",
+            "title": "moved",
+            "file_name": "moved.docx",
+            "source_path": document.source_path,
+            "file_type": "docx",
+            "status": "active",
+            "chunk_count": 3,
+            "size_bytes": source.stat().st_size,
+            "created_at": None,
+            "updated_at": None,
+        }
+
+    monkeypatch.setattr(routes.ingestion_pipeline, "ingest_path", ingest_path)
+
+    response = client.post("/api/documents/historical-id/parse")
+
+    assert response.status_code == 200
+    assert response.json()["id"] == document.id
+    assert calls == [(source, document.id)]
+
+
 def test_get_document_returns_full_text(monkeypatch, tmp_path) -> None:
     doc_file = tmp_path / "full-doc.md"
     doc_file.write_text("# Full Document Content\nDetailed paragraphs.", encoding="utf-8")
@@ -108,6 +140,7 @@ def test_get_document_returns_full_text(monkeypatch, tmp_path) -> None:
     )
     monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 10))
     monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: doc_file)
+    monkeypatch.setattr(routes, "read_preview", lambda source_path: doc_file.read_text(encoding="utf-8"))
 
     response = client.get("/api/documents/doc-full")
 
@@ -130,6 +163,8 @@ def test_get_document_falls_back_to_chunks_when_source_missing(monkeypatch) -> N
     )
     monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 3))
     monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: None)
+    monkeypatch.setattr(routes, "read_preview", lambda source_path: None)
+    monkeypatch.setattr(routes, "get_document_preview_text", lambda session, doc_id: "Chunk 1")
     monkeypatch.setattr(routes, "get_document_full_text", lambda session, doc_id: "Chunk 1\n\nChunk 2\n\nChunk 3")
 
     response = client.get("/api/documents/doc-chunks")

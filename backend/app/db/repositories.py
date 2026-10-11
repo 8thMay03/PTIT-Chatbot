@@ -100,6 +100,10 @@ def get_document_vector_ids(session: Session, document_id: str) -> list[str]:
     return list(session.scalars(select(Chunk.vector_id).where(Chunk.document_id == document_id)))
 
 
+def get_document_id_by_source_path(session: Session, source_path: str) -> str | None:
+    return session.scalar(select(Document.id).where(Document.source_path == source_path))
+
+
 def upsert_document(
     session: Session,
     document: DocumentRecord,

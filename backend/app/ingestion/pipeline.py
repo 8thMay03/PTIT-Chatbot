@@ -6,6 +6,7 @@ from app.db.repositories import (
     ChunkRecord,
     DocumentRecord,
     delete_document,
+    get_document_id_by_source_path,
     get_document_vector_ids,
     replace_knowledge_base,
     serialize_document,
@@ -78,11 +79,16 @@ class IngestionPipeline:
             path.unlink(missing_ok=True)
             raise
 
-    def ingest_path(self, path: Path) -> dict:
+    def ingest_path(self, path: Path, *, document_id: str | None = None) -> dict:
         init_db()
         text = read_document_text(path) or ""
+        if document_id is None:
+            # A repaired source path can differ from the path that originally
+            # generated the stored ID. Reuse that identity for uploads as well.
+            with SessionLocal() as session:
+                document_id = get_document_id_by_source_path(session, _source_path(path))
         document_record, chunk_records, chunks_payload = _records_for_document(
-            SourceDocument(path=path, text=text)
+            SourceDocument(path=path, text=text), document_id=document_id
         )
 
         embeddings: list[list[float]] = []
@@ -153,8 +159,11 @@ class IngestionPipeline:
         return document_records, chunk_records, chunks_payload
 
 
-def _records_for_document(document: SourceDocument) -> tuple[DocumentRecord, list[ChunkRecord], list[dict]]:
-    document_id = _document_id(document.path)
+def _records_for_document(
+    document: SourceDocument, *, document_id: str | None = None
+) -> tuple[DocumentRecord, list[ChunkRecord], list[dict]]:
+    if document_id is None:
+        document_id = _document_id(document.path)
     source_path = _source_path(document.path)
     size_bytes = _file_size(document.path)
     document_record = DocumentRecord(
