@@ -172,12 +172,8 @@ def _compact_table_line(match: re.Match[str]) -> str:
     line = match.group(0).rstrip()
     if re.fullmatch(r"\|(?:\s*:?-+:?\s*\|)+", line):
         return re.sub(r"-{3,}", "---", line.replace(" ", ""))
-    line = re.sub(r"[ \t]{2,}", " ", line)
-    # A merged cell spanning the row is repeated in every column; keep it once.
-    cells = [cell.strip() for cell in line.strip("|").split("|")]
-    if len(cells) > 1 and cells[0] and all(cell == cells[0] for cell in cells):
-        return "| " + cells[0] + " |" + " |" * (len(cells) - 1)
-    return line
+    # Equal values can be independent cells; Markdown alone cannot identify spans.
+    return re.sub(r"[ \t]{2,}", " ", line)
 
 
 def _promote_bold_line(match: re.Match[str]) -> str:

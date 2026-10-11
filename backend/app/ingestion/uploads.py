@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
+from shutil import copy2
+from tempfile import TemporaryDirectory
 
 from app.core.config import PROJECT_ROOT, settings
 from app.ingestion.converters import (
@@ -78,6 +82,30 @@ def prepare_upload(filename: str, content: bytes, documents_path: Path) -> Path:
 
     destination.write_text(text, encoding="utf-8")
     return destination
+
+
+@contextmanager
+def publish_upload(staged_path: Path, destination: Path) -> Iterator[None]:
+    """Publish a parsed upload and restore the source if its DB commit fails."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    # Replacement and backup share the destination filesystem for atomic rename.
+    # Neither temporary filename has an ingestible extension.
+    with TemporaryDirectory(prefix=".upload-", dir=destination.parent) as folder:
+        replacement = Path(folder) / "replacement"
+        backup = Path(folder) / "original"
+        copy2(staged_path, replacement)
+        had_original = destination.is_file()
+        if had_original:
+            copy2(destination, backup)
+        replacement.replace(destination)
+        try:
+            yield
+        except BaseException:
+            if had_original:
+                backup.replace(destination)
+            else:
+                destination.unlink(missing_ok=True)
+            raise
 
 
 def resolve_source_path(source_path: str) -> Path | None:

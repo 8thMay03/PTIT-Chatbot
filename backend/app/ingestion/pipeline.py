@@ -1,5 +1,7 @@
-from pathlib import Path
+from contextlib import nullcontext
 from hashlib import sha256
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from app.core.config import PROJECT_ROOT, settings
 from app.db.repositories import (
@@ -17,7 +19,7 @@ from app.embeddings import EmbeddingModel, create_embedding_model
 from app.ingestion.chunker import Chunk, ParentChildChunk, split_parent_child, split_text
 from app.ingestion.converters import DocumentConversionError, read_document_text
 from app.ingestion.loaders import SourceDocument, load_documents
-from app.ingestion.uploads import delete_source_file, prepare_upload
+from app.ingestion.uploads import delete_source_file, prepare_upload, publish_upload
 from app.retrieval.bm25 import invalidate_bm25_cache
 from app.vectordb import VectorStore, create_vector_store
 
@@ -71,24 +73,36 @@ class IngestionPipeline:
         }
 
     def ingest_upload(self, filename: str, content: bytes) -> dict:
-        path = prepare_upload(filename, content, settings.documents_path)
-        try:
-            return self.ingest_path(path)
-        except DocumentConversionError:
-            # Do not leave an unparseable upload behind for the next full re-ingest.
-            path.unlink(missing_ok=True)
-            raise
+        # Parse outside the document tree so neither a replacement nor an
+        # in-progress upload can affect existing sources or a concurrent scan.
+        with TemporaryDirectory(prefix="ptit-upload-") as folder:
+            staged_path = prepare_upload(filename, content, Path(folder))
+            text = read_document_text(staged_path) or ""
+            if not text.strip():
+                raise DocumentConversionError(f"{staged_path.name} không có nội dung văn bản.")
+            path = settings.documents_path / staged_path.name
+            return self._ingest_document(SourceDocument(path=path, text=text), staged_path=staged_path)
 
     def ingest_path(self, path: Path, *, document_id: str | None = None) -> dict:
-        init_db()
         text = read_document_text(path) or ""
+        return self._ingest_document(SourceDocument(path=path, text=text), document_id=document_id)
+
+    def _ingest_document(
+        self,
+        document: SourceDocument,
+        *,
+        document_id: str | None = None,
+        staged_path: Path | None = None,
+    ) -> dict:
+        init_db()
+        path = document.path
         if document_id is None:
             # A repaired source path can differ from the path that originally
             # generated the stored ID. Reuse that identity for uploads as well.
             with SessionLocal() as session:
                 document_id = get_document_id_by_source_path(session, _source_path(path))
         document_record, chunk_records, chunks_payload = _records_for_document(
-            SourceDocument(path=path, text=text), document_id=document_id
+            document, document_id=document_id, size_bytes=_file_size(staged_path or path)
         )
 
         embeddings: list[list[float]] = []
@@ -111,7 +125,11 @@ class IngestionPipeline:
         with SessionLocal() as session:
             existing_ids = get_document_vector_ids(session, document_record.id)
             stored = upsert_document(session, document_record, chunk_records)
-            session.commit()
+            # Parsing, embeddings and DB flush have succeeded before publication.
+            # A failed commit rolls back both the indexed data and source file.
+            publication = publish_upload(staged_path, path) if staged_path is not None else nullcontext()
+            with publication:
+                session.commit()
             session.refresh(stored)
             document_item = serialize_document(stored, len(chunk_records), _file_size(path))
 
@@ -160,12 +178,13 @@ class IngestionPipeline:
 
 
 def _records_for_document(
-    document: SourceDocument, *, document_id: str | None = None
+    document: SourceDocument, *, document_id: str | None = None, size_bytes: int | None = None
 ) -> tuple[DocumentRecord, list[ChunkRecord], list[dict]]:
     if document_id is None:
         document_id = _document_id(document.path)
     source_path = _source_path(document.path)
-    size_bytes = _file_size(document.path)
+    if size_bytes is None:
+        size_bytes = _file_size(document.path)
     document_record = DocumentRecord(
         id=document_id,
         source_path=source_path,

@@ -152,7 +152,10 @@ def test_retrieval(request: RetrievalTestRequest) -> dict:
 
 @router.post("/ingest", response_model=IngestResponse)
 def ingest() -> IngestResponse:
-    result = ingestion_pipeline.ingest_documents()
+    try:
+        result = ingestion_pipeline.ingest_documents()
+    except DocumentConversionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return IngestResponse(**result)
 
 

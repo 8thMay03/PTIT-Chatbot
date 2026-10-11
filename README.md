@@ -184,6 +184,10 @@ uvicorn app.main:app --reload --port 8000
 
 Tài liệu hỗ trợ: `.md`, `.txt`, `.pdf`, `.docx`. File PDF/DOCX được [Docling](https://github.com/docling-project/docling) chuyển sang Markdown (giữ heading và bảng), kết quả cache tại `backend/storage/converted/` theo hash nội dung file, nên chỉ chuyển đổi lại khi file thay đổi. Lần chạy đầu Docling sẽ tải model layout/bảng từ HuggingFace. PDF scan không có lớp text cần bật `DOCLING_OCR_ENABLED=true`. File `.doc` (Word 97-2003) chưa được hỗ trợ, hãy lưu lại dưới dạng `.docx`.
 
+Upload được parse và tạo embeddings trong vùng tạm trước khi thay file nguồn. Nếu conversion, embeddings hoặc transaction PostgreSQL thất bại, file cũ và dữ liệu đã index được giữ nguyên; upload mới thất bại không để lại file trong kho tài liệu.
+
+Rebuild toàn bộ chỉ thay knowledge base sau khi mọi tài liệu có định dạng hỗ trợ đã đọc thành công và có nội dung. Nếu một file lỗi hoặc rỗng, rebuild dừng và giữ nguyên dữ liệu đã index; `POST /api/ingest` trả HTTP 422 kèm tên file cần xử lý. Chuẩn hóa bảng chỉ rút gọn khoảng trắng, giữ nguyên các ô có giá trị giống nhau.
+
 Docling chạy nhanh hơn nhiều trên GPU NVIDIA. `pip install` mặc định có thể kéo torch bản CPU, khi đó cài lại torch bản CUDA (chọn bản cu khớp driver, xem `nvidia-smi`), rồi kiểm tra bằng `python -c "import torch; print(torch.cuda.is_available())"`:
 
 ```powershell

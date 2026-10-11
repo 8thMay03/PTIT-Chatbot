@@ -90,7 +90,7 @@ def test_table_cell_padding_is_compacted(monkeypatch, tmp_path: Path) -> None:
     path.write_bytes(b"%PDF table")
 
     assert read_document_text(path) == (
-        "| TT | Thang điểm 10 |\n|---|---|\n| a) Loại đạt | |\n| 1 | 8,5 - 10 |\n"
+        "| TT | Thang điểm 10 |\n|---|---|\n| a) Loại đạt | a) Loại đạt |\n| 1 | 8,5 - 10 |\n"
     )
 
 
@@ -143,6 +143,8 @@ def test_resolve_cuda(monkeypatch, device: str, has_cuda: bool, expected: bool) 
 
 def test_resolve_cuda_warns_when_gpu_requested_but_torch_is_cpu_only(monkeypatch, caplog) -> None:
     monkeypatch.setitem(sys.modules, "torch", _FakeTorch(False))
+    # Migration logging setup in other tests may disable pre-existing loggers.
+    monkeypatch.setattr(converters.logger, "disabled", False)
 
     with caplog.at_level(logging.WARNING, logger=converters.__name__):
         assert converters._resolve_cuda("cuda") is False
@@ -150,7 +152,7 @@ def test_resolve_cuda_warns_when_gpu_requested_but_torch_is_cpu_only(monkeypatch
     assert "CUDA" in caplog.text
 
 
-def test_load_documents_skips_files_that_fail_conversion(monkeypatch, tmp_path: Path) -> None:
+def test_load_documents_rejects_files_that_fail_conversion(monkeypatch, tmp_path: Path) -> None:
     def broken_converter():
         raise DocumentConversionError("boom")
 
@@ -162,6 +164,33 @@ def test_load_documents_skips_files_that_fail_conversion(monkeypatch, tmp_path: 
     (data / "broken.pdf").write_bytes(b"%PDF broken")
     (data / "legacy.doc").write_bytes(b"ignored")
 
-    documents = load_documents(data)
+    with pytest.raises(DocumentConversionError, match="broken.pdf"):
+        load_documents(data)
 
-    assert [document.path.name for document in documents] == ["ok.md"]
+
+@pytest.mark.parametrize("value", ["100", "0", "a) Loại đạt"])
+def test_equal_table_cells_are_preserved_including_cached_exports(fake_converter, tmp_path, value):
+    path = tmp_path / "table.pdf"
+    path.write_bytes(b"%PDF equal cells")
+    fake_converter.markdown = f"| Year A | Year B |\n|---|---|\n| {value} | {value} |"
+
+    first = read_document_text(path)
+    cached = read_document_text(path, convert=False)
+
+    assert f"| {value} | {value} |" in first
+    assert cached == first
+    assert len(fake_converter.calls) == 1
+
+
+def test_load_documents_rejects_empty_supported_file(tmp_path):
+    (tmp_path / "empty.md").write_text("  \n", encoding="utf-8")
+
+    with pytest.raises(DocumentConversionError, match="empty.md"):
+        load_documents(tmp_path)
+
+
+def test_load_documents_ignores_unsupported_files(tmp_path):
+    (tmp_path / "ok.md").write_text("# OK\n", encoding="utf-8")
+    (tmp_path / "legacy.doc").write_bytes(b"ignored")
+
+    assert [document.path.name for document in load_documents(tmp_path)] == ["ok.md"]

@@ -2,11 +2,14 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, event, select
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.db.models import Base, Chunk, Document
+from app.core.config import settings
 from app.embeddings.models import HashEmbeddingModel
+from app.ingestion import converters, uploads
+from app.ingestion.converters import DocumentConversionError
 from app.ingestion.pipeline import IngestionPipeline
 
 
@@ -150,3 +153,154 @@ def test_reparse_moved_document_preserves_identity(
         assert all(chunk.chunk_metadata["document_id"] == first["id"] for chunk in chunks)
         assert all(chunk.chunk_metadata["source"] == moved.as_posix() for chunk in chunks)
     assert all(item["metadata"]["document_id"] == first["id"] for item in store.payloads)
+
+
+@pytest.fixture
+def upload_pipeline(tmp_path: Path, monkeypatch):
+    engine = _memory_engine()
+    _patch_sessions(monkeypatch, engine)
+    monkeypatch.setattr(settings, "documents_path", tmp_path / "data")
+    monkeypatch.setattr(settings, "converted_documents_path", tmp_path / "cache")
+    parsed_paths = []
+
+    def convert(path):
+        parsed_paths.append(path)
+        return "# Policy\n\n" + path.read_bytes().decode("utf-8", errors="replace")
+
+    monkeypatch.setattr(converters, "convert_with_docling", convert)
+    store = RecordingVectorStore()
+    pipeline = IngestionPipeline(embedding_model=HashEmbeddingModel(), vector_store=store)
+    return pipeline, engine, store, parsed_paths
+
+
+def _stored_records(engine):
+    with sessionmaker(bind=engine)() as session:
+        return (
+            session.execute(
+                select(Document.id, Document.source_path, Document.content_hash, Document.document_metadata)
+                .order_by(Document.id)
+            ).all(),
+            session.execute(
+                select(Chunk.id, Chunk.document_id, Chunk.text, Chunk.chunk_metadata).order_by(Chunk.id)
+            ).all(),
+        )
+
+
+@pytest.mark.parametrize("replace_existing", [False, True])
+@pytest.mark.parametrize("failure", ["conversion", "embedding", "flush", "publish", "commit"])
+def test_failed_upload_preserves_source_and_index(upload_pipeline, monkeypatch, replace_existing, failure):
+    pipeline, engine, store, parsed_paths = upload_pipeline
+    original = b"%PDF original source"
+    if replace_existing:
+        pipeline.ingest_upload("policy.pdf", original)
+    source = settings.documents_path / "policy.pdf"
+    before = _stored_records(engine)
+    old_vectors = list(store.added)
+
+    def fail(*args, **kwargs):
+        if failure == "conversion":
+            parsed_paths.append(args[0])
+            raise DocumentConversionError("injected conversion failure")
+        raise RuntimeError("injected failure")
+
+    if failure == "conversion":
+        monkeypatch.setattr(converters, "convert_with_docling", fail)
+    elif failure == "embedding":
+        monkeypatch.setattr(pipeline.embedding_model, "embed", fail)
+    elif failure == "publish":
+        monkeypatch.setattr(uploads, "copy2", fail)
+    else:
+        class FailingSession(Session):
+            def flush(self, *args, **kwargs):
+                super().flush(*args, **kwargs)
+                if failure == "flush":
+                    fail()
+
+            def commit(self):
+                fail()
+
+        monkeypatch.setattr("app.ingestion.pipeline.SessionLocal", sessionmaker(bind=engine, class_=FailingSession))
+
+    with pytest.raises(RuntimeError, match="injected"):
+        pipeline.ingest_upload("policy.pdf", b"%PDF broken replacement")
+
+    assert source.exists() is replace_existing
+    if replace_existing:
+        assert source.read_bytes() == original
+    assert _stored_records(engine) == before
+    assert store.added == old_vectors
+    assert store.deleted == []
+    assert store.reset_calls == 0
+    if settings.documents_path.exists():
+        assert list(settings.documents_path.iterdir()) == ([source] if replace_existing else [])
+    assert all(not path.exists() for path in parsed_paths if path != source)
+
+
+@pytest.mark.parametrize(("filename", "signature"), [("policy.pdf", b"%PDF"), ("policy.docx", b"PK\x03\x04")])
+def test_upload_replacement_publishes_final_source_and_metadata(upload_pipeline, filename, signature):
+    pipeline, engine, store, parsed_paths = upload_pipeline
+    source = settings.documents_path / filename
+    first = pipeline.ingest_upload(filename, signature + b" original")
+    replacement = signature + b" updated content with a different size"
+
+    second = pipeline.ingest_upload(filename, replacement)
+
+    assert second["id"] == first["id"]
+    assert source.read_bytes() == replacement
+    assert second["size_bytes"] == len(replacement)
+    assert second["source_path"] == source.as_posix()
+    assert second["file_name"] == filename
+    assert list(settings.documents_path.iterdir()) == [source]
+    assert len(parsed_paths) == 2
+    assert all(not path.exists() for path in parsed_paths)
+    with sessionmaker(bind=engine)() as session:
+        document = session.get(Document, first["id"])
+        assert document.document_metadata["size_bytes"] == len(replacement)
+        assert document.document_metadata["source"] == source.as_posix()
+        chunks = session.scalars(select(Chunk)).all()
+        assert chunks and all("updated content" in chunk.text for chunk in chunks)
+        assert all(chunk.chunk_metadata["source"] == source.as_posix() for chunk in chunks)
+    assert store.deleted
+    assert all(item["metadata"]["source"] == source.as_posix() for item in store.payloads)
+
+
+def test_rebuild_parse_failure_preserves_entire_index(upload_pipeline, monkeypatch):
+    pipeline, engine, store, _parsed_paths = upload_pipeline
+    pipeline.ingest_upload("broken.pdf", b"%PDF previously valid")
+    pipeline.ingest_upload("ok.md", b"# Original\nOld text")
+    before = _stored_records(engine)
+    old_vectors = list(store.added)
+    (settings.documents_path / "broken.pdf").write_bytes(b"%PDF now broken")
+    (settings.documents_path / "ok.md").write_text("# Changed\nNew text", encoding="utf-8")
+
+    def fail(path):
+        raise DocumentConversionError("conversion unavailable")
+
+    monkeypatch.setattr(converters, "convert_with_docling", fail)
+    embedding_calls = []
+    monkeypatch.setattr(pipeline.embedding_model, "embed", lambda texts: embedding_calls.append(texts) or [])
+
+    with pytest.raises(DocumentConversionError, match="broken.pdf"):
+        pipeline.ingest_documents()
+
+    assert _stored_records(engine) == before
+    assert store.added == old_vectors
+    assert store.deleted == []
+    assert store.reset_calls == 0
+    assert embedding_calls == []
+
+
+def test_rebuild_valid_documents_replaces_index(upload_pipeline):
+    pipeline, engine, store, _parsed_paths = upload_pipeline
+    pipeline.ingest_upload("policy.pdf", b"%PDF policy")
+    pipeline.ingest_upload("ok.md", b"# Original\nOld text")
+    (settings.documents_path / "ok.md").write_text("# Changed\nNew text", encoding="utf-8")
+
+    result = pipeline.ingest_documents()
+
+    assert result["documents"] == 2
+    assert result["chunks"] > 0
+    assert store.reset_calls == 1
+    with sessionmaker(bind=engine)() as session:
+        assert len(session.scalars(select(Document)).all()) == 2
+        assert any("New text" in chunk.text for chunk in session.scalars(select(Chunk)).all())
