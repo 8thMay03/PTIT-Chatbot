@@ -1,9 +1,10 @@
 import json
 import time
+from pathlib import Path
 from collections.abc import Iterator
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -58,7 +59,7 @@ from app.guardrails import OUT_OF_SCOPE_ANSWER, filter_safe_history
 from app.generation.citations import public_citations
 from app.generation.llm import _normalize_answer_citations, stream_answer_with_llm
 from app.ingestion import ingestion_pipeline
-from app.parsers import DocumentParseError, read_document_text
+from app.parsers import DocumentParseError, read_document_text, registry
 from app.ingestion.uploads import DocumentUploadError, read_preview, resolve_source_path
 from app.llm.factory import create_llm_provider_from_config
 
@@ -260,8 +261,16 @@ def upload_document(file: UploadFile = File(...)) -> DocumentItem:
     return DocumentItem(**payload)
 
 
+@router.get("/documents/{document_id}/parsers")
+def document_parsers(document_id: str, session: Session = Depends(get_session)) -> dict:
+    row = get_document_with_chunk_count(session, document_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return {"parsers": registry.list_parsers(Path(row[0].source_path))}
+
+
 @router.post("/documents/{document_id}/parse", response_model=DocumentItem)
-def parse_single_document(document_id: str, session: Session = Depends(get_session)) -> DocumentItem:
+def parse_single_document(document_id: str, session: Session = Depends(get_session), parser_name: str | None = Query(default=None, min_length=1)) -> DocumentItem:
     row = get_document_with_chunk_count(session, document_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
@@ -271,7 +280,8 @@ def parse_single_document(document_id: str, session: Session = Depends(get_sessi
         raise HTTPException(status_code=404, detail="File nguồn không tồn tại trên đĩa.")
 
     try:
-        result = ingestion_pipeline.ingest_path(path, document_id=document.id)
+        options = {"parser_name": parser_name} if parser_name is not None else {}
+        result = ingestion_pipeline.ingest_path(path, document_id=document.id, **options)
     except DocumentParseError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return DocumentItem(**result)

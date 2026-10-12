@@ -30,6 +30,11 @@ class ParserRegistry:
             if default or suffix not in self._defaults:
                 self._defaults[suffix] = parser.name
 
+    def list_parsers(self, path: Path) -> list[dict]:
+        suffix = path.suffix.lower()
+        return [{"name": p.name, "is_default": self._defaults.get(suffix) == p.name}
+                for p in self._parsers.values() if suffix in p.extensions]
+
     def get_parser(self, path: Path, *, parser_name: str | None = None) -> DocumentParser:
         suffix = path.suffix.lower()
         if parser_name is None:

@@ -83,8 +83,9 @@ class IngestionPipeline:
             path = settings.documents_path / staged_path.name
             return self._ingest_document(SourceDocument(path=path, text=text), staged_path=staged_path)
 
-    def ingest_path(self, path: Path, *, document_id: str | None = None) -> dict:
-        text = read_document_text(path) or ""
+    def ingest_path(self, path: Path, *, document_id: str | None = None, parser_name: str | None = None) -> dict:
+        options = {"parser_name": parser_name} if parser_name is not None else {}
+        text = read_document_text(path, **options) or ""
         return self._ingest_document(SourceDocument(path=path, text=text), document_id=document_id)
 
     def _ingest_document(

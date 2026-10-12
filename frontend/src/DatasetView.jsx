@@ -24,6 +24,7 @@ import {
 import { API_BASE_URL } from "./api";
 import { apiError, EMPTY, formatDate, formatDateOnly, formatSize } from "./lib/format";
 import DocumentView from "./DocumentView";
+import ParserSelectionModal from "./components/ParserSelectionModal";
 import Modal from "./components/Modal";
 import { useToast } from "./components/Toast";
 
@@ -67,6 +68,8 @@ export default function DatasetView({ onChanged }) {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [reindexing, setReindexing] = useState(false);
+  const [parseTarget, setParseTarget] = useState(null);
+  const parseResolve = useRef(null);
   const [parsingDocId, setParsingDocId] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -357,11 +360,23 @@ export default function DatasetView({ onChanged }) {
     }
   }
 
-  async function parseDocument(doc) {
+  function requestParse(doc) {
+    if (!doc || parsingDocId || reindexing || parseTarget) return Promise.resolve();
+    setParseTarget(doc);
+    return new Promise((resolve) => { parseResolve.current = resolve; });
+  }
+
+  function closeParserSelection() {
+    setParseTarget(null);
+    parseResolve.current?.();
+    parseResolve.current = null;
+  }
+
+  async function parseDocument(doc, parserName) {
     if (!doc || parsingDocId || reindexing) return;
     setParsingDocId(doc.id);
     try {
-      const response = await fetch(`${API_BASE_URL}/documents/${doc.id}/parse`, { method: "POST" });
+      const response = await fetch(`${API_BASE_URL}/documents/${doc.id}/parse?parser_name=${encodeURIComponent(parserName)}`, { method: "POST" });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(apiError(payload, "Không parse được tài liệu."));
       const label = payload.title || payload.file_name || doc.file_name;
@@ -430,15 +445,22 @@ export default function DatasetView({ onChanged }) {
   }
 
   // Màn chi tiết tài liệu, mở từ danh sách bên dưới
+  const parserDialog = parseTarget && <ParserSelectionModal document={parseTarget}
+    busy={Boolean(parsingDocId)} onClose={closeParserSelection}
+    onConfirm={async (name) => { await parseDocument(parseTarget, name); closeParserSelection(); }} />;
+
   if (selectedDocId) {
     return (
+      <>
+      {parserDialog}
       <DocumentView
         documentId={selectedDocId}
         onBack={() => setSelectedDocId(null)}
         parsingDocId={parsingDocId}
         reindexing={reindexing}
-        onParse={parseDocument}
+        onParse={requestParse}
       />
+      </>
     );
   }
 
@@ -446,6 +468,7 @@ export default function DatasetView({ onChanged }) {
 
   return (
     <div className="dataset-wrapper">
+      {parserDialog}
       <input
         ref={fileRef}
         type="file"
@@ -727,7 +750,7 @@ export default function DatasetView({ onChanged }) {
                                 className="act-btn"
                                 title={`Parse lại ${fileName}`}
                                 aria-label={`Parse lại ${fileName}`}
-                                onClick={() => parseDocument(doc)}
+                                onClick={() => requestParse(doc)}
                                 disabled={isParsing || reindexing}
                               >
                                 {isParsing ? <Loader2 size={14} className="spin" /> : <Play size={13} fill="currentColor" />}

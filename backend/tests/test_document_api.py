@@ -137,6 +137,32 @@ def test_parse_single_document_passes_existing_identity(monkeypatch, tmp_path) -
     assert calls == [(source, document.id)]
 
 
+def test_parser_options_and_explicit_selection(monkeypatch, tmp_path) -> None:
+    source = tmp_path / "note.md"
+    source.write_text("hello", encoding="utf-8")
+    document = SimpleNamespace(id="note", source_path=str(source))
+    monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda *args: (document, 1))
+    monkeypatch.setattr(routes, "resolve_source_path", lambda *args: source)
+    response = client.get("/api/documents/note/parsers")
+    assert response.status_code == 200
+    assert response.json() == {"parsers": [{"name": "text", "is_default": True}]}
+    calls = []
+
+    def reject(path, **options):
+        calls.append(options)
+        raise routes.DocumentParseError("unsupported selection")
+
+    monkeypatch.setattr(routes.ingestion_pipeline, "ingest_path", reject)
+    response = client.post("/api/documents/note/parse?parser_name=docling")
+    assert response.status_code == 422
+    assert calls == [{"document_id": "note", "parser_name": "docling"}]
+
+
+def test_parser_options_missing_document(monkeypatch) -> None:
+    monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda *args: None)
+    assert client.get("/api/documents/missing/parsers").status_code == 404
+
+
 def test_get_document_returns_full_text(monkeypatch, tmp_path) -> None:
     doc_file = tmp_path / "full-doc.md"
     doc_file.write_text("# Full Document Content\nDetailed paragraphs.", encoding="utf-8")

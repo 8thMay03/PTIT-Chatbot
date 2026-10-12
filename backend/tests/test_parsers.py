@@ -43,6 +43,12 @@ def test_registry_supports_named_alternatives_and_explicit_default():
     registry.register(preferred, default=True)
     assert registry.get_parser(source) is preferred
     assert registry.get_parser(source, parser_name="first") is first
+    assert registry.list_parsers(Path("policy.PDF")) == [
+        {"name": "first", "is_default": False},
+        {"name": "alternative", "is_default": False},
+        {"name": "preferred", "is_default": True},
+    ]
+    assert registry.list_parsers(Path("file.doc")) == []
 
 
 @pytest.mark.parametrize(
