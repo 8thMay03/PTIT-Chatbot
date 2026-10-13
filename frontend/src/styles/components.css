@@ -5,7 +5,8 @@
 
 /* --------------------------------------------------------------------------
    Nút trong modal
-   -------------------------------------------------------------------------- */.ghost-btn
+   -------------------------------------------------------------------------- */
+.ghost-btn,
 .danger-btn {
   display: inline-flex;
   align-items: center;
@@ -41,12 +42,12 @@
   background: var(--danger-hover);
 }
 
-.danger-btn:hover:not(:disabled)
+.danger-btn:hover:not(:disabled),
 .ghost-btn:hover:not(:disabled) {
   transform: translateY(-1px);
 }
 
-.ghost-btn:disabled
+.ghost-btn:disabled,
 .danger-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -492,4 +493,34 @@
   line-height: 1.5;
   color: var(--warning-text);
   font-weight: 400;
+}
+
+/* --------------------------------------------------------------------------
+   Trạng thái đang tải toàn màn (Settings) và nút xoá ô tìm kiếm
+   -------------------------------------------------------------------------- */
+.model-mgmt-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  gap: 12px;
+  color: var(--text-muted);
+}
+
+.model-mgmt-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.search-clear-btn {
+  border: 0;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 2px;
 }
