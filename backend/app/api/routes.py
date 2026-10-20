@@ -58,6 +58,7 @@ from app.generation.rag_chain import rag_chain
 from app.guardrails import OUT_OF_SCOPE_ANSWER, filter_safe_history
 from app.generation.citations import public_citations
 from app.generation.llm import _normalize_answer_citations, stream_answer_with_llm
+from app.llm import LLMStreamError
 from app.ingestion import ingestion_pipeline
 from app.parsers import DocumentParseError, read_document_text, registry
 from app.ingestion.uploads import DocumentUploadError, read_preview, resolve_source_path
@@ -377,6 +378,7 @@ def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -
         contexts = retrieval["contexts"] if retrieval["strong_context"] else []
         sources = public_citations(contexts)
         deltas: list[str] = []
+        stream_error: str | None = None
         yield _ndjson({"type": "start", "conversation_id": conversation.id})
 
         if not retrieval["guardrail_allowed"]:
@@ -386,12 +388,32 @@ def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -
         else:
             stream = iter(["Chưa tìm thấy thông tin này trong tài liệu."])
 
-        for delta in stream:
-            deltas.append(delta)
-            yield _ndjson({"type": "delta", "content": delta})
+        try:
+            for delta in stream:
+                deltas.append(delta)
+                yield _ndjson({"type": "delta", "content": delta})
+        except LLMStreamError as exc:
+            # LLM lỗi sau khi đã stream một phần: báo lỗi cho client thay vì nối
+            # thêm câu trả lời dự phòng vào phần text đã phát ra.
+            stream_error = str(exc) or "LLM streaming failed."
+            yield _ndjson({"type": "error", "message": stream_error})
+
+        assistant_metadata: dict[str, Any] = {
+            "sources": [s.model_dump() if hasattr(s, "model_dump") else dict(s) for s in sources]
+        }
+        if stream_error:
+            assistant_metadata["error"] = {
+                "type": "llm_stream",
+                "message": stream_error,
+            }
 
         raw_answer = "".join(deltas)
-        answer = _normalize_answer_citations(raw_answer, contexts) if contexts else raw_answer
+        if stream_error:
+            # Phần text nửa vời không phải câu trả lời hoàn chỉnh: bỏ qua chuẩn
+            # hóa trích dẫn (thuộc tính này có thể tự nối thêm "[1]" cho ảo).
+            answer = raw_answer.strip()
+        else:
+            answer = _normalize_answer_citations(raw_answer, contexts) if contexts else raw_answer
         add_message(
             session,
             conversation.id,
@@ -404,10 +426,14 @@ def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -
             conversation.id,
             "assistant",
             answer,
-            metadata={"sources": [s.model_dump() if hasattr(s, "model_dump") else dict(s) for s in sources]},
+            metadata=assistant_metadata,
         )
         add_message_sources(session, assistant_message.id, contexts)
         session.commit()
+        if stream_error:
+            # Event `error` đã gửi ở trên là event kết thúc; client giữ phần text
+            # đã stream và hiển thị nút thử lại, không ghi đè bằng `done`.
+            return
         yield _ndjson({
             "type": "done",
             "answer": answer,

@@ -4,6 +4,7 @@ from app.llm.base import (
     LLMMessage,
     LLMProviderError,
     LLMResponse,
+    LLMStreamError,
 )
 from app.llm.factory import get_llm_provider, register_llm_provider
 from app.llm.providers.azure_openai_provider import AzureOpenAIProvider
@@ -19,6 +20,7 @@ __all__ = [
     "LLMMessage",
     "LLMProviderError",
     "LLMResponse",
+    "LLMStreamError",
     "OpenAICompatibleProvider",
     "OpenAIProvider",
     "get_llm_provider",

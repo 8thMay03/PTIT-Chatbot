@@ -36,6 +36,11 @@ class LLMConfigurationError(LLMProviderError):
     pass
 
 
+class LLMStreamError(LLMProviderError):
+    """Raised when a streaming LLM call fails after at least one token was emitted."""
+    pass
+
+
 class BaseLLMProvider(ABC):
     """Abstract base class for all LLM providers."""
 

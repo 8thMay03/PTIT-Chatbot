@@ -13,6 +13,7 @@ from app.llm import (
     LLMConfigurationError,
     LLMMessage,
     LLMProviderError,
+    LLMStreamError,
     OpenAICompatibleProvider,
     OpenAIProvider,
     get_llm_provider,
@@ -283,3 +284,93 @@ def test_answer_with_llm_falls_back_to_extractive_when_unconfigured() -> None:
     answer = answer_with_llm("Học phí?", contexts, provider=UnconfiguredProvider())
     assert "Chưa cấu hình API Key cho LLM" in answer
     assert "Nội dung học phí trích xuất" in answer
+
+
+class RecordingTemperatureProvider(BaseLLMProvider):
+    """Fake provider ghi lại temperature mà app truyền xuống."""
+
+    def __init__(self) -> None:
+        super().__init__(model_name="recording-model")
+        self.generate_temperature: float | None = None
+        self.stream_temperature: float | None = None
+
+    def is_configured(self) -> bool:
+        return True
+
+    def generate(self, messages, temperature=0.0, max_tokens=None, **kwargs) -> str:
+        self.generate_temperature = temperature
+        return "Học phí theo quy định [1]."
+
+    def generate_stream(self, messages, temperature=0.2, max_tokens=None, **kwargs) -> Iterator[str]:
+        self.stream_temperature = temperature
+        yield "Học phí"
+
+
+TEMPERATURE_CONTEXTS = [
+    {
+        "source_name": "handbook.md",
+        "heading": "Học phí",
+        "section_path": "Học phí",
+        "text": "Nội dung học phí.",
+    }
+]
+
+
+def test_answer_with_llm_passes_settings_temperature(monkeypatch) -> None:
+    monkeypatch.setattr("app.core.config.settings.llm_temperature", 0.7)
+    provider = RecordingTemperatureProvider()
+
+    answer_with_llm("Học phí?", TEMPERATURE_CONTEXTS, provider=provider)
+
+    assert provider.generate_temperature == 0.7
+
+
+def test_stream_answer_with_llm_passes_settings_temperature(monkeypatch) -> None:
+    monkeypatch.setattr("app.core.config.settings.llm_temperature", 0.7)
+    provider = RecordingTemperatureProvider()
+
+    list(stream_answer_with_llm("Học phí?", TEMPERATURE_CONTEXTS, provider=provider))
+
+    assert provider.stream_temperature == 0.7
+
+
+class FailingStreamProvider(BaseLLMProvider):
+    """Fake provider lỗi giữa chừng hoặc ngay từ đầu theo cấu hình."""
+
+    def __init__(self, fail_before_first_token: bool) -> None:
+        super().__init__(model_name="failing-model")
+        self.fail_before_first_token = fail_before_first_token
+
+    def is_configured(self) -> bool:
+        return True
+
+    def generate(self, messages, temperature=0.0, max_tokens=None, **kwargs) -> str:
+        raise LLMConfigurationError("not used in stream tests")
+
+    def generate_stream(self, messages, temperature=0.2, max_tokens=None, **kwargs) -> Iterator[str]:
+        if self.fail_before_first_token:
+            raise ValueError("connection reset")
+        yield "Học "
+        yield "phí "
+        raise ValueError("connection dropped mid-stream")
+
+
+def test_stream_answer_falls_back_to_extractive_on_failure_before_first_token() -> None:
+    provider = FailingStreamProvider(fail_before_first_token=True)
+
+    chunks = list(stream_answer_with_llm("Học phí?", TEMPERATURE_CONTEXTS, provider=provider))
+    text = "".join(chunks)
+
+    assert "Chưa cấu hình API Key cho LLM" in text
+    assert "Nội dung học phí." in text
+
+
+def test_stream_answer_raises_stream_error_after_tokens_streamed() -> None:
+    provider = FailingStreamProvider(fail_before_first_token=False)
+
+    with pytest.raises(LLMStreamError):
+        list(stream_answer_with_llm("Học phí?", TEMPERATURE_CONTEXTS, provider=provider))
+
+
+def test_stream_error_is_a_provider_error() -> None:
+    assert issubclass(LLMStreamError, LLMProviderError)

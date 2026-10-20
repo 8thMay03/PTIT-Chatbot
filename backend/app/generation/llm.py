@@ -6,7 +6,7 @@ from app.core.config import settings
 from app.generation.citations import numbered_contexts, public_citations
 from app.guardrails import OUT_OF_SCOPE_ANSWER
 from app.generation.prompts import SYSTEM_PROMPT, build_context_prompt
-from app.llm import BaseLLMProvider, get_llm_provider
+from app.llm import BaseLLMProvider, LLMStreamError, get_llm_provider
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,12 @@ def stream_answer_with_llm(
     history: list[dict[str, str]] | None = None,
     provider: BaseLLMProvider | None = None,
 ) -> Iterator[str]:
-    """Yield answer deltas as they arrive from the model."""
+    """Yield answer deltas as they arrive from the model.
+
+    - Lỗi trước token đầu tiên: yield câu trả lời dự phòng extractive (giống ``answer_with_llm``).
+    - Lỗi sau khi đã stream một phần: raise :class:`LLMStreamError` để caller (ví dụ
+      ``/chat/stream``) gửi event báo lỗi thay vì nối thêm text dự phòng lộn xộn.
+    """
     if not contexts:
         yield "Mình chưa tìm thấy thông tin phù hợp trong kho tài liệu."
         return
@@ -57,11 +62,18 @@ def stream_answer_with_llm(
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": build_context_prompt(question, contexts, history)},
     ]
+    emitted = 0
     try:
-        yield from llm.generate_stream(messages, temperature=0.2)
+        for delta in llm.generate_stream(messages, temperature=settings.llm_temperature):
+            emitted += 1
+            yield delta
     except Exception as exc:
-        logger.warning("LLM streaming failed: %s. Falling back to extractive answer.", exc)
-        yield _extractive_answer(contexts)
+        if emitted == 0:
+            logger.warning("LLM streaming failed before first token: %s. Falling back to extractive answer.", exc)
+            yield _extractive_answer(contexts)
+            return
+        logger.warning("LLM streaming failed after %d token(s): %s.", emitted, exc)
+        raise LLMStreamError(f"LLM streaming failed: {exc}") from exc
 
 
 def _extractive_answer(contexts: list[dict]) -> str:
