@@ -215,8 +215,8 @@ const ChatView = forwardRef(function ChatView(
     );
   }
 
-  function failLastMessage(error, status) {
-    const described = describeError(error, status);
+  function failLastMessage(error, status, describedOverride) {
+    const described = describedOverride ?? describeError(error, status);
     setMessages((current) =>
       current.map((message, index) =>
         index === current.length - 1
@@ -281,6 +281,19 @@ const ChatView = forwardRef(function ChatView(
             setConversationId(eventData.conversation_id);
           } else if (eventData.type === "delta") {
             appendChunk(eventData.content);
+          } else if (eventData.type === "error") {
+            // LLM lỗi sau khi đã stream một phần: backend không gửi `done` sau
+            // event này, nên hiển thị lỗi kèm nút "Thử lại" để gửi lại câu hỏi.
+            failLastMessage(
+              new Error(eventData.message || "LLM streaming failed."),
+              0,
+              {
+                title: "Tạo câu trả lời bị gián đoạn",
+                detail:
+                  eventData.message ||
+                  "Mô hình gặp lỗi giữa chừng khi trả lời. Thử gửi lại câu hỏi.",
+              }
+            );
           } else if (eventData.type === "done") {
             setConversationId(eventData.conversation_id);
             setMessages((current) =>
