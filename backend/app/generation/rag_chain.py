@@ -109,7 +109,7 @@ class RagChain:
     ) -> dict:
         """Run retrieval independently so callers can stream generation."""
         scope_allowed = True
-        scope_reason = ""
+        scope_reason = "disabled"
         if settings.guardrail_scope_enabled:
             scope = check_scope(question, history)
             scope_allowed = scope.allowed
@@ -180,7 +180,7 @@ class RagChain:
             "retrieved_chunks": retrieved_chunks,
             "selected_chunks": selected_chunks,
             "strong_context": strong_context,
-            "guardrail": {"allowed": True, "reason": scope.reason},
+            "guardrail": {"allowed": True, "reason": scope_reason},
             "unsafe_contexts_removed": unsafe_context_count,
         }
         return {

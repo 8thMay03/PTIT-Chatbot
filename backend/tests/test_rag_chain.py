@@ -161,6 +161,38 @@ def test_rag_chain_blocks_out_of_scope_request_before_retrieval() -> None:
     }
 
 
+def test_rag_chain_retrieve_context_without_scope_guardrail(monkeypatch) -> None:
+    monkeypatch.setattr("app.generation.rag_chain.settings.guardrail_scope_enabled", False)
+
+    result = RagChain(
+        retriever_=CapturingRetriever(),
+        query_rewriter=FixedRewriter(),
+        multi_query_generator=SingleQueryGenerator(),
+    ).retrieve_context("Thủ đô của Nhật Bản là gì?")
+
+    assert result["guardrail_allowed"] is True
+    assert result["retrieval_debug"]["guardrail"] == {
+        "allowed": True,
+        "reason": "disabled",
+    }
+
+
+def test_rag_chain_retrieve_context_with_scope_guardrail_enabled(monkeypatch) -> None:
+    monkeypatch.setattr("app.generation.rag_chain.settings.guardrail_scope_enabled", True)
+
+    result = RagChain(
+        retriever_=CapturingRetriever(),
+        query_rewriter=FixedRewriter(),
+        multi_query_generator=SingleQueryGenerator(),
+    ).retrieve_context("Học phí PTIT thế nào?")
+
+    assert result["guardrail_allowed"] is True
+    assert result["retrieval_debug"]["guardrail"] == {
+        "allowed": True,
+        "reason": "ptit_domain",
+    }
+
+
 def test_rag_chain_removes_indirect_prompt_injection_from_retrieved_context() -> None:
     class PoisonedRetriever:
         def retrieve(self, question: str, top_k: int) -> list[dict]:
