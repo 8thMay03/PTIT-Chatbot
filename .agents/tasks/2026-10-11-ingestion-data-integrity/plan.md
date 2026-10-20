@@ -1,9 +1,0 @@
-# Plan
-
-- Coordinator, implementer, verifier and reviewer: `/root`; review is `self_review`.
-- S-1 (done): Add failing regression coverage for source preservation, rebuild atomicity and table-cell fidelity. Changed files: `backend/tests/test_document_pipeline.py`, `backend/tests/test_document_converters.py`, `backend/tests/test_document_api.py`; existing upload validation tests retained unchanged.
-- S-2 (done; depends S-1): Parse upload in an external temporary directory. Share ingestion of parsed text at its final logical source path. Publish source atomically on the destination filesystem around DB commit with restoration on failure. Owned files: `backend/app/ingestion/pipeline.py`, `backend/app/ingestion/uploads.py`.
-- S-3 (done; depends S-1): Fail fast on unreadable/empty supported documents before rebuild mutation; map conversion failure to HTTP 422 with filename. Owned files: `backend/app/ingestion/loaders.py`, `backend/app/api/routes.py`.
-- S-4 (done; depends S-1): Remove equal-cell deduplication while keeping whitespace normalization. Owned file: `backend/app/ingestion/converters.py`.
-- S-5 (done; depends S-2/S-3/S-4): Update behavior docs, run regression checks, verify Docker with isolated fixtures, inspect diff and complete self_review. Owned files: `README.md`, this task's five Markdown files. Docker-only harness lives in the host temporary directory, outside the repository.
-- Contract: `ingest_path(path, *, document_id=None)` stays compatible. Upload parsing uses a temporary physical source but document/chunk/vector metadata use the final destination. DB commit and source publication share a rollback context; external vector updates stay after commit. `load_documents` no longer silently skips failed or empty supported files; `/api/ingest` reports conversion failures with 422. Markdown values are never inferred to be merged cells merely because they are equal.
