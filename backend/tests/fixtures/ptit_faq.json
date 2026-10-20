@@ -86,20 +86,20 @@
   {
     "id": "double_degree",
     "question": "Sinh viên có được học đồng thời hai ngành đào tạo hay không?",
-    "expected_terms": ["2 văn bằng", "2 ngành"],
-    "reference_answer": "Có. Sinh viên có năng lực và nguyện vọng được đăng ký học cùng lúc 2 văn bằng hoặc 2 ngành đào tạo đồng thời."
+    "expected_terms": ["2 CTĐT", "đồng thời"],
+    "reference_answer": "Có. Sinh viên có thể đăng ký học 2 chương trình đào tạo (CTĐT) đồng thời, do Phòng Giáo vụ giải quyết."
   },
   {
-    "id": "chairman_council",
-    "question": "Ai là Chủ tịch Hội đồng Học viện?",
-    "expected_terms": ["Từ Minh Phương"],
-    "reference_answer": "Chủ tịch Hội đồng Học viện là GS.TS Từ Minh Phương."
+    "id": "union_chairman",
+    "question": "Ai là Chủ tịch Công đoàn Học viện?",
+    "expected_terms": ["Trần Quang Anh"],
+    "reference_answer": "Chủ tịch Công đoàn Học viện là PGS.TS. Trần Quang Anh."
   },
   {
     "id": "director_ptit",
     "question": "Ai là Giám đốc Học viện Công nghệ Bưu chính Viễn thông?",
-    "expected_terms": ["Vũ Văn San"],
-    "reference_answer": "Giám đốc Học viện là PGS.TS Vũ Văn San."
+    "expected_terms": ["Đặng Hoài Bắc"],
+    "reference_answer": "Giám đốc Học viện là PGS.TS. Đặng Hoài Bắc."
   },
   {
     "id": "training_duration_45",

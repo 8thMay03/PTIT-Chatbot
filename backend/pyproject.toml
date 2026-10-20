@@ -52,4 +52,7 @@ include = ["app*"]
 pythonpath = ["."]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+  "corpus: test cần kho tài liệu đầy đủ trong data/ (bị gitignore) — tự skip kèm lý do khi thiếu dữ liệu",
+]
 
