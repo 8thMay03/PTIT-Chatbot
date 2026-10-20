@@ -115,3 +115,90 @@ def test_test_llm_endpoint_unconfigured() -> None:
         data = response.json()
         assert data["success"] is False
         assert "chưa được cấu hình" in data["message"]
+
+
+def test_retrieval_test_endpoint_returns_disabled_guardrail(monkeypatch) -> None:
+    """PUT guardrails.scope_enabled=false then /retrieval/test must not 500."""
+    from app.api import routes
+
+    original = settings.guardrail_scope_enabled
+
+    response = client.put("/api/config", json={"guardrails": {"scope_enabled": False}})
+    assert response.status_code == 200
+    assert settings.guardrail_scope_enabled is False
+
+    class _Rewriter:
+        def rewrite(self, question, history=None):
+            return question
+
+    class _MultiQuery:
+        def generate(self, query):
+            return [query]
+
+    class _Retriever:
+        def retrieve(self, query, top_k):
+            return [{"text": "Nội dung không liên quan", "vector_score": 0.1, "bm25_score": 0.5}]
+
+    monkeypatch.setattr(routes.rag_chain, "query_rewriter", _Rewriter())
+    monkeypatch.setattr(routes.rag_chain, "multi_query_generator", _MultiQuery())
+    monkeypatch.setattr(routes.rag_chain, "retriever", _Retriever())
+    monkeypatch.setattr(settings, "reranker_enabled", False)
+
+    try:
+        resp = client.post("/api/retrieval/test", json={"query": "Thủ đô của Nhật Bản là gì?", "top_k": 4})
+    finally:
+        settings.guardrail_scope_enabled = original
+
+    assert resp.status_code == 200
+    assert resp.json()["retrieval_debug"]["guardrail"] == {
+        "allowed": True,
+        "reason": "disabled",
+    }
+
+
+def test_chat_endpoint_returns_200_when_scope_guardrail_disabled(monkeypatch) -> None:
+    """PUT guardrails.scope_enabled=false then /chat must return HTTP 200."""
+    from types import SimpleNamespace
+
+    from app.api import routes
+    from app.db.session import get_session
+    from app.generation.rag_chain import NO_CONTEXT_ANSWER
+
+    original = settings.guardrail_scope_enabled
+
+    response = client.put("/api/config", json={"guardrails": {"scope_enabled": False}})
+    assert response.status_code == 200
+    assert settings.guardrail_scope_enabled is False
+
+    monkeypatch.setattr(routes, "ensure_conversation", lambda *a, **k: SimpleNamespace(id="conv-1"))
+    monkeypatch.setattr(routes, "get_recent_conversation_history", lambda *a, **k: [])
+    monkeypatch.setattr(routes, "add_message", lambda *a, **k: SimpleNamespace(id="msg-1"))
+    monkeypatch.setattr(routes, "add_message_sources", lambda *a, **k: None)
+    monkeypatch.setattr(settings, "conversation_memory_enabled", False)
+
+    class _Rewriter:
+        def rewrite(self, question, history=None):
+            return question
+
+    class _MultiQuery:
+        def generate(self, query):
+            return [query]
+
+    class _WeakRetriever:
+        def retrieve(self, query, top_k):
+            return [{"text": "Nội dung không liên quan", "vector_score": 0.1, "bm25_score": 0.5}]
+
+    monkeypatch.setattr(routes.rag_chain, "query_rewriter", _Rewriter())
+    monkeypatch.setattr(routes.rag_chain, "multi_query_generator", _MultiQuery())
+    monkeypatch.setattr(routes.rag_chain, "retriever", _WeakRetriever())
+    monkeypatch.setattr(settings, "reranker_enabled", False)
+
+    app.dependency_overrides[get_session] = lambda: SimpleNamespace(commit=lambda: None)
+    try:
+        resp = client.post("/api/chat", json={"message": "Thủ đô của Nhật Bản là gì?"})
+    finally:
+        app.dependency_overrides.pop(get_session, None)
+        settings.guardrail_scope_enabled = original
+
+    assert resp.status_code == 200
+    assert resp.json()["answer"] == NO_CONTEXT_ANSWER
