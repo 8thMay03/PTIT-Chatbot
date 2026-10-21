@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from app.db.models import Base, Chunk, Document
-from app.vectordb.base import VectorStore
 from app.vectordb.pgvector_store import PgVectorStore
 from app.vectordb import create_vector_store
 

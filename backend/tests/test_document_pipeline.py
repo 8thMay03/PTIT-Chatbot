@@ -177,18 +177,26 @@ def _stored_records(engine):
     with sessionmaker(bind=engine)() as session:
         return (
             session.execute(
-                select(Document.id, Document.source_path, Document.content_hash, Document.document_metadata)
-                .order_by(Document.id)
+                select(
+                    Document.id,
+                    Document.source_path,
+                    Document.content_hash,
+                    Document.document_metadata,
+                ).order_by(Document.id)
             ).all(),
             session.execute(
-                select(Chunk.id, Chunk.document_id, Chunk.text, Chunk.chunk_metadata).order_by(Chunk.id)
+                select(Chunk.id, Chunk.document_id, Chunk.text, Chunk.chunk_metadata).order_by(
+                    Chunk.id
+                )
             ).all(),
         )
 
 
 @pytest.mark.parametrize("replace_existing", [False, True])
 @pytest.mark.parametrize("failure", ["conversion", "embedding", "flush", "publish", "commit"])
-def test_failed_upload_preserves_source_and_index(upload_pipeline, monkeypatch, replace_existing, failure):
+def test_failed_upload_preserves_source_and_index(
+    upload_pipeline, monkeypatch, replace_existing, failure
+):
     pipeline, engine, store, parsed_paths = upload_pipeline
     original = b"%PDF original source"
     if replace_existing:
@@ -210,6 +218,7 @@ def test_failed_upload_preserves_source_and_index(upload_pipeline, monkeypatch, 
     elif failure == "publish":
         monkeypatch.setattr(uploads, "copy2", fail)
     else:
+
         class FailingSession(Session):
             def flush(self, *args, **kwargs):
                 super().flush(*args, **kwargs)
@@ -219,7 +228,9 @@ def test_failed_upload_preserves_source_and_index(upload_pipeline, monkeypatch, 
             def commit(self):
                 fail()
 
-        monkeypatch.setattr("app.ingestion.pipeline.SessionLocal", sessionmaker(bind=engine, class_=FailingSession))
+        monkeypatch.setattr(
+            "app.ingestion.pipeline.SessionLocal", sessionmaker(bind=engine, class_=FailingSession)
+        )
 
     with pytest.raises(RuntimeError, match="injected"):
         pipeline.ingest_upload("policy.pdf", b"%PDF broken replacement")
@@ -236,8 +247,12 @@ def test_failed_upload_preserves_source_and_index(upload_pipeline, monkeypatch, 
     assert all(not path.exists() for path in parsed_paths if path != source)
 
 
-@pytest.mark.parametrize(("filename", "signature"), [("policy.pdf", b"%PDF"), ("policy.docx", b"PK\x03\x04")])
-def test_upload_replacement_publishes_final_source_and_metadata(upload_pipeline, filename, signature):
+@pytest.mark.parametrize(
+    ("filename", "signature"), [("policy.pdf", b"%PDF"), ("policy.docx", b"PK\x03\x04")]
+)
+def test_upload_replacement_publishes_final_source_and_metadata(
+    upload_pipeline, filename, signature
+):
     pipeline, engine, store, parsed_paths = upload_pipeline
     source = settings.documents_path / filename
     first = pipeline.ingest_upload(filename, signature + b" original")
@@ -278,7 +293,9 @@ def test_rebuild_parse_failure_preserves_entire_index(upload_pipeline, monkeypat
 
     monkeypatch.setattr(docling, "convert_with_docling", fail)
     embedding_calls = []
-    monkeypatch.setattr(pipeline.embedding_model, "embed", lambda texts: embedding_calls.append(texts) or [])
+    monkeypatch.setattr(
+        pipeline.embedding_model, "embed", lambda texts: embedding_calls.append(texts) or []
+    )
 
     with pytest.raises(DocumentParseError, match="broken.pdf"):
         pipeline.ingest_documents()

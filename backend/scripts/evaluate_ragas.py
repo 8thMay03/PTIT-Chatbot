@@ -158,8 +158,7 @@ def create_metrics(
         )
     except ImportError as exc:
         raise RuntimeError(
-            'Ragas dependencies are missing or incompatible. '
-            'Run: pip install -e ".[eval]"'
+            'Ragas dependencies are missing or incompatible. Run: pip install -e ".[eval]"'
         ) from exc
 
     client = AsyncOpenAI(api_key=api_key)
@@ -327,11 +326,7 @@ async def evaluate_ragas(
         "errors": sum(bool(item.errors) for item in results),
     }
     for name in metrics:
-        valid_scores = [
-            item.scores[name]
-            for item in results
-            if item.scores.get(name) is not None
-        ]
+        valid_scores = [item.scores[name] for item in results if item.scores.get(name) is not None]
         summary[name] = mean(valid_scores) if valid_scores else None
 
     available = [summary[name] for name in metrics if summary[name] is not None]
@@ -380,7 +375,9 @@ def _parse_args() -> argparse.Namespace:
         default=DEFAULT_REPORT,
         help=f"JSON report path (default: {DEFAULT_REPORT}).",
     )
-    parser.add_argument("--fail-below", type=float, help="Fail when ragas_score is below this value.")
+    parser.add_argument(
+        "--fail-below", type=float, help="Fail when ragas_score is below this value."
+    )
     parser.add_argument("--no-progress", action="store_true", help="Disable the progress bar.")
     args = parser.parse_args()
     if not 1 <= args.top_k <= 10:

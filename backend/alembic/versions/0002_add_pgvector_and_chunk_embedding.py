@@ -5,6 +5,7 @@ Revises: 0001_initial_schema
 Create Date: 2026-08-31 01:00:00.000000
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -28,19 +29,18 @@ def upgrade() -> None:
     # Add embedding column to chunks
     op.add_column("chunks", sa.Column("embedding", Vector(1536), nullable=True))
 
-    # On PostgreSQL, create HNSW index for cosine distance
+    # On PostgreSQL, create HNSW index for cosine distance. Other dialects get a
+    # plain index so SQLAlchemy metadata and migrations stay in sync (SQLite dev/test).
     if is_postgres:
         op.execute(
             "CREATE INDEX IF NOT EXISTS idx_chunks_embedding_hnsw "
             "ON chunks USING hnsw (embedding vector_cosine_ops);"
         )
+    else:
+        op.create_index("idx_chunks_embedding_hnsw", "chunks", ["embedding"])
 
 
 def downgrade() -> None:
-    bind = op.get_bind()
-    is_postgres = bind.dialect.name == "postgresql"
-
-    if is_postgres:
-        op.execute("DROP INDEX IF EXISTS idx_chunks_embedding_hnsw;")
+    op.execute("DROP INDEX IF EXISTS idx_chunks_embedding_hnsw;")
 
     op.drop_column("chunks", "embedding")

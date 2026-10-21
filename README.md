@@ -1,5 +1,7 @@
 # PTIT RAG Chatbot
 
+[![CI](https://github.com/8thMay03/PTIT-Chatbot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/8thMay03/PTIT-Chatbot/actions/workflows/ci.yml)
+
 PTIT RAG Chatbot là hệ thống hỏi đáp tiếng Việt dành cho sinh viên Học viện Công nghệ Bưu chính Viễn thông (PTIT). Hệ thống sử dụng kiến trúc Retrieval-Augmented Generation (RAG) để tìm kiếm thông tin trong tài liệu nội bộ, chọn các đoạn bằng chứng phù hợp và tạo câu trả lời có trích dẫn nguồn.
 
 Thay vì để mô hình trả lời hoàn toàn từ kiến thức có sẵn, chatbot chỉ sinh câu trả lời dựa trên context được truy xuất từ kho tài liệu. Cách tiếp cận này giúp giảm hallucination, tăng khả năng kiểm chứng và phù hợp với các câu hỏi về quy chế, học phí, học phần, thi cử, thủ tục sinh viên và tốt nghiệp.
@@ -374,6 +376,14 @@ cat backup_ptit_chatbot.sql | docker compose exec -T postgres psql -U ptit_user 
 
 
 ## Kiểm thử
+
+GitHub Actions chạy CI trên mọi pull request và khi push lên `main` (`.github/workflows/ci.yml`):
+
+| Job | Nội dung |
+|---|---|
+| `backend` | Python 3.11, `ruff check`, `ruff format --check`, `pytest` |
+| `migrations` | `alembic upgrade head` + `alembic check` trên PostgreSQL 16 (`pgvector/pgvector:pg16`) trống |
+| `frontend` | `npm ci` + `npm run build` |
 
 Chạy toàn bộ unit test:
 

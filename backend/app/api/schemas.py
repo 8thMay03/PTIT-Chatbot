@@ -107,6 +107,7 @@ class DocumentDeleteResponse(BaseModel):
 # Configuration Schemas
 # ==========================================
 
+
 class LLMConfigPayload(BaseModel):
     provider: str = "openai"
     model: str = "gpt-4.1-mini"
@@ -162,7 +163,16 @@ class EmbeddingConfigPayload(BaseModel):
 
 
 class AvailableProviders(BaseModel):
-    llm: list[str] = ["openai", "gemini", "azure", "openai_compatible", "anthropic", "deepseek", "cohere", "qwen"]
+    llm: list[str] = [
+        "openai",
+        "gemini",
+        "azure",
+        "openai_compatible",
+        "anthropic",
+        "deepseek",
+        "cohere",
+        "qwen",
+    ]
     embedding: list[str] = ["openai", "sentence-transformers", "cohere", "gemini"]
     reranker: list[str] = ["heuristic", "cross-encoder", "cohere"]
 

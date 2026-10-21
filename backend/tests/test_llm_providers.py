@@ -35,7 +35,9 @@ class MockCustomProvider(BaseLLMProvider):
         self.generate_called = True
         return self.response_text
 
-    def generate_stream(self, messages, temperature=0.2, max_tokens=None, **kwargs) -> Iterator[str]:
+    def generate_stream(
+        self, messages, temperature=0.2, max_tokens=None, **kwargs
+    ) -> Iterator[str]:
         self.stream_called = True
         for word in self.response_text.split():
             yield word + " "
@@ -48,7 +50,9 @@ class UnconfiguredProvider(BaseLLMProvider):
     def generate(self, messages, temperature=0.0, max_tokens=None, **kwargs) -> str:
         raise LLMConfigurationError("Provider not configured")
 
-    def generate_stream(self, messages, temperature=0.2, max_tokens=None, **kwargs) -> Iterator[str]:
+    def generate_stream(
+        self, messages, temperature=0.2, max_tokens=None, **kwargs
+    ) -> Iterator[str]:
         raise LLMConfigurationError("Provider not configured")
 
 
@@ -155,13 +159,7 @@ def test_gemini_provider_generate_mock_http() -> None:
     provider = GeminiProvider(api_key="test-key", model_name="gemini-1.5-flash")
 
     mock_response_data = {
-        "candidates": [
-            {
-                "content": {
-                    "parts": [{"text": "Câu trả lời từ Gemini [1]"}]
-                }
-            }
-        ]
+        "candidates": [{"content": {"parts": [{"text": "Câu trả lời từ Gemini [1]"}]}}]
     }
     mock_resp = MagicMock()
     mock_resp.read.return_value = json.dumps(mock_response_data).encode("utf-8")
@@ -179,7 +177,7 @@ def test_gemini_provider_generate_stream_mock_http() -> None:
     mock_sse_lines = [
         b'data: {"candidates": [{"content": {"parts": [{"text": "Gemini "}]}}]}\n',
         b'data: {"candidates": [{"content": {"parts": [{"text": "streaming"}]}}]}\n',
-        b'data: [DONE]\n',
+        b"data: [DONE]\n",
     ]
     mock_resp = MagicMock()
     mock_resp.__iter__.return_value = iter(mock_sse_lines)
@@ -301,7 +299,9 @@ class RecordingTemperatureProvider(BaseLLMProvider):
         self.generate_temperature = temperature
         return "Học phí theo quy định [1]."
 
-    def generate_stream(self, messages, temperature=0.2, max_tokens=None, **kwargs) -> Iterator[str]:
+    def generate_stream(
+        self, messages, temperature=0.2, max_tokens=None, **kwargs
+    ) -> Iterator[str]:
         self.stream_temperature = temperature
         yield "Học phí"
 
@@ -347,7 +347,9 @@ class FailingStreamProvider(BaseLLMProvider):
     def generate(self, messages, temperature=0.0, max_tokens=None, **kwargs) -> str:
         raise LLMConfigurationError("not used in stream tests")
 
-    def generate_stream(self, messages, temperature=0.2, max_tokens=None, **kwargs) -> Iterator[str]:
+    def generate_stream(
+        self, messages, temperature=0.2, max_tokens=None, **kwargs
+    ) -> Iterator[str]:
         if self.fail_before_first_token:
             raise ValueError("connection reset")
         yield "Học "

@@ -1,6 +1,7 @@
 import re
 
 from app.core.config import settings
+from app.llm import BaseLLMProvider, get_llm_provider
 
 
 REWRITE_SYSTEM_PROMPT = """Bạn chuyển câu hỏi tiếng Việt thành một truy vấn tìm kiếm tài liệu PTIT.
@@ -26,9 +27,6 @@ CONVERSATIONAL_PREFIXES = (
     r"bạn có thể (?:cho (?:mình|tôi|em) )?biết",
     r"hãy cho (?:mình|tôi|em) biết",
 )
-
-
-from app.llm import BaseLLMProvider, get_llm_provider
 
 
 class VietnameseQueryRewriter:
@@ -93,8 +91,7 @@ def _rewrite_with_llm(
 ) -> str:
     provider = llm or get_llm_provider()
     history_text = "\n".join(
-        f"{message.get('role', 'user')}: {message.get('content', '')}"
-        for message in history
+        f"{message.get('role', 'user')}: {message.get('content', '')}" for message in history
     )
     messages = [
         {"role": "system", "content": REWRITE_SYSTEM_PROMPT},

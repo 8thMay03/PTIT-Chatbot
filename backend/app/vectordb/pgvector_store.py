@@ -34,9 +34,7 @@ class PgVectorStore:
                 vector_id = chunk_data.get("vector_id")
                 if chunk_id:
                     session.execute(
-                        update(Chunk)
-                        .where(Chunk.id == chunk_id)
-                        .values(embedding=embedding)
+                        update(Chunk).where(Chunk.id == chunk_id).values(embedding=embedding)
                     )
                 elif vector_id:
                     session.execute(

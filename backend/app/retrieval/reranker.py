@@ -59,8 +59,7 @@ def heuristic_rerank(query: str, contexts: list[dict], top_k: int) -> list[dict]
 
     for index, context in enumerate(contexts):
         searchable_text = " ".join(
-            str(context.get(field) or "")
-            for field in ("heading", "section_path", "text")
+            str(context.get(field) or "") for field in ("heading", "section_path", "text")
         )
         document_terms = set(_tokenize(searchable_text))
         term_coverage = len(query_terms & document_terms) / max(len(query_terms), 1)

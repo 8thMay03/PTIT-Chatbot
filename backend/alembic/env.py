@@ -11,9 +11,8 @@ backend_dir = Path(__file__).resolve().parents[1]
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
-from app.core.config import settings
-from app.db.models import Base
-from app.db.session import get_engine_options
+from app.core.config import settings  # noqa: E402
+from app.db.models import Base  # noqa: E402
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -34,7 +33,6 @@ def get_url() -> str:
     if not url or url == "postgresql+psycopg://ptit_user:ptit_password@localhost:5432/ptit_chatbot":
         return settings.database_url
     return url
-
 
 
 def run_migrations_offline() -> None:
