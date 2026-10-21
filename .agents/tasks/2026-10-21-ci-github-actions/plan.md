@@ -5,7 +5,7 @@
 ### S-01 — Cấu hình ruff và format code backend
 
 - Agent: `agent-opencode`
-- Trạng thái: `in_progress`
+- Trạng thái: `done`
 - Mục tiêu: thêm ruff vào dev dependency và `[tool.ruff]` trong `backend/pyproject.toml`; sửa các lỗi lint hiện có (import thừa/biến thừa/late import) và format toàn bộ Python backend; phục vụ `AC-02`.
 - Phạm vi file được sửa: `backend/pyproject.toml`, `backend/app/**`, `backend/tests/**`, `backend/alembic/env.py`, `backend/scripts/**`.
 - Phụ thuộc: không có.
@@ -15,7 +15,7 @@
 ### S-02 — Đồng bộ model với migration HNSW
 
 - Agent: `agent-opencode`
-- Trạng thái: `todo`
+- Trạng thái: `done`
 - Mục tiêu: khai báo index `idx_chunks_embedding_hnsw` trong SQLAlchemy metadata và tạo index tương ứng trên dialect không phải Postgres để `alembic check` đạt trên cả Postgres và SQLite; phục vụ `AC-01` (job migrations).
 - Phạm vi file được sửa: `backend/app/db/models.py`, `backend/alembic/versions/0002_add_pgvector_and_chunk_embedding.py`.
 - Phụ thuộc: S-01 (để chạy định dạng/lint trên file đã sửa).
@@ -25,7 +25,7 @@
 ### S-03 — Workflow CI và badge README
 
 - Agent: `agent-opencode`
-- Trạng thái: `todo`
+- Trạng thái: `done`
 - Mục tiêu: tạo `.github/workflows/ci.yml` với trigger `pull_request` + `push` nhánh `main`, ba job `backend`, `migrations`, `frontend`, cache pip/npm; thêm badge CI vào `README.md`; phục vụ `AC-01`, `AC-03`, `AC-04`, `AC-05`.
 - Phạm vi file được sửa: `.github/workflows/ci.yml` (mới), `README.md`.
 - Phụ thuộc: S-01, S-02 (workflow gọi các lệnh đã đạt cục bộ).
@@ -35,7 +35,7 @@
 ### S-04 — Kiểm chứng và thử CI đỏ
 
 - Agent: `agent-opencode`
-- Trạng thái: `todo`
+- Trạng thái: `done`
 - Mục tiêu: chạy lại toàn bộ kiểm tra cục bộ (ruff, pytest, migration Postgres, frontend build); push nhánh và mở PR, xác nhận 3 job xanh; tạo commit tạm làm hỏng test để xác nhận CI đỏ rồi revert; ghi bằng chứng vào `verification.md`; phục vụ `AC-01` → `AC-05`.
 - Phạm vi file được sửa: `.agents/tasks/2026-10-21-ci-github-actions/verification.md`; commit tạm trên nhánh sẽ được revert.
 - Phụ thuộc: S-03.

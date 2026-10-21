@@ -81,9 +81,18 @@ index HNSW với migration, thêm badge và mô tả CI trong README.
   - Khắc phục: pin `ruff==0.17.1` trong dev dependency, format lại bằng đúng phiên
     bản, nâng action lên major hiện hành (`checkout@v7`, `setup-python@v7`,
     `setup-node@v7`) để tránh cảnh báo Node 20.
+  - Run thứ hai `39619649836`: `frontend` và `migrations` xanh, `backend` đỏ khi collect
+    test vì CI không có `OPENAI_API_KEY` (máy cục bộ có `.env`). Khắc phục: đặt
+    `EMBEDDING_PROVIDER=hash` cho job `backend` (test không gọi API thật).
+  - Run thứ ba `39619951265` và run cuối `39622987957` xanh cả 3 job; thời lượng run cuối
+    44 giây.
+  - Thử AC-03: commit `92ec35b` thêm `backend/tests/test_ci_red_probe.py`
+    (`assert False`); run `39620376702` đỏ ở job `backend` với
+    `1 failed, 214 passed, 21 skipped`, hai job còn lại xanh. Commit `76bb37b` xóa probe,
+    run cuối xanh trở lại.
 - File thay đổi: `backend/pyproject.toml`, `backend/tests/test_rag_chain.py`,
-  `.github/workflows/ci.yml`.
-- Kiểm tra đã chạy: xem `verification.md`.
+  `.github/workflows/ci.yml`, `.agents/tasks/2026-10-21-ci-github-actions/*`.
+- Kiểm tra đã chạy: xem `verification.md` (đủ 5 AC).
 - Còn lại/blocker: không có.
 
 ## Trao đổi giữa agents

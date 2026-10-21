@@ -1,45 +1,72 @@
-# Review: <task-id>
+# Review: 2026-10-21-ci-github-actions
 
-- Reviewer: `<agent-id>`.
-- Hình thức: `<independent | self_review>` (chọn một).
-- Trạng thái: `pending`.
-- Bản được review: <commit hoặc working tree + diff/phạm vi file cụ thể>.
-- Cập nhật lúc: `<ISO 8601 có múi giờ>`.
+- Reviewer: `agent-opencode`.
+- Hình thức: `self_review` (một agent thực hiện toàn bộ task).
+- Trạng thái: `approved`.
+- Bản được review: nhánh `ci/github-actions`, commit
+  `76bb37b1ef7c394640ff06e7e2be1ed152ff0bfa`, PR #42
+  (https://github.com/8thMay03/PTIT-Chatbot/pull/42).
+- Cập nhật lúc: `2026-10-21T22:12:58+07:00`.
 
 ## Phạm vi và cơ sở đánh giá
 
-- Yêu cầu/tiêu chí: <AC-* và nhiệm vụ S-* liên quan>.
-- File/thay đổi cần đọc: <đường dẫn và phạm vi diff>.
-- Bằng chứng kiểm chứng: <mục V-* trong verification.md; ghi rõ phần chưa kiểm chứng>.
-- Điểm cần đánh giá: <tính đúng đắn, trường hợp lỗi, tương thích, bảo mật, khả năng bảo trì hoặc tính nhất quán tài liệu theo phạm vi task>.
+- Yêu cầu/tiêu chí: AC-01 → AC-05 trong `task.md`; S-01 → S-04 trong `plan.md`.
+- File/thay đổi cần đọc:
+  - `.github/workflows/ci.yml` (mới).
+  - `backend/pyproject.toml` (ruff config, `ruff==0.17.1`, marker corpus).
+  - `backend/app/db/models.py`, `backend/alembic/versions/0002_add_pgvector_and_chunk_embedding.py`.
+  - Toàn bộ diff format backend (không đổi logic) và `README.md`.
+- Bằng chứng kiểm chứng: `verification.md` V-01 → V-05, gồm run xanh, run đỏ cố ý,
+  log cache và badge HTTP 200.
+- Điểm cần đánh giá: tính đúng đắn của trigger/job, khả năng tái lập giữa máy cục bộ và CI,
+  đồng bộ migration, phạm vi diff format, rủi ro còn lại.
 
 ## Nhận xét
 
-Khối dưới là mẫu, chưa phải nhận xét thực tế. Thay bằng các nhận xét có ID duy nhất; nếu đã review và không có vấn đề, ghi rõ không có nhận xét kèm phạm vi đã đọc.
+### R-01 — Job backend chạy với hash embedding thay vì provider mặc định
 
-### R-01 — <Tên vấn đề>
+- Vị trí: `.github/workflows/ci.yml`, `jobs.backend.env.EMBEDDING_PROVIDER`.
+- Liên quan: AC-01, AC-04.
+- Mức độ: `low`.
+- Bắt buộc sửa: không.
+- Trạng thái: `deferred`.
+- Vấn đề và tác động: CI không cần `OPENAI_API_KEY` nhờ hash embedding, nhưng cấu hình
+  này khác mặc định `openai` của môi trường phát triển. Test hiện tại mock provider và đã
+  đạt với cả hai cấu hình (234 passed cục bộ; 214 passed, 21 skipped trên bản sạch), nên
+  không che giấu lỗi hành vi. Nếu sau này có test phụ thuộc đặc thù OpenAI embedding, cần
+  đánh dấu và cấu hình riêng.
+- Hướng theo dõi: giữ hash cho CI offline; thêm job/marker riêng nếu cần kiểm tra provider thật.
+- Người xử lý: `agent-opencode`.
+- Quyết định của coordinator: chấp nhận `deferred` vì không bắt buộc và có lý do rõ ràng.
 
-- Vị trí: <file:dòng hoặc mục cụ thể>.
-- Liên quan: <AC-*/S-*>.
-- Mức độ: `<critical | high | medium | low>` (chọn một).
-- Bắt buộc sửa: <có/không; critical và high luôn có>.
-- Trạng thái: `open`.
-- Vấn đề và tác động: <quan sát cụ thể, tình huống xảy ra, hậu quả>.
-- Đề nghị xử lý: <kết quả cần đạt>.
-- Người xử lý: `<agent-id>`.
-- Phản hồi/cách sửa: <người triển khai bổ sung hoặc gửi reviewer tổng hợp>.
-- Bằng chứng sau sửa: <diff/commit và kiểm tra liên quan>.
-- Xác nhận của reviewer: <kết quả review lại; chỉ resolved khi đã xác nhận>.
-- Nếu deferred: <lý do, hướng theo dõi và quyết định của coordinator; chỉ áp dụng với nhận xét không bắt buộc>.
+### R-02 — Migration 0002 được sửa để tạo index trên SQLite
+
+- Vị trí: `backend/alembic/versions/0002_add_pgvector_and_chunk_embedding.py`.
+- Liên quan: AC-01 (job migrations), S-02.
+- Mức độ: `low`.
+- Bắt buộc sửa: không.
+- Trạng thái: `deferred`.
+- Vấn đề và tác động: nhánh `else` tạo index thường giúp metadata và migration khớp trên
+  SQLite (dev/test), nhưng các DB SQLite đã chạy migration 0002 từ trước sẽ không tự có
+  index này. SQLite không phải môi trường production của dự án; Postgres đã có index HNSW
+  từ bản gốc và `alembic check` đạt trên cả DB mới lẫn DB đã migrate.
+- Hướng theo dõi: nếu SQLite trở thành môi trường được hỗ trợ lâu dài, tạo migration bổ
+  sung hoặc tài liệu hóa việc tạo lại DB dev.
+- Người xử lý: `agent-opencode`.
+- Quyết định của coordinator: chấp nhận `deferred`; ghi rõ trong `implementation.md`.
 
 ## Lịch sử các vòng review
 
-- <Thời gian> — <reviewer> — <bản/phạm vi> — <kết luận và các R-* liên quan>.
+- `2026-10-21T22:12:58+07:00` — `agent-opencode` — commit `76bb37b`, toàn bộ diff
+  `.github/workflows/ci.yml`, cấu hình ruff, model/migration, README và format backend —
+  `approved`; R-01, R-02 là nhận xét `low` không bắt buộc, đã `deferred` kèm hướng theo dõi.
 
 ## Kết luận
 
-- Kết luận: `pending`.
-- Nhận xét bắt buộc còn mở: <R-* hoặc không có, sau khi đã review>.
-- Nhận xét hoãn lại: <R-* và hướng theo dõi, hoặc không có>.
-- Phần chưa review / giới hạn: <ghi rõ>.
-- Bước tiếp theo: <agent xử lý / verifier kiểm tra lại / coordinator đóng task khi đủ điều kiện>.
+- Kết luận: `approved`.
+- Nhận xét bắt buộc cần xử lý: không có.
+- Nhận xét hoãn lại: R-01, R-02 (low, không bắt buộc, có hướng theo dõi).
+- Phần chưa review / giới hạn: chưa kiểm tra hành vi trên nhánh `main` sau merge và badge
+  trên giao diện GitHub; badge URL đã trả HTTP 200 và workflow sẽ chạy khi push lên `main`.
+- Bước tiếp theo: coordinator đóng task; đề xuất merge PR #42 vào `dev`, sau đó merge
+  `dev` → `main` để badge phản ánh trạng thái mới nhất.

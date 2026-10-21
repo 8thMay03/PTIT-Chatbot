@@ -1,11 +1,11 @@
 # Task: Thiết lập CI bằng GitHub Actions
 
 - ID: `2026-10-21-ci-github-actions`
-- Trạng thái: `in_progress`
+- Trạng thái: `done`
 - Coordinator: `agent-opencode`
 - Người yêu cầu: Người dùng (issue "Thiết lập CI bằng GitHub Actions")
 - Tạo lúc: `2026-10-21T21:39:53+07:00`
-- Cập nhật lúc: `2026-10-21T21:39:53+07:00`
+- Cập nhật lúc: `2026-10-21T22:12:58+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -25,11 +25,11 @@ Kết quả mong muốn: trạng thái từng job hiển thị trên PR, PR cố
 
 ## Tiêu chí nghiệm thu
 
-- [ ] AC-01: Workflow chạy trên PR và báo trạng thái từng job (`backend`, `migrations`, `frontend`).
-- [ ] AC-02: Có cấu hình ruff trong `backend/pyproject.toml`; code hiện tại pass `ruff check` và `ruff format --check` sau khi format.
-- [ ] AC-03: Một PR cố tình làm hỏng test thì CI báo đỏ.
-- [ ] AC-04: Có cache pip/npm; tổng thời gian workflow dưới 10 phút.
-- [ ] AC-05: README có badge CI.
+- [x] AC-01: Workflow chạy trên PR và báo trạng thái từng job (`backend`, `migrations`, `frontend`).
+- [x] AC-02: Có cấu hình ruff trong `backend/pyproject.toml`; code hiện tại pass `ruff check` và `ruff format --check` sau khi format.
+- [x] AC-03: Một PR cố tình làm hỏng test thì CI báo đỏ.
+- [x] AC-04: Có cache pip/npm; tổng thời gian workflow dưới 10 phút.
+- [x] AC-05: README có badge CI.
 
 ## Tài liệu và phụ thuộc
 
@@ -46,10 +46,14 @@ Kết quả mong muốn: trạng thái từng job hiển thị trên PR, PR cố
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: đang triển khai trên nhánh `ci/github-actions`.
+- Tóm tắt: hoàn tất — 5 AC có bằng chứng `passed` trong `verification.md`; PR #42 xanh cả
+  3 job, run đỏ cố ý đã được xác nhận và revert; review `approved` (self_review) trên
+  commit `76bb37b`.
 - Blocker: không có.
-- Bước tiếp theo: `agent-opencode` hoàn tất S-01 → S-04 và kiểm chứng.
+- Bước tiếp theo: người dùng merge PR #42 vào `dev` (và `dev` → `main` khi sẵn sàng).
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
 - `2026-10-21T21:39:53+07:00` — `agent-opencode`: tạo task, đặt trạng thái `in_progress`; chọn nhánh `ci/github-actions` tách từ `dev` vì `main` chưa có S1-03.
+- `2026-10-21T21:50:00+07:00` — `agent-opencode`: mở rộng phạm vi sang đồng bộ index HNSW trong model/migration vì `alembic check` đang lỗi trên Postgres; lý do ghi ở MSG-agent-opencode-001.
+- `2026-10-21T22:12:58+07:00` — `agent-opencode` (coordinator): chuyển `done` sau khi đủ 5 AC có bằng chứng và review `approved`; R-01/R-02 là nhận xét low không bắt buộc, đã `deferred`.
