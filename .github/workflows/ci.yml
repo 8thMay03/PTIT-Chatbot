@@ -20,6 +20,9 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    env:
+      # Test suite không gọi API thật; dùng hash embedding để không cần OPENAI_API_KEY.
+      EMBEDDING_PROVIDER: hash
     steps:
       - name: Checkout
         uses: actions/checkout@v7
