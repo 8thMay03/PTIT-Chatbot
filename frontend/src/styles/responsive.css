@@ -64,44 +64,16 @@
     font-size: 22px;
   }
 
-  /* ---- Dataset: sidebar dọc -> thanh tab ngang ---- */
+  /* ---- Dataset ---- */
   .dataset-wrapper {
-    flex-direction: column;
     overflow-y: auto;
-  }
-
-  .dataset-sidebar {
-    width: 100%;
-    flex-direction: row;
-    align-items: center;
-    gap: var(--space-3);
-    overflow-x: auto;
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
-    padding: var(--space-3);
-    padding-left: 62px;
-  }
-
-  .dataset-info-card {
-    flex-shrink: 0;
-    margin: 0;
-  }
-
-  .dataset-nav-menu {
-    flex-direction: row;
-    gap: 6px;
-    margin: 0;
-  }
-
-  .dataset-nav-item {
-    flex-shrink: 0;
-    white-space: nowrap;
   }
 
   .dataset-view-header {
     flex-direction: column;
     align-items: stretch;
     gap: var(--space-3);
+    padding-left: 62px;
   }
 
   .dataset-view-toolbar {
@@ -114,7 +86,6 @@
   }
 
   /* ---- Mọi layout 2 cột xếp chồng ---- */
-  .retrieval-two-col-layout,
   .config-two-col-grid,
   .model-mgmt-layout,
   .doc-view-split-layout {
@@ -122,11 +93,9 @@
     gap: var(--space-5);
   }
 
-  /* Cột trái của document/retrieval cần chiều cao rõ ràng khi đã xếp chồng */
+  /* Cột trái/phải của document cần chiều cao rõ ràng khi đã xếp chồng */
   .doc-view-left-col,
-  .doc-view-right-col,
-  .retrieval-col-left,
-  .retrieval-col-right {
+  .doc-view-right-col {
     min-height: 380px;
   }
 
