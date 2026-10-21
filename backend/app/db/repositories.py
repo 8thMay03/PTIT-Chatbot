@@ -71,7 +71,6 @@ def replace_knowledge_base(
     session.flush()
 
 
-
 def list_documents(session: Session) -> list[tuple[Document, int]]:
     chunk_count = func.count(Chunk.id).label("chunk_count")
     rows = session.execute(
@@ -83,7 +82,9 @@ def list_documents(session: Session) -> list[tuple[Document, int]]:
     return [(document, count) for document, count in rows]
 
 
-def get_document_with_chunk_count(session: Session, document_id: str) -> tuple[Document, int] | None:
+def get_document_with_chunk_count(
+    session: Session, document_id: str
+) -> tuple[Document, int] | None:
     chunk_count = func.count(Chunk.id).label("chunk_count")
     row = session.execute(
         select(Document, chunk_count)
@@ -260,9 +261,7 @@ def add_message(
     )
     session.add(message)
     session.execute(
-        update(Conversation)
-        .where(Conversation.id == conversation_id)
-        .values(updated_at=func.now())
+        update(Conversation).where(Conversation.id == conversation_id).values(updated_at=func.now())
     )
     session.flush()
     return message
@@ -320,15 +319,19 @@ def add_message_sources(session: Session, message_id: str, sources: list[dict]) 
         return
 
     chunk_ids = [source.get("chunk_id") for source in sources if source.get("chunk_id")]
-    existing_chunk_ids = set(
-        session.scalars(select(Chunk.id).where(Chunk.id.in_(chunk_ids))).all()
-    ) if chunk_ids else set()
+    existing_chunk_ids = (
+        set(session.scalars(select(Chunk.id).where(Chunk.id.in_(chunk_ids))).all())
+        if chunk_ids
+        else set()
+    )
 
     session.add_all(
         MessageSource(
             id=str(uuid4()),
             message_id=message_id,
-            chunk_id=source.get("chunk_id") if source.get("chunk_id") in existing_chunk_ids else None,
+            chunk_id=source.get("chunk_id")
+            if source.get("chunk_id") in existing_chunk_ids
+            else None,
             score=source.get("score"),
             excerpt=source.get("text"),
         )

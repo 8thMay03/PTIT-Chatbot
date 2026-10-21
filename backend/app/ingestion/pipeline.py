@@ -81,9 +81,13 @@ class IngestionPipeline:
             if not text.strip():
                 raise DocumentParseError(f"{staged_path.name} không có nội dung văn bản.")
             path = settings.documents_path / staged_path.name
-            return self._ingest_document(SourceDocument(path=path, text=text), staged_path=staged_path)
+            return self._ingest_document(
+                SourceDocument(path=path, text=text), staged_path=staged_path
+            )
 
-    def ingest_path(self, path: Path, *, document_id: str | None = None, parser_name: str | None = None) -> dict:
+    def ingest_path(
+        self, path: Path, *, document_id: str | None = None, parser_name: str | None = None
+    ) -> dict:
         options = {"parser_name": parser_name} if parser_name is not None else {}
         text = read_document_text(path, **options) or ""
         return self._ingest_document(SourceDocument(path=path, text=text), document_id=document_id)
@@ -128,13 +132,17 @@ class IngestionPipeline:
             stored = upsert_document(session, document_record, chunk_records)
             # Parsing, embeddings and DB flush have succeeded before publication.
             # A failed commit rolls back both the indexed data and source file.
-            publication = publish_upload(staged_path, path) if staged_path is not None else nullcontext()
+            publication = (
+                publish_upload(staged_path, path) if staged_path is not None else nullcontext()
+            )
             with publication:
                 session.commit()
             session.refresh(stored)
             document_item = serialize_document(stored, len(chunk_records), _file_size(path))
 
-        if hasattr(self.vector_store, "delete") and not hasattr(self.vector_store, "session_factory"):
+        if hasattr(self.vector_store, "delete") and not hasattr(
+            self.vector_store, "session_factory"
+        ):
             if existing_ids:
                 self.vector_store.delete(existing_ids)
 
@@ -155,7 +163,9 @@ class IngestionPipeline:
             source_path = document.source_path
             session.commit()
 
-        if hasattr(self.vector_store, "delete") and not hasattr(self.vector_store, "session_factory"):
+        if hasattr(self.vector_store, "delete") and not hasattr(
+            self.vector_store, "session_factory"
+        ):
             if vector_ids:
                 self.vector_store.delete(vector_ids)
 

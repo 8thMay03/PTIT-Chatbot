@@ -46,4 +46,3 @@ def test_rewriter_with_llm_provider(monkeypatch) -> None:
     result = rewriter.rewrite("Học phí bao nhiêu?")
 
     assert result == "truy vấn viết lại từ LLM"
-

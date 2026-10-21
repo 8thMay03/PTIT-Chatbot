@@ -164,7 +164,11 @@ def _split_markdown_sections(text: str) -> list[Section]:
                 )
 
             level, title = heading
-            heading_stack = [(item_level, item_title) for item_level, item_title in heading_stack if item_level < level]
+            heading_stack = [
+                (item_level, item_title)
+                for item_level, item_title in heading_stack
+                if item_level < level
+            ]
             heading_stack.append((level, title))
             current_heading = title
             current_level = level
@@ -525,6 +529,7 @@ def _merge_short_table_tail(
         return pieces
 
     header_len = len(header)
+
     def data_rows(piece: str) -> list[str]:
         lines = [line for line in piece.splitlines() if line.strip()]
         return lines[header_len:]

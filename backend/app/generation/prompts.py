@@ -59,10 +59,13 @@ def build_context_prompt(
         )
 
     context_text = "\n\n".join(blocks)
-    history_text = "\n".join(
-        f"{'Người dùng' if message.get('role') == 'user' else 'Trợ lý'}: {message.get('content', '')}"
-        for message in (history or [])
-    ) or "(Không có)"
+    history_text = (
+        "\n".join(
+            f"{'Người dùng' if message.get('role') == 'user' else 'Trợ lý'}: {message.get('content', '')}"
+            for message in (history or [])
+        )
+        or "(Không có)"
+    )
     return (
         f"LỊCH SỬ HỘI THOẠI (chỉ để hiểu tham chiếu):\n{history_text}\n\n"
         f"NGỮ CẢNH TÀI LIỆU ĐƯỢC PHÉP SỬ DỤNG:\n{context_text}\n\n"

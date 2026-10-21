@@ -30,7 +30,9 @@ Late payment details.
 def test_split_text_splits_long_section_without_losing_heading_context() -> None:
     text = """## Academic Warning
 
-""" + "\n\n".join(f"Paragraph {index} has enough content to force section splitting." for index in range(8))
+""" + "\n\n".join(
+        f"Paragraph {index} has enough content to force section splitting." for index in range(8)
+    )
 
     chunks = split_text(text, chunk_size=160, chunk_overlap=20)
 
@@ -70,9 +72,7 @@ Child content.
 
 
 def test_split_text_splits_markdown_table_between_rows_and_repeats_header() -> None:
-    rows = "\n".join(
-        f"| Program-{index} | {100000 + index} |" for index in range(1, 13)
-    )
+    rows = "\n".join(f"| Program-{index} | {100000 + index} |" for index in range(1, 13))
     text = f"""## Tuition fees
 
 Introductory paragraph immediately before the table.
@@ -91,10 +91,13 @@ Closing paragraph.
     assert sum(chunk.text.count("| Program-1 |") for chunk in table_chunks) == 1
     assert sum(chunk.text.count("| Program-12 |") for chunk in table_chunks) == 1
     assert all(chunk.heading == "Tuition fees" for chunk in table_chunks)
-    assert max(
-        sum(1 for line in chunk.text.splitlines() if line.startswith("| Program-"))
-        for chunk in table_chunks
-    ) >= 3
+    assert (
+        max(
+            sum(1 for line in chunk.text.splitlines() if line.startswith("| Program-"))
+            for chunk in table_chunks
+        )
+        >= 3
+    )
 
 
 def test_split_text_does_not_cut_an_oversized_table_row() -> None:
@@ -250,8 +253,7 @@ def test_wide_table_does_not_collapse_to_one_row_per_chunk() -> None:
     assert all("Mã Giao Dịch" in chunk.text for chunk in tx_children)
 
     rows_per_child = [
-        sum(1 for line in chunk.text.splitlines() if "| TX-" in line)
-        for chunk in tx_children
+        sum(1 for line in chunk.text.splitlines() if "| TX-" in line) for chunk in tx_children
     ]
     assert max(rows_per_child) >= 3
     assert sum(1 for count in rows_per_child if count == 1) <= 1

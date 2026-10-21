@@ -57,4 +57,3 @@ def test_multi_query_with_llm_provider(monkeypatch) -> None:
     assert "câu hỏi gốc" in queries
     assert "truy vấn 1" in queries
     assert "truy vấn 2" in queries
-

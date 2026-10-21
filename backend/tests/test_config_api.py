@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings, settings
@@ -90,7 +90,9 @@ def test_reset_config_restores_defaults() -> None:
 
 def test_test_llm_endpoint_success() -> None:
     with patch("app.llm.providers.openai_provider.OpenAIProvider.generate", return_value="OK PTIT"):
-        with patch("app.llm.providers.openai_provider.OpenAIProvider.is_configured", return_value=True):
+        with patch(
+            "app.llm.providers.openai_provider.OpenAIProvider.is_configured", return_value=True
+        ):
             payload = {
                 "provider": "openai",
                 "model": "gpt-4.1-mini",
@@ -145,7 +147,9 @@ def test_retrieval_test_endpoint_returns_disabled_guardrail(monkeypatch) -> None
     monkeypatch.setattr(settings, "reranker_enabled", False)
 
     try:
-        resp = client.post("/api/retrieval/test", json={"query": "Thủ đô của Nhật Bản là gì?", "top_k": 4})
+        resp = client.post(
+            "/api/retrieval/test", json={"query": "Thủ đô của Nhật Bản là gì?", "top_k": 4}
+        )
     finally:
         settings.guardrail_scope_enabled = original
 

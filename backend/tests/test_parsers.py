@@ -53,8 +53,12 @@ def test_registry_supports_named_alternatives_and_explicit_default():
 
 @pytest.mark.parametrize(
     ("path", "parser_name", "message"),
-    [("file.doc", None, ".doc"), ("file", None, "không có"),
-     ("file.md", "missing", "missing"), ("file.pdf", "text", "text")],
+    [
+        ("file.doc", None, ".doc"),
+        ("file", None, "không có"),
+        ("file.md", "missing", "missing"),
+        ("file.pdf", "text", "text"),
+    ],
 )
 def test_registry_rejects_unsupported_input(path, parser_name, message):
     registry = ParserRegistry([TextParser()])

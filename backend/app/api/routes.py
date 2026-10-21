@@ -78,7 +78,6 @@ def health() -> dict[str, Any]:
     }
 
 
-
 @router.get("/config", response_model=FullConfigResponse)
 def get_config() -> FullConfigResponse:
     return FullConfigResponse(**get_runtime_config_dict())
@@ -136,7 +135,6 @@ def test_llm(request: TestLLMRequest) -> TestLLMResponse:
             message=f"Lỗi khi kết nối tới {request.provider}: {str(exc)}",
             latency_ms=latency_ms,
         )
-
 
 
 @router.post("/retrieval/test")
@@ -202,7 +200,9 @@ def get_document(document_id: str, session: Session = Depends(get_session)) -> D
         except Exception:
             pass
 
-    return DocumentDetail(**_document_payload(document, chunk_count), preview=preview, full_text=full_text)
+    return DocumentDetail(
+        **_document_payload(document, chunk_count), preview=preview, full_text=full_text
+    )
 
 
 @router.get("/documents/{document_id}/chunks", response_model=DocumentChunksResponse)
@@ -271,7 +271,11 @@ def document_parsers(document_id: str, session: Session = Depends(get_session)) 
 
 
 @router.post("/documents/{document_id}/parse", response_model=DocumentItem)
-def parse_single_document(document_id: str, session: Session = Depends(get_session), parser_name: str | None = Query(default=None, min_length=1)) -> DocumentItem:
+def parse_single_document(
+    document_id: str,
+    session: Session = Depends(get_session),
+    parser_name: str | None = Query(default=None, min_length=1),
+) -> DocumentItem:
     row = get_document_with_chunk_count(session, document_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
@@ -337,7 +341,11 @@ def chat(request: ChatRequest, session: Session = Depends(get_session)) -> ChatR
         conversation.id,
         "assistant",
         result["answer"],
-        metadata={"sources": [s.model_dump() if hasattr(s, "model_dump") else dict(s) for s in result["sources"]]},
+        metadata={
+            "sources": [
+                s.model_dump() if hasattr(s, "model_dump") else dict(s) for s in result["sources"]
+            ]
+        },
     )
     add_message_sources(session, assistant_message.id, result["contexts"])
     session.commit()
@@ -372,7 +380,9 @@ def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -
         else []
     )
     history = filter_safe_history(history)
-    retrieval = rag_chain.retrieve_context(request.message, top_k=request.effective_top_k, history=history)
+    retrieval = rag_chain.retrieve_context(
+        request.message, top_k=request.effective_top_k, history=history
+    )
 
     def event_stream() -> Iterator[str]:
         contexts = retrieval["contexts"] if retrieval["strong_context"] else []
@@ -434,12 +444,14 @@ def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -
             # Event `error` đã gửi ở trên là event kết thúc; client giữ phần text
             # đã stream và hiển thị nút thử lại, không ghi đè bằng `done`.
             return
-        yield _ndjson({
-            "type": "done",
-            "answer": answer,
-            "sources": sources,
-            "conversation_id": conversation.id,
-        })
+        yield _ndjson(
+            {
+                "type": "done",
+                "answer": answer,
+                "sources": sources,
+                "conversation_id": conversation.id,
+            }
+        )
 
     return StreamingResponse(
         event_stream(),

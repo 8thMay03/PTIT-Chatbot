@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from typing import Any
 
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -59,11 +59,10 @@ def init_db() -> None:
         Base.metadata.create_all(bind=engine)
     except Exception as exc:
         import logging
-        logging.getLogger("app.db").warning("Could not auto-create tables during init_db: %s", exc)
 
+        logging.getLogger("app.db").warning("Could not auto-create tables during init_db: %s", exc)
 
 
 def get_session() -> Generator[Session, None, None]:
     with SessionLocal() as session:
         yield session
-

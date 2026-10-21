@@ -38,6 +38,5 @@ def reciprocal_rank_fusion(
 
 def _result_key(result: dict) -> str:
     return str(
-        result.get("chunk_id")
-        or f"{result.get('document_id', '')}:{result.get('chunk_index', '')}"
+        result.get("chunk_id") or f"{result.get('document_id', '')}:{result.get('chunk_index', '')}"
     )

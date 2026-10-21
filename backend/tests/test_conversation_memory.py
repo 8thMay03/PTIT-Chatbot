@@ -82,7 +82,9 @@ async def test_chat_stream_delivers_ndjson_events(monkeypatch) -> None:
     monkeypatch.setattr(
         routes,
         "ensure_conversation",
-        lambda session, conversation_id, user_id, title: SimpleNamespace(id="conversation-stream-1"),
+        lambda session, conversation_id, user_id, title: SimpleNamespace(
+            id="conversation-stream-1"
+        ),
     )
     monkeypatch.setattr(
         routes.rag_chain,
@@ -118,9 +120,10 @@ async def test_chat_stream_delivers_ndjson_events(monkeypatch) -> None:
 
     types = [event["type"] for event in events]
     assert types == ["start", "delta", "delta", "delta", "done"]
-    assert "".join(event["content"] for event in events if event["type"] == "delta") == "Học phí PTIT [1]"
+    assert (
+        "".join(event["content"] for event in events if event["type"] == "delta")
+        == "Học phí PTIT [1]"
+    )
     done_event = next(event for event in events if event["type"] == "done")
     assert done_event["answer"] == "Học phí PTIT [1]"
     assert len(done_event["sources"]) == 1
-
-
