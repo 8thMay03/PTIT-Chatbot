@@ -110,8 +110,9 @@ def test_rag_chain_retrieves_with_rewritten_query_but_answers_original_question(
     answered_questions = []
     monkeypatch.setattr(
         "app.generation.rag_chain.answer_with_llm",
-        lambda question, contexts, history=None, provider=None: answered_questions.append(question)
-        or "Câu trả lời [1]",
+        lambda question, contexts, history=None, provider=None: (
+            answered_questions.append(question) or "Câu trả lời [1]"
+        ),
     )
 
     result = RagChain(
