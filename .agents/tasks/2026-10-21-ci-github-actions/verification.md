@@ -2,7 +2,8 @@
 
 - Verifier: `agent-opencode`.
 - Trạng thái tổng: `passed`.
-- Bản được kiểm tra: nhánh `ci/github-actions`, commit cuối `76bb37b1ef7c394640ff06e7e2be1ed152ff0bfa`, PR #42
+- Bản được kiểm tra: nhánh `ci/github-actions`, commit mã `76bb37b1ef7c394640ff06e7e2be1ed152ff0bfa`
+  và các commit tài liệu task đến `b6e49d7`; PR #42
   (https://github.com/8thMay03/PTIT-Chatbot/pull/42) vào nhánh `dev`.
 - Môi trường: Windows 11, Python 3.11.5 (`backend/.venv`), ruff 0.17.1, Node 24.14.0/npm 11.9.0;
   CI: GitHub Actions `ubuntu-latest`, Python 3.11.17, Node 20.20.2, Docker 29.2.1 với
@@ -20,11 +21,12 @@
 - Kỳ vọng: workflow `pull_request` được trigger; ba job riêng biệt `backend`,
   `migrations`, `frontend` đều hiển thị trạng thái và cùng xanh.
 - Kết quả thực tế: run [39622987957](https://github.com/8thMay03/PTIT-Chatbot/actions/runs/39622987957)
-  kết luận `success`:
-  - `Backend (ruff + pytest)` — `success`, 15:08:27Z → 15:08:51Z.
-  - `Alembic migrations (Postgres)` — `success`, 15:08:27Z → 15:09:05Z.
-  - `Frontend (npm build)` — `success`, 15:08:27Z → 15:08:38Z.
-  PR #42 ở trạng thái `open`, `head=76bb37b`, `mergeable_state=clean`.
+  trên commit mã `76bb37b` và run [39629279343](https://github.com/8thMay03/PTIT-Chatbot/actions/runs/39629279343)
+  trên commit tài liệu `b6e49d7` đều kết luận `success`, đủ ba job:
+  - `Backend (ruff + pytest)` — `success`, 15:50:20Z → 15:50:44Z (run cuối).
+  - `Alembic migrations (Postgres)` — `success`, 15:50:20Z → 15:51:00Z (run cuối).
+  - `Frontend (npm build)` — `success`, 15:50:20Z → 15:50:36Z (run cuối).
+  PR #42 ở trạng thái `open`, `mergeable_state=clean`, `head=b6e49d7`.
 - Trạng thái: `passed`.
 - Bằng chứng: phản hồi GitHub API cho run/jobs (id, started_at, completed_at, conclusion
   ghi ở trên); URL run và PR #42.
@@ -113,14 +115,12 @@
 - Không có kiểm tra bắt buộc nào chưa chạy. Job `backend` không dùng service Postgres vì
   toàn bộ test hiện tại dùng SQLite in-memory/tmp; Postgres thật chỉ cần cho job `migrations`
   và đã được kiểm tra cả cục bộ (container `pgvector/pgvector:pg16`) lẫn trên CI.
-- Sự cố ngoài phạm vi: từ `2026-10-21T14:52:49Z` GitHub báo sự cố
+- Sự cố ngoài phạm vi (đã hết): từ `2026-10-21T14:52:49Z` GitHub báo sự cố
   "Delays for Pull Requests and Webhook deliveries" và component `Actions` ở trạng thái
-  `degraded_performance` (https://stspg.io/gnnt0tx9nxmk). Run `39624908421` cho commit chỉ
-  sửa tài liệu task (`93c7fc7`) có log cho thấy cả ba job đã chạy xong và build/pytest thành
-  công, nhưng trạng thái job `Frontend`/`Backend` bị kẹt ở `in_progress` và PR hiển thị
-  `mergeable_state=unstable`. Đây là lỗi báo trạng thái của GitHub, không phải CI thất bại;
-  bằng chứng AC-01 vẫn là run `39622987957` trên commit mã `76bb37b` với đủ ba job
-  `success` và `mergeable_state=clean` trước khi sự cố ảnh hưởng lần chạy tài liệu.
+  `degraded_performance` (https://stspg.io/gnnt0tx9nxmk). Trong sự cố, run `39624908421`
+  cho commit chỉ sửa tài liệu task có log cả ba job chạy xong nhưng trạng thái job bị kẹt
+  `in_progress`. Run `39629279343` sau đó đã xanh đầy đủ và PR trở lại
+  `mergeable_state=clean`; đây là lỗi báo trạng thái phía GitHub, CI không thất bại.
 
 ## Kết luận
 
