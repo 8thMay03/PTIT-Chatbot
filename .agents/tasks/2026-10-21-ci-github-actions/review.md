@@ -68,5 +68,8 @@
 - Nhận xét hoãn lại: R-01, R-02 (low, không bắt buộc, có hướng theo dõi).
 - Phần chưa review / giới hạn: chưa kiểm tra hành vi trên nhánh `main` sau merge và badge
   trên giao diện GitHub; badge URL đã trả HTTP 200 và workflow sẽ chạy khi push lên `main`.
+  Tại thời điểm review, GitHub đang có sự cố "Delays for Pull Requests and Webhook deliveries"
+  khiến check của commit chỉ sửa tài liệu task bị kẹt `in_progress` dù log đã chạy xong;
+  commit mã `76bb37b` đã có run xanh đầy đủ trước đó.
 - Bước tiếp theo: coordinator đóng task; đề xuất merge PR #42 vào `dev`, sau đó merge
   `dev` → `main` để badge phản ánh trạng thái mới nhất.

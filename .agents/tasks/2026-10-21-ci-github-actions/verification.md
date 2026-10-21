@@ -113,6 +113,14 @@
 - Không có kiểm tra bắt buộc nào chưa chạy. Job `backend` không dùng service Postgres vì
   toàn bộ test hiện tại dùng SQLite in-memory/tmp; Postgres thật chỉ cần cho job `migrations`
   và đã được kiểm tra cả cục bộ (container `pgvector/pgvector:pg16`) lẫn trên CI.
+- Sự cố ngoài phạm vi: từ `2026-10-21T14:52:49Z` GitHub báo sự cố
+  "Delays for Pull Requests and Webhook deliveries" và component `Actions` ở trạng thái
+  `degraded_performance` (https://stspg.io/gnnt0tx9nxmk). Run `39624908421` cho commit chỉ
+  sửa tài liệu task (`93c7fc7`) có log cho thấy cả ba job đã chạy xong và build/pytest thành
+  công, nhưng trạng thái job `Frontend`/`Backend` bị kẹt ở `in_progress` và PR hiển thị
+  `mergeable_state=unstable`. Đây là lỗi báo trạng thái của GitHub, không phải CI thất bại;
+  bằng chứng AC-01 vẫn là run `39622987957` trên commit mã `76bb37b` với đủ ba job
+  `success` và `mergeable_state=clean` trước khi sự cố ảnh hưởng lần chạy tài liệu.
 
 ## Kết luận
 
