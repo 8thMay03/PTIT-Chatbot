@@ -44,3 +44,10 @@ Toàn bộ diff: `backend/scripts/eval_retrieval.py`, `backend/tests/test_eval_r
 ## Kết luận
 
 - `approved`: mọi AC-01…AC-06 có bằng chứng `passed` trong `verification.md`; hai nhận xét bắt buộc không có; R-03/R-04 là low, không bắt buộc, có hướng theo dõi rõ.
+
+## Bổ sung review vòng 2 (mở rộng coverage@k, 2026-10-25)
+
+- Phạm vi: diff coverage@k trong `eval_retrieval.py` + test + baseline chạy lại.
+- Kiểm tra: thuật toán coverage dùng đúng chuẩn hóa chung (không Copy code lệch đường phân tích; term trùng sau chuẩn hóa khử trùng); câu thiếu coverage bỏ khỏi trung bình thay vì kéo bằng 0; `--compare` chéo v1/v2 in `—` thay vì 0 giả — hợp lý.
+- Không nhận xét bắt buộc mới. R-03 (đường dẫn tương đối) vẫn mở và đã tự gặp lại một lần khi smoke (file rơi ra ngoài repo) — tiếp tục theo dõi, chưa đổi để giữ tương thích.
+- Kết luận: giữ `approved` trên bản có coverage (self_review).

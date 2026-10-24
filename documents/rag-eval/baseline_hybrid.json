@@ -1,12 +1,12 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "mode": "hybrid",
-  "created_at": "2026-10-24T23:59:45+07:00",
-  "elapsed_seconds": 9.859,
+  "created_at": "2026-10-25T00:13:58+07:00",
+  "elapsed_seconds": 5.328,
   "git": {
-    "commit": "bdff20ba31481e522c5104b5a9c2d8c7ada90377",
+    "commit": "2acff9660a83129cc97f77b50af236d7b52cfec1",
     "branch": "dev",
-    "dirty": false
+    "dirty": true
   },
   "dataset": {
     "path": "D:\\GithubRepositories\\PTIT Chatbot\\backend\\tests\\fixtures\\ptit_ragas_100.json",
@@ -17,8 +17,8 @@
     "provider": "openai",
     "model": "text-embedding-3-small",
     "cache_file": "D:\\GithubRepositories\\PTIT Chatbot\\backend\\storage\\eval\\embedding_cache.json",
-    "cache_hits": 100,
-    "cache_misses": 100
+    "cache_hits": 200,
+    "cache_misses": 0
   },
   "corpus": {
     "fingerprint": "ccf48780bbcc813d129b5a6423e1b6d4810a13d0ca6f6ac7a4c2e31b6ccc6670",
@@ -65,7 +65,10 @@
       "hit@1": 0.65,
       "hit@4": 0.84,
       "hit@10": 0.9,
-      "mrr": 0.738611
+      "mrr": 0.738611,
+      "coverage@1": 0.593333,
+      "coverage@4": 0.799167,
+      "coverage@10": 0.8575
     },
     "by_diacritics": {
       "co_dau": {
@@ -73,7 +76,10 @@
         "hit@1": 0.65,
         "hit@4": 0.84,
         "hit@10": 0.9,
-        "mrr": 0.738611
+        "mrr": 0.738611,
+        "coverage@1": 0.593333,
+        "coverage@4": 0.799167,
+        "coverage@10": 0.8575
       }
     },
     "by_question_type": {
@@ -82,7 +88,10 @@
         "hit@1": 0.65,
         "hit@4": 0.84,
         "hit@10": 0.9,
-        "mrr": 0.738611
+        "mrr": 0.738611,
+        "coverage@1": 0.593333,
+        "coverage@4": 0.799167,
+        "coverage@10": 0.8575
       }
     },
     "by_source": {
@@ -91,7 +100,10 @@
         "hit@1": 0.65,
         "hit@4": 0.84,
         "hit@10": 0.9,
-        "mrr": 0.738611
+        "mrr": 0.738611,
+        "coverage@1": 0.593333,
+        "coverage@4": 0.799167,
+        "coverage@10": 0.8575
       }
     }
   },
@@ -175,7 +187,12 @@
           "heading": "1. Tên gọi",
           "score": 0.013482
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "headquarters_address",
@@ -256,7 +273,12 @@
           "heading": "3. PTITer chơi gì?",
           "score": 0.012308
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "hanoi_campus_address",
@@ -337,7 +359,12 @@
           "heading": "I. THÔNG TIN CHUNG",
           "score": 0.013678
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.333333,
+        "coverage@4": 0.666667,
+        "coverage@10": 0.666667
+      }
     },
     {
       "id": "hcm_campus_address",
@@ -418,7 +445,12 @@
           "heading": "VIII. PHÒNG KẾ HOẠCH ĐẦU TƯ",
           "score": 0.012121
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.666667,
+        "coverage@4": 0.666667,
+        "coverage@10": 0.666667
+      }
     },
     {
       "id": "academy_type",
@@ -499,7 +531,12 @@
           "heading": "1. Ứng dụng PTIT Slink:",
           "score": 0.012425
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "academy_established_date",
@@ -580,7 +617,12 @@
           "heading": "Điều 1. Đối tượng áp dụng",
           "score": 0.013229
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "academy_governing_ministry",
@@ -661,7 +703,12 @@
           "heading": "2. PTITer đi lại?",
           "score": 0.0125
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "undergraduate_major_count",
@@ -742,7 +789,12 @@
           "heading": "Điều 20. Phương thức cấp bù tiền miễn, giảm học phí, hỗ trợ chỉ phí học tập đối với các cơ sở giáo dục công lập",
           "score": 0.012473
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "it_major_code",
@@ -823,7 +875,12 @@
           "heading": "HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH THÔNG",
           "score": 0.013115
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "english_exit_score",
@@ -904,7 +961,12 @@
           "heading": "PHỤ LỤC 1: BẢNG QUI ĐỔI CHI TIẾT TRÌNH ĐỘ, NĂNG LỰC TIẾNG ANH",
           "score": 0.012308
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "engineering_program_duration",
@@ -985,7 +1047,12 @@
           "heading": "2. Kế hoạch học tập và làm việc cho 4 năm học",
           "score": 0.011429
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "business_program_duration",
@@ -1066,7 +1133,12 @@
           "heading": "2. Kế hoạch học tập và làm việc cho 4 năm học",
           "score": 0.011429
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "engineering_program_credits",
@@ -1147,7 +1219,12 @@
           "heading": "2. Khóa học",
           "score": 0.0125
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "four_year_program_credits",
@@ -1228,7 +1305,12 @@
           "heading": "Chương I: NHỮNG QUY ĐỊNH CHUNG",
           "score": 0.011706
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.5,
+        "coverage@4": 0.5,
+        "coverage@10": 0.5
+      }
     },
     {
       "id": "graduation_final_options",
@@ -1309,7 +1391,12 @@
           "heading": "2. Kế hoạch học tập và làm việc cho 4 năm học",
           "score": 0.012272
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.666667,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "maximum_study_time",
@@ -1390,7 +1477,12 @@
           "heading": "Điều 20. Phương thức cấp bù tiền miễn, giảm học phí, hỗ trợ chỉ phí học tập đối với các cơ sở giáo dục công lập",
           "score": 0.012566
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 0.0
+      }
     },
     {
       "id": "bachelor_main_semesters",
@@ -1471,7 +1563,12 @@
           "heading": "Chương I: NHỮNG QUY ĐỊNH CHUNG",
           "score": 0.012055
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "maximum_course_duration_rule",
@@ -1552,7 +1649,12 @@
           "heading": "Điều 20. Phương thức cấp bù tiền miễn, giảm học phí, hỗ trợ chỉ phí học tập đối với các cơ sở giáo dục công lập",
           "score": 0.013207
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "part_time_duration",
@@ -1633,7 +1735,12 @@
           "heading": "Học kỳ ......Năm học........",
           "score": 0.011429
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "academic_year_semesters",
@@ -1714,7 +1821,12 @@
           "heading": "Học kỳ ......Năm học........",
           "score": 0.011765
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "summer_semester_weeks",
@@ -1795,7 +1907,12 @@
           "heading": "Chương III- CƠ CHẾ THU VÀ QUẢN LÝ HỌC PHÍ",
           "score": 0.012121
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "regular_teaching_hours",
@@ -1876,7 +1993,12 @@
           "heading": "Chương I: NHỮNG QUY ĐỊNH CHUNG",
           "score": 0.01194
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "intensive_course_limit",
@@ -1957,7 +2079,12 @@
           "heading": "2. Khóa học",
           "score": 0.012454
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "student_card_initial_deadline",
@@ -2038,7 +2165,12 @@
           "heading": "Điều 31. Cấp và chứng thực bảng điểm",
           "score": 0.013369
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "general_course_class_size",
@@ -2119,7 +2251,12 @@
           "heading": "Chương I: NHỮNG QUY ĐỊNH CHUNG",
           "score": 0.012859
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "practice_class_minimum",
@@ -2200,7 +2337,12 @@
           "heading": "Điều 22. Lớp sinh viên",
           "score": 0.011802
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "cancelled_class_replacement",
@@ -2281,7 +2423,12 @@
           "heading": "Điều 38. Cấp bằng tốt nghiệp",
           "score": 0.011268
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "online_program_limit",
@@ -2362,7 +2509,12 @@
           "heading": "5. Thi thực hành",
           "score": 0.011823
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "first_semester_registration",
@@ -2443,7 +2595,12 @@
           "heading": "Chương V : ĐÁNH GIÁ KẾT QUẢ VÀ THI KẾT THÚC HỌC PHẦN",
           "score": 0.012959
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "bachelor_credit_load",
@@ -2524,7 +2681,12 @@
           "heading": "Danh sách các môn học đã đăng ký",
           "score": 0.012416
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "engineer_credit_load",
@@ -2605,7 +2767,12 @@
           "heading": "CHƯƠNG II: QUY ĐỊNH VỀ VIỆC NỘP HỌC PHÍ",
           "score": 0.012496
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "summer_credit_limit",
@@ -2686,7 +2853,12 @@
           "heading": "CHƯƠNG II: QUY ĐỊNH VỀ VIỆC NỘP HỌC PHÍ",
           "score": 0.012341
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "main_registration_rounds",
@@ -2767,7 +2939,12 @@
           "heading": "Danh sách các môn học đã đăng ký",
           "score": 0.011993
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "summer_registration_rounds",
@@ -2848,7 +3025,12 @@
           "heading": "2. Khóa học",
           "score": 0.012277
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "tuition_condition_registration",
@@ -2929,7 +3111,12 @@
           "heading": "2. Khóa học",
           "score": 0.01194
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "failed_elective_choice",
@@ -3010,7 +3197,12 @@
           "heading": "2. Khóa học",
           "score": 0.01194
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.5,
+        "coverage@4": 0.5,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "grade_improvement_rule",
@@ -3091,7 +3283,12 @@
           "heading": "Điều 26. Công nhận, bảo lưu kết quả học tập và chuyển đổi tín chỉ",
           "score": 0.0125
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 0.0
+      }
     },
     {
       "id": "withdraw_main_semester",
@@ -3172,7 +3369,12 @@
           "heading": "Điều 32. Xử lý thôi học",
           "score": 0.011623
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "late_withdrawal_consequence",
@@ -3253,7 +3455,12 @@
           "heading": "2. Khóa học",
           "score": 0.011594
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.5,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "grade_scale_types",
@@ -3334,7 +3541,12 @@
           "heading": "Điều 33. Cảnh báo kết quả học tập",
           "score": 0.011727
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "grade_a_plus",
@@ -3415,7 +3627,12 @@
           "heading": "Điều 9. Phương thức xét tuyển đầu vào",
           "score": 0.013709
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "grade_f",
@@ -3496,7 +3713,12 @@
           "heading": "3. Đánh giá theo chuẩn đầu ra (CLO)",
           "score": 0.012121
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "pass_fail_course",
@@ -3577,7 +3799,12 @@
           "heading": "ĐIỀU KIỆN DỰ THI",
           "score": 0.011629
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.5,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "absence_request_deadline",
@@ -3658,7 +3885,12 @@
           "heading": "ĐIỀU KIỆN DỰ THI",
           "score": 0.012698
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.5,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "incomplete_grade_resolution",
@@ -3739,7 +3971,12 @@
           "heading": "Học kỳ ......Năm học........",
           "score": 0.0125
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "transfer_credit_limit",
@@ -3820,7 +4057,12 @@
           "heading": "Điều 26. Công nhận, bảo lưu kết quả học tập và chuyển đổi tín chỉ",
           "score": 0.01193
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "general_credit_retention",
@@ -3901,7 +4143,12 @@
           "heading": "2. Khóa học",
           "score": 0.011765
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "professional_credit_retention",
@@ -3982,7 +4229,12 @@
           "heading": "Điều 26. Công nhận, bảo lưu kết quả học tập và chuyển đổi tín chỉ",
           "score": 0.011429
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "physical_defense_gpa",
@@ -4063,7 +4315,12 @@
           "heading": "2. Khóa học",
           "score": 0.011765
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.666667,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "excellent_classification",
@@ -4144,7 +4401,12 @@
           "heading": "XEM ĐIỂM",
           "score": 0.011594
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "process_grade_complaint",
@@ -4225,7 +4487,12 @@
           "heading": "ĐIỀU KIỆN DỰ THI",
           "score": 0.012543
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "exam_grade_complaint",
@@ -4306,7 +4573,12 @@
           "heading": "Chương V : ĐÁNH GIÁ KẾT QUẢ VÀ THI KẾT THÚC HỌC PHẦN",
           "score": 0.012537
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "grade_complaint_deadline",
@@ -4387,7 +4659,12 @@
           "heading": "ĐIỀU KIỆN DỰ THI",
           "score": 0.012637
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "regrade_result_deadline",
@@ -4468,7 +4745,12 @@
           "heading": "CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN",
           "score": 0.01194
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "transcript_original_copies",
@@ -4549,7 +4831,12 @@
           "heading": "Chương V : ĐÁNH GIÁ KẾT QUẢ VÀ THI KẾT THÚC HỌC PHẦN",
           "score": 0.012201
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "dismissal_zero_gpa",
@@ -4630,7 +4917,12 @@
           "heading": "XEM ĐIỂM",
           "score": 0.012818
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.5,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "warning_levels",
@@ -4711,7 +5003,12 @@
           "heading": "Điều 26. Công nhận, bảo lưu kết quả học tập và chuyển đổi tín chỉ",
           "score": 0.011268
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "warning_credit_condition",
@@ -4792,7 +5089,12 @@
           "heading": "ĐĂNG KÝ MÔN HỌC HỌC KỲ 1 - NĂM HỌC 2023-2024",
           "score": 0.011823
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "warning_first_semester_gpa",
@@ -4873,7 +5175,12 @@
           "heading": "Học kỳ ......Năm học........",
           "score": 0.012121
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "warning_later_semester_gpa",
@@ -4954,7 +5261,12 @@
           "heading": "Học kỳ ......Năm học........",
           "score": 0.0125
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "warning_level_three",
@@ -5035,7 +5347,12 @@
           "heading": "Điều 15. Quy định đối với giảng viên hướng dẫn và phản biện",
           "score": 0.012166
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "warning_reduction",
@@ -5116,7 +5433,12 @@
           "heading": "Điều 6. Kế hoạch tốt nghiệp, khung đề cương thực tập tốt nghiệp",
           "score": 0.011429
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "internship_credit_requirement",
@@ -5197,7 +5519,12 @@
           "heading": "Điều 33. Cảnh báo kết quả học tập",
           "score": 0.012537
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "internship_rounds",
@@ -5278,7 +5605,12 @@
           "heading": "Học kỳ ......Năm học........",
           "score": 0.011594
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "internship_duration",
@@ -5359,7 +5691,12 @@
           "heading": "2. Khóa học",
           "score": 0.011919
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "thesis_debt_limit",
@@ -5440,7 +5777,12 @@
           "heading": "CHƯƠNG II: QUY ĐỊNH VỀ VIỆC NỘP HỌC PHÍ",
           "score": 0.012726
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 0.0
+      }
     },
     {
       "id": "graduation_min_gpa",
@@ -5521,7 +5863,12 @@
           "heading": "Điều 26. Công nhận, bảo lưu kết quả học tập và chuyển đổi tín chỉ",
           "score": 0.011279
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 0.0
+      }
     },
     {
       "id": "graduation_it_requirement",
@@ -5602,7 +5949,12 @@
           "heading": "CÁC CHƯƠNG TRÌNH ĐÀO TẠO",
           "score": 0.011594
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "graduation_rounds",
@@ -5683,7 +6035,12 @@
           "heading": "Điều 18. Hồ sơ thủ tục, trình tự thực hiện miễn, giảm học phí, hỗ trợ học phí và hỗ trợ chi phí học tập",
           "score": 0.012114
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "diploma_original",
@@ -5764,7 +6121,12 @@
           "heading": "Điều 26. Công nhận, bảo lưu kết quả học tập và chuyển đổi tín chỉ",
           "score": 0.011268
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "graduation_processing_time",
@@ -5845,7 +6207,12 @@
           "heading": "Điều 20. Phương thức cấp bù tiền miễn, giảm học phí, hỗ trợ chỉ phí học tập đối với các cơ sở giáo dục công lập",
           "score": 0.012195
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "temporary_graduation_certificate",
@@ -5926,7 +6293,12 @@
           "heading": "Điều 15. Quy định đối với giảng viên hướng dẫn và phản biện",
           "score": 0.013408
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "graduation_rank_reduction",
@@ -6007,7 +6379,12 @@
           "heading": "Học kỳ ......Năm học........",
           "score": 0.01194
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "impersonation_first_offense",
@@ -6088,7 +6465,12 @@
           "heading": "Học kỳ ......Năm học........",
           "score": 0.011453
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "second_program_start",
@@ -6169,7 +6551,12 @@
           "heading": "2. Khóa học",
           "score": 0.012496
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.5,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "second_program_suspension",
@@ -6250,7 +6637,12 @@
           "heading": "2. Khóa học",
           "score": 0.011586
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "second_program_registration_months",
@@ -6331,7 +6723,12 @@
           "heading": "2. Khóa học",
           "score": 0.011562
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "second_program_graduation_timing",
@@ -6412,7 +6809,12 @@
           "heading": "Danh sách các môn học đã đăng ký",
           "score": 0.01194
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "second_program_max_duration",
@@ -6493,7 +6895,12 @@
           "heading": "Điều 6. Chương trình đào tạo",
           "score": 0.012687
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "english_four_skills",
@@ -6574,7 +6981,12 @@
           "heading": "1. Yêu cầu về chuẩn đầu ra khi tốt nghiệp:",
           "score": 0.0125
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "student_card_validity",
@@ -6655,7 +7067,12 @@
           "heading": "HƯỚNG DẪN THỦ TỤC HÀNH CHÍNH CỦA PHÒNG GIÁO VỤ VÀ PHÒNG CHÍNH TRỊ & CÔNG TÁC SINH VIÊN",
           "score": 0.011607
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 0.5
+      }
     },
     {
       "id": "student_card_reissue",
@@ -6736,7 +7153,12 @@
           "heading": "Điều 6. Quy định về giữ gìn an ninh trật tự",
           "score": 0.011594
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 0.0
+      }
     },
     {
       "id": "student_card_return",
@@ -6817,7 +7239,12 @@
           "heading": "CHƯƠNG II: QUY ĐỊNH VỀ VIỆC NỘP HỌC PHÍ",
           "score": 0.012167
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 0.75
+      }
     },
     {
       "id": "student_card_uses",
@@ -6898,7 +7325,12 @@
           "heading": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO 24",
           "score": 0.012124
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.25,
+        "coverage@10": 0.5
+      }
     },
     {
       "id": "tuition_payment_period",
@@ -6979,7 +7411,12 @@
           "heading": "- Học phí chi tiết từng kỳ (chọn kỳ cần xem)",
           "score": 0.01194
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 0.0
+      }
     },
     {
       "id": "tuition_receipt",
@@ -7060,7 +7497,12 @@
           "heading": "Điều 18. Hồ sơ thủ tục, trình tự thực hiện miễn, giảm học phí, hỗ trợ học phí và hỗ trợ chi phí học tập",
           "score": 0.01202
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 0.0
+      }
     },
     {
       "id": "late_tuition_30_days",
@@ -7141,7 +7583,12 @@
           "heading": "Điều 20. Phương thức cấp bù tiền miễn, giảm học phí, hỗ trợ chỉ phí học tập đối với các cơ sở giáo dục công lập",
           "score": 0.011765
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 0.5
+      }
     },
     {
       "id": "late_tuition_60_days",
@@ -7222,7 +7669,12 @@
           "heading": "CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN",
           "score": 0.012121
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "tuition_debt_exam",
@@ -7303,7 +7755,12 @@
           "heading": "ĐIỀU KIỆN DỰ THI",
           "score": 0.01311
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 0.0
+      }
     },
     {
       "id": "late_dorm_fee",
@@ -7384,7 +7841,12 @@
           "heading": "CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN",
           "score": 0.011765
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 0.0
+      }
     },
     {
       "id": "classroom_clothing",
@@ -7465,7 +7927,12 @@
           "heading": "Điều 4. Quy định thẻ sinh viên, học viên",
           "score": 0.011629
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "classroom_prohibited_items",
@@ -7546,7 +8013,12 @@
           "heading": "KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH KỸ THUẬT ĐIỆN TỬ VIỄN THÔNG - KHÓA 2026",
           "score": 0.011429
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.5,
+        "coverage@4": 0.5,
+        "coverage@10": 0.5
+      }
     },
     {
       "id": "classroom_phone_rule",
@@ -7627,7 +8099,12 @@
           "heading": "I. Ở ký túc xá của Học viện",
           "score": 0.011594
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 0.5
+      }
     },
     {
       "id": "academic_office_scope",
@@ -7708,7 +8185,12 @@
           "heading": "Chương V : ĐÁNH GIÁ KẾT QUẢ VÀ THI KẾT THÚC HỌC PHẦN",
           "score": 0.012121
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.666667,
+        "coverage@4": 0.666667,
+        "coverage@10": 0.666667
+      }
     },
     {
       "id": "student_affairs_scope",
@@ -7789,7 +8271,12 @@
           "heading": "Điều 22. Lớp sinh viên",
           "score": 0.013482
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "one_stop_hours_morning",
@@ -7870,7 +8357,12 @@
           "heading": "I. PHÒNG GIÁO VỤ",
           "score": 0.011429
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "one_stop_hours_afternoon",
@@ -7951,7 +8443,12 @@
           "heading": "2. Khóa học",
           "score": 0.011268
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "testing_center_schedule",
@@ -8032,7 +8529,12 @@
           "heading": "ĐIỀU KIỆN DỰ THI",
           "score": 0.011612
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 0.0
+      }
     },
     {
       "id": "testing_center_location",
@@ -8113,7 +8615,12 @@
           "heading": "3. PTITer chơi gì?",
           "score": 0.011765
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.5,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     },
     {
       "id": "exam_review_form_destination",
@@ -8194,7 +8701,12 @@
           "heading": "Điều 6. Kế hoạch tốt nghiệp, khung đề cương thực tập tốt nghiệp",
           "score": 0.012244
         }
-      ]
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
     }
   ]
 }

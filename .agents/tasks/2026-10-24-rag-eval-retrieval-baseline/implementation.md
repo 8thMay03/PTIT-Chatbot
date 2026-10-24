@@ -32,3 +32,14 @@
 ## Trao đổi
 
 - (không có — một agent tự thực hiện)
+
+## Mở rộng 2026-10-25: coverage@k (AC-07)
+
+- Người dùng hỏi có nên thêm recall/precision. Đánh giá ghi nhận: recall đáng thêm ngay dưới dạng **coverage@k** (69/100 câu có nhiều `expected_terms` nhưng hit chỉ cần khớp một); precision bằng `expected_terms` sẽ sai lệch (chunk liên quan nhưng không chứa chuỗi term bị tính false positive) — để dành cho Ragas context_precision hoặc khi RAG-02 gắn nhãn chunk vàng.
+- Thay đổi trong `backend/scripts/eval_retrieval.py` (commit `2acff9660a83`):
+  - `coverage_by_k`: tỉ lệ term được phủ bởi top-k (chuẩn hóa dùng lại `normalize_terms`/`normalize_text`; term trùng sau chuẩn hóa tính một lần).
+  - `compute_coverage_metrics`: trung bình theo câu, câu thiếu coverage bị bỏ khỏi trung bình.
+  - `aggregate_metrics` gộp coverage vào overall + từng nhóm; `run_case` ghi `coverage` từng câu; `print_summary` in 2 dòng (rank metrics + coverage).
+  - `SCHEMA_VERSION` lên 2; `collect_metric_rows` chỉ giữ metric có thật trong báo cáo để `--compare` chéo v1/v2 hiển thị `—` thay vì 0 giả, kèm chú thích schema khác nhau.
+- Test: 3 test mới (`coverage_by_k` từng case, `compute_coverage_metrics`, so sánh v1/v2), cập nhật 2 test cũ — 16/16 pass offline.
+- Baseline chạy lại 4 mode tại commit `2acff9660a83`: hit/MRR và rank từng câu **giống hệt** bản 2026-10-24 (so với `git show HEAD~1`), chỉ thêm coverage — không hồi quy. Deterministic schema v2 kiểm chứng bằng 2 lần chạy bm25 (metrics + rank + coverage bằng tuyệt đối).

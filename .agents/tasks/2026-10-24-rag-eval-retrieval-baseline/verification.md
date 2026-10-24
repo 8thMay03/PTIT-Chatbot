@@ -48,3 +48,11 @@
 ## Kiểm tra chưa chạy
 
 - Không chạy `--compare` trên hai báo cáo khác corpus/dataset thật (chỉ xem mã nhánh cảnh báo); chưa đo trên chế độ `full` với multi-query/reranker bật vì cấu hình hiện tại tắt.
+
+## AC-07 — coverage@k trong báo cáo + test + baseline không hồi quy (mở rộng 2026-10-25)
+
+- Lệnh: `pytest tests/test_eval_retrieval.py -q` → `passed` — 16 passed (3 test mới cho coverage).
+- Lệnh: chạy lại 4 baseline tại commit `2acff9660a83` rồi so với bản committed trước (`git show HEAD~1:documents/rag-eval/baseline_*.json`): hit@1/4/10, MRR và `first_hit_rank`/`matched_term` từng câu bằng tuyệt đối cả 4 mode; chỉ thêm trường `coverage` — `passed`.
+- Kết quả coverage overall: bm25 0.637/0.797/0.866, vector 0.530/0.749/0.826, hybrid 0.593/0.799/0.858, full 0.568/0.793/0.858 (cov@1/4/10).
+- Deterministic schema v2: 2 lần chạy `--mode bm25` liên tiếp → metrics + rank + coverage từng câu bằng tuyệt đối — `passed`.
+- `--compare` chéo schema (v1 từ `git show` vs v2): cột coverage phía v1 hiển thị `—`, có dòng chú thích schema khác nhau — `passed`.

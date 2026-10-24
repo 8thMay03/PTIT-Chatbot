@@ -5,7 +5,7 @@
 - Coordinator: `zcode-agent`
 - Người yêu cầu: người dùng (phiên ZCode 2026-10-24)
 - Tạo lúc: `2026-10-24T23:54:57+07:00`
-- Cập nhật lúc: `2026-10-25T00:07:00+07:00`
+- Cập nhật lúc: `2026-10-25T00:15:00+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -32,6 +32,7 @@
 - [x] AC-04: Có baseline cho cả 4 chế độ (`bm25`, `vector`, `hybrid`, `full`) trên index hiện tại, được commit kèm mô tả cấu hình (`documents/rag-eval/README.md`).
 - [x] AC-05: Unit test cho hit@k, MRR, so khớp `expected_terms` chạy được khi không có mạng và không có `OPENAI_API_KEY`. — 13 passed; suite 247 passed / 1 skipped.
 - [x] AC-06: `--compare` in được bảng chênh lệch giữa hai báo cáo.
+- [x] AC-07 (mở rộng 2026-10-25 theo yêu cầu người dùng): thêm coverage@k (recall theo `expected_terms`) vào báo cáo, có unit test, chạy lại baseline 4 chế độ; hit/MRR không đổi so với bản trước. — cov@1/4/10: bm25 0.637/0.797/0.866, vector 0.530/0.749/0.826, hybrid 0.593/0.799/0.858, full 0.568/0.793/0.858.
 
 ## Tài liệu và phụ thuộc
 
@@ -46,17 +47,17 @@
 
 ## Trạng thái hiện tại
 
-- Tóm tắt (baseline 2026-10-24, index 1 tài liệu / 1269 chunk, fingerprint `ccf48780bbcc813d…`, commit `bdff20ba3148`, cấu hình `.env` local):
+- Tóm tắt (baseline cập nhật 2026-10-25 kèm coverage@k, index 1 tài liệu / 1269 chunk, fingerprint `ccf48780bbcc813d…`, commit code `2acff9660a83`):
 
-  | mode | hit@1 | hit@4 | hit@10 | MRR |
-  |---|---:|---:|---:|---:|
-  | bm25 | 0.690 | 0.830 | 0.900 | 0.755 |
-  | vector | 0.590 | 0.800 | 0.870 | 0.688 |
-  | hybrid | 0.650 | 0.840 | 0.900 | 0.739 |
-  | full | 0.620 | 0.830 | 0.900 | 0.722 |
+  | mode | hit@1 | hit@4 | hit@10 | MRR | cov@1 | cov@4 | cov@10 |
+  |---|---:|---:|---:|---:|---:|---:|---:|
+  | bm25 | 0.690 | 0.830 | 0.900 | 0.755 | 0.637 | 0.797 | 0.866 |
+  | vector | 0.590 | 0.800 | 0.870 | 0.688 | 0.530 | 0.749 | 0.826 |
+  | hybrid | 0.650 | 0.840 | 0.900 | 0.739 | 0.593 | 0.799 | 0.858 |
+  | full | 0.620 | 0.830 | 0.900 | 0.722 | 0.568 | 0.793 | 0.858 |
 
-  Đọc số: BM25 dẫn đầu hit@1/MRR, vector yếu nhất; hybrid với `HYBRID_VECTOR_WEIGHT=0.80` bị vector kéo xuống hit@1 nhưng tốt nhất hit@4 — thí nghiệm đầu tiên đáng làm là hạ trọng số vector. Chi tiết + cách reproduce: `documents/rag-eval/README.md`.
-- Hoàn tất: script + test (13 unit test thuần; suite 247 passed / 1 skipped không hồi quy), 4 báo cáo baseline + README đã commit; mọi AC có bằng chứng trong `verification.md`; `review.md` self_review kết luận `approved` (R-03/R-04 low, trì hoãn có theo dõi).
+  Đọc số: BM25 dẫn đầu cả hit lẫn coverage, vector yếu nhất; hybrid với `HYBRID_VECTOR_WEIGHT=0.80` thua BM25 ở hit@1 — hạ trọng số vector là thí nghiệm đầu tiên. Khoảng cách hit@4 0.84 vs cov@4 0.80 (hybrid) cho thấy câu trúng vẫn thường thiếu một phần dữ kiện trong top-4. Chi tiết + cách reproduce: `documents/rag-eval/README.md`.
+- Hoàn tất: script + test (16 unit test thuần; hit/MRR/rank từng câu giữ nguyên tuyệt đối so với bản 2026-10-24 — không hồi quy), 4 báo cáo baseline schema v2 + README; AC-01…AC-07 có bằng chứng trong `verification.md`; `review.md` self_review kết luận `approved` (R-03/R-04 low, trì hoãn có theo dõi).
 - Blocker: không có.
 - Bước tiếp theo: RAG-02 bổ sung câu không dấu + metadata `question_type`/`source` vào dataset — script tự nhóm, không cần đổi mã; sau đó thử hạ `HYBRID_VECTOR_WEIGHT` và bật multi-query/rerank rồi `--compare` với baseline này.
 
@@ -64,3 +65,4 @@
 
 - `2026-10-24T23:54:57+07:00` — `zcode-agent`: tạo task từ yêu cầu người dùng; mode `full` tái dựng đúng pipeline `RagChain.retrieve_context` nhưng bỏ guardrail scope (không phải một phần của retrieval) và bỏ lọc `strong_context` (chỉ dùng để chốt câu trả lời); giữ lọc prompt-injection trên context.
 - `2026-10-25T00:07:00+07:00` — `zcode-agent`: mọi AC đạt có bằng chứng; review self_review `approved`; task `done`.
+- `2026-10-25T00:15:00+07:00` — `zcode-agent`: theo yêu cầu người dùng, mở rộng thêm AC-07 — coverage@k (recall theo term) vì hit@k chỉ cần một `expected_terms` là trúng trong khi 69/100 câu cần nhiều dữ kiện; precision không thêm vì thiếu nhãn liên quan từng chunk (chi tiết xem assessment trong implementation.md). Task quay lại `in_progress` rồi hoàn tất với baseline schema v2.
