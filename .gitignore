@@ -6,7 +6,7 @@ __pycache__/
 .pytest_cache/
 backend/storage/
 backend/.env
-frontend/node_modules/
+node_modules/
 frontend/dist/
 !backend/tests/test_ptit_faq.py
 *report.json
