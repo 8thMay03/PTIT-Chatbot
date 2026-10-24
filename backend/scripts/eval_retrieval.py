@@ -8,6 +8,12 @@ Chỉ chạy phần truy xuất, không sinh câu trả lời và không gọi L
 - ``full``: hybrid + multi-query + rerank theo cấu hình hiện tại (bỏ guardrail scope
   và lọc strong_context vì không thuộc về retrieval).
 
+Chỉ số:
+
+- hit@1/4/10 + MRR theo rank context đầu tiên chứa một `expected_terms`.
+- coverage@1/4/10: tỉ lệ `expected_terms` được phủ bởi top-k context (recall theo
+  term) — đo việc truy xuất đủ mọi thông tin cần cho câu trả lời, không chỉ một.
+
 Câu hỏi được xem là trúng khi một `expected_terms` xuất hiện trong text của context
 sau khi chuẩn hóa NFKC + bỏ thẻ HTML + casefold; nhãn không phụ thuộc chunk ID nên
 dùng được khi thay đổi chunking. Embedding câu hỏi được cache theo khóa
@@ -43,8 +49,10 @@ DEFAULT_OUTPUT_DIR = REPO_ROOT / "documents" / "rag-eval"
 DEFAULT_CACHE_FILE = BACKEND_DIR / "storage" / "eval" / "embedding_cache.json"
 MODES = ("bm25", "vector", "hybrid", "full")
 METRIC_KS = (1, 4, 10)
-SCHEMA_VERSION = 1
-REPORT_METRICS = ("hit@1", "hit@4", "hit@10", "mrr")
+SCHEMA_VERSION = 2
+RANK_METRICS = ("hit@1", "hit@4", "hit@10", "mrr")
+COVERAGE_METRICS = ("coverage@1", "coverage@4", "coverage@10")
+REPORT_METRICS = RANK_METRICS + COVERAGE_METRICS
 
 HTML_TAG_RE = re.compile(r"<[^>]+>")
 WHITESPACE_RE = re.compile(r"\s+")
@@ -147,6 +155,47 @@ def compute_metrics(ranks: list[int | None], ks: tuple[int, ...] = METRIC_KS) ->
     return metrics
 
 
+def coverage_by_k(
+    contexts: list[dict],
+    expected_terms: list[str],
+    ks: tuple[int, ...] = METRIC_KS,
+    text_field: str = "text",
+) -> dict[str, float]:
+    """Tỉ lệ `expected_terms` được phủ bởi top-k context, cho từng k.
+
+    coverage@k = số term xuất hiện trong ít nhất một context của top-k /
+    tổng số term. Đây là recall theo term: câu hỏi cần nhiều thông tin thì
+    đòi hỏi phủ đủ mọi term, không chỉ trúng một.
+    """
+
+    terms = [normalized for normalized, _ in normalize_terms(expected_terms)]
+    if not terms:
+        return {f"coverage@{k}": 0.0 for k in ks}
+    normalized_texts = [
+        normalize_text(str(context.get(text_field) or "")) for context in contexts
+    ]
+    metrics: dict[str, float] = {}
+    for k in ks:
+        prefix = [text for text in normalized_texts[:k] if text]
+        covered = sum(1 for term in terms if any(term in text for text in prefix))
+        metrics[f"coverage@{k}"] = round(covered / len(terms), 6)
+    return metrics
+
+
+def compute_coverage_metrics(
+    coverages: list[dict[str, float]],
+    ks: tuple[int, ...] = METRIC_KS,
+) -> dict:
+    """Trung bình coverage@k trên các câu; câu thiếu dữ liệu coverage bị bỏ qua."""
+
+    metrics: dict[str, float] = {}
+    for k in ks:
+        name = f"coverage@{k}"
+        values = [coverage[name] for coverage in coverages if name in coverage]
+        metrics[name] = round(fmean(values), 6) if values else 0.0
+    return metrics
+
+
 def diacritics_group(question: str) -> str:
     """Phân loại câu hỏi có dấu / không dấu tiếng Việt."""
 
@@ -168,7 +217,11 @@ def aggregate_metrics(case_results: list[dict]) -> dict:
     """Gộp chỉ số tổng và theo nhóm nguồn / loại câu hỏi / dấu."""
 
     def summarize(items: list[dict]) -> dict:
-        return compute_metrics([item["first_hit_rank"] for item in items])
+        metrics = compute_metrics([item["first_hit_rank"] for item in items])
+        metrics.update(
+            compute_coverage_metrics([item.get("coverage") or {} for item in items])
+        )
+        return metrics
 
     grouped: dict[str, dict[str, dict]] = {}
     for section, key_fn in (
@@ -492,7 +545,12 @@ def run_case(question: str, retrieval_fn: Callable[[str], list[dict]], expected_
                 "score": round(float(context.get("score") or 0.0), 6),
             }
         )
-    return {"first_hit_rank": rank, "matched_term": matched_term, "retrieved": retrieved}
+    return {
+        "first_hit_rank": rank,
+        "matched_term": matched_term,
+        "retrieved": retrieved,
+        "coverage": coverage_by_k(contexts, expected_terms),
+    }
 
 
 def evaluate(mode: str, cases: list[dict], top_k: int, cache_file: Path) -> dict:
@@ -534,6 +592,7 @@ def evaluate(mode: str, cases: list[dict], top_k: int, cache_file: Path) -> dict
                 "first_hit_rank": outcome["first_hit_rank"],
                 "matched_term": outcome["matched_term"],
                 "retrieved": outcome["retrieved"],
+                "coverage": outcome["coverage"],
             }
         )
         print(
@@ -586,8 +645,8 @@ def write_report(report: dict, output: Path) -> None:
     )
 
 
-def format_metric_line(label: str, metrics: dict) -> str:
-    values = "  ".join(f"{name} {metrics.get(name, 0.0):.3f}" for name in REPORT_METRICS)
+def format_metric_line(label: str, metrics: dict, names: tuple[str, ...]) -> str:
+    values = "  ".join(f"{name} {metrics.get(name, 0.0):.3f}" for name in names)
     return f"  {label:<24} {values}"
 
 
@@ -612,14 +671,19 @@ def print_summary(report: dict) -> None:
             f"(cache {embedding['cache_hits']} hit / {embedding['cache_misses']} miss)"
         )
     print()
-    print(format_metric_line("overall", report["metrics"]["overall"]))
+    for section_metrics, names in (
+        (report["metrics"]["overall"], RANK_METRICS),
+        (report["metrics"]["overall"], COVERAGE_METRICS),
+    ):
+        print(format_metric_line("overall", section_metrics, names))
     for section in ("by_diacritics", "by_question_type", "by_source"):
         groups = report["metrics"].get(section) or {}
         if not groups:
             continue
         print(section)
         for label, metrics in groups.items():
-            print(format_metric_line(label, metrics))
+            print(format_metric_line(label, metrics, RANK_METRICS))
+            print(format_metric_line(label, metrics, COVERAGE_METRICS))
 
 
 # ---------------------------------------------------------------------------
@@ -627,17 +691,22 @@ def print_summary(report: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
-def collect_metric_rows(metrics: dict) -> dict[str, dict[str, float]]:
-    """Duỗi metrics thành dict {đường_dẫn: {metric: giá trị}} cho bảng so sánh."""
+def collect_metric_rows(metrics: dict) -> dict[str, dict[str, float | None]]:
+    """Duỗi metrics thành dict {đường_dẫn: {metric: giá trị}} cho bảng so sánh.
 
-    rows: dict[str, dict[str, float]] = {}
+    Chỉ giữ các metric thực sự có trong báo cáo để so sánh chéo báo cáo schema cũ
+    (thiếu coverage) với schema mới mà không tạo giá trị 0 giả.
+    """
+
+    def metric_row(source: dict) -> dict[str, float | None]:
+        return {name: source[name] for name in REPORT_METRICS if name in source}
+
+    rows: dict[str, dict[str, float | None]] = {}
     overall = metrics.get("overall") or {}
-    rows["overall"] = {name: overall.get(name, 0.0) for name in REPORT_METRICS}
+    rows["overall"] = metric_row(overall)
     for section in ("by_diacritics", "by_question_type", "by_source"):
         for label, group_metrics in (metrics.get(section) or {}).items():
-            rows[f"{section}.{label}"] = {
-                name: group_metrics.get(name, 0.0) for name in REPORT_METRICS
-            }
+            rows[f"{section}.{label}"] = metric_row(group_metrics)
     return rows
 
 
@@ -678,6 +747,12 @@ def compare_reports(path_a: Path, path_b: Path) -> int:
     }
     if len(dataset_hashes) > 1:
         print("Cảnh báo: hai báo cáo dùng dataset khác nhau.")
+    if report_a.get("schema_version") != report_b.get("schema_version"):
+        print(
+            f"Chú thích: schema_version khác nhau "
+            f"({report_a.get('schema_version')} vs {report_b.get('schema_version')}); "
+            "metric chỉ có ở một bên hiển thị '—'."
+        )
 
     rows_a = collect_metric_rows(report_a.get("metrics") or {})
     rows_b = collect_metric_rows(report_b.get("metrics") or {})

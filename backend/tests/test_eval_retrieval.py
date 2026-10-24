@@ -101,6 +101,54 @@ def test_compute_metrics_empty_and_edge_values() -> None:
     assert first["mrr"] == 1.0
 
 
+def test_coverage_by_k_partial_and_full_coverage() -> None:
+    from scripts.eval_retrieval import coverage_by_k
+
+    contexts = [
+        {"text": "Học phí tín chỉ năm 2026."},
+        {"text": "Thông tin thư viện."},
+        {"text": "Thời hạn đóng học phí là cuối tháng 9."},
+        {"text": "Chính sách học bổng."},
+    ]
+
+    metrics = coverage_by_k(contexts, ["học phí", "thời hạn đóng học phí"])
+    assert metrics["coverage@1"] == 0.5  # chỉ phủ được term "học phí"
+    assert metrics["coverage@4"] == 1.0
+    assert metrics["coverage@10"] == 1.0  # ít context hơn k thì lấy tất cả
+
+    # Term trùng nhau sau chuẩn hóa chỉ tính một lần.
+    assert coverage_by_k(contexts, ["học phí", "HỌC PHÍ"])["coverage@1"] == 1.0
+
+    # Term không xuất hiện ở đâu cả.
+    assert coverage_by_k(contexts, ["không tồn tại"])["coverage@4"] == 0.0
+
+    # Không có term hợp lệ.
+    assert coverage_by_k(contexts, ["   "])["coverage@1"] == 0.0
+
+
+def test_coverage_by_k_normalizes_html_and_case() -> None:
+    from scripts.eval_retrieval import coverage_by_k
+
+    contexts = [{"text": "Mức <b>HỌC PHÍ</b> tín chỉ."}]
+    assert coverage_by_k(contexts, ["học phí"])["coverage@1"] == 1.0
+
+
+def test_compute_coverage_metrics_mean_and_skips_missing() -> None:
+    from scripts.eval_retrieval import compute_coverage_metrics
+
+    coverages = [
+        {"coverage@1": 1.0, "coverage@4": 1.0, "coverage@10": 1.0},
+        {"coverage@1": 0.0, "coverage@4": 0.5, "coverage@10": 0.5},
+        {},  # câu thiếu dữ liệu coverage bị bỏ khỏi trung bình
+    ]
+    metrics = compute_coverage_metrics(coverages)
+    assert metrics["coverage@1"] == 0.5
+    assert metrics["coverage@4"] == 0.75
+    assert metrics["coverage@10"] == 0.75
+
+    assert compute_coverage_metrics([])["coverage@1"] == 0.0
+
+
 def test_diacritics_group_classification() -> None:
     from scripts.eval_retrieval import diacritics_group
 
@@ -127,6 +175,7 @@ def test_aggregate_metrics_groups_and_overall() -> None:
             "diacritics": "co_dau",
             "question_type": "tuition",
             "source": "so_tay",
+            "coverage": {"coverage@1": 1.0, "coverage@4": 1.0, "coverage@10": 1.0},
         },
         {
             "id": "b",
@@ -134,6 +183,7 @@ def test_aggregate_metrics_groups_and_overall() -> None:
             "diacritics": "khong_dau",
             "question_type": "tuition",
             "source": "so_tay",
+            "coverage": {"coverage@1": 0.0, "coverage@4": 0.0, "coverage@10": 0.5},
         },
         {
             "id": "c",
@@ -141,6 +191,7 @@ def test_aggregate_metrics_groups_and_overall() -> None:
             "diacritics": "co_dau",
             "question_type": UNKNOWN_GROUP,
             "source": UNKNOWN_GROUP,
+            "coverage": {"coverage@1": 0.5, "coverage@4": 1.0, "coverage@10": 1.0},
         },
     ]
 
@@ -148,9 +199,12 @@ def test_aggregate_metrics_groups_and_overall() -> None:
     assert metrics["overall"]["cases"] == 3
     assert metrics["overall"]["hit@1"] == pytest.approx(1 / 3, abs=1e-6)
     assert metrics["overall"]["mrr"] == pytest.approx((1 + 0 + 0.5) / 3, abs=1e-6)
+    assert metrics["overall"]["coverage@1"] == pytest.approx(0.5, abs=1e-6)
+    assert metrics["overall"]["coverage@4"] == pytest.approx(2 / 3, abs=1e-6)
 
     assert set(metrics["by_diacritics"]) == {"co_dau", "khong_dau"}
     assert metrics["by_diacritics"]["khong_dau"]["hit@1"] == 0.0
+    assert metrics["by_diacritics"]["co_dau"]["coverage@1"] == pytest.approx(0.75, abs=1e-6)
     assert metrics["by_question_type"]["tuition"]["cases"] == 2
     assert metrics["by_source"]["so_tay"]["hit@1"] == pytest.approx(0.5)
 
@@ -158,17 +212,34 @@ def test_aggregate_metrics_groups_and_overall() -> None:
 def test_collect_metric_rows_flattens_groups_for_compare() -> None:
     from scripts.eval_retrieval import collect_metric_rows
 
-    metrics = {
+    # Báo cáo schema v1 (chưa có coverage): chỉ giữ các metric thực sự có.
+    metrics_v1 = {
         "overall": {"cases": 2, "hit@1": 0.5, "hit@4": 1.0, "hit@10": 1.0, "mrr": 0.75},
         "by_diacritics": {
             "co_dau": {"cases": 1, "hit@1": 1.0, "hit@4": 1.0, "hit@10": 1.0, "mrr": 1.0},
         },
     }
-
-    rows = collect_metric_rows(metrics)
+    rows = collect_metric_rows(metrics_v1)
     assert rows["overall"]["hit@1"] == 0.5
     assert rows["by_diacritics.co_dau"]["mrr"] == 1.0
     assert set(rows["overall"]) == {"hit@1", "hit@4", "hit@10", "mrr"}
+
+    # Báo cáo schema v2: đủ cả coverage.
+    metrics_v2 = {
+        "overall": {
+            "cases": 2,
+            "hit@1": 0.5,
+            "hit@4": 1.0,
+            "hit@10": 1.0,
+            "mrr": 0.75,
+            "coverage@1": 0.5,
+            "coverage@4": 1.0,
+            "coverage@10": 1.0,
+        }
+    }
+    rows_v2 = collect_metric_rows(metrics_v2)
+    assert rows_v2["overall"]["coverage@1"] == 0.5
+    assert "coverage@10" in rows_v2["overall"]
 
 
 def test_cached_embedding_model_reuses_cache_and_persists(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
