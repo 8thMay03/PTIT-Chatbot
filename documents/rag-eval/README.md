@@ -18,6 +18,7 @@ python -m scripts.eval_retrieval --compare ..\documents\rag-eval\baseline_bm25.j
 - Chỉ số:
   - **hit@1 / hit@4 / hit@10 và MRR** — theo rank context đầu tiên chứa một `expected_terms`;
   - **coverage@1/4/10** — tỉ lệ `expected_terms` được phủ bởi top-k (recall theo term), đo việc truy xuất **đủ** thông tin cho câu trả lời thay vì chỉ trúng một.
+  - **section_dominance** (từ schema v3) — tỉ lệ câu có mỗi section (`source_name` + `section_path`) trong top-4; `--compare` tự tính lại từ `heading` cho báo cáo cũ.
   - "Trúng" khi một `expected_terms` xuất hiện trong text context sau chuẩn hóa NFKC + bỏ thẻ HTML
   + casefold — nhãn không phụ thuộc chunk ID nên vẫn dùng được khi đổi chunking.
 - Embedding câu hỏi được cache tại `backend/storage/eval/embedding_cache.json`
@@ -59,6 +60,39 @@ Cấu hình đáng chú ý tại thời điểm đo (lấy từ `config` trong t
   hướng xử trực tiếp khoảng trống này.
 - Hai lần chạy liên tiếp cùng cấu hình cho kết quả giống hệt nhau (kể cả thứ tự
   chunk, điểm số và coverage); hybrid chạy ~4.5–5.5s với cache embedding nóng.
+
+## RAG-05 — chuẩn hóa phân cấp heading (2026-10-25)
+
+Báo cáo: [`rag-05/`](rag-05/) (schema v3: thêm `retrieved[].section_path` và
+`metrics.section_dominance`, tức tỉ lệ câu có mỗi section trong top-4). Cấu hình RAG giữ
+nguyên như baseline; chỉ đổi Markdown đầu vào nhờ bước `normalize_markdown` chạy sau mọi
+parser (PHẦN=1, tiêu đề văn bản=2, Chương=3, Mục=4, Điều=5).
+
+| Bản D26 | Chế độ | hit@1 | hit@4 | hit@10 | MRR | cov@4 | cov@10 | section chiếm chỗ nhất (top-4) |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| baseline (processed, chưa chuẩn hóa) | hybrid | 0.650 | 0.840 | 0.900 | 0.739 | 0.799 | 0.858 | 0.45 "2. Khóa học" |
+| **processed + chuẩn hóa** (chọn) | hybrid | **0.720** | **0.850** | 0.900 | **0.780** | **0.807** | 0.853 | **0.15** "Điều 25. Thang điểm đánh giá" |
+| Docling + chuẩn hóa | hybrid | 0.680 | 0.850 | 0.890 | 0.763 | 0.792 | 0.835 | 0.16 "Điều 25. Thang điểm đánh giá" |
+| baseline (processed, chưa chuẩn hóa) | bm25 | 0.690 | 0.830 | 0.900 | 0.755 | 0.797 | 0.866 | 0.42 "2. Khóa học" |
+| processed + chuẩn hóa | bm25 | 0.700 | 0.830 | 0.890 | 0.762 | 0.797 | 0.851 | 0.15 "Điều 12. Đăng ký học tập" |
+| Docling + chuẩn hóa | bm25 | 0.730 | 0.840 | 0.890 | 0.786 | 0.803 | 0.846 | 0.15 "3. Khối lượng học tập" |
+
+- Index: processed 1283 chunk (fingerprint `0a63b72686b2…`), Docling 1038 chunk
+  (`86e726a7316d…`). Đo trên working tree chưa commit, nền commit `9d67b581ee6d`.
+- **Bản chuẩn cho D26: `data/processed/Sổ tay sinh viên D26 _1_ _1_.md` (parser `text`).**
+  Bản này tốt hơn Docling ở chế độ hybrid (chế độ app dùng) trên mọi chỉ số, đạt ngưỡng
+  chiếm chỗ ≤ 15%. Văn bản Docling còn lỗi thứ tự đọc: tiêu đề Nghị định 238 dính đoạn
+  "Lắng nghe giảng viên…", Điều 16 đứng trước Điều 12. Docling chỉ nhỉnh hơn ở BM25
+  thuần (hit@1 0.730).
+- So với baseline hybrid: 3 câu có thêm hit@4 (`intensive_course_limit`,
+  `grade_improvement_rule`, `student_card_return`) và 2 câu mất
+  (`student_card_initial_deadline` rank 1→7, `exam_review_form_destination` rank 3→ngoài
+  top-10). Trường hợp thứ hai là do Điều 30 trước đây nằm chung section "Điều 26"; giờ
+  nó là section riêng nên không còn được kéo theo. coverage@10 giảm nhẹ (0.858→0.853).
+- Ingest lại làm chỉ mục vector xấp xỉ được dựng lại, nên các rank 5–10 có thể xê dịch
+  giữa hai lần ingest cùng nội dung (lần đo này: coverage@10 0.850 so với 0.853; hit@1/4
+  và MRR không đổi). Trên cùng một index, chạy lại vẫn cho kết quả giống hệt.
+- Kiểm tra cấu trúc: `python -m scripts.check_structure <file> [--parser docling] --tree --strict`.
 
 ## Hạn chế đã biết
 

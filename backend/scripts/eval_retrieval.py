@@ -13,6 +13,8 @@ Chỉ số:
 - hit@1/4/10 + MRR theo rank context đầu tiên chứa một `expected_terms`.
 - coverage@1/4/10: tỉ lệ `expected_terms` được phủ bởi top-k context (recall theo
   term) — đo việc truy xuất đủ mọi thông tin cần cho câu trả lời, không chỉ một.
+- section_dominance: tỉ lệ câu có mỗi section (source + section_path) trong top-4 —
+  phát hiện section quá lớn chiếm chỗ đáp án đúng.
 
 Câu hỏi được xem là trúng khi một `expected_terms` xuất hiện trong text của context
 sau khi chuẩn hóa NFKC + bỏ thẻ HTML + casefold; nhãn không phụ thuộc chunk ID nên
@@ -49,7 +51,9 @@ DEFAULT_OUTPUT_DIR = REPO_ROOT / "documents" / "rag-eval"
 DEFAULT_CACHE_FILE = BACKEND_DIR / "storage" / "eval" / "embedding_cache.json"
 MODES = ("bm25", "vector", "hybrid", "full")
 METRIC_KS = (1, 4, 10)
-SCHEMA_VERSION = 2
+# v3: thêm `retrieved[].section_path` và `metrics.section_dominance`.
+SCHEMA_VERSION = 3
+DOMINANCE_K = 4
 RANK_METRICS = ("hit@1", "hit@4", "hit@10", "mrr")
 COVERAGE_METRICS = ("coverage@1", "coverage@4", "coverage@10")
 REPORT_METRICS = RANK_METRICS + COVERAGE_METRICS
@@ -234,7 +238,43 @@ def aggregate_metrics(case_results: list[dict]) -> dict:
             buckets.setdefault(key_fn(item), []).append(item)
         grouped[section] = {label: summarize(items) for label, items in sorted(buckets.items())}
 
-    return {"overall": summarize(case_results), **grouped}
+    return {
+        "overall": summarize(case_results),
+        **grouped,
+        "section_dominance": section_dominance(case_results),
+    }
+
+
+def section_dominance(case_results: list[dict], k: int = DOMINANCE_K, limit: int = 10) -> dict:
+    """Tỉ lệ câu hỏi có mỗi section trong top-k, section chiếm chỗ nhiều nhất trước.
+
+    Một section quá lớn (nuốt nhiều Điều) xuất hiện trong top-k của rất nhiều câu và
+    đẩy đáp án đúng ra ngoài. Section = ``source_name`` + ``section_path``; báo cáo cũ
+    chưa có ``section_path`` thì dùng ``heading``.
+    """
+
+    total = len(case_results)
+    counts: dict[str, int] = {}
+    for item in case_results:
+        sections = {
+            section_key(context)
+            for context in item.get("retrieved") or []
+            if int(context.get("rank") or 0) <= k
+        }
+        for section in sections:
+            counts[section] = counts.get(section, 0) + 1
+    ranked = sorted(counts.items(), key=lambda entry: (-entry[1], entry[0]))
+    top = [
+        {"section": section, "cases": count, "share": round(count / total, 6)}
+        for section, count in ranked[:limit]
+    ]
+    return {"k": k, "max_share": top[0]["share"] if top else 0.0, "top": top}
+
+
+def section_key(context: dict) -> str:
+    section = str(context.get("section_path") or context.get("heading") or "").strip() or "(không tiêu đề)"
+    source = str(context.get("source_name") or "").strip()
+    return f"{source} :: {section}" if source else section
 
 
 # ---------------------------------------------------------------------------
@@ -542,6 +582,7 @@ def run_case(question: str, retrieval_fn: Callable[[str], list[dict]], expected_
                 "chunk_id": str(context.get("chunk_id") or ""),
                 "source_name": str(context.get("source_name") or ""),
                 "heading": str(context.get("heading") or ""),
+                "section_path": str(context.get("section_path") or ""),
                 "score": round(float(context.get("score") or 0.0), 6),
             }
         )
@@ -684,6 +725,20 @@ def print_summary(report: dict) -> None:
         for label, metrics in groups.items():
             print(format_metric_line(label, metrics, RANK_METRICS))
             print(format_metric_line(label, metrics, COVERAGE_METRICS))
+    print_dominance(report_dominance(report))
+
+
+def report_dominance(report: dict) -> dict:
+    """Lấy section_dominance từ báo cáo; báo cáo schema cũ thì tính lại từ `cases`."""
+
+    stored = (report.get("metrics") or {}).get("section_dominance")
+    return stored if stored else section_dominance(report.get("cases") or [])
+
+
+def print_dominance(dominance: dict, limit: int = 5, label: str = "") -> None:
+    print(f"section_dominance{label} (tỉ lệ câu có section trong top-{dominance['k']}):")
+    for entry in dominance["top"][:limit]:
+        print(f"  {entry['share']:.3f}  ({entry['cases']} câu)  {entry['section'][:110]}")
 
 
 # ---------------------------------------------------------------------------
@@ -780,6 +835,16 @@ def compare_reports(path_a: Path, path_b: Path) -> int:
                 delta = "—"
             suffix = f"  (n={cases_a})" if name == "hit@1" and cases_a == cases_b else ""
             print(f"{key:<38} {name:<8} {text_a:>8} {text_b:>8} {delta:>9}{suffix}")
+
+    dominance_a = report_dominance(report_a)
+    dominance_b = report_dominance(report_b)
+    print()
+    print(
+        f"{'section_dominance max':<38} {'share':<8} {dominance_a['max_share']:>8.3f} "
+        f"{dominance_b['max_share']:>8.3f} {dominance_b['max_share'] - dominance_a['max_share']:>+9.3f}"
+    )
+    print_dominance(dominance_a, label=" A")
+    print_dominance(dominance_b, label=" B")
     return 0
 
 
@@ -834,6 +899,9 @@ def resolve_output(output: Path | None, mode: str) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    # Console Windows mặc định cp1252 không in được tiếng Việt khi stdout bị chuyển hướng.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     if args.compare is not None:
         return compare_reports(args.compare[0], args.compare[1])
 

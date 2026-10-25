@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import re
-import unicodedata
 from hashlib import sha256
 from pathlib import Path
 from threading import Lock
@@ -129,20 +128,12 @@ def _resolve_cuda(device: str) -> bool:
 
 
 def _postprocess_markdown(markdown: str) -> str:
-    # PDF text layers often carry decomposed Vietnamese diacritics; NFC keeps BM25 and
-    # embeddings consistent with user queries.
-    markdown = unicodedata.normalize("NFC", markdown)
+    # Docling-specific cleanup only. NFC, unescaping and heading levels (including bold
+    # paragraphs used as headings in the school's Word files) run for every parser in
+    # app.parsers.normalize.
     markdown = re.sub(r"<!--\s*image\s*-->", "", markdown)
-    # Docling escapes "&" in text ("CT&amp;CTSV"); "<"/">" stay escaped so they never look like HTML.
-    markdown = markdown.replace("&amp;", "&")
-    markdown = _BOLD_LINE.sub(_promote_bold_line, markdown)
     markdown = _TABLE_LINE.sub(_compact_table_line, markdown)
     return re.sub(r"\n{3,}", "\n\n", markdown).strip() + "\n"
-
-
-# Word files from the school mark headings with bold paragraphs instead of Heading styles.
-# Promote a line that is entirely bold so the chunker can build section paths.
-_BOLD_LINE = re.compile(r"^\*\*([^*\n]{2,150}?)\*\*[ \t]*$", re.MULTILINE)
 
 
 # Docling pads every table cell to the widest one for alignment; the padding can be
@@ -156,12 +147,6 @@ def _compact_table_line(match: re.Match[str]) -> str:
         return re.sub(r"-{3,}", "---", line.replace(" ", ""))
     # Equal values can be independent cells; Markdown alone cannot identify spans.
     return re.sub(r"[ \t]{2,}", " ", line)
-
-
-def _promote_bold_line(match: re.Match[str]) -> str:
-    title = match.group(1).strip().rstrip(":").strip()
-    level = "#" if title == title.upper() and any(char.isalpha() for char in title) else "##"
-    return f"{level} {title}"
 
 
 def _cache_path(path: Path) -> Path:
