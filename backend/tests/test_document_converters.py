@@ -120,8 +120,9 @@ def test_bold_only_lines_become_headings(monkeypatch, tmp_path: Path) -> None:
 
     text = read_document_text(path)
 
-    assert text.splitlines()[0] == "# HƯỚNG DẪN MUA BẢO HIỂM Y TẾ"
-    assert "## 1. Khai báo thông tin BHYT" in text
+    # Document titles ("HƯỚNG DẪN …") are level 2 in the shared hierarchy; headings below them nest one deeper.
+    assert text.splitlines()[0] == "## HƯỚNG DẪN MUA BẢO HIỂM Y TẾ"
+    assert "### 1. Khai báo thông tin BHYT" in text
     assert "Sinh viên điền mục **BHYT** ." in text
     assert "**2. Hoàn tiền** (đối với sinh viên đã có thẻ)" in text
 
