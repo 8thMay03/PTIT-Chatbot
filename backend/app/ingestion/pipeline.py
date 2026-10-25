@@ -16,7 +16,13 @@ from app.db.repositories import (
 )
 from app.db.session import SessionLocal, init_db
 from app.embeddings import EmbeddingModel, create_embedding_model
-from app.ingestion.chunker import Chunk, ParentChildChunk, split_parent_child, split_text
+from app.ingestion.chunker import (
+    Chunk,
+    ParentChildChunk,
+    compose_search_text,
+    split_parent_child,
+    split_text,
+)
 from app.parsers import DocumentParseError, read_document_text
 from app.ingestion.loaders import SourceDocument, load_documents
 from app.ingestion.uploads import delete_source_file, prepare_upload, publish_upload
@@ -39,13 +45,14 @@ class IngestionPipeline:
 
         embeddings: list[list[float]] = []
         if chunks_payload:
-            embeddings = self.embedding_model.embed([item["text"] for item in chunks_payload])
+            embeddings = self.embedding_model.embed([_embedding_input(item) for item in chunks_payload])
             chunk_records = [
                 ChunkRecord(
                     id=record.id,
                     document_id=record.document_id,
                     chunk_index=record.chunk_index,
                     text=record.text,
+                    search_text=record.search_text,
                     vector_id=record.vector_id,
                     token_count=record.token_count,
                     metadata=record.metadata,
@@ -108,13 +115,14 @@ class IngestionPipeline:
 
         embeddings: list[list[float]] = []
         if chunks_payload:
-            embeddings = self.embedding_model.embed([chunk["text"] for chunk in chunks_payload])
+            embeddings = self.embedding_model.embed([_embedding_input(chunk) for chunk in chunks_payload])
             chunk_records = [
                 ChunkRecord(
                     id=record.id,
                     document_id=record.document_id,
                     chunk_index=record.chunk_index,
                     text=record.text,
+                    search_text=record.search_text,
                     vector_id=record.vector_id,
                     token_count=record.token_count,
                     metadata=record.metadata,
@@ -201,6 +209,7 @@ def _records_for_document(
 
     chunk_records: list[ChunkRecord] = []
     chunks_payload: list[dict] = []
+    document_title = document_record.title or document.path.stem
     for chunk in _split_document(document.text):
         if isinstance(chunk, ParentChildChunk):
             parent_index = chunk.parent_index
@@ -214,6 +223,7 @@ def _records_for_document(
             chunk_id = _chunk_id(document.path, chunk.index)
             parent_id = chunk_id
             parent_text = chunk.text
+        search_text = compose_search_text(document_title, chunk.section_path, chunk.text)
         metadata = {
             "source": source_path,
             "source_name": document.path.name,
@@ -235,6 +245,7 @@ def _records_for_document(
                 document_id=document_id,
                 chunk_index=chunk.index,
                 text=chunk.text,
+                search_text=search_text,
                 token_count=_estimate_token_count(chunk.text),
                 vector_id=chunk_id,
                 metadata=metadata,
@@ -244,11 +255,20 @@ def _records_for_document(
             {
                 "id": chunk_id,
                 "text": chunk.text,
+                "search_text": search_text,
                 "metadata": metadata,
             }
         )
 
     return document_record, chunk_records, chunks_payload
+
+
+def _embedding_input(chunk_payload: dict) -> str:
+    """Pick the field fed to the embedding model according to configuration."""
+    field = settings.embedding_input_field.strip().lower()
+    if field == "search_text":
+        return chunk_payload["search_text"]
+    return chunk_payload["text"]
 
 
 def _file_size(path: Path) -> int | None:
@@ -297,6 +317,7 @@ def _split_document(text: str) -> list[Chunk | ParentChildChunk]:
             parent_overlap=settings.chunk_overlap,
             child_size=settings.child_chunk_size,
             child_overlap=settings.child_chunk_overlap,
+            min_child_size=settings.min_child_chunk_chars,
         )
     return split_text(text, settings.chunk_size, settings.chunk_overlap)
 

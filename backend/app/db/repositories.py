@@ -29,6 +29,7 @@ class ChunkRecord:
     chunk_index: int
     text: str
     vector_id: str
+    search_text: str = ""
     token_count: int | None = None
     metadata: dict | None = None
     embedding: list[float] | None = None
@@ -61,6 +62,7 @@ def replace_knowledge_base(
             document_id=chunk.document_id,
             chunk_index=chunk.chunk_index,
             text=chunk.text,
+            search_text=chunk.search_text or chunk.text,
             token_count=chunk.token_count,
             vector_id=chunk.vector_id,
             embedding=chunk.embedding,
@@ -138,6 +140,7 @@ def upsert_document(
             document_id=chunk.document_id,
             chunk_index=chunk.chunk_index,
             text=chunk.text,
+            search_text=chunk.search_text or chunk.text,
             token_count=chunk.token_count,
             vector_id=chunk.vector_id,
             embedding=chunk.embedding,

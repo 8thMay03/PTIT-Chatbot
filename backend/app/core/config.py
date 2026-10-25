@@ -66,6 +66,11 @@ class Settings(BaseSettings):
         default="text-embedding-3-small",
         alias="EMBEDDING_MODEL",
     )
+    # Trường chunk đưa vào embedding: "search_text" (header ngữ cảnh + text) hoặc
+    # "text". Trên golden set với text-embedding-3-small, header tĩnh làm vector
+    # tụt (hybrid hit@4 0.820 so với 0.850) nên mặc định là "text"; BM25 luôn
+    # dùng search_text.
+    embedding_input_field: str = Field(default="text", alias="EMBEDDING_INPUT_FIELD")
 
     vector_dim: int = Field(default=1536, ge=1, alias="VECTOR_DIM")
     database_url: str = Field(
@@ -92,6 +97,11 @@ class Settings(BaseSettings):
     )
     child_chunk_size: int = Field(default=450, ge=100, alias="CHILD_CHUNK_SIZE")
     child_chunk_overlap: int = Field(default=75, ge=0, alias="CHILD_CHUNK_OVERLAP")
+    min_child_chunk_chars: int = Field(
+        default=120,
+        ge=0,
+        alias="MIN_CHILD_CHUNK_CHARS",
+    )
     hybrid_vector_weight: float = Field(default=0.65, ge=0, le=1, alias="HYBRID_VECTOR_WEIGHT")
     hybrid_candidate_multiplier: int = Field(default=4, ge=1, alias="HYBRID_CANDIDATE_MULTIPLIER")
     hybrid_rrf_k: int = Field(default=60, ge=1, alias="HYBRID_RRF_K")

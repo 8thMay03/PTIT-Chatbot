@@ -10,6 +10,14 @@ _HTML_THEAD = re.compile(r"<thead\b[^>]*>.*?</thead\s*>", re.IGNORECASE | re.DOT
 _HTML_TR = re.compile(r"<tr\b[^>]*>.*?</tr\s*>", re.IGNORECASE | re.DOTALL)
 _HTML_TBODY = re.compile(r"<tbody\b[^>]*>.*?</tbody\s*>", re.IGNORECASE | re.DOTALL)
 
+# Sentence units end at ".", ";", "!", "?" followed by whitespace, or at a newline.
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?;])\s+|\n+")
+_PARAGRAPH_SPLIT = re.compile(r"\n{2,}")
+
+# Children/parents shorter than this merge into their neighbour inside the same
+# section whenever the size budget allows (RAG-06 default, configurable).
+DEFAULT_MIN_CHILD_CHARS = 120
+
 
 @dataclass(frozen=True)
 class Chunk:
@@ -42,7 +50,25 @@ class ParentChildChunk:
     section_path: str = ""
 
 
-def split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[Chunk]:
+def compose_search_text(document_title: str, section_path: str, text: str) -> str:
+    """Build the searchable text: context header (title > section path) + body.
+
+    Embedding and BM25 run on this field so every chunk carries its document and
+    section context (e.g. "BHYT" for an insurance clause that never spells it out);
+    the plain ``text`` stays what users see and what feeds the prompt.
+    """
+    header = " > ".join(part for part in (document_title.strip(), section_path.strip()) if part)
+    if not header:
+        return text
+    return f"{header}\n{text}"
+
+
+def split_text(
+    text: str,
+    chunk_size: int,
+    chunk_overlap: int,
+    min_chunk_len: int = 0,
+) -> list[Chunk]:
     """Split raw text into sized chunks while preserving markdown section structure."""
     cleaned = clean_text(text)
     if not cleaned:
@@ -50,7 +76,15 @@ def split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[Chunk]:
 
     chunks: list[Chunk] = []
     for section in _split_markdown_sections(cleaned):
-        chunks.extend(_split_section(section, chunk_size, chunk_overlap, start_index=len(chunks)))
+        chunks.extend(
+            _split_section(
+                section,
+                chunk_size,
+                chunk_overlap,
+                start_index=len(chunks),
+                min_chunk_len=min_chunk_len,
+            )
+        )
 
     return chunks
 
@@ -61,83 +95,63 @@ def split_parent_child(
     parent_overlap: int,
     child_size: int,
     child_overlap: int,
+    min_child_size: int | None = None,
 ) -> list[ParentChildChunk]:
-    """Create searchable child chunks while retaining larger parent context."""
-    parents = split_text(text, parent_size, parent_overlap)
+    """Create searchable child chunks while retaining larger parent context.
+
+    Parents never cross a heading boundary: one parent = one Điều/mục section, and
+    an oversized section becomes several parents, each grouping consecutive
+    Khoản/paragraphs (RAG-06). Children split within their parent at clause/
+    paragraph boundaries; undersized pieces merge into their neighbour.
+    """
+    min_child = DEFAULT_MIN_CHILD_CHARS if min_child_size is None else min_child_size
+    min_child = max(0, min(min_child, child_size))
+
+    cleaned = clean_text(text)
+    if not cleaned:
+        return []
+
     output: list[ParentChildChunk] = []
-
-    for parent in parents:
-        children = _enforce_child_size(
-            split_text(parent.text, child_size, child_overlap),
-            child_size,
-            child_overlap,
-        )
-        if not children:
-            children = [
-                Chunk(
-                    text=parent.text,
-                    index=0,
-                    heading=parent.heading,
-                    heading_level=parent.heading_level,
-                    section_path=parent.section_path,
-                )
-            ]
-
-        for child_index, child in enumerate(children):
-            output.append(
-                ParentChildChunk(
-                    text=child.text,
-                    index=len(output),
-                    parent_text=parent.text,
-                    parent_index=parent.index,
-                    child_index=child_index,
-                    # Always inherit hierarchy from the parent split — re-chunking
-                    # parent.text only sees the leaf heading and would drop ancestors.
-                    heading=parent.heading,
-                    heading_level=parent.heading_level,
-                    section_path=parent.section_path,
-                )
-            )
-
-    return output
-
-
-def _enforce_child_size(
-    children: list[Chunk],
-    child_size: int,
-    child_overlap: int,
-) -> list[Chunk]:
-    """Split oversized searchable children while leaving their parent intact."""
-    output: list[Chunk] = []
-    for child in children:
-        if len(child.text) <= child_size:
-            output.append(
-                Chunk(
-                    text=child.text,
-                    index=len(output),
-                    heading=child.heading,
-                    heading_level=child.heading_level,
-                    section_path=child.section_path,
-                )
-            )
+    parent_counter = 0
+    for section in _split_markdown_sections(cleaned):
+        heading_line, body = _separate_heading(section)
+        if not body:
             continue
 
-        section = Section(
-            text=child.text,
-            heading=child.heading,
-            heading_level=child.heading_level,
-            section_path=child.section_path,
-        )
-        for piece in _split_section(section, child_size, child_overlap, start_index=0):
-            output.append(
-                Chunk(
-                    text=piece.text,
-                    index=len(output),
-                    heading=child.heading,
-                    heading_level=child.heading_level,
-                    section_path=child.section_path,
+        heading_context = f"{heading_line}\n\n" if heading_line else ""
+        parent_budget = parent_size - len(heading_context)
+        if parent_budget <= 0:
+            heading_context = ""
+            parent_budget = parent_size
+
+        parent_min = min(min_child, parent_budget)
+        parent_bodies = _split_body_pieces(body, parent_budget, parent_overlap, min_len=parent_min)
+        for parent_body in parent_bodies:
+            parent_text = f"{heading_context}{parent_body}".strip()
+            child_budget = child_size - len(heading_context)
+            child_context = heading_context if child_budget > 0 else ""
+            if child_budget <= 0:
+                child_budget = child_size
+
+            child_bodies = _split_body_pieces(parent_body, child_budget, child_overlap, min_len=min_child)
+            if not child_bodies:
+                child_bodies = [parent_body]
+
+            for child_index, child_body in enumerate(child_bodies):
+                output.append(
+                    ParentChildChunk(
+                        text=f"{child_context}{child_body}".strip(),
+                        index=len(output),
+                        parent_text=parent_text,
+                        parent_index=parent_counter,
+                        child_index=child_index,
+                        heading=section.heading,
+                        heading_level=section.heading_level,
+                        section_path=section.section_path,
+                    )
                 )
-            )
+            parent_counter += 1
+
     return output
 
 
@@ -187,50 +201,43 @@ def _split_markdown_sections(text: str) -> list[Section]:
     return [section for section in sections if section.text]
 
 
-def _split_section(
-    section: Section,
+def _split_body_pieces(
+    body: str,
     chunk_size: int,
     chunk_overlap: int,
-    start_index: int,
-) -> list[Chunk]:
-    """Split one section into chunks that respect paragraph boundaries and size limits."""
-    heading_line, body = _separate_heading(section)
-    if not body:
+    min_len: int = 0,
+) -> list[str]:
+    """Split a heading-less body into size-bounded pieces at block boundaries."""
+    if not body.strip():
         return []
-
-    heading_context = f"{heading_line}\n\n" if heading_line else ""
-    body_chunk_size = chunk_size - len(heading_context)
-    if body_chunk_size <= 0:
-        heading_context = ""
-        body_chunk_size = chunk_size
 
     blocks = _split_blocks(body)
     if not blocks:
         return []
 
     compact = "\n\n".join(blocks)
-    if len(compact) <= body_chunk_size:
-        return [_build_chunk(f"{heading_context}{compact}".strip(), section, start_index)]
+    if len(compact) <= chunk_size:
+        return [compact]
 
     pieces: list[str] = []
     current = ""
-    intro_threshold = min(200, max(1, body_chunk_size // 4))
+    intro_threshold = min(200, max(1, chunk_size // 3))
 
     for block in blocks:
         if _is_markdown_table(block) or _is_html_table(block):
-            table_budget = body_chunk_size
+            table_budget = chunk_size
             prefix = ""
             if current and not _is_markdown_table(current) and not _is_html_table(current):
                 if len(current) <= intro_threshold:
                     prefix = current
-                    table_budget = body_chunk_size - len(prefix) - (2 if prefix else 0)
+                    table_budget = chunk_size - len(prefix) - (2 if prefix else 0)
                     current = ""
                 else:
                     pieces.append(current)
                     current = ""
 
             if table_budget <= 0:
-                table_budget = body_chunk_size
+                table_budget = chunk_size
                 if prefix:
                     pieces.append(prefix)
                     prefix = ""
@@ -244,7 +251,7 @@ def _split_section(
                 pieces.extend(table_pieces)
             else:
                 merged = f"{prefix}\n\n{block}".strip() if prefix else block
-                if len(merged) <= body_chunk_size:
+                if len(merged) <= chunk_size:
                     pieces.append(merged)
                 else:
                     if prefix:
@@ -252,15 +259,15 @@ def _split_section(
                     pieces.append(block)
             continue
 
-        if len(block) > body_chunk_size:
+        if len(block) > chunk_size:
             if current:
                 pieces.append(current)
                 current = ""
-            pieces.extend(_split_long_block(block, body_chunk_size, chunk_overlap))
+            pieces.extend(_split_long_block(block, chunk_size, chunk_overlap))
             continue
 
         candidate = f"{current}\n\n{block}".strip() if current else block
-        if len(candidate) <= body_chunk_size:
+        if len(candidate) <= chunk_size:
             current = candidate
             continue
 
@@ -271,6 +278,140 @@ def _split_section(
     if current:
         pieces.append(current)
 
+    pieces = [piece for piece in pieces if piece.strip()]
+    if min_len > 0:
+        pieces = _merge_short_pieces(pieces, chunk_size, min_len)
+    return pieces
+
+
+def _merge_short_pieces(pieces: list[str], limit: int, min_len: int) -> list[str]:
+    """Fold pieces shorter than ``min_len`` into their neighbour, same section.
+
+    A trailing fragment first tries to join the previous piece outright; when the
+    two do not fit together, trailing blocks/sentences migrate backwards until the
+    tail reaches ``min_len``. Pieces therefore stay within ``limit`` and a piece
+    ends up under ``min_len`` only when the whole body was that short.
+    """
+    if min_len <= 0 or len(pieces) <= 1:
+        return pieces
+
+    merged = [pieces[0]]
+    for piece in pieces[1:]:
+        prev = merged[-1]
+        if len(prev) >= min_len:
+            merged.append(piece)
+        elif len(prev) + 2 + len(piece) <= limit:
+            merged[-1] = f"{prev}\n\n{piece}"
+        elif _is_markdown_table(piece) or _is_html_table(piece):
+            # Tables legitimately exceed the soft budget; their leading note
+            # (e.g. "Chi tiết xem tại …") folds into the first table piece.
+            merged[-1] = f"{prev}\n\n{piece}"
+        else:
+            moved = _steal_leading_units(prev, piece, limit, min_len)
+            if moved is None:
+                merged.append(piece)
+            else:
+                merged[-1], piece = moved
+                merged.append(piece)
+
+    guard = 0
+    while len(merged) >= 2 and len(merged[-1]) < min_len and guard < 100:
+        guard += 1
+        prev, last = merged[-2], merged[-1]
+        if len(prev) + 2 + len(last) <= limit:
+            merged[-2:] = [f"{prev}\n\n{last}"]
+            break
+        if (_is_markdown_table(prev) or _is_html_table(prev)) and not (
+            _is_markdown_table(last) or _is_html_table(last)
+        ):
+            # Keep a short trailing note attached to its table instead of
+            # emitting a near-empty chunk.
+            merged[-2:] = [f"{prev}\n\n{last}"]
+            break
+        moved = _steal_trailing_unit(prev, last, limit, min_len)
+        if moved is None:
+            break
+        merged[-2:] = [moved[0], moved[1]]
+
+    return [piece for piece in merged if piece.strip()]
+
+
+def _steal_trailing_unit(prev: str, last: str, limit: int, min_len: int) -> tuple[str, str] | None:
+    """Move the last block/sentence of ``prev`` to the front of ``last``.
+
+    Refuses to shrink ``prev`` below ``min_len`` — rebalancing must not push the
+    shortness problem onto the previous piece.
+    """
+    units, separator = _split_units(prev)
+    if len(units) < 2:
+        return None
+
+    unit = units.pop()
+    new_prev = separator.join(units).strip()
+    new_last = f"{unit}{separator}{last}".strip()
+    if not new_prev or len(new_prev) < min_len or len(new_last) > limit:
+        return None
+    return new_prev, new_last
+
+
+def _steal_leading_units(prev: str, piece: str, limit: int, min_len: int) -> tuple[str, str] | None:
+    """Move leading blocks/sentences of ``piece`` back into ``prev`` until it reaches ``min_len``."""
+    if _is_markdown_table(piece) or _is_html_table(piece):
+        return None
+    units, separator = _split_units(piece)
+    if len(units) < 2:
+        return None
+
+    new_prev = prev
+    while len(new_prev) < min_len and units:
+        candidate = f"{new_prev}{separator}{units[0]}".strip()
+        if len(candidate) > limit:
+            break
+        new_prev = candidate
+        units.pop(0)
+
+    if not units or len(new_prev) == len(prev):
+        return None
+    return new_prev, separator.join(units).strip()
+
+
+def _split_units(text: str) -> tuple[list[str], str]:
+    """Split a piece into movable units: paragraphs (\\n\\n) or sentences (space)."""
+    blocks = [block for block in _PARAGRAPH_SPLIT.split(text) if block.strip()]
+    if len(blocks) > 1 and not any(_is_markdown_table(block) or _is_html_table(block) for block in blocks):
+        return blocks, "\n\n"
+
+    if not (_is_markdown_table(text) or _is_html_table(text)):
+        sentences = _split_sentences(text)
+        if len(sentences) > 1:
+            return sentences, " "
+    return [text], "\n\n"
+
+
+def _split_sentences(text: str) -> list[str]:
+    """Split text at sentence boundaries (., ;, !, ?, newline), keeping terminators."""
+    return [unit.strip() for unit in _SENTENCE_SPLIT.split(text) if unit.strip()]
+
+
+def _split_section(
+    section: Section,
+    chunk_size: int,
+    chunk_overlap: int,
+    start_index: int,
+    min_chunk_len: int = 0,
+) -> list[Chunk]:
+    """Split one section into chunks that respect paragraph boundaries and size limits."""
+    heading_line, body = _separate_heading(section)
+    if not body:
+        return []
+
+    heading_context = f"{heading_line}\n\n" if heading_line else ""
+    body_chunk_size = chunk_size - len(heading_context)
+    if body_chunk_size <= 0:
+        heading_context = ""
+        body_chunk_size = chunk_size
+
+    pieces = _split_body_pieces(body, body_chunk_size, chunk_overlap, min_len=min_chunk_len)
     return [
         _build_chunk(f"{heading_context}{piece}".strip(), section, start_index + offset)
         for offset, piece in enumerate(pieces)
@@ -610,19 +751,85 @@ def _split_long_html_table(text: str, chunk_size: int) -> list[str]:
 
 
 def _split_long_block(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
-    """Split an oversized block into fixed-size pieces with sliding overlap."""
+    """Split an oversized prose block at sentence boundaries, never mid-word."""
+    units = _split_sentences(text)
+    if not units:
+        return []
+
+    pieces = _pack_units(units, chunk_size)
+    return _apply_sentence_overlap(pieces, chunk_size, chunk_overlap)
+
+
+def _pack_units(units: list[str], limit: int) -> list[str]:
+    """Greedily pack sentence units into pieces of at most ``limit`` characters."""
     pieces: list[str] = []
-    step = max(1, chunk_size - max(0, chunk_overlap))
-    start = 0
+    current = ""
+    for unit in units:
+        if len(unit) > limit:
+            if current:
+                pieces.append(current)
+                current = ""
+            pieces.extend(_split_oversized_unit(unit, limit))
+            continue
 
-    while start < len(text):
-        end = min(len(text), start + chunk_size)
-        pieces.append(text[start:end].strip())
-        if end == len(text):
-            break
-        start += step
+        candidate = f"{current} {unit}" if current else unit
+        if len(candidate) <= limit:
+            current = candidate
+        else:
+            pieces.append(current)
+            current = unit
 
-    return [piece for piece in pieces if piece]
+    if current:
+        pieces.append(current)
+    return pieces
+
+
+def _split_oversized_unit(unit: str, limit: int) -> list[str]:
+    """Cut an unbreakable unit at whitespace so no piece starts mid-word."""
+    pieces: list[str] = []
+    rest = unit
+    while len(rest) > limit:
+        cut = rest.rfind(" ", 1, limit + 1)
+        if cut <= 0:
+            cut = limit
+        piece = rest[:cut].strip()
+        if piece:
+            pieces.append(piece)
+        rest = rest[cut:].lstrip()
+
+    rest = rest.strip()
+    if rest:
+        pieces.append(rest)
+    return pieces
+
+
+def _apply_sentence_overlap(pieces: list[str], chunk_size: int, chunk_overlap: int) -> list[str]:
+    """Prepend a word-aligned tail of the previous piece when overlap is enabled."""
+    if chunk_overlap <= 0 or len(pieces) < 2:
+        return pieces
+
+    output = [pieces[0]]
+    for piece in pieces[1:]:
+        tail = _tail_at_word_boundary(output[-1], chunk_overlap)
+        if not tail:
+            output.append(piece)
+            continue
+        candidate = f"{tail} {piece}"
+        output.append(candidate if len(candidate) <= chunk_size else piece)
+    return output
+
+
+def _tail_at_word_boundary(text: str, overlap: int) -> str:
+    """Return up to ``overlap`` trailing characters, starting at a word boundary."""
+    if overlap <= 0 or len(text) <= overlap:
+        return ""
+    start = len(text) - overlap
+    if not text[start - 1].isspace():
+        space = text.find(" ", start)
+        if space == -1:
+            return ""
+        start = space + 1
+    return text[start:]
 
 
 def _build_chunk(text: str, section: Section, index: int) -> Chunk:

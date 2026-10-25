@@ -69,7 +69,9 @@ class BM25Search:
                 return
 
             chunks = self._load_chunks()
-            tokenized_documents = [_tokenize(chunk["text"]) for chunk in chunks]
+            tokenized_documents = [
+                _tokenize(chunk.get("search_text") or chunk["text"]) for chunk in chunks
+            ]
             self._chunks = chunks
             self._scorer = BM25Okapi(tokenized_documents) if tokenized_documents else None
             self._generation = current_generation
@@ -94,6 +96,7 @@ class BM25Search:
                     "section_path": metadata.get("section_path", ""),
                     "chunk_index": chunk.chunk_index,
                     "text": chunk.text,
+                    "search_text": chunk.search_text or chunk.text,
                     "parent_id": metadata.get("parent_id", chunk.id),
                     "parent_index": metadata.get("parent_index", chunk.chunk_index),
                     "child_index": metadata.get("child_index", 0),

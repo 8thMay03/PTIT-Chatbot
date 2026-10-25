@@ -34,7 +34,6 @@ def _assert_table_chunking(text: str) -> None:
 
 
 def _assert_parent_child_section_paths(text: str) -> None:
-    parents = split_text(text, chunk_size=2048, chunk_overlap=150)
     children = split_parent_child(
         text,
         parent_size=2048,
@@ -43,10 +42,21 @@ def _assert_parent_child_section_paths(text: str) -> None:
         child_overlap=100,
     )
 
-    parent_paths = {parent.index: parent.section_path for parent in parents}
     assert children
-    assert all(child.section_path == parent_paths[child.parent_index] for child in children)
     assert all(child.heading for child in children)
+    # Từ RAG-06, parent được dựng theo section (không tách theo ký tự), nên mỗi
+    # nhóm child cùng parent phải cùng heading/section_path và parent_text chứa
+    # đúng heading đó thay vì trộn section khác.
+    by_parent: dict[int, list] = {}
+    for child in children:
+        by_parent.setdefault(child.parent_index, []).append(child)
+    for parent_index, group in by_parent.items():
+        assert len({child.section_path for child in group}) == 1
+        assert len({child.heading for child in group}) == 1
+        parent_text = group[0].parent_text
+        assert group[0].heading in parent_text
+        for child in group:
+            assert child.text in child.parent_text or child.heading in parent_text
 
 
 def _assert_table_children_keep_header(text: str) -> None:

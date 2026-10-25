@@ -118,6 +118,7 @@ def _format_chunk_context(chunk: Chunk, score: float) -> dict[str, Any]:
         "section_path": metadata.get("section_path", ""),
         "chunk_index": chunk.chunk_index,
         "text": chunk.text,
+        "search_text": chunk.search_text or chunk.text,
         "score": max(0.0, min(1.0, score)),
     }
     if metadata.get("parent_id"):

@@ -52,6 +52,8 @@ class Chunk(Base):
     document_id: Mapped[str] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    # Contextual-header copy used by embedding and BM25; falls back to `text`.
+    search_text: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
     token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     vector_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
