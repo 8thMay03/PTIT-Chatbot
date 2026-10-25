@@ -209,6 +209,51 @@ def test_aggregate_metrics_groups_and_overall() -> None:
     assert metrics["by_source"]["so_tay"]["hit@1"] == pytest.approx(0.5)
 
 
+def test_section_dominance_counts_each_case_once_within_top_k() -> None:
+    from scripts.eval_retrieval import aggregate_metrics, section_dominance
+
+    def retrieved(*sections: tuple[int, str]) -> list[dict]:
+        return [
+            {"rank": rank, "source_name": "so-tay.md", "heading": path.rsplit(" > ", 1)[-1], "section_path": path}
+            for rank, path in sections
+        ]
+
+    big = "Chương III > 2. Khóa học"
+    cases = [
+        # Cùng section hai lần trong top-4 vẫn chỉ tính một câu.
+        {"retrieved": retrieved((1, big), (2, big), (3, "Chương VI > Điều 33"))},
+        {"retrieved": retrieved((1, "Chương VI > Điều 33"), (5, big))},
+        {"retrieved": retrieved((4, big))},
+    ]
+
+    dominance = section_dominance(cases)
+
+    assert dominance["k"] == 4
+    assert dominance["max_share"] == pytest.approx(2 / 3, abs=1e-6)
+    assert dominance["top"][0] == {"section": f"so-tay.md :: {big}", "cases": 2, "share": pytest.approx(2 / 3, abs=1e-6)}
+    assert dominance["top"][1]["cases"] == 2
+
+    full = [{**case, "first_hit_rank": None, "diacritics": "co_dau", "question_type": "x", "source": "y"} for case in cases]
+    assert aggregate_metrics(full)["section_dominance"] == dominance
+
+
+def test_section_dominance_falls_back_to_heading_for_old_reports() -> None:
+    from scripts.eval_retrieval import report_dominance
+
+    old_report = {
+        "metrics": {"overall": {"cases": 2}},
+        "cases": [
+            {"retrieved": [{"rank": 1, "source_name": "", "heading": "2. Khóa học"}]},
+            {"retrieved": [{"rank": 2, "source_name": "", "heading": "2. Khóa học"}]},
+        ],
+    }
+
+    dominance = report_dominance(old_report)
+
+    assert dominance["top"] == [{"section": "2. Khóa học", "cases": 2, "share": 1.0}]
+    assert dominance["max_share"] == 1.0
+
+
 def test_collect_metric_rows_flattens_groups_for_compare() -> None:
     from scripts.eval_retrieval import collect_metric_rows
 
