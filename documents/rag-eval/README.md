@@ -94,6 +94,46 @@ parser (PHẦN=1, tiêu đề văn bản=2, Chương=3, Mục=4, Điều=5).
   và MRR không đổi). Trên cùng một index, chạy lại vẫn cho kết quả giống hệt.
 - Kiểm tra cấu trúc: `python -m scripts.check_structure <file> [--parser docling] --tree --strict`.
 
+## RAG-06 — chunking Điều/Khoản, `search_text`, lọc nhiễu (2026-10-25)
+
+Báo cáo: [`rag-06/`](rag-06/) (cùng schema v3; thí nghiệm A/B ở
+[`rag-06/experiments/`](rag-06/experiments/)). Thay đổi đầu vào index so với RAG-05:
+
+- **Chunking theo Điều/Khoản**: parent = một Điều/mục (Điều dài thì nhóm Khoản liên
+  tiếp), child = Khoản/đoạn; cắt đoạn dài theo ranh giới câu, gộp chunk < 120 ký tự
+  vào chunk liền kề cùng section (`MIN_CHILD_CHUNK_CHARS`). Vẫn dùng cấu hình local
+  2048/1024 trong `.env`.
+- **`search_text`** = `"{tên tài liệu} > {section_path}\n{text}"` (cột mới qua
+  migration `0003`); **BM25 tokenize `search_text`**; embedding đọc trường theo
+  `EMBEDDING_INPUT_FIELD` (mặc định `text` — xem ghi chú dưới).
+- **Lọc nhiễu** trong cleaner: mục lục (cả section, kể cả bảng), quốc hiệu + tiêu ngữ,
+  dòng ngày tháng, số trang, khối chữ ký + "Nơi nhận", watermark scan. Script kiểm tra
+  mới: `python -m scripts.check_chunks --db | --data <dir> [--strict]`.
+
+Index: 1203 chunk / 749 parent (fingerprint `620d26fd0e0c…`), chi phí re-embed ~$0.007.
+
+| Chế độ | hit@1 | hit@4 | hit@10 | MRR | cov@4 | so với RAG-05 |
+|---|---:|---:|---:|---:|---:|---|
+| hybrid (RAG-06) | 0.720 | **0.850** | 0.890 | **0.778** | 0.804 | ngang (RAG-05: 0.850/0.780) |
+| bm25 (RAG-06) | 0.710 | **0.850** | **0.910** | **0.770** | 0.798 | **+0.02 hit@4** (0.830/0.762) |
+| vector (RAG-06) | 0.620 | 0.770 | 0.850 | 0.700 | 0.727 | hit@4 −0.03, MRR +0.01 (0.800/0.688) |
+
+Đọc số và quyết định:
+
+- **Header ngữ cảnh giúp BM25** (term như "BHYT" giờ nằm trong text được tokenize) nhưng
+  **làm vector tụt** khi embed thẳng: thí nghiệm embed `search_text` cho hybrid
+  0.820/0.738 (thấp hơn cả RAG-05) vì header tĩnh dài, nhiều chữ HOA làm vector
+  `text-embedding-3-small` lệch. Vì vậy mặc định `EMBEDDING_INPUT_FIELD=text` — embedding
+  dùng text hiển thị, BM25 dùng `search_text`; muốn bật lại cho model khác chỉ cần đổi env.
+- **Chưa đạt tiêu chí "hybrid tăng"**: hybrid ngang bằng RAG-05 (chênh MRR −0.002, trong
+  sai số hai lần ingest đã ghi nhận ở RAG-05), nhóm 18 câu thủ tục giảm hit@4
+  0.667 → 0.611 — 3 câu thua đều nằm ở guide "HƯỚNG DẪN THỦ TỤC HÀNH CHÍNH" mà parent
+  theo mục làm evidence phân mảnh. Hướng xử lý tiếp: parent lớn hơn cho tài liệu guide,
+  tune `HYBRID_VECTOR_WEIGHT`, hoặc contextual embedding bằng LLM.
+- Chất lượng ngữ liệu: 0 chunk mục lục/quốc hiệu/chữ ký (index RAG-05 còn 4 chunk "MỤC
+  LỤC"), 0 chunk cắt giữa từ (trước: 143), 0 chunk < 120 ký tự ngoài section ngắn thật
+  (trước: 59). `check_chunks --db --strict` sạch.
+
 ## Hạn chế đã biết
 
 - Dataset chưa có metadata `question_type` / `source` nên các nhóm
