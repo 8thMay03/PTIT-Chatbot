@@ -50,10 +50,11 @@ class OpenAIEmbeddingModel(EmbeddingModel):
                 input=batch,
                 model=self.model_name,
             )
-            batch_embeddings = [item.embedding for item in sorted(response.data, key=lambda item: item.index)]
+            batch_embeddings = [
+                item.embedding for item in sorted(response.data, key=lambda item: item.index)
+            ]
             all_embeddings.extend(batch_embeddings)
         return all_embeddings
-
 
 
 class SentenceTransformerEmbeddingModel(EmbeddingModel):

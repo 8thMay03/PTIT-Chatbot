@@ -17,7 +17,9 @@ def _session() -> Session:
     return Session(engine)
 
 
-def _document(doc_id: str = "doc-1", title: str = "Handbook") -> tuple[DocumentRecord, list[ChunkRecord]]:
+def _document(
+    doc_id: str = "doc-1", title: str = "Handbook"
+) -> tuple[DocumentRecord, list[ChunkRecord]]:
     record = DocumentRecord(
         id=doc_id,
         source_path="data/handbook.md",

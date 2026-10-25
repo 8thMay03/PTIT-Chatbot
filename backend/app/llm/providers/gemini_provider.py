@@ -45,20 +45,22 @@ class GeminiProvider(BaseLLMProvider):
             if role == "system":
                 system_parts.append(content)
             elif role == "assistant":
-                contents.append({
-                    "role": "model",
-                    "parts": [{"text": content}],
-                })
+                contents.append(
+                    {
+                        "role": "model",
+                        "parts": [{"text": content}],
+                    }
+                )
             else:
-                contents.append({
-                    "role": "user",
-                    "parts": [{"text": content}],
-                })
+                contents.append(
+                    {
+                        "role": "user",
+                        "parts": [{"text": content}],
+                    }
+                )
 
         system_instruction = (
-            {"parts": [{"text": "\n\n".join(system_parts)}]}
-            if system_parts
-            else None
+            {"parts": [{"text": "\n\n".join(system_parts)}]} if system_parts else None
         )
         return system_instruction, contents
 
@@ -96,7 +98,9 @@ class GeminiProvider(BaseLLMProvider):
             raise LLMConfigurationError("GEMINI_API_KEY is not configured.")
 
         url = f"{GEMINI_API_BASE}/{self.model_name}:generateContent?key={self.api_key}"
-        payload = self._build_payload(messages, temperature=temperature, max_tokens=max_tokens, **kwargs)
+        payload = self._build_payload(
+            messages, temperature=temperature, max_tokens=max_tokens, **kwargs
+        )
         data = json.dumps(payload).encode("utf-8")
 
         def _call() -> str:
@@ -130,8 +134,12 @@ class GeminiProvider(BaseLLMProvider):
         if not self.is_configured():
             raise LLMConfigurationError("GEMINI_API_KEY is not configured.")
 
-        url = f"{GEMINI_API_BASE}/{self.model_name}:streamGenerateContent?alt=sse&key={self.api_key}"
-        payload = self._build_payload(messages, temperature=temperature, max_tokens=max_tokens, **kwargs)
+        url = (
+            f"{GEMINI_API_BASE}/{self.model_name}:streamGenerateContent?alt=sse&key={self.api_key}"
+        )
+        payload = self._build_payload(
+            messages, temperature=temperature, max_tokens=max_tokens, **kwargs
+        )
         data = json.dumps(payload).encode("utf-8")
 
         req = urllib.request.Request(
@@ -146,7 +154,7 @@ class GeminiProvider(BaseLLMProvider):
                     line = raw_line.decode("utf-8").strip()
                     if not line or not line.startswith("data:"):
                         continue
-                    data_str = line[len("data:"):].strip()
+                    data_str = line[len("data:") :].strip()
                     if not data_str or data_str == "[DONE]":
                         continue
                     try:

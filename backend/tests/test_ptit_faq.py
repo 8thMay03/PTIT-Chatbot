@@ -49,15 +49,15 @@ def _assert_case_finds_expected_evidence(case: dict, chunks: list[Chunk]) -> Non
         [chunk.text for chunk in chunks],
         top_k=50,
     )
-    retrieved_texts = [unicodedata.normalize("NFC", chunks[index].text).casefold() for index, _ in ranked]
-    expected_terms = [unicodedata.normalize("NFC", term).casefold() for term in case["expected_terms"]]
+    retrieved_texts = [
+        unicodedata.normalize("NFC", chunks[index].text).casefold() for index, _ in ranked
+    ]
+    expected_terms = [
+        unicodedata.normalize("NFC", term).casefold() for term in case["expected_terms"]
+    ]
 
     matching_text = next(
-        (
-            text
-            for text in retrieved_texts
-            if all(term in text for term in expected_terms)
-        ),
+        (text for text in retrieved_texts if all(term in text for term in expected_terms)),
         None,
     )
 
@@ -117,14 +117,16 @@ def test_common_ptit_question_retrieves_expected_evidence_from_full_corpus(
     trong top-50. Kiểm tra xếp hạng vẫn do test trên fixture đảm nhiệm.
     """
     expected_terms = [
-        unicodedata.normalize("NFC", term).casefold()
-        for term in case["expected_terms"]
+        unicodedata.normalize("NFC", term).casefold() for term in case["expected_terms"]
     ]
     matching_text = next(
         (
             unicodedata.normalize("NFC", chunk.text).casefold()
             for chunk in corpus_chunks
-            if all(term in unicodedata.normalize("NFC", chunk.text).casefold() for term in expected_terms)
+            if all(
+                term in unicodedata.normalize("NFC", chunk.text).casefold()
+                for term in expected_terms
+            )
         ),
         None,
     )

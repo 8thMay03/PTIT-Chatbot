@@ -28,16 +28,19 @@ class LLMResponse:
 
 class LLMProviderError(Exception):
     """Base exception for LLM provider errors."""
+
     pass
 
 
 class LLMConfigurationError(LLMProviderError):
     """Raised when an LLM provider is misconfigured or missing credentials."""
+
     pass
 
 
 class LLMStreamError(LLMProviderError):
     """Raised when a streaming LLM call fails after at least one token was emitted."""
+
     pass
 
 
@@ -91,10 +94,12 @@ class BaseLLMProvider(ABC):
             if isinstance(msg, LLMMessage):
                 normalized.append({"role": msg.role, "content": msg.content})
             elif isinstance(msg, dict):
-                normalized.append({
-                    "role": str(msg.get("role", "user")),
-                    "content": str(msg.get("content", "")),
-                })
+                normalized.append(
+                    {
+                        "role": str(msg.get("role", "user")),
+                        "content": str(msg.get("content", "")),
+                    }
+                )
             else:
                 normalized.append({"role": "user", "content": str(msg)})
         return normalized
@@ -139,7 +144,15 @@ def _is_retryable_error(exc: Exception) -> bool:
         return False
 
     exc_name = exc.__class__.__name__
-    if any(name in exc_name for name in ("AuthenticationError", "PermissionDeniedError", "NotFoundError", "BadRequestError")):
+    if any(
+        name in exc_name
+        for name in (
+            "AuthenticationError",
+            "PermissionDeniedError",
+            "NotFoundError",
+            "BadRequestError",
+        )
+    ):
         return False
 
     err_str = str(exc).lower()
@@ -147,4 +160,3 @@ def _is_retryable_error(exc: Exception) -> bool:
         return False
 
     return True
-

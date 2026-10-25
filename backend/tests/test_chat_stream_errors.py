@@ -1,7 +1,6 @@
 import json
 from types import SimpleNamespace
 
-import pytest
 
 from app.api import routes
 from app.api.schemas import ChatRequest
@@ -60,7 +59,9 @@ async def _read_events(response) -> list[dict]:
     return events
 
 
-async def test_stream_providers_error_before_first_token_returns_extractive_fallback(monkeypatch) -> None:
+async def test_stream_providers_error_before_first_token_returns_extractive_fallback(
+    monkeypatch,
+) -> None:
     stored_messages: list[dict] = []
     _prepare(monkeypatch, stored_messages)
 
@@ -71,7 +72,9 @@ async def test_stream_providers_error_before_first_token_returns_extractive_fall
 
     monkeypatch.setattr(routes, "stream_answer_with_llm", fake_stream)
 
-    response = routes.chat_stream(ChatRequest(message="Học phí?"), session=SimpleNamespace(commit=lambda: None))
+    response = routes.chat_stream(
+        ChatRequest(message="Học phí?"), session=SimpleNamespace(commit=lambda: None)
+    )
     events = await _read_events(response)
 
     assert [event["type"] for event in events] == ["start", "delta", "done"]
@@ -84,7 +87,9 @@ async def test_stream_providers_error_before_first_token_returns_extractive_fall
     assert "error" not in assistant["metadata"]
 
 
-async def test_stream_providers_error_after_tokens_emits_error_event_without_fallback(monkeypatch) -> None:
+async def test_stream_providers_error_after_tokens_emits_error_event_without_fallback(
+    monkeypatch,
+) -> None:
     stored_messages: list[dict] = []
     _prepare(monkeypatch, stored_messages)
 
@@ -95,7 +100,9 @@ async def test_stream_providers_error_after_tokens_emits_error_event_without_fal
 
     monkeypatch.setattr(routes, "stream_answer_with_llm", fake_stream)
 
-    response = routes.chat_stream(ChatRequest(message="Học phí?"), session=SimpleNamespace(commit=lambda: None))
+    response = routes.chat_stream(
+        ChatRequest(message="Học phí?"), session=SimpleNamespace(commit=lambda: None)
+    )
     events = await _read_events(response)
 
     types = [event["type"] for event in events]

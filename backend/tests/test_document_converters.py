@@ -30,7 +30,9 @@ class _FakeConverter:
 @pytest.fixture
 def fake_converter(monkeypatch, tmp_path: Path) -> _FakeConverter:
     # Decomposed "Điều" (NFD) as emitted by some PDF text layers.
-    converter = _FakeConverter("# \u0110ie\u0302\u0300u 1\n\nCT&amp;CTSV\n\n<!-- image -->\n\n\n\n| A | B |\n|---|---|\n| 1 | 2 |")
+    converter = _FakeConverter(
+        "# \u0110ie\u0302\u0300u 1\n\nCT&amp;CTSV\n\n<!-- image -->\n\n\n\n| A | B |\n|---|---|\n| 1 | 2 |"
+    )
     monkeypatch.setattr(docling, "_get_converter", lambda: converter)
     monkeypatch.setattr(settings, "converted_documents_path", tmp_path / "converted")
     return converter
@@ -76,12 +78,17 @@ def test_changed_file_is_reconverted(fake_converter, tmp_path: Path) -> None:
     assert len(fake_converter.calls) == 2
 
 
-def test_pre_extraction_docling_cache_is_read_without_conversion(fake_converter, monkeypatch, tmp_path):
+def test_pre_extraction_docling_cache_is_read_without_conversion(
+    fake_converter, monkeypatch, tmp_path
+):
     monkeypatch.setattr(settings, "docling_ocr_enabled", False)
     source = tmp_path / "legacy.pdf"
     source.write_bytes(b"%PDF-1.7 legacy")
     # Existing docling-v2/no-ocr cache filename produced before package extraction.
-    cache = settings.converted_documents_path / "03ac7ad915a49a86bfdef44e4408d17efca6fb67432052aa1e38fafb04da24c1.md"
+    cache = (
+        settings.converted_documents_path
+        / "03ac7ad915a49a86bfdef44e4408d17efca6fb67432052aa1e38fafb04da24c1.md"
+    )
     cache.parent.mkdir(parents=True)
     cache.write_text("# Existing export\n\n| A | B |\n|---|---|\n| 100 | 100 |", encoding="utf-8")
 

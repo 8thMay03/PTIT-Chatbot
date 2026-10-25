@@ -13,6 +13,7 @@ from app.generation.query_rewriter import VietnameseQueryRewriter
 from app.retrieval import Retriever, retriever
 from app.retrieval.multi_query import fuse_multi_query_results
 from app.retrieval.reranker import Reranker
+from app.llm import BaseLLMProvider
 
 NO_CONTEXT_ANSWER = "Chưa tìm thấy thông tin này trong tài liệu."
 
@@ -48,9 +49,6 @@ def _debug_chunk(context: dict, rank: int) -> dict:
         if value is not None:
             snapshot[field] = float(value) if field.endswith("score") else value
     return snapshot
-
-
-from app.llm import BaseLLMProvider
 
 
 class RagChain:
@@ -93,7 +91,9 @@ class RagChain:
             }
 
         provider = llm_provider or self.llm_provider
-        answer = answer_with_llm(question, result["contexts"], history=safe_history, provider=provider)
+        answer = answer_with_llm(
+            question, result["contexts"], history=safe_history, provider=provider
+        )
         return {
             "answer": answer,
             "sources": public_citations(result["contexts"]),
@@ -140,14 +140,10 @@ class RagChain:
             if settings.reranker_enabled
             else top_k
         )
-        result_sets = [
-            self.retriever.retrieve(query, top_k=candidate_count)
-            for query in queries
-        ]
+        result_sets = [self.retriever.retrieve(query, top_k=candidate_count) for query in queries]
         contexts = fuse_multi_query_results(result_sets, top_k=candidate_count)
         unsafe_context_count = sum(
-            contains_prompt_injection(str(context.get("text", "")))
-            for context in contexts
+            contains_prompt_injection(str(context.get("text", ""))) for context in contexts
         )
         contexts = [
             context
@@ -155,16 +151,14 @@ class RagChain:
             if not contains_prompt_injection(str(context.get("text", "")))
         ]
         retrieved_chunks = [
-            _debug_chunk(context, rank)
-            for rank, context in enumerate(contexts, start=1)
+            _debug_chunk(context, rank) for rank, context in enumerate(contexts, start=1)
         ]
         if settings.reranker_enabled:
             contexts = self.reranker.rerank(rewritten_query, contexts, top_k=top_k)
         else:
             contexts = contexts[:top_k]
         selected_chunks = [
-            _debug_chunk(context, rank)
-            for rank, context in enumerate(contexts, start=1)
+            _debug_chunk(context, rank) for rank, context in enumerate(contexts, start=1)
         ]
         strong_context = has_strong_context(
             contexts,

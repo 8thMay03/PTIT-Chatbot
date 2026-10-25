@@ -60,7 +60,8 @@ def _assert_table_children_keep_header(text: str) -> None:
     md_table_children = [
         chunk
         for chunk in children
-        if chunk.text.count("|") >= 4 and any(line.strip().startswith("|") for line in chunk.text.splitlines())
+        if chunk.text.count("|") >= 4
+        and any(line.strip().startswith("|") for line in chunk.text.splitlines())
     ]
 
     assert md_table_children
@@ -77,7 +78,9 @@ def _assert_html_table_well_formed(text: str) -> None:
 
     assert html_chunks
     assert all("</table>" in chunk.text.lower() for chunk in html_chunks)
-    assert all("<thead>" in chunk.text.lower() or "<th" in chunk.text.lower() for chunk in html_chunks)
+    assert all(
+        "<thead>" in chunk.text.lower() or "<th" in chunk.text.lower() for chunk in html_chunks
+    )
 
 
 def _assert_stress_child_sizes(text: str) -> None:

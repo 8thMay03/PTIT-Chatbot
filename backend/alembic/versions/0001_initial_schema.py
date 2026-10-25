@@ -1,10 +1,11 @@
 """0001_initial_schema
 
 Revision ID: 0001_initial_schema
-Revises: 
+Revises:
 Create Date: 2026-08-31 00:00:00.000000
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -24,8 +25,12 @@ def upgrade() -> None:
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("user_id", sa.String(), nullable=True),
         sa.Column("title", sa.String(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("idx_conversations_user_id", "conversations", ["user_id"], unique=False)
@@ -38,11 +43,18 @@ def upgrade() -> None:
         sa.Column("role", sa.String(), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("metadata", sa.JSON(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("idx_messages_conversation_id_created_at", "messages", ["conversation_id", "created_at"], unique=False)
+    op.create_index(
+        "idx_messages_conversation_id_created_at",
+        "messages",
+        ["conversation_id", "created_at"],
+        unique=False,
+    )
 
     # 3. documents table
     op.create_table(
@@ -54,8 +66,12 @@ def upgrade() -> None:
         sa.Column("content_hash", sa.String(), nullable=False),
         sa.Column("status", sa.String(), server_default="active", nullable=False),
         sa.Column("metadata", sa.JSON(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("source_path"),
     )
@@ -70,7 +86,9 @@ def upgrade() -> None:
         sa.Column("token_count", sa.Integer(), nullable=True),
         sa.Column("vector_id", sa.String(), nullable=False),
         sa.Column("metadata", sa.JSON(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.ForeignKeyConstraint(["document_id"], ["documents.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("vector_id"),
@@ -86,12 +104,16 @@ def upgrade() -> None:
         sa.Column("chunk_id", sa.String(), nullable=True),
         sa.Column("score", sa.Float(), nullable=True),
         sa.Column("excerpt", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.ForeignKeyConstraint(["chunk_id"], ["chunks.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["message_id"], ["messages.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("idx_message_sources_message_id", "message_sources", ["message_id"], unique=False)
+    op.create_index(
+        "idx_message_sources_message_id", "message_sources", ["message_id"], unique=False
+    )
 
 
 def downgrade() -> None:

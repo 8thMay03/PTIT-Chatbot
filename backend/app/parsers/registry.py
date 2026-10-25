@@ -24,7 +24,9 @@ class ParserRegistry:
         if not parser.extensions or any(
             not suffix.startswith(".") or suffix != suffix.lower() for suffix in parser.extensions
         ):
-            raise ValueError("Parser extensions must be nonempty, lowercase suffixes starting with '.'.")
+            raise ValueError(
+                "Parser extensions must be nonempty, lowercase suffixes starting with '.'."
+            )
         self._parsers[parser.name] = parser
         for suffix in parser.extensions:
             if default or suffix not in self._defaults:
@@ -32,8 +34,11 @@ class ParserRegistry:
 
     def list_parsers(self, path: Path) -> list[dict]:
         suffix = path.suffix.lower()
-        return [{"name": p.name, "is_default": self._defaults.get(suffix) == p.name}
-                for p in self._parsers.values() if suffix in p.extensions]
+        return [
+            {"name": p.name, "is_default": self._defaults.get(suffix) == p.name}
+            for p in self._parsers.values()
+            if suffix in p.extensions
+        ]
 
     def get_parser(self, path: Path, *, parser_name: str | None = None) -> DocumentParser:
         suffix = path.suffix.lower()
@@ -45,5 +50,7 @@ class ParserRegistry:
         if parser is None:
             raise DocumentParseError(f"Parser {parser_name!r} chưa được đăng ký.")
         if suffix not in parser.extensions:
-            raise DocumentParseError(f"Parser {parser_name!r} không hỗ trợ định dạng {suffix or '(không có)'}.")
+            raise DocumentParseError(
+                f"Parser {parser_name!r} không hỗ trợ định dạng {suffix or '(không có)'}."
+            )
         return parser

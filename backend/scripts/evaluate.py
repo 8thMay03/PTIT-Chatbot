@@ -59,9 +59,7 @@ def _citation_validity(answer: str, sources: list[dict]) -> float:
 
     cited_ids = {int(value) for value in re.findall(r"\[(\d+)\]", answer)}
     valid_ids = {
-        int(source["citation_id"])
-        for source in sources
-        if source.get("citation_id") is not None
+        int(source["citation_id"]) for source in sources if source.get("citation_id") is not None
     }
     return float(bool(cited_ids) and cited_ids <= valid_ids)
 
@@ -71,10 +69,7 @@ def evaluate_case(case: dict, chain: RagChain, top_k: int) -> CaseResult:
 
     question = str(case["question"])
     expected_terms = [str(term) for term in case.get("expected_terms", [])]
-    answer_terms = [
-        str(term)
-        for term in case.get("answer_terms", expected_terms)
-    ]
+    answer_terms = [str(term) for term in case.get("answer_terms", expected_terms)]
 
     try:
         result = chain.answer(question, top_k=top_k)
@@ -119,7 +114,9 @@ def evaluate(dataset: list[dict], chain: RagChain, top_k: int) -> dict:
         "top_k": top_k,
         "retrieval_hit_rate": mean(item.retrieval_hit for item in results) if count else 0.0,
         "retrieval_mrr": mean(item.reciprocal_rank for item in results) if count else 0.0,
-        "answer_keyword_recall": mean(item.answer_keyword_recall for item in results) if count else 0.0,
+        "answer_keyword_recall": mean(item.answer_keyword_recall for item in results)
+        if count
+        else 0.0,
         "citation_validity": mean(item.citation_validity for item in results) if count else 0.0,
         "answer_quality": mean(item.answer_quality for item in results) if count else 0.0,
         "errors": sum(item.error is not None for item in results),

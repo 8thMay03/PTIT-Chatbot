@@ -2,12 +2,14 @@ from app.generation.citations import numbered_contexts, public_citations
 
 
 def test_citation_extracts_article_clause_and_point() -> None:
-    contexts = [{
-        "source_name": "so-tay.md",
-        "heading": "Điều 33. Cảnh báo kết quả học tập",
-        "section_path": "Quy chế đào tạo > Điều 33. Cảnh báo kết quả học tập",
-        "text": "## Điều 33. Cảnh báo kết quả học tập\n\n2. Sinh viên bị cảnh báo khi:\n\na) Điểm quá thấp.",
-    }]
+    contexts = [
+        {
+            "source_name": "so-tay.md",
+            "heading": "Điều 33. Cảnh báo kết quả học tập",
+            "section_path": "Quy chế đào tạo > Điều 33. Cảnh báo kết quả học tập",
+            "text": "## Điều 33. Cảnh báo kết quả học tập\n\n2. Sinh viên bị cảnh báo khi:\n\na) Điểm quá thấp.",
+        }
+    ]
 
     citation = public_citations(contexts)[0]
 
@@ -32,25 +34,33 @@ def test_chunks_from_different_clauses_receive_different_citation_numbers() -> N
 
 
 def test_citation_falls_back_to_heading_when_no_legal_locator_exists() -> None:
-    citation = public_citations([{
-        "source_name": "so-tay.md",
-        "heading": "Lịch tiếp sinh viên",
-        "section_path": "Thủ tục hành chính > Lịch tiếp sinh viên",
-        "text": "Sinh viên liên hệ trong giờ hành chính.",
-    }])[0]
+    citation = public_citations(
+        [
+            {
+                "source_name": "so-tay.md",
+                "heading": "Lịch tiếp sinh viên",
+                "section_path": "Thủ tục hành chính > Lịch tiếp sinh viên",
+                "text": "Sinh viên liên hệ trong giờ hành chính.",
+            }
+        ]
+    )[0]
 
     assert citation["article"] is None
     assert citation["locator"] == "Lịch tiếp sinh viên"
 
 
 def test_parent_context_uses_child_evidence_for_precise_clause_citation() -> None:
-    citation = public_citations([{
-        "source_name": "so-tay.md",
-        "heading": "Điều 12. Thu học phí",
-        "section_path": "Quy định > Điều 12. Thu học phí",
-        "text": "1. Học phí được thu hàng tháng.\n\n2. Thời hạn do Học viện quy định.",
-        "evidence_text": "2. Thời hạn do Học viện quy định.",
-    }])[0]
+    citation = public_citations(
+        [
+            {
+                "source_name": "so-tay.md",
+                "heading": "Điều 12. Thu học phí",
+                "section_path": "Quy định > Điều 12. Thu học phí",
+                "text": "1. Học phí được thu hàng tháng.\n\n2. Thời hạn do Học viện quy định.",
+                "evidence_text": "2. Thời hạn do Học viện quy định.",
+            }
+        ]
+    )[0]
 
     assert citation["clauses"] == ["2"]
     assert citation["locator"] == "Điều 12. Thu học phí — Khoản 2"

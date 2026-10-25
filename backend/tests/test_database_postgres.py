@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from types import SimpleNamespace
-from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,9 +9,8 @@ from sqlalchemy.orm import Session
 
 from alembic import command
 from alembic.config import Config
-from app.api.routes import router
 from app.core.config import Settings
-from app.db.models import Base, Chunk, Conversation, Document, Message, MessageSource
+from app.db.models import Base, Chunk, Document, MessageSource
 from app.db.repositories import (
     ChunkRecord,
     DocumentRecord,
@@ -22,14 +18,12 @@ from app.db.repositories import (
     add_message_sources,
     delete_document,
     ensure_conversation,
-    get_document_chunks,
-    get_document_with_chunk_count,
     get_recent_conversation_history,
     list_documents,
     replace_knowledge_base,
     upsert_document,
 )
-from app.db.session import check_db_health, create_app_engine, get_engine_options
+from app.db.session import check_db_health, get_engine_options
 from app.main import app
 
 
@@ -108,9 +102,9 @@ def test_alembic_upgrade_check_and_downgrade_cycle(tmp_path: Path) -> None:
     # Verify tables created
     engine = create_engine(db_url)
     with engine.connect() as conn:
-        tables = conn.execute(
-            text("SELECT name FROM sqlite_master WHERE type='table'")
-        ).scalars().all()
+        tables = (
+            conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).scalars().all()
+        )
         assert "conversations" in tables
         assert "messages" in tables
         assert "documents" in tables
@@ -128,8 +122,8 @@ def test_repository_conversation_and_messages_lifecycle(memory_db: Session) -> N
     assert conv.title == "Hỏi học phí"
 
     # Add messages
-    m1 = add_message(session, conv.id, "user", "Học phí năm nay thế nào?")
-    m2 = add_message(session, conv.id, "assistant", "Học phí là 20 triệu/năm.")
+    add_message(session, conv.id, "user", "Học phí năm nay thế nào?")
+    add_message(session, conv.id, "assistant", "Học phí là 20 triệu/năm.")
     session.commit()
 
     history = get_recent_conversation_history(session, conv.id, max_messages=10, max_chars=5000)
@@ -254,4 +248,3 @@ def test_repository_replace_knowledge_base(memory_db: Session) -> None:
     listed = list_documents(session)
     assert len(listed) == 1
     assert listed[0][0].id == "doc-b"
-

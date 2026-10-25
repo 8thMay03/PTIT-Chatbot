@@ -118,7 +118,9 @@ class Settings(BaseSettings):
         default="cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
         alias="RERANKER_MODEL",
     )
-    reranker_candidate_multiplier: int = Field(default=3, ge=1, alias="RERANKER_CANDIDATE_MULTIPLIER")
+    reranker_candidate_multiplier: int = Field(
+        default=3, ge=1, alias="RERANKER_CANDIDATE_MULTIPLIER"
+    )
     reranker_vector_weight: float = Field(default=0.45, ge=0, alias="RERANKER_VECTOR_WEIGHT")
     reranker_bm25_weight: float = Field(default=0.35, ge=0, alias="RERANKER_BM25_WEIGHT")
     reranker_lexical_weight: float = Field(default=0.20, ge=0, alias="RERANKER_LEXICAL_WEIGHT")
@@ -158,7 +160,6 @@ class Settings(BaseSettings):
         return PROJECT_ROOT / "backend/storage"
 
 
-
 def _resolve_project_path(path: Path) -> Path:
     if path.is_absolute():
         return path
@@ -188,7 +189,7 @@ def _mask_api_key(key: str | None) -> str | None:
 def get_runtime_config_dict() -> dict:
     """Return a comprehensive runtime configuration dictionary with masked API keys."""
     provider = settings.llm_provider.lower()
-    
+
     has_active_key = False
     active_model = settings.openai_model
     active_base_url = settings.openai_base_url
@@ -206,7 +207,9 @@ def get_runtime_config_dict() -> dict:
         active_model = settings.azure_openai_deployment_name or "azure-default"
         active_base_url = settings.azure_openai_endpoint
     elif provider in ("openai_compatible", "local", "ollama", "vllm"):
-        has_active_key = bool(settings.openai_compatible_api_key) or True  # local often no key needed
+        has_active_key = (
+            bool(settings.openai_compatible_api_key) or True
+        )  # local often no key needed
         active_model = settings.openai_compatible_model
         active_base_url = settings.openai_compatible_base_url
 
@@ -261,7 +264,16 @@ def get_runtime_config_dict() -> dict:
             "model": settings.embedding_model,
         },
         "available_providers": {
-            "llm": ["openai", "gemini", "azure", "openai_compatible", "anthropic", "deepseek", "cohere", "qwen"],
+            "llm": [
+                "openai",
+                "gemini",
+                "azure",
+                "openai_compatible",
+                "anthropic",
+                "deepseek",
+                "cohere",
+                "qwen",
+            ],
             "embedding": ["openai", "sentence-transformers", "cohere", "gemini"],
             "reranker": ["heuristic", "cross-encoder", "cohere"],
         },
@@ -283,17 +295,31 @@ def update_runtime_config(payload: dict) -> dict:
     # Specific LLM Provider fields
     if "openai_model" in llm and llm["openai_model"]:
         settings.openai_model = str(llm["openai_model"]).strip()
-    if "openai_api_key" in llm and llm["openai_api_key"] is not None and llm["openai_api_key"] != "":
+    if (
+        "openai_api_key" in llm
+        and llm["openai_api_key"] is not None
+        and llm["openai_api_key"] != ""
+    ):
         settings.openai_api_key = str(llm["openai_api_key"]).strip()
     if "openai_base_url" in llm:
-        settings.openai_base_url = str(llm["openai_base_url"]).strip() if llm["openai_base_url"] else None
+        settings.openai_base_url = (
+            str(llm["openai_base_url"]).strip() if llm["openai_base_url"] else None
+        )
 
     if "gemini_model" in llm and llm["gemini_model"]:
         settings.gemini_model = str(llm["gemini_model"]).strip()
-    if "gemini_api_key" in llm and llm["gemini_api_key"] is not None and llm["gemini_api_key"] != "":
+    if (
+        "gemini_api_key" in llm
+        and llm["gemini_api_key"] is not None
+        and llm["gemini_api_key"] != ""
+    ):
         settings.gemini_api_key = str(llm["gemini_api_key"]).strip()
 
-    if "azure_openai_api_key" in llm and llm["azure_openai_api_key"] is not None and llm["azure_openai_api_key"] != "":
+    if (
+        "azure_openai_api_key" in llm
+        and llm["azure_openai_api_key"] is not None
+        and llm["azure_openai_api_key"] != ""
+    ):
         settings.azure_openai_api_key = str(llm["azure_openai_api_key"]).strip()
     if "azure_openai_endpoint" in llm and llm["azure_openai_endpoint"]:
         settings.azure_openai_endpoint = str(llm["azure_openai_endpoint"]).strip()
@@ -315,7 +341,18 @@ def update_runtime_config(payload: dict) -> dict:
         curr_provider = settings.llm_provider.lower()
         if curr_provider in ("openai",):
             settings.openai_base_url = b_val
-        elif curr_provider in ("openai_compatible", "local", "ollama", "vllm", "deepseek", "moonshot", "tongyi", "qwen", "zhipu", "xai"):
+        elif curr_provider in (
+            "openai_compatible",
+            "local",
+            "ollama",
+            "vllm",
+            "deepseek",
+            "moonshot",
+            "tongyi",
+            "qwen",
+            "zhipu",
+            "xai",
+        ):
             settings.openai_compatible_base_url = b_val
 
     if "api_key" in llm and llm["api_key"] is not None and llm["api_key"] != "":
@@ -327,7 +364,18 @@ def update_runtime_config(payload: dict) -> dict:
             settings.gemini_api_key = key_val
         elif curr_provider in ("azure", "azure_openai"):
             settings.azure_openai_api_key = key_val
-        elif curr_provider in ("openai_compatible", "local", "ollama", "vllm", "deepseek", "moonshot", "tongyi", "qwen", "zhipu", "xai"):
+        elif curr_provider in (
+            "openai_compatible",
+            "local",
+            "ollama",
+            "vllm",
+            "deepseek",
+            "moonshot",
+            "tongyi",
+            "qwen",
+            "zhipu",
+            "xai",
+        ):
             settings.openai_compatible_api_key = key_val
 
     if "model" in llm and llm["model"]:
@@ -339,7 +387,18 @@ def update_runtime_config(payload: dict) -> dict:
             settings.gemini_model = model_val
         elif curr_provider in ("azure", "azure_openai"):
             settings.azure_openai_deployment_name = model_val
-        elif curr_provider in ("openai_compatible", "local", "ollama", "vllm", "deepseek", "moonshot", "tongyi", "qwen", "zhipu", "xai"):
+        elif curr_provider in (
+            "openai_compatible",
+            "local",
+            "ollama",
+            "vllm",
+            "deepseek",
+            "moonshot",
+            "tongyi",
+            "qwen",
+            "zhipu",
+            "xai",
+        ):
             settings.openai_compatible_model = model_val
 
     # Retrieval
@@ -373,7 +432,9 @@ def update_runtime_config(payload: dict) -> dict:
     if "model" in reranker and reranker["model"]:
         settings.reranker_model = str(reranker["model"]).strip()
     if "candidate_multiplier" in reranker and reranker["candidate_multiplier"] is not None:
-        settings.reranker_candidate_multiplier = max(1, min(8, int(reranker["candidate_multiplier"])))
+        settings.reranker_candidate_multiplier = max(
+            1, min(8, int(reranker["candidate_multiplier"]))
+        )
 
     # Guardrails
     guardrails = payload.get("guardrails") or {}

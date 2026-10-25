@@ -69,7 +69,10 @@ def stream_answer_with_llm(
             yield delta
     except Exception as exc:
         if emitted == 0:
-            logger.warning("LLM streaming failed before first token: %s. Falling back to extractive answer.", exc)
+            logger.warning(
+                "LLM streaming failed before first token: %s. Falling back to extractive answer.",
+                exc,
+            )
             yield _extractive_answer(contexts)
             return
         logger.warning("LLM streaming failed after %d token(s): %s.", emitted, exc)
@@ -82,9 +85,8 @@ def _extractive_answer(contexts: list[dict]) -> str:
         text = " ".join(item["text"].split())
         excerpts.append(f"- {text[:700]} [{citation_id}]")
 
-    return (
-        "Chưa cấu hình API Key cho LLM nên mình trả về các đoạn liên quan nhất:\n"
-        + "\n".join(excerpts)
+    return "Chưa cấu hình API Key cho LLM nên mình trả về các đoạn liên quan nhất:\n" + "\n".join(
+        excerpts
     )
 
 

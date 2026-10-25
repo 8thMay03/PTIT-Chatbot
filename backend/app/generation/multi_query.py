@@ -1,6 +1,7 @@
 import re
 
 from app.core.config import settings
+from app.llm import BaseLLMProvider, get_llm_provider
 
 
 MULTI_QUERY_SYSTEM_PROMPT = """Tạo các truy vấn tìm kiếm tiếng Việt khác nhau cho câu hỏi về tài liệu PTIT.
@@ -9,8 +10,26 @@ Giữ nguyên tên riêng, mã môn, con số và mốc thời gian.
 Các truy vấn phải diễn đạt khác nhau nhưng giữ đúng ý định ban đầu."""
 
 STOP_WORDS = {
-    "ai", "bao", "biết", "có", "cho", "gì", "khi", "không", "là", "nào",
-    "như", "ở", "sao", "thế", "thì", "tôi", "và", "về", "đâu", "được",
+    "ai",
+    "bao",
+    "biết",
+    "có",
+    "cho",
+    "gì",
+    "khi",
+    "không",
+    "là",
+    "nào",
+    "như",
+    "ở",
+    "sao",
+    "thế",
+    "thì",
+    "tôi",
+    "và",
+    "về",
+    "đâu",
+    "được",
 }
 
 DOMAIN_EXPANSIONS = {
@@ -20,9 +39,6 @@ DOMAIN_EXPANSIONS = {
     "tốt nghiệp": "điều kiện xét công nhận tốt nghiệp",
     "học bổng": "điều kiện tiêu chuẩn xét học bổng",
 }
-
-
-from app.llm import BaseLLMProvider, get_llm_provider
 
 
 class VietnameseMultiQueryGenerator:

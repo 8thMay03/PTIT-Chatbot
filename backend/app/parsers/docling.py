@@ -81,9 +81,7 @@ def _get_converter() -> Any:
             from docling.datamodel.pipeline_options import PdfPipelineOptions
             from docling.document_converter import DocumentConverter, PdfFormatOption
         except ImportError as exc:
-            raise DocumentParseError(
-                "Chưa cài Docling. Chạy: pip install -e \".[docling]\""
-            ) from exc
+            raise DocumentParseError('Chưa cài Docling. Chạy: pip install -e ".[docling]"') from exc
 
         use_gpu = _resolve_cuda(settings.docling_device)
         pdf_options = PdfPipelineOptions()

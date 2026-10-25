@@ -90,7 +90,9 @@ def test_upload_document_maps_validation_errors(monkeypatch) -> None:
 
 
 def test_delete_document_returns_404_when_missing(monkeypatch) -> None:
-    monkeypatch.setattr(routes.ingestion_pipeline, "delete_ingested_document", lambda document_id: None)
+    monkeypatch.setattr(
+        routes.ingestion_pipeline, "delete_ingested_document", lambda document_id: None
+    )
 
     response = client.delete("/api/documents/missing")
 
@@ -109,7 +111,9 @@ def test_parse_single_document_passes_existing_identity(monkeypatch, tmp_path) -
     source = tmp_path / "moved.docx"
     source.write_bytes(b"source is parsed by the pipeline")
     document = SimpleNamespace(id="historical-id", source_path="data/raw/moved.docx")
-    monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 4))
+    monkeypatch.setattr(
+        routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 4)
+    )
     monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: source)
     calls = []
 
@@ -177,9 +181,13 @@ def test_get_document_returns_full_text(monkeypatch, tmp_path) -> None:
         created_at=None,
         updated_at=None,
     )
-    monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 10))
+    monkeypatch.setattr(
+        routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 10)
+    )
     monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: doc_file)
-    monkeypatch.setattr(routes, "read_preview", lambda source_path: doc_file.read_text(encoding="utf-8"))
+    monkeypatch.setattr(
+        routes, "read_preview", lambda source_path: doc_file.read_text(encoding="utf-8")
+    )
 
     response = client.get("/api/documents/doc-full")
 
@@ -200,15 +208,18 @@ def test_get_document_falls_back_to_chunks_when_source_missing(monkeypatch) -> N
         created_at=None,
         updated_at=None,
     )
-    monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 3))
+    monkeypatch.setattr(
+        routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 3)
+    )
     monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: None)
     monkeypatch.setattr(routes, "read_preview", lambda source_path: None)
     monkeypatch.setattr(routes, "get_document_preview_text", lambda session, doc_id: "Chunk 1")
-    monkeypatch.setattr(routes, "get_document_full_text", lambda session, doc_id: "Chunk 1\n\nChunk 2\n\nChunk 3")
+    monkeypatch.setattr(
+        routes, "get_document_full_text", lambda session, doc_id: "Chunk 1\n\nChunk 2\n\nChunk 3"
+    )
 
     response = client.get("/api/documents/doc-chunks")
 
     assert response.status_code == 200
     data = response.json()
     assert data["full_text"] == "Chunk 1\n\nChunk 2\n\nChunk 3"
-
