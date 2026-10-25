@@ -72,6 +72,7 @@ CONFIG_FIELDS = (
     "parent_child_chunking_enabled",
     "child_chunk_size",
     "child_chunk_overlap",
+    "min_child_chunk_chars",
     "hybrid_vector_weight",
     "hybrid_candidate_multiplier",
     "hybrid_rrf_k",
