@@ -4,7 +4,15 @@ import logging
 from collections.abc import Iterator
 from typing import Any
 
-from app.llm.base import BaseLLMProvider, LLMConfigurationError, LLMMessage, LLMProviderError
+from app.llm.base import (
+    CONTENT_DELTA,
+    REASONING_DELTA,
+    BaseLLMProvider,
+    LLMConfigurationError,
+    LLMMessage,
+    LLMProviderError,
+    StreamDelta,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +98,47 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
+        except Exception as exc:
+            logger.error("OpenAI-compatible streaming failed: %s", exc)
+            raise LLMProviderError(f"OpenAI-compatible streaming error: {exc}") from exc
+
+    def generate_stream_deltas(
+        self,
+        messages: list[LLMMessage | dict[str, str]],
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> Iterator[StreamDelta]:
+        """Stream content plus reasoning tokens when the model exposes them.
+
+        DeepSeek-R1/GLM/Qwen thinking models emit ``reasoning_content`` on the
+        delta; OpenRouter uses ``reasoning``. Reading the attributes is safe on
+        models without thinking: they simply never set them.
+        """
+        client = self._get_client()
+        normalized_messages = self._normalize_messages(messages)
+
+        params: dict[str, Any] = {
+            "model": self.model_name,
+            "messages": normalized_messages,
+            "temperature": temperature,
+            "stream": True,
+        }
+        if max_tokens is not None:
+            params["max_tokens"] = max_tokens
+        params.update(kwargs)
+
+        try:
+            stream = client.chat.completions.create(**params)
+            for chunk in stream:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                reasoning = getattr(delta, "reasoning_content", None) or getattr(delta, "reasoning", None)
+                if reasoning:
+                    yield StreamDelta(kind=REASONING_DELTA, text=reasoning)
+                if delta.content:
+                    yield StreamDelta(kind=CONTENT_DELTA, text=delta.content)
         except Exception as exc:
             logger.error("OpenAI-compatible streaming failed: %s", exc)
             raise LLMProviderError(f"OpenAI-compatible streaming error: {exc}") from exc

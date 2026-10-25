@@ -271,6 +271,10 @@ class ConversationMessage(BaseModel):
     role: str
     content: str
     sources: list[Source] = Field(default_factory=list)
+    # Reasoning/steps được lưu trong metadata lúc sinh câu trả lời; hội thoại
+    # cũ (trước khi có trường này) sẽ trả về None/rỗng.
+    reasoning: str | None = None
+    steps: list[dict] = Field(default_factory=list)
     created_at: datetime | None = None
 
 

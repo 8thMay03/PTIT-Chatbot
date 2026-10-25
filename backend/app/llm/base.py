@@ -18,6 +18,19 @@ class LLMMessage:
     content: str
 
 
+# Kind của delta stream: "content" là phần câu trả lời, "reasoning" là phần
+# suy luận của model (reasoning_content của DeepSeek/GLM, thought part của
+# Gemini). Provider không hỗ trợ thinking chỉ phát delta "content".
+CONTENT_DELTA = "content"
+REASONING_DELTA = "reasoning"
+
+
+@dataclass
+class StreamDelta:
+    kind: str
+    text: str
+
+
 @dataclass
 class LLMResponse:
     content: str
@@ -80,6 +93,22 @@ class BaseLLMProvider(ABC):
     ) -> Iterator[str]:
         """Generate streamed text chunks."""
         raise NotImplementedError
+
+    def generate_stream_deltas(
+        self,
+        messages: list[LLMMessage | dict[str, str]],
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> Iterator[StreamDelta]:
+        """Stream typed deltas so callers can separate reasoning from content.
+
+        Default implementation wraps :meth:`generate_stream` and only emits
+        ``content`` deltas; providers whose models expose reasoning tokens
+        (DeepSeek/GLM reasoning_content, Gemini thought parts) override this.
+        """
+        for text in self.generate_stream(messages, temperature=temperature, max_tokens=max_tokens, **kwargs):
+            yield StreamDelta(kind=CONTENT_DELTA, text=text)
 
     def _normalize_messages(
         self,

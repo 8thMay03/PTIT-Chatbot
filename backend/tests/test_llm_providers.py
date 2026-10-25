@@ -5,10 +5,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.generation.llm import answer_with_llm, stream_answer_with_llm
+from app.generation.llm import answer_with_llm, stream_answer_deltas_with_llm, stream_answer_with_llm
 from app.llm import (
     AzureOpenAIProvider,
     BaseLLMProvider,
+    CONTENT_DELTA,
     GeminiProvider,
     LLMConfigurationError,
     LLMMessage,
@@ -16,6 +17,8 @@ from app.llm import (
     LLMStreamError,
     OpenAICompatibleProvider,
     OpenAIProvider,
+    REASONING_DELTA,
+    StreamDelta,
     get_llm_provider,
     register_llm_provider,
 )
@@ -218,6 +221,128 @@ def test_openai_compatible_provider() -> None:
 
     result = provider.generate([{"role": "user", "content": "Test"}])
     assert result == "Ollama response [1]"
+
+
+def test_openai_compatible_generate_stream_deltas_parses_reasoning_content() -> None:
+    provider = OpenAICompatibleProvider(base_url="http://localhost:11434/v1", model_name="deepseek-r1")
+
+    fake_client = MagicMock()
+    chunks = [
+        SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=None, reasoning_content="Đang suy luận "))]),
+        SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=None, reasoning_content="về học phí"))]),
+        SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="Học phí [1]", reasoning_content=None))]),
+        # Model không hỗ trợ thinking: delta không có field reasoning_* vẫn chạy.
+        SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=" thêm"))]),
+    ]
+    fake_client.chat.completions.create.return_value = iter(chunks)
+    provider._client = fake_client
+
+    deltas = list(provider.generate_stream_deltas([{"role": "user", "content": "Học phí"}]))
+
+    assert [(d.kind, d.text) for d in deltas] == [
+        (REASONING_DELTA, "Đang suy luận "),
+        (REASONING_DELTA, "về học phí"),
+        (CONTENT_DELTA, "Học phí [1]"),
+        (CONTENT_DELTA, " thêm"),
+    ]
+
+
+def test_default_generate_stream_deltas_wraps_content_only() -> None:
+    # OpenAIProvider không override generate_stream_deltas: phải nhận mặc định
+    # bọc generate_stream thành delta content-only.
+    provider = OpenAIProvider(api_key="test-key", model_name="gpt-4.1-mini")
+
+    fake_client = MagicMock()
+    chunk1 = SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="Học "))])
+    chunk2 = SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="phí"))])
+    fake_client.chat.completions.create.return_value = iter([chunk1, chunk2])
+    provider._client = fake_client
+
+    deltas = list(provider.generate_stream_deltas([{"role": "user", "content": "Học phí"}]))
+
+    assert [(d.kind, d.text) for d in deltas] == [
+        (CONTENT_DELTA, "Học "),
+        (CONTENT_DELTA, "phí"),
+    ]
+
+
+def test_gemini_generate_stream_deltas_splits_thought_parts(monkeypatch) -> None:
+    provider = GeminiProvider(api_key="test-key", model_name="gemini-2.5-flash")
+    monkeypatch.setattr("app.llm.providers.gemini_provider.settings.llm_reasoning_stream_enabled", True)
+
+    mock_sse_lines = [
+        'data: {"candidates": [{"content": {"parts": [{"text": "Tìm điều học phí", "thought": true}]}}]}\n'.encode("utf-8"),
+        'data: {"candidates": [{"content": {"parts": [{"text": "Học phí [1]"}]}}]}\n'.encode("utf-8"),
+        b"data: [DONE]\n",
+    ]
+    captured: dict = {}
+
+    def fake_urlopen(req, timeout=None):
+        captured["payload"] = json.loads(req.data.decode("utf-8"))
+        mock_resp = MagicMock()
+        mock_resp.__iter__.return_value = iter(mock_sse_lines)
+        mock_resp.__enter__.return_value = mock_resp
+        return mock_resp
+
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        deltas = list(provider.generate_stream_deltas([{"role": "user", "content": "Học phí"}]))
+
+    assert [(d.kind, d.text) for d in deltas] == [
+        (REASONING_DELTA, "Tìm điều học phí"),
+        (CONTENT_DELTA, "Học phí [1]"),
+    ]
+    # includeThoughts chỉ được thêm khi cờ bật.
+    assert captured["payload"]["generationConfig"]["includeThoughts"] is True
+
+
+def test_gemini_generate_stream_deltas_omits_include_thoughts_when_disabled(monkeypatch) -> None:
+    provider = GeminiProvider(api_key="test-key", model_name="gemini-2.5-flash")
+    monkeypatch.setattr("app.llm.providers.gemini_provider.settings.llm_reasoning_stream_enabled", False)
+
+    mock_sse_lines = [
+        'data: {"candidates": [{"content": {"parts": [{"text": "Học phí [1]"}]}}]}\n'.encode("utf-8"),
+        b"data: [DONE]\n",
+    ]
+    captured: dict = {}
+
+    def fake_urlopen(req, timeout=None):
+        captured["payload"] = json.loads(req.data.decode("utf-8"))
+        mock_resp = MagicMock()
+        mock_resp.__iter__.return_value = iter(mock_sse_lines)
+        mock_resp.__enter__.return_value = mock_resp
+        return mock_resp
+
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        deltas = list(provider.generate_stream_deltas([{"role": "user", "content": "Học phí"}]))
+
+    assert [(d.kind, d.text) for d in deltas] == [(CONTENT_DELTA, "Học phí [1]")]
+    assert "includeThoughts" not in captured["payload"]["generationConfig"]
+
+
+class ReasoningMockProvider(MockCustomProvider):
+    """Provider phát reasoning trước rồi mới đến content."""
+
+    def __init__(self) -> None:
+        super().__init__(response_text="Câu trả lời [1]")
+
+    def generate_stream_deltas(self, messages, temperature=0.2, max_tokens=None, **kwargs):
+        yield StreamDelta(kind=REASONING_DELTA, text="Suy luận...")
+        yield StreamDelta(kind=CONTENT_DELTA, text="Câu trả lời [1]")
+
+
+def test_stream_answer_deltas_with_llm_passes_reasoning_through() -> None:
+    deltas = list(stream_answer_deltas_with_llm("Học phí?", TEMPERATURE_CONTEXTS, provider=ReasoningMockProvider()))
+
+    assert [(d.kind, d.text) for d in deltas] == [
+        (REASONING_DELTA, "Suy luận..."),
+        (CONTENT_DELTA, "Câu trả lời [1]"),
+    ]
+
+
+def test_stream_answer_with_llm_filters_reasoning_out() -> None:
+    chunks = list(stream_answer_with_llm("Học phí?", TEMPERATURE_CONTEXTS, provider=ReasoningMockProvider()))
+
+    assert chunks == ["Câu trả lời [1]"]
 
 
 def test_llm_factory_resolves_providers(monkeypatch) -> None:

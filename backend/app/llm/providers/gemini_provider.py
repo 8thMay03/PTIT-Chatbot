@@ -7,7 +7,16 @@ from typing import Any
 import urllib.error
 import urllib.request
 
-from app.llm.base import BaseLLMProvider, LLMConfigurationError, LLMMessage, LLMProviderError
+from app.core.config import settings
+from app.llm.base import (
+    CONTENT_DELTA,
+    REASONING_DELTA,
+    BaseLLMProvider,
+    LLMConfigurationError,
+    LLMMessage,
+    LLMProviderError,
+    StreamDelta,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -120,13 +129,14 @@ class GeminiProvider(BaseLLMProvider):
 
         return self._execute_with_retry(_call, operation_name="Gemini completion")
 
-    def generate_stream(
+    def _stream_sse_chunks(
         self,
         messages: list[LLMMessage | dict[str, str]],
         temperature: float = 0.2,
         max_tokens: int | None = None,
         **kwargs: Any,
-    ) -> Iterator[str]:
+    ) -> Iterator[dict[str, Any]]:
+        """POST streamGenerateContent and yield parsed SSE JSON chunks."""
         if not self.is_configured():
             raise LLMConfigurationError("GEMINI_API_KEY is not configured.")
 
@@ -150,14 +160,7 @@ class GeminiProvider(BaseLLMProvider):
                     if not data_str or data_str == "[DONE]":
                         continue
                     try:
-                        chunk = json.loads(data_str)
-                        candidates = chunk.get("candidates", [])
-                        if candidates:
-                            parts = candidates[0].get("content", {}).get("parts", [])
-                            for part in parts:
-                                text = part.get("text", "")
-                                if text:
-                                    yield text
+                        yield json.loads(data_str)
                     except json.JSONDecodeError:
                         continue
         except urllib.error.HTTPError as exc:
@@ -167,3 +170,51 @@ class GeminiProvider(BaseLLMProvider):
         except Exception as exc:
             logger.error("Gemini streaming failed: %s", exc)
             raise LLMProviderError(f"Gemini streaming error: {exc}") from exc
+
+    def generate_stream(
+        self,
+        messages: list[LLMMessage | dict[str, str]],
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> Iterator[str]:
+        for chunk in self._stream_sse_chunks(messages, temperature=temperature, max_tokens=max_tokens, **kwargs):
+            candidates = chunk.get("candidates", [])
+            if not candidates:
+                continue
+            parts = candidates[0].get("content", {}).get("parts", [])
+            for part in parts:
+                # Thought summaries chỉ xuất hiện khi includeThoughts được bật
+                # ở generate_stream_deltas; ở đây luôn bỏ qua để giữ text thuần.
+                text = part.get("text", "")
+                if text and not part.get("thought"):
+                    yield text
+
+    def generate_stream_deltas(
+        self,
+        messages: list[LLMMessage | dict[str, str]],
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> Iterator[StreamDelta]:
+        """Stream content plus thought summaries on thinking models (2.5+).
+
+        Thought parts (``{"text": ..., "thought": true}``) become reasoning
+        deltas; the rest are content deltas. ``includeThoughts`` chỉ gửi khi
+        cờ bật vì model cũ (1.5) có thể từ chối field này.
+        """
+        if settings.llm_reasoning_stream_enabled:
+            kwargs.setdefault("includeThoughts", True)
+        for chunk in self._stream_sse_chunks(messages, temperature=temperature, max_tokens=max_tokens, **kwargs):
+            candidates = chunk.get("candidates", [])
+            if not candidates:
+                continue
+            parts = candidates[0].get("content", {}).get("parts", [])
+            for part in parts:
+                text = part.get("text", "")
+                if not text:
+                    continue
+                if part.get("thought"):
+                    yield StreamDelta(kind=REASONING_DELTA, text=text)
+                else:
+                    yield StreamDelta(kind=CONTENT_DELTA, text=text)

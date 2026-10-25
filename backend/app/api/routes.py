@@ -57,8 +57,8 @@ from app.db.repositories import (
 from app.generation.rag_chain import rag_chain
 from app.guardrails import OUT_OF_SCOPE_ANSWER, filter_safe_history
 from app.generation.citations import public_citations
-from app.generation.llm import _normalize_answer_citations, stream_answer_with_llm
-from app.llm import LLMStreamError
+from app.generation.llm import _normalize_answer_citations, stream_answer_deltas_with_llm
+from app.llm import CONTENT_DELTA, REASONING_DELTA, LLMStreamError, StreamDelta
 from app.ingestion import ingestion_pipeline
 from app.parsers import DocumentParseError, read_document_text, registry, resolve_parser_name
 from app.ingestion.uploads import DocumentUploadError, read_preview, resolve_source_path
@@ -364,7 +364,12 @@ def chat(request: ChatRequest, session: Session = Depends(get_session)) -> ChatR
 
 @router.post("/chat/stream")
 def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -> StreamingResponse:
-    """Stream newline-delimited JSON events while preserving the normal chat contract."""
+    """Stream newline-delimited JSON events while preserving the normal chat contract.
+
+    Event types: ``start``, ``step`` (tiến độ từng bước retrieval/generation),
+    ``reasoning`` (thinking của model, khi bật cờ và model hỗ trợ), ``delta``
+    (text câu trả lời), ``error`` (event kết thúc), ``done``.
+    """
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message must not be empty.")
 
@@ -385,35 +390,78 @@ def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -
         else []
     )
     history = filter_safe_history(history)
-    retrieval = rag_chain.retrieve_context(request.message, top_k=request.effective_top_k, history=history)
 
     def event_stream() -> Iterator[str]:
+        steps_log: list[dict[str, Any]] = []
+        reasoning_parts: list[str] = []
+        reasoning_enabled = settings.llm_reasoning_stream_enabled
+        retrieval: dict[str, Any] | None = None
+
+        yield _ndjson({"type": "start", "conversation_id": conversation.id})
+
+        # Retrieval chạy trong generator để mỗi bước phát event ngay khi xong.
+        try:
+            for event in rag_chain.iter_retrieve_context(
+                request.message, top_k=request.effective_top_k, history=history
+            ):
+                if "result" in event:
+                    retrieval = event["result"]
+                    continue
+                entry = {"status": "done", **event}
+                steps_log.append(entry)
+                yield _ndjson({"type": "step", **entry})
+        except Exception as exc:
+            # Đã gửi event start nên không thể trả HTTP 500 nữa: báo lỗi qua event.
+            yield _ndjson({"type": "error", "message": f"Retrieval failed: {exc}"})
+            return
+
+        assert retrieval is not None  # iter_retrieve_context luôn kết thúc bằng result
         contexts = retrieval["contexts"] if retrieval["strong_context"] else []
         sources = public_citations(contexts)
         deltas: list[str] = []
         stream_error: str | None = None
-        yield _ndjson({"type": "start", "conversation_id": conversation.id})
+
+        generate_started = time.perf_counter()
+        generate_step: dict[str, Any] = {"step": "generate", "status": "start", "detail": {}, "elapsed_ms": 0}
+        yield _ndjson({"type": "step", **generate_step})
 
         if not retrieval["guardrail_allowed"]:
-            stream = iter([OUT_OF_SCOPE_ANSWER])
+            stream: Iterator[StreamDelta] = iter([StreamDelta(kind=CONTENT_DELTA, text=OUT_OF_SCOPE_ANSWER)])
         elif retrieval["strong_context"]:
-            stream = stream_answer_with_llm(request.message, contexts, history=history)
+            stream = stream_answer_deltas_with_llm(request.message, contexts, history=history)
         else:
-            stream = iter(["Chưa tìm thấy thông tin này trong tài liệu."])
+            stream = iter([StreamDelta(kind=CONTENT_DELTA, text="Chưa tìm thấy thông tin này trong tài liệu.")])
 
         try:
             for delta in stream:
-                deltas.append(delta)
-                yield _ndjson({"type": "delta", "content": delta})
+                if delta.kind == REASONING_DELTA:
+                    if reasoning_enabled:
+                        reasoning_parts.append(delta.text)
+                        yield _ndjson({"type": "reasoning", "content": delta.text})
+                else:
+                    deltas.append(delta.text)
+                    yield _ndjson({"type": "delta", "content": delta.text})
         except LLMStreamError as exc:
             # LLM lỗi sau khi đã stream một phần: báo lỗi cho client thay vì nối
             # thêm câu trả lời dự phòng vào phần text đã phát ra.
             stream_error = str(exc) or "LLM streaming failed."
             yield _ndjson({"type": "error", "message": stream_error})
 
-        assistant_metadata: dict[str, Any] = {
-            "sources": [s.model_dump() if hasattr(s, "model_dump") else dict(s) for s in sources]
+        generate_step = {
+            "step": "generate",
+            "status": "done",
+            "detail": {},
+            "elapsed_ms": round((time.perf_counter() - generate_started) * 1000),
         }
+        steps_log.append(generate_step)
+
+        reasoning_text = "".join(reasoning_parts)
+        assistant_metadata: dict[str, Any] = {
+            "sources": [s.model_dump() if hasattr(s, "model_dump") else dict(s) for s in sources],
+            "steps": steps_log,
+        }
+        if reasoning_text:
+            assistant_metadata["reasoning"] = reasoning_text
         if stream_error:
             assistant_metadata["error"] = {
                 "type": "llm_stream",
@@ -452,6 +500,8 @@ def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -
             "answer": answer,
             "sources": sources,
             "conversation_id": conversation.id,
+            "reasoning": reasoning_text or None,
+            "steps": steps_log,
         })
 
     return StreamingResponse(
@@ -518,6 +568,8 @@ def get_conversation_detail(
                 # Citation được lưu trong metadata lúc sinh câu trả lời; hội thoại
                 # cũ (trước khi có trường này) sẽ trả về danh sách rỗng.
                 sources=(message.message_metadata or {}).get("sources", []) or [],
+                reasoning=(message.message_metadata or {}).get("reasoning"),
+                steps=(message.message_metadata or {}).get("steps", []) or [],
                 created_at=message.created_at,
             )
             for message in messages

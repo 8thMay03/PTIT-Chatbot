@@ -193,6 +193,54 @@ def test_rag_chain_retrieve_context_with_scope_guardrail_enabled(monkeypatch) ->
     }
 
 
+def test_iter_retrieve_context_yields_steps_then_result(monkeypatch) -> None:
+    monkeypatch.setattr("app.generation.rag_chain.settings.guardrail_scope_enabled", False)
+
+    chain = RagChain(
+        retriever_=CapturingRetriever(),
+        query_rewriter=FixedRewriter(),
+        multi_query_generator=SingleQueryGenerator(),
+    )
+    events = list(chain.iter_retrieve_context("Học phí PTIT?"))
+
+    step_events = [event for event in events if "step" in event]
+    assert [event["step"] for event in step_events] == [
+        "guardrail",
+        "query_rewrite",
+        "multi_query",
+        "retrieve",
+        "rerank",
+    ]
+    for event in step_events:
+        assert isinstance(event["elapsed_ms"], int)
+        assert isinstance(event["detail"], dict)
+
+    rewrite_event = step_events[1]
+    assert rewrite_event["detail"] == {"rewritten_query": "truy vấn đã viết lại"}
+    retrieve_event = step_events[3]
+    assert retrieve_event["detail"]["sources"] == ["handbook.md"]
+    rerank_event = step_events[4]
+    assert rerank_event["detail"]["selected_count"] == 1
+
+    result_event = events[-1]
+    assert "result" in result_event
+    # Event result cuối phải cùng shape với retrieve_context chạy độc lập.
+    assert result_event["result"] == chain.retrieve_context("Học phí PTIT?")
+
+
+def test_iter_retrieve_context_out_of_scope_stops_after_guardrail_step() -> None:
+    chain = RagChain(retriever_=CapturingRetriever())
+
+    events = list(chain.iter_retrieve_context("Viết mã Python cho tôi"))
+
+    step_events = [event for event in events if "step" in event]
+    assert [event["step"] for event in step_events] == ["guardrail"]
+    assert step_events[0]["detail"]["allowed"] is False
+    result = events[-1]["result"]
+    assert result["guardrail_allowed"] is False
+    assert result["contexts"] == []
+
+
 def test_rag_chain_removes_indirect_prompt_injection_from_retrieved_context() -> None:
     class PoisonedRetriever:
         def retrieve(self, question: str, top_k: int) -> list[dict]:

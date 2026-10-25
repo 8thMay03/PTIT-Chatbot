@@ -1,3 +1,6 @@
+import time
+from collections.abc import Iterator
+
 from app.core.config import settings
 from app.generation.confidence import has_strong_context
 from app.guardrails import (
@@ -108,6 +111,33 @@ class RagChain:
         history: list[dict[str, str]] | None = None,
     ) -> dict:
         """Run retrieval independently so callers can stream generation."""
+        for event in self.iter_retrieve_context(question, top_k=top_k, history=history):
+            if "result" in event:
+                return event["result"]
+        # iter_retrieve_context luôn kết thúc bằng event result nên không tới đây.
+        raise RuntimeError("iter_retrieve_context ended without a result event.")
+
+    def iter_retrieve_context(
+        self,
+        question: str,
+        top_k: int = 4,
+        history: list[dict[str, str]] | None = None,
+    ) -> Iterator[dict]:
+        """Yield progress events for each retrieval stage, then the result.
+
+        Mỗi event bước có dạng ``{"step": str, "detail": dict, "elapsed_ms": int}``
+        (elapsed_ms là thời gian của chính bước đó). Event cuối cùng mang key
+        ``"result"`` với đúng shape của :meth:`retrieve_context` để caller lấy
+        kết quả mà không phải chạy lại retrieval.
+        """
+        step_started = time.perf_counter()
+
+        def step_event(step: str, detail: dict | None = None) -> dict:
+            nonlocal step_started
+            elapsed_ms = round((time.perf_counter() - step_started) * 1000)
+            step_started = time.perf_counter()
+            return {"step": step, "detail": detail or {}, "elapsed_ms": elapsed_ms}
+
         scope_allowed = True
         scope_reason = "disabled"
         if settings.guardrail_scope_enabled:
@@ -115,6 +145,7 @@ class RagChain:
             scope_allowed = scope.allowed
             scope_reason = scope.reason
             if not scope_allowed:
+                yield step_event("guardrail", {"allowed": False, "reason": scope_reason})
                 retrieval_debug = {
                     "original_query": question,
                     "rewritten_query": "",
@@ -126,15 +157,22 @@ class RagChain:
                     "strong_context": False,
                     "guardrail": {"allowed": False, "reason": scope_reason},
                 }
-                return {
-                    "contexts": [],
-                    "retrieval_debug": retrieval_debug,
-                    "strong_context": False,
-                    "guardrail_allowed": False,
+                yield {
+                    "result": {
+                        "contexts": [],
+                        "retrieval_debug": retrieval_debug,
+                        "strong_context": False,
+                        "guardrail_allowed": False,
+                    }
                 }
+                return
+        else:
+            yield step_event("guardrail", {"allowed": True, "reason": scope_reason})
 
         rewritten_query = self.query_rewriter.rewrite(question, history=history)
+        yield step_event("query_rewrite", {"rewritten_query": rewritten_query})
         queries = self.multi_query_generator.generate(rewritten_query)
+        yield step_event("multi_query", {"queries": queries})
         candidate_count = (
             max(top_k, top_k * settings.reranker_candidate_multiplier)
             if settings.reranker_enabled
@@ -158,6 +196,21 @@ class RagChain:
             _debug_chunk(context, rank)
             for rank, context in enumerate(contexts, start=1)
         ]
+        # Tên tài liệu distinct (giữ thứ tự xuất hiện) để UI gợi ý kho đang hit.
+        hit_sources: list[str] = []
+        for context in contexts:
+            name = context.get("source_name") or context.get("source")
+            if name and name not in hit_sources:
+                hit_sources.append(str(name))
+        yield step_event(
+            "retrieve",
+            {
+                "candidate_count": len(contexts),
+                "queries": queries,
+                "sources": hit_sources[:3],
+                "unsafe_contexts_removed": unsafe_context_count,
+            },
+        )
         if settings.reranker_enabled:
             contexts = self.reranker.rerank(rewritten_query, contexts, top_k=top_k)
         else:
@@ -166,6 +219,7 @@ class RagChain:
             _debug_chunk(context, rank)
             for rank, context in enumerate(contexts, start=1)
         ]
+        yield step_event("rerank", {"selected_count": len(contexts), "enabled": settings.reranker_enabled})
         strong_context = has_strong_context(
             contexts,
             min_vector_score=settings.retrieval_min_vector_score,
@@ -183,11 +237,13 @@ class RagChain:
             "guardrail": {"allowed": True, "reason": scope_reason},
             "unsafe_contexts_removed": unsafe_context_count,
         }
-        return {
-            "contexts": contexts,
-            "retrieval_debug": retrieval_debug,
-            "strong_context": strong_context,
-            "guardrail_allowed": True,
+        yield {
+            "result": {
+                "contexts": contexts,
+                "retrieval_debug": retrieval_debug,
+                "strong_context": strong_context,
+                "guardrail_allowed": True,
+            }
         }
 
 

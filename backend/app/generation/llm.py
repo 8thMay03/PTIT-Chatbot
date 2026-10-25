@@ -6,7 +6,13 @@ from app.core.config import settings
 from app.generation.citations import numbered_contexts, public_citations
 from app.guardrails import OUT_OF_SCOPE_ANSWER
 from app.generation.prompts import SYSTEM_PROMPT, build_context_prompt
-from app.llm import BaseLLMProvider, LLMStreamError, get_llm_provider
+from app.llm import (
+    CONTENT_DELTA,
+    BaseLLMProvider,
+    LLMStreamError,
+    StreamDelta,
+    get_llm_provider,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,25 +43,25 @@ def answer_with_llm(
     return _normalize_answer_citations(answer, contexts)
 
 
-def stream_answer_with_llm(
+def stream_answer_deltas_with_llm(
     question: str,
     contexts: list[dict],
     history: list[dict[str, str]] | None = None,
     provider: BaseLLMProvider | None = None,
-) -> Iterator[str]:
-    """Yield answer deltas as they arrive from the model.
+) -> Iterator[StreamDelta]:
+    """Yield typed answer deltas (content + reasoning) as they arrive.
 
     - Lỗi trước token đầu tiên: yield câu trả lời dự phòng extractive (giống ``answer_with_llm``).
     - Lỗi sau khi đã stream một phần: raise :class:`LLMStreamError` để caller (ví dụ
       ``/chat/stream``) gửi event báo lỗi thay vì nối thêm text dự phòng lộn xộn.
     """
     if not contexts:
-        yield "Mình chưa tìm thấy thông tin phù hợp trong kho tài liệu."
+        yield StreamDelta(kind=CONTENT_DELTA, text="Mình chưa tìm thấy thông tin phù hợp trong kho tài liệu.")
         return
 
     llm = provider or get_llm_provider()
     if not llm.is_configured():
-        yield _extractive_answer(contexts)
+        yield StreamDelta(kind=CONTENT_DELTA, text=_extractive_answer(contexts))
         return
 
     messages = [
@@ -64,16 +70,28 @@ def stream_answer_with_llm(
     ]
     emitted = 0
     try:
-        for delta in llm.generate_stream(messages, temperature=settings.llm_temperature):
+        for delta in llm.generate_stream_deltas(messages, temperature=settings.llm_temperature):
             emitted += 1
             yield delta
     except Exception as exc:
         if emitted == 0:
             logger.warning("LLM streaming failed before first token: %s. Falling back to extractive answer.", exc)
-            yield _extractive_answer(contexts)
+            yield StreamDelta(kind=CONTENT_DELTA, text=_extractive_answer(contexts))
             return
         logger.warning("LLM streaming failed after %d token(s): %s.", emitted, exc)
         raise LLMStreamError(f"LLM streaming failed: {exc}") from exc
+
+
+def stream_answer_with_llm(
+    question: str,
+    contexts: list[dict],
+    history: list[dict[str, str]] | None = None,
+    provider: BaseLLMProvider | None = None,
+) -> Iterator[str]:
+    """Yield answer text deltas only (reasoning deltas are filtered out)."""
+    for delta in stream_answer_deltas_with_llm(question, contexts, history=history, provider=provider):
+        if delta.kind == CONTENT_DELTA:
+            yield delta.text
 
 
 def _extractive_answer(contexts: list[dict]) -> str:

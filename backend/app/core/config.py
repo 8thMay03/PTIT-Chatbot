@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     llm_timeout: float = Field(default=30.0, ge=1.0, alias="LLM_TIMEOUT")
     llm_max_retries: int = Field(default=2, ge=0, alias="LLM_MAX_RETRIES")
     llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0, alias="LLM_TEMPERATURE")
+    # Phát reasoning (reasoning_content/thought tokens) lên /chat/stream. Tắt
+    # khi dùng model cũ từ chối includeThoughts (ví dụ Gemini 1.5).
+    llm_reasoning_stream_enabled: bool = Field(default=True, alias="LLM_REASONING_STREAM_ENABLED")
 
     # OpenAI Settings
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
