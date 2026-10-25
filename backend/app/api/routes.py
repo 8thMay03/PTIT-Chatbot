@@ -4,7 +4,7 @@ from pathlib import Path
 from collections.abc import Iterator
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -252,12 +252,21 @@ def download_document(document_id: str, session: Session = Depends(get_session))
     return FileResponse(path, filename=path.name, media_type=media_type)
 
 
+@router.get("/parsers")
+def parsers_for_file(file_name: str = Query(min_length=1)) -> dict:
+    """Parsers able to read a file that has not been uploaded yet, by its extension."""
+    return {"parsers": registry.list_parsers(Path(file_name))}
+
+
 @router.post("/documents", response_model=DocumentItem)
-def upload_document(file: UploadFile = File(...)) -> DocumentItem:
+def upload_document(
+    file: UploadFile = File(...), parser_name: str | None = Form(default=None, min_length=1)
+) -> DocumentItem:
     # Sync handler: Docling conversion and embedding run in FastAPI's threadpool
     # instead of blocking the event loop.
     try:
-        payload = ingestion_pipeline.ingest_upload(file.filename or "", file.file.read())
+        options = {"parser_name": parser_name} if parser_name is not None else {}
+        payload = ingestion_pipeline.ingest_upload(file.filename or "", file.file.read(), **options)
     except DocumentUploadError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     except DocumentParseError as exc:

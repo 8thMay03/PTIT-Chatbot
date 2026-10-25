@@ -158,6 +158,47 @@ def test_parser_options_and_explicit_selection(monkeypatch, tmp_path) -> None:
     assert calls == [{"document_id": "note", "parser_name": "docling"}]
 
 
+def test_parser_options_by_file_name_before_upload(monkeypatch) -> None:
+    from app.parsers.registry import ParserRegistry
+
+    class Stub:
+        extensions = frozenset({".pdf"})
+
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+    monkeypatch.setattr(routes, "registry", ParserRegistry([Stub("docling"), Stub("llamaparse")]))
+
+    response = client.get("/api/parsers", params={"file_name": "Sổ tay.PDF"})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "parsers": [{"name": "docling", "is_default": True}, {"name": "llamaparse", "is_default": False}]
+    }
+    assert client.get("/api/parsers", params={"file_name": "notes.xyz"}).json() == {"parsers": []}
+    assert client.get("/api/parsers").status_code == 422
+
+
+def test_upload_document_passes_selected_parser(monkeypatch) -> None:
+    calls = []
+
+    def reject(filename, content, **options):
+        calls.append((filename, options))
+        raise DocumentParseError("Parser 'llamaparse' chưa được đăng ký.")
+
+    monkeypatch.setattr(routes.ingestion_pipeline, "ingest_upload", reject)
+
+    response = client.post(
+        "/api/documents",
+        files={"file": ("policy.pdf", b"%PDF", "application/pdf")},
+        data={"parser_name": "llamaparse"},
+    )
+
+    assert response.status_code == 422
+    assert "llamaparse" in response.json()["detail"]
+    assert calls == [("policy.pdf", {"parser_name": "llamaparse"})]
+
+
 def test_parser_options_missing_document(monkeypatch) -> None:
     monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda *args: None)
     assert client.get("/api/documents/missing/parsers").status_code == 404

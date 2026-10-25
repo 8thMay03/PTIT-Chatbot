@@ -308,6 +308,25 @@ def test_rebuild_valid_documents_replaces_index(upload_pipeline):
         assert any("New text" in chunk.text for chunk in session.scalars(select(Chunk)).all())
 
 
+def test_upload_parses_with_selected_parser_and_stores_it(upload_pipeline, monkeypatch):
+    pipeline, engine, _store, docling_paths = upload_pipeline
+    monkeypatch.setattr(settings, "llamaparse_enabled", True)
+    monkeypatch.setattr(settings, "llama_cloud_api_key", "llx-test-key")
+    monkeypatch.setattr(parsers, "registry", build_registry())
+    monkeypatch.setattr(llamaparse, "convert_with_llamaparse", lambda path: "# LlamaParse\n\nNội dung từ LlamaParse")
+
+    pipeline.ingest_upload("chosen.pdf", b"%PDF chosen", parser_name="llamaparse")
+
+    with sessionmaker(bind=engine)() as session:
+        document = session.scalars(select(Document)).one()
+        chunks = session.scalars(select(Chunk)).all()
+    assert document.document_metadata["parser"] == "llamaparse"
+    assert any("Nội dung từ LlamaParse" in chunk.text for chunk in chunks)
+    assert docling_paths == []
+    with pytest.raises(DocumentParseError, match="không hỗ trợ"):
+        pipeline.ingest_upload("notes.md", b"# Notes", parser_name="llamaparse")
+
+
 def test_parser_choice_is_stored_and_kept_by_preview_and_full_reload(upload_pipeline, monkeypatch):
     pipeline, engine, _store, docling_paths = upload_pipeline
     monkeypatch.setattr(settings, "llamaparse_enabled", True)

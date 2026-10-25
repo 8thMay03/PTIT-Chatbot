@@ -80,16 +80,17 @@ class IngestionPipeline:
             "collection": self.vector_store.collection_name,
         }
 
-    def ingest_upload(self, filename: str, content: bytes) -> dict:
+    def ingest_upload(self, filename: str, content: bytes, *, parser_name: str | None = None) -> dict:
         # Parse outside the document tree so neither a replacement nor an
         # in-progress upload can affect existing sources or a concurrent scan.
+        options = {"parser_name": parser_name} if parser_name is not None else {}
         with TemporaryDirectory(prefix="ptit-upload-") as folder:
             staged_path = prepare_upload(filename, content, Path(folder))
-            text = read_document_text(staged_path) or ""
+            text = read_document_text(staged_path, **options) or ""
             if not text.strip():
                 raise DocumentParseError(f"{staged_path.name} không có nội dung văn bản.")
             path = settings.documents_path / staged_path.name
-            document = SourceDocument(path=path, text=text, parser_name=get_parser_name(staged_path))
+            document = SourceDocument(path=path, text=text, parser_name=get_parser_name(staged_path, parser_name))
             return self._ingest_document(document, staged_path=staged_path)
 
     def ingest_path(self, path: Path, *, document_id: str | None = None, parser_name: str | None = None) -> dict:
