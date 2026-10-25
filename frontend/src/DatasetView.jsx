@@ -18,13 +18,30 @@ import {
 import { API_BASE_URL } from "./api";
 import { apiError, EMPTY, formatDate, formatSize } from "./lib/format";
 import DocumentView from "./DocumentView";
-import ParserSelectionModal from "./components/ParserSelectionModal";
+import ParserSelectionModal, { parserTitle } from "./components/ParserSelectionModal";
 import Modal from "./components/Modal";
 import { useToast } from "./components/Toast";
 
 const ACCEPTED_TYPES =
   ".md,.txt,.pdf,.docx,text/markdown,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const PAGE_SIZES = [10, 20, 50, 100];
+
+function fileExtension(name) {
+  const dot = name.lastIndexOf(".");
+  return dot > 0 ? name.slice(dot).toLowerCase() : "";
+}
+
+/** Parser khả dụng theo đuôi file, hỏi backend một lần cho mỗi đuôi. */
+async function loadParsersByExtension(files) {
+  const samples = new Map(files.map((file) => [fileExtension(file.name), file.name]));
+  const entries = await Promise.all([...samples].map(async ([ext, name]) => {
+    const response = await fetch(`${API_BASE_URL}/parsers?file_name=${encodeURIComponent(name)}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(apiError(payload, "Không tải được danh sách parser."));
+    return [ext, payload.parsers || []];
+  }));
+  return Object.fromEntries(entries);
+}
 
 export default function DatasetView({ onChanged }) {
   const toast = useToast();
@@ -51,6 +68,8 @@ export default function DatasetView({ onChanged }) {
   const [pendingDelete, setPendingDelete] = useState(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadTarget, setUploadTarget] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState("");
   const [reindexing, setReindexing] = useState(false);
   const [parseTarget, setParseTarget] = useState(null);
   const parseResolve = useRef(null);
@@ -174,17 +193,56 @@ export default function DatasetView({ onChanged }) {
     }
   }
 
-  async function uploadFiles(fileList) {
+  // Chỉ hỏi chọn parser khi có tệp nhận được hơn một parser (vd. PDF/Word khi bật
+  // LlamaParse); còn lại tải lên ngay với parser mặc định như trước.
+  async function requestUpload(fileList) {
     const files = Array.from(fileList || []);
-    if (!files.length || uploading) return;
+    if (!files.length || uploading || uploadTarget) return;
 
+    setUploading(true);
+    let parsersByExt = {};
+    try {
+      parsersByExt = await loadParsersByExtension(files);
+    } catch {
+      // Không lấy được danh sách: để backend dùng parser mặc định và báo lỗi theo từng tệp.
+    }
+    const choosable = files.filter((file) => (parsersByExt[fileExtension(file.name)] || []).length > 1);
+    if (!choosable.length) {
+      await uploadFiles(files);
+      return;
+    }
+
+    const parsers = [];
+    for (const file of choosable) {
+      for (const parser of parsersByExt[fileExtension(file.name)]) {
+        const existing = parsers.find((item) => item.name === parser.name);
+        if (existing) existing.is_default ||= parser.is_default;
+        else parsers.push({ ...parser });
+      }
+    }
+    setUploading(false);
+    setUploadTarget({ files, parsers, parsersByExt, choiceCount: choosable.length });
+  }
+
+  async function confirmUpload(parserName) {
+    const { files, parsersByExt } = uploadTarget;
+    await uploadFiles(files, parserName, parsersByExt);
+    setUploadTarget(null);
+  }
+
+  async function uploadFiles(files, parserName = null, parsersByExt = {}) {
     setUploading(true);
     const failures = [];
     let uploaded = 0;
 
-    for (const file of files) {
+    for (const [index, file] of files.entries()) {
+      setUploadProgress(files.length > 1 ? `${index + 1}/${files.length}` : "");
       const form = new FormData();
       form.append("file", file);
+      // Tệp không hỗ trợ parser đã chọn (vd. .md khi chọn LlamaParse) giữ parser mặc định.
+      if (parserName && (parsersByExt[fileExtension(file.name)] || []).some((item) => item.name === parserName)) {
+        form.append("parser_name", parserName);
+      }
       try {
         const response = await fetch(`${API_BASE_URL}/documents`, { method: "POST", body: form });
         const payload = await response.json().catch(() => ({}));
@@ -201,9 +259,10 @@ export default function DatasetView({ onChanged }) {
     await loadDocuments();
     onChanged?.();
     setUploading(false);
+    setUploadProgress("");
 
     if (uploaded && !failures.length) {
-      toast.success(`Đã nạp ${uploaded} tài liệu vào kho.`);
+      toast.success(`Đã nạp ${uploaded} tài liệu vào kho${parserName ? ` bằng ${parserTitle(parserName)}` : ""}.`);
     } else if (uploaded) {
       toast.warning(`Đã nạp ${uploaded} tài liệu. ${failures.length} file bị lỗi: ${failures.join(" · ")}`);
     } else {
@@ -335,13 +394,16 @@ export default function DatasetView({ onChanged }) {
   function onDrop(event) {
     event.preventDefault();
     setDragOver(false);
-    uploadFiles(event.dataTransfer.files);
+    requestUpload(event.dataTransfer.files);
   }
 
   // Màn chi tiết tài liệu, mở từ danh sách bên dưới
   const parserDialog = parseTarget && <ParserSelectionModal document={parseTarget}
     busy={Boolean(parsingDocId)} onClose={closeParserSelection}
     onConfirm={async (name) => { await parseDocument(parseTarget, name); closeParserSelection(); }} />;
+
+  const uploadDialog = uploadTarget && <ParserSelectionModal upload={uploadTarget}
+    busy={uploading} progress={uploadProgress} onClose={() => setUploadTarget(null)} onConfirm={confirmUpload} />;
 
   if (selectedDocId) {
     return (
@@ -363,6 +425,7 @@ export default function DatasetView({ onChanged }) {
   return (
     <div className="dataset-wrapper">
       {parserDialog}
+      {uploadDialog}
       <input
         ref={fileRef}
         type="file"
@@ -370,7 +433,7 @@ export default function DatasetView({ onChanged }) {
         multiple
         hidden
         onChange={(e) => {
-          uploadFiles(e.target.files);
+          requestUpload(e.target.files);
           e.target.value = "";
         }}
       />

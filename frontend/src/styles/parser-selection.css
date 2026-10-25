@@ -29,3 +29,5 @@
 @keyframes parser-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .parser-spinner { animation: none; } .parser-card { transition: none; } }
 @media (max-width: 480px) { .parser-card { padding: 12px; } .parser-document { padding: 12px; } }
+.parser-document strong + strong { margin-top: 2px; }
+.parser-document .parser-document-more { margin: 4px 0 0; }
