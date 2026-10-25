@@ -179,7 +179,7 @@ def test_get_document_returns_full_text(monkeypatch, tmp_path) -> None:
     )
     monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 10))
     monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: doc_file)
-    monkeypatch.setattr(routes, "read_preview", lambda source_path: doc_file.read_text(encoding="utf-8"))
+    monkeypatch.setattr(routes, "read_preview", lambda source_path, **_: doc_file.read_text(encoding="utf-8"))
 
     response = client.get("/api/documents/doc-full")
 
@@ -202,7 +202,7 @@ def test_get_document_falls_back_to_chunks_when_source_missing(monkeypatch) -> N
     )
     monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 3))
     monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: None)
-    monkeypatch.setattr(routes, "read_preview", lambda source_path: None)
+    monkeypatch.setattr(routes, "read_preview", lambda source_path, **_: None)
     monkeypatch.setattr(routes, "get_document_preview_text", lambda session, doc_id: "Chunk 1")
     monkeypatch.setattr(routes, "get_document_full_text", lambda session, doc_id: "Chunk 1\n\nChunk 2\n\nChunk 3")
 
@@ -212,3 +212,43 @@ def test_get_document_falls_back_to_chunks_when_source_missing(monkeypatch) -> N
     data = response.json()
     assert data["full_text"] == "Chunk 1\n\nChunk 2\n\nChunk 3"
 
+
+
+def test_get_document_reads_text_with_stored_parser(monkeypatch, tmp_path) -> None:
+    import app.parsers as parsers
+    from app.parsers.registry import ParserRegistry
+
+    class Stub:
+        extensions = frozenset({".custom"})
+
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+        def parse(self, path, *, convert=True):
+            return f"# From {self.name}\n"
+
+    monkeypatch.setattr(parsers, "registry", ParserRegistry([Stub("default"), Stub("alternative")]))
+    source = tmp_path / "chosen.custom"
+    source.write_bytes(b"data")
+    document = SimpleNamespace(
+        id="doc-chosen",
+        title="chosen",
+        source_path="chosen.custom",
+        file_type="custom",
+        status="active",
+        document_metadata={"parser": "alternative"},
+        created_at=None,
+        updated_at=None,
+    )
+    preview_calls = []
+    monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 1))
+    monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: source)
+    monkeypatch.setattr(
+        routes, "read_preview", lambda source_path, **kwargs: preview_calls.append(kwargs) or "preview"
+    )
+
+    response = client.get("/api/documents/doc-chosen")
+
+    assert response.status_code == 200
+    assert response.json()["full_text"] == "# From alternative\n"
+    assert preview_calls == [{"parser_name": "alternative"}]

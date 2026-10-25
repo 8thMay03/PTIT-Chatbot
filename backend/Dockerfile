@@ -1,29 +1,40 @@
+# syntax=docker/dockerfile:1
 FROM python:3.11-slim
 
 # HF_HOME keeps Docling's layout/table models (downloaded on first use) on the storage volume.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     HF_HOME=/app/backend/storage/.cache/huggingface
 
 WORKDIR /app/backend
 
-COPY backend/pyproject.toml ./
-COPY backend/app ./app
-COPY backend/scripts ./scripts
-COPY backend/alembic ./alembic
-COPY backend/alembic.ini ./alembic.ini
-COPY data /app/data
-COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-
-# CPU-only torch wheels keep the image far smaller than the default CUDA build.
-RUN pip install --upgrade pip \
-    && pip install --extra-index-url https://download.pytorch.org/whl/cpu ".[docling]" \
-    && sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
-    && chmod +x /usr/local/bin/docker-entrypoint.sh \
-    && useradd --create-home --uid 10001 appuser \
+RUN useradd --create-home --uid 10001 appuser \
     && mkdir -p /app/backend/storage \
-    && chown -R appuser:appuser /app
+    && chown appuser:appuser /app /app/backend /app/backend/storage
+
+# Dependencies first, from pyproject.toml alone: this heavy layer (torch, Docling) is
+# reused until dependencies change, so code or data edits never reinstall it. A stub
+# package lets pip resolve the project; the code runs from the working directory.
+# The pip cache mount keeps downloaded wheels between builds without adding them to the image.
+COPY backend/pyproject.toml ./
+RUN --mount=type=cache,target=/root/.cache/pip \
+    mkdir app && touch app/__init__.py \
+    && pip install --upgrade pip \
+    # CPU-only torch wheels keep the image far smaller than the default CUDA build.
+    && pip install --extra-index-url https://download.pytorch.org/whl/cpu ".[docling,llamaparse]" \
+    && pip uninstall -y ptit-chatbot-backend \
+    && rm -rf app build *.egg-info
+
+COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Most frequently edited last. docker-compose also mounts these for live reload.
+COPY --chown=appuser:appuser data /app/data
+COPY --chown=appuser:appuser backend/alembic.ini ./alembic.ini
+COPY --chown=appuser:appuser backend/alembic ./alembic
+COPY --chown=appuser:appuser backend/scripts ./scripts
+COPY --chown=appuser:appuser backend/app ./app
 
 USER appuser
 

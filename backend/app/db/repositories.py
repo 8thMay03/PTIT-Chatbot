@@ -106,6 +106,16 @@ def get_document_id_by_source_path(session: Session, source_path: str) -> str | 
     return session.scalar(select(Document.id).where(Document.source_path == source_path))
 
 
+def get_document_parsers(session: Session) -> dict[str, str]:
+    """Map source_path to the parser recorded at ingestion, for documents that have one."""
+    parsers: dict[str, str] = {}
+    for source_path, metadata in session.execute(select(Document.source_path, Document.document_metadata)):
+        parser = (metadata or {}).get("parser")
+        if isinstance(parser, str) and parser:
+            parsers[source_path] = parser
+    return parsers
+
+
 def upsert_document(
     session: Session,
     document: DocumentRecord,

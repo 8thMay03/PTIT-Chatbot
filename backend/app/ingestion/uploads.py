@@ -8,7 +8,7 @@ from shutil import copy2
 from tempfile import TemporaryDirectory
 
 from app.core.config import PROJECT_ROOT, settings
-from app.parsers import get_supported_extensions, read_document_text
+from app.parsers import get_supported_extensions, read_document_text, resolve_parser_name
 from app.parsers.text import TEXT_EXTENSIONS
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
@@ -147,12 +147,17 @@ def resolve_source_path(source_path: str) -> Path | None:
     return None
 
 
-def read_preview(source_path: str, limit: int = PREVIEW_CHAR_LIMIT) -> str | None:
+def read_preview(
+    source_path: str, limit: int = PREVIEW_CHAR_LIMIT, *, parser_name: str | None = None
+) -> str | None:
+    """Preview from cache only; parser_name is the document's stored parser choice."""
     path = resolve_source_path(source_path)
     if path is None or not path.is_file():
         return None
     try:
-        text = read_document_text(path, convert=False)
+        text = read_document_text(
+            path, convert=False, parser_name=resolve_parser_name(path, parser_name)
+        )
         if text is None:
             return None
         if len(text) <= limit:

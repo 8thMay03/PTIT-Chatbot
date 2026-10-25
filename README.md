@@ -107,7 +107,7 @@ PTIT Chatbot/
 │   │   ├── generation/   # RAG chain, prompt, LLM và citation
 │   │   ├── guardrails/   # Scope filter và prompt-injection protection
 │   │   ├── ingestion/    # Đọc, làm sạch và chia tài liệu
-│   │   ├── parsers/      # Interface, registry, text parser và Docling parser
+│   │   ├── parsers/      # Interface, registry, text, Docling và LlamaParse parser
 │   │   ├── retrieval/    # BM25, hybrid retrieval, RRF và reranker
 │   │   └── vectordb/     # ChromaDB adapter
 │   ├── scripts/          # Ingest, data migration (SQLite -> Postgres) và evaluation
@@ -201,7 +201,7 @@ text = read_document_text(path, parser_name="my_pdf")
 # Khi đăng ký, thêm default=True nếu muốn parser mới trở thành mặc định.
 ```
 
-Lựa chọn theo tên hiện có ở API Python; giao diện upload vẫn dùng parser mặc định theo định dạng. `app.ingestion.converters` giữ các public import cũ để tương thích, còn parser mới được triển khai trong `app.parsers`.
+Upload luôn dùng parser mặc định theo định dạng; sau đó có thể parse lại một tài liệu bằng parser khác trong giao diện quản lý tài liệu (`GET /api/documents/{id}/parsers`, `POST /api/documents/{id}/parse?parser_name=...`). Parser đã dùng được lưu trong `documents.metadata.parser`, nên màn xem tài liệu, preview và rebuild toàn bộ tiếp tục đọc tài liệu đó bằng đúng parser này; nếu parser không còn được đăng ký thì dùng parser mặc định và ghi cảnh báo. `app.ingestion.converters` giữ các public import cũ để tương thích, còn parser mới được triển khai trong `app.parsers`.
 
 Docling chạy nhanh hơn nhiều trên GPU NVIDIA. `pip install` mặc định có thể kéo torch bản CPU, khi đó cài lại torch bản CUDA (chọn bản cu khớp driver, xem `nvidia-smi`), rồi kiểm tra bằng `python -c "import torch; print(torch.cuda.is_available())"`:
 
@@ -210,6 +210,25 @@ pip install --force-reinstall --no-deps torch torchvision --index-url https://do
 ```
 
 `DOCLING_DEVICE=auto` (mặc định) tự dùng GPU khi có; đặt `cpu` để ép chạy CPU.
+
+### LlamaParse (tùy chọn)
+
+[LlamaParse](https://developers.llamaindex.ai/llamaparse/) là parser PDF/DOCX chạy trên cloud của LlamaIndex, dùng **bên cạnh** Docling cho các file Docling xử lý chưa tốt (file scan, bảng phức tạp, watermark). Docling vẫn là parser mặc định; LlamaParse chỉ xuất hiện trong danh sách parser khi được bật:
+
+```powershell
+pip install -e ".[llamaparse]"
+```
+
+```env
+LLAMAPARSE_ENABLED=true
+LLAMA_CLOUD_API_KEY=llx-...
+LLAMAPARSE_TIER=cost_effective   # fast | cost_effective | agentic | agentic_plus
+```
+
+- Mở tài liệu trong giao diện, chọn parse lại bằng **LlamaParse**. File được tải lên LlamaCloud và tính credit theo trang (tham khảo bảng giá: fast 1, cost_effective 3, agentic 10, agentic_plus 45 credit/trang).
+- Markdown được cache tại `backend/storage/converted/llamaparse/` theo hash file + tier + version + ngôn ngữ; xem lại tài liệu hoặc rebuild không gọi API lại trừ khi file hoặc cấu hình đổi.
+- Lỗi key (401), hết credit (402), giới hạn tần suất (429), timeout (`LLAMAPARSE_TIMEOUT_SECONDS`, mặc định 900 giây) trả HTTP 422 với thông báo rõ ràng. SDK tự retry lỗi tạm thời (`LLAMAPARSE_MAX_RETRIES`).
+- Dùng region EU: đặt `LLAMAPARSE_BASE_URL` theo hướng dẫn của LlamaCloud.
 
 Backend:
 

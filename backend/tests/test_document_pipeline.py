@@ -9,7 +9,9 @@ from app.db.models import Base, Chunk, Document
 from app.core.config import settings
 from app.embeddings.models import HashEmbeddingModel
 from app.ingestion import uploads
-from app.parsers import DocumentParseError, docling
+import app.parsers as parsers
+from app.ingestion.uploads import read_preview
+from app.parsers import DocumentParseError, build_registry, docling, llamaparse
 from app.ingestion.pipeline import IngestionPipeline
 
 
@@ -304,3 +306,46 @@ def test_rebuild_valid_documents_replaces_index(upload_pipeline):
     with sessionmaker(bind=engine)() as session:
         assert len(session.scalars(select(Document)).all()) == 2
         assert any("New text" in chunk.text for chunk in session.scalars(select(Chunk)).all())
+
+
+def test_parser_choice_is_stored_and_kept_by_preview_and_full_reload(upload_pipeline, monkeypatch):
+    pipeline, engine, _store, docling_paths = upload_pipeline
+    monkeypatch.setattr(settings, "llamaparse_enabled", True)
+    monkeypatch.setattr(settings, "llama_cloud_api_key", "llx-test-key")
+    monkeypatch.setattr(parsers, "registry", build_registry())
+    remote_calls = []
+
+    def convert(path):
+        remote_calls.append(path.name)
+        return "# LlamaParse\n\nNội dung từ LlamaParse"
+
+    monkeypatch.setattr(llamaparse, "convert_with_llamaparse", convert)
+    chosen = pipeline.ingest_upload("chosen.pdf", b"%PDF chosen")
+    pipeline.ingest_upload("other.pdf", b"%PDF other")
+    chosen_path = settings.documents_path / "chosen.pdf"
+
+    pipeline.ingest_path(chosen_path, document_id=chosen["id"], parser_name="llamaparse")
+
+    def stored_parsers():
+        with sessionmaker(bind=engine)() as session:
+            rows = session.execute(select(Document.source_path, Document.document_metadata)).all()
+        return {Path(source).name: metadata["parser"] for source, metadata in rows}
+
+    assert stored_parsers() == {"chosen.pdf": "llamaparse", "other.pdf": "docling"}
+    # tmp_path lies outside the project root that resolve_source_path accepts.
+    monkeypatch.setattr(uploads, "resolve_source_path", lambda source_path: chosen_path)
+    assert "Nội dung từ LlamaParse" in read_preview(chosen["source_path"], parser_name="llamaparse")
+    assert "Nội dung từ LlamaParse" not in read_preview(chosen["source_path"])
+
+    pipeline.ingest_documents()
+
+    assert stored_parsers() == {"chosen.pdf": "llamaparse", "other.pdf": "docling"}
+    with sessionmaker(bind=engine)() as session:
+        texts = {
+            Path(chunk.chunk_metadata["source"]).name: chunk.text for chunk in session.scalars(select(Chunk)).all()
+        }
+    assert "Nội dung từ LlamaParse" in texts["chosen.pdf"]
+    assert "Nội dung từ LlamaParse" not in texts["other.pdf"]
+    # Reload and preview read the cache: one remote parse, no re-conversion.
+    assert remote_calls == ["chosen.pdf"]
+    assert [path.name for path in docling_paths] == ["chosen.pdf", "other.pdf"]

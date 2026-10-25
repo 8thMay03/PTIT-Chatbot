@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import pytest
@@ -5,7 +6,8 @@ import pytest
 import app.parsers as parsers
 from app.ingestion.loaders import load_documents
 from app.ingestion.uploads import prepare_upload
-from app.parsers import DocumentParseError, read_document_text
+from app.core.config import settings
+from app.parsers import DocumentParseError, build_registry, read_document_text, resolve_parser_name
 from app.parsers.registry import ParserRegistry
 from app.parsers.text import TextParser
 
@@ -113,3 +115,57 @@ def test_legacy_converter_public_imports_remain_compatible(tmp_path):
     assert converters.read_document_text(source) == "Legacy caller"
     assert converters.convert_with_docling is docling.convert_with_docling
     assert converters.SUPPORTED_EXTENSIONS == {".md", ".txt", ".pdf", ".docx"}
+
+
+@pytest.mark.parametrize(
+    ("enabled", "api_key", "expected"),
+    [
+        (True, "llx-key", [{"name": "docling", "is_default": True}, {"name": "llamaparse", "is_default": False}]),
+        (False, "llx-key", [{"name": "docling", "is_default": True}]),
+        (True, None, [{"name": "docling", "is_default": True}]),
+        (True, "   ", [{"name": "docling", "is_default": True}]),
+    ],
+)
+def test_llamaparse_is_an_opt_in_alternative_to_docling(monkeypatch, enabled, api_key, expected):
+    monkeypatch.setattr(settings, "llamaparse_enabled", enabled)
+    monkeypatch.setattr(settings, "llama_cloud_api_key", api_key)
+    registry = build_registry()
+
+    for name in ("policy.pdf", "huong-dan.DOCX"):
+        assert registry.list_parsers(Path(name)) == expected
+        assert registry.get_parser(Path(name)).name == "docling"
+    assert registry.list_parsers(Path("note.md")) == [{"name": "text", "is_default": True}]
+
+
+def test_resolve_parser_name_falls_back_when_stored_parser_is_unavailable(monkeypatch, caplog):
+    monkeypatch.setattr(parsers, "registry", ParserRegistry([StubParser("first"), StubParser("alternative")]))
+    source = Path("file.custom")
+
+    assert resolve_parser_name(source, "alternative") == "alternative"
+    assert resolve_parser_name(source, None) is None
+    assert resolve_parser_name(source, "") is None
+    # Alembic's fileConfig (test_database_postgres) disables loggers created before it.
+    monkeypatch.setattr(parsers.logger, "disabled", False)
+    with caplog.at_level(logging.WARNING, logger=parsers.__name__):
+        assert resolve_parser_name(source, "llamaparse") is None
+    assert "không còn khả dụng" in caplog.text
+
+
+def test_loader_uses_stored_parser_choice_per_document(monkeypatch, tmp_path):
+    first = StubParser("first")
+    alternative = StubParser("alternative")
+    monkeypatch.setattr(parsers, "registry", ParserRegistry([TextParser(), first, alternative]))
+    chosen = tmp_path / "chosen.custom"
+    default = tmp_path / "default.custom"
+    removed = tmp_path / "removed.custom"
+    for path in (chosen, default, removed):
+        path.write_bytes(b"data")
+    stored = {chosen: "alternative", removed: "llamaparse"}
+
+    documents = {doc.path.name: doc for doc in load_documents(tmp_path, parser_for=stored.get)}
+
+    assert documents["chosen.custom"].text == "# Parsed by alternative\n"
+    assert documents["chosen.custom"].parser_name == "alternative"
+    assert documents["default.custom"].parser_name == "first"
+    assert documents["removed.custom"].parser_name == "first"
+    assert alternative.calls == [(chosen, True)]

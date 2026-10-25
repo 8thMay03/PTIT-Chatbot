@@ -8,6 +8,11 @@ import "../styles/parser-selection.css";
 const PARSER_DETAILS = {
   docling: { title: "Docling", description: "Chuyển PDF và Word thành văn bản, giữ tiêu đề và cấu trúc bảng." },
   text: { title: "Text", description: "Đọc trực tiếp nội dung Markdown và văn bản UTF-8." },
+  llamaparse: {
+    title: "LlamaParse",
+    badge: "Cloud",
+    description: "Parse PDF và Word bằng dịch vụ LlamaParse, phù hợp file scan, bảng phức tạp hoặc có watermark. File được gửi lên LlamaCloud và tốn credit theo số trang.",
+  },
 };
 
 export default function ParserSelectionModal({ document, busy, onClose, onConfirm }) {
@@ -65,7 +70,8 @@ export default function ParserSelectionModal({ document, busy, onClose, onConfir
                 checked={selected === parser.name} onChange={() => setSelected(parser.name)} />
               <span className="parser-card-content">
                 <span className="parser-card-heading"><strong>{details?.title || parser.name}</strong>
-                  {parser.is_default && <span className="parser-badge">Mặc định</span>}</span>
+                  {parser.is_default && <span className="parser-badge">Mặc định</span>}
+                  {details?.badge && <span className="parser-badge">{details.badge}</span>}</span>
                 <span className="parser-card-description">{details?.description || "Xử lý tài liệu bằng parser này."}</span>
               </span>
             </label>;

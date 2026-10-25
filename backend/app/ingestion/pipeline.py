@@ -9,6 +9,7 @@ from app.db.repositories import (
     DocumentRecord,
     delete_document,
     get_document_id_by_source_path,
+    get_document_parsers,
     get_document_vector_ids,
     replace_knowledge_base,
     serialize_document,
@@ -23,7 +24,7 @@ from app.ingestion.chunker import (
     split_parent_child,
     split_text,
 )
-from app.parsers import DocumentParseError, read_document_text
+from app.parsers import DocumentParseError, get_parser_name, read_document_text
 from app.ingestion.loaders import SourceDocument, load_documents
 from app.ingestion.uploads import delete_source_file, prepare_upload, publish_upload
 from app.retrieval.bm25 import invalidate_bm25_cache
@@ -88,12 +89,14 @@ class IngestionPipeline:
             if not text.strip():
                 raise DocumentParseError(f"{staged_path.name} không có nội dung văn bản.")
             path = settings.documents_path / staged_path.name
-            return self._ingest_document(SourceDocument(path=path, text=text), staged_path=staged_path)
+            document = SourceDocument(path=path, text=text, parser_name=get_parser_name(staged_path))
+            return self._ingest_document(document, staged_path=staged_path)
 
     def ingest_path(self, path: Path, *, document_id: str | None = None, parser_name: str | None = None) -> dict:
         options = {"parser_name": parser_name} if parser_name is not None else {}
         text = read_document_text(path, **options) or ""
-        return self._ingest_document(SourceDocument(path=path, text=text), document_id=document_id)
+        document = SourceDocument(path=path, text=text, parser_name=get_parser_name(path, parser_name))
+        return self._ingest_document(document, document_id=document_id)
 
     def _ingest_document(
         self,
@@ -172,7 +175,13 @@ class IngestionPipeline:
         return {"id": document_id, "deleted": True}
 
     def build_chunks(self) -> tuple[list[DocumentRecord], list[ChunkRecord], list[dict]]:
-        documents = load_documents(settings.documents_path)
+        # A full reload keeps each document's parser choice (e.g. LlamaParse) instead of
+        # silently re-reading it with the format default.
+        with SessionLocal() as session:
+            stored_parsers = get_document_parsers(session)
+        documents = load_documents(
+            settings.documents_path, parser_for=lambda path: stored_parsers.get(_source_path(path))
+        )
         document_records: list[DocumentRecord] = []
         chunk_records: list[ChunkRecord] = []
         chunks_payload: list[dict] = []
@@ -204,6 +213,7 @@ def _records_for_document(
             "source": source_path,
             "file_name": document.path.name,
             "size_bytes": size_bytes,
+            "parser": document.parser_name,
         },
     )
 

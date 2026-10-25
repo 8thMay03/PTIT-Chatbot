@@ -60,7 +60,7 @@ from app.generation.citations import public_citations
 from app.generation.llm import _normalize_answer_citations, stream_answer_with_llm
 from app.llm import LLMStreamError
 from app.ingestion import ingestion_pipeline
-from app.parsers import DocumentParseError, read_document_text, registry
+from app.parsers import DocumentParseError, read_document_text, registry, resolve_parser_name
 from app.ingestion.uploads import DocumentUploadError, read_preview, resolve_source_path
 from app.llm.factory import create_llm_provider_from_config
 
@@ -177,18 +177,22 @@ def get_document(document_id: str, session: Session = Depends(get_session)) -> D
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
 
     document, chunk_count = row
+    stored_parser = (document.document_metadata or {}).get("parser")
     source_p = resolve_source_path(document.source_path)
     full_text = None
     if source_p is not None and source_p.is_file():
         try:
-            full_text = read_document_text(source_p, convert=False)
+            parser_name = resolve_parser_name(source_p, stored_parser)
+            full_text = read_document_text(source_p, convert=False, parser_name=parser_name)
         except Exception:
             full_text = None
 
     if not full_text:
         full_text = get_document_full_text(session, document.id)
 
-    preview = read_preview(document.source_path) or get_document_preview_text(session, document.id)
+    preview = read_preview(document.source_path, parser_name=stored_parser) or get_document_preview_text(
+        session, document.id
+    )
     if not full_text:
         full_text = preview
 
