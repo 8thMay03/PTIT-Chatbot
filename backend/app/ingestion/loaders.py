@@ -1,7 +1,14 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.parsers import DocumentParseError, get_supported_extensions, read_document_text
+from app.parsers import (
+    DocumentParseError,
+    get_parser_name,
+    get_supported_extensions,
+    read_document_text,
+    resolve_parser_name,
+)
 
 SUPPORTED_EXTENSIONS = get_supported_extensions()  # Legacy import compatibility.
 __all__ = ("SUPPORTED_EXTENSIONS", "SourceDocument", "load_documents")
@@ -11,9 +18,14 @@ __all__ = ("SUPPORTED_EXTENSIONS", "SourceDocument", "load_documents")
 class SourceDocument:
     path: Path
     text: str
+    # Parser that produced text; None when the caller did not track it.
+    parser_name: str | None = None
 
 
-def load_documents(data_dir: Path) -> list[SourceDocument]:
+def load_documents(
+    data_dir: Path, parser_for: Callable[[Path], str | None] | None = None
+) -> list[SourceDocument]:
+    """Read every supported file; parser_for returns a document's stored parser choice."""
     if not data_dir.exists():
         return []
 
@@ -22,13 +34,14 @@ def load_documents(data_dir: Path) -> list[SourceDocument]:
     for path in sorted(data_dir.rglob("*")):
         if not path.is_file() or path.suffix.lower() not in supported_extensions:
             continue
+        parser_name = resolve_parser_name(path, parser_for(path) if parser_for else None)
         try:
-            text = read_document_text(path)
+            text = read_document_text(path, parser_name=parser_name)
         except (DocumentParseError, OSError, UnicodeError) as exc:
             # A partial result would delete failed documents during replacement.
             raise DocumentParseError(f"Không parse được tài liệu {path.name}: {exc}") from exc
         if not text or not text.strip():
             raise DocumentParseError(f"{path.name} không có nội dung văn bản.")
-        documents.append(SourceDocument(path=path, text=text))
+        documents.append(SourceDocument(path=path, text=text, parser_name=get_parser_name(path, parser_name)))
 
     return documents

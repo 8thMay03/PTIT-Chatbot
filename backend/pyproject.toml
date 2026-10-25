@@ -31,6 +31,10 @@ docling = [
   # PDF/DOCX -> Markdown conversion (layout + table structure models).
   "docling>=2.40.0",
 ]
+llamaparse = [
+  # Optional cloud PDF/DOCX -> Markdown parser (LlamaParse v2 via the LlamaCloud SDK).
+  "llama-cloud>=2.19.0,<3",
+]
 eval = [
   "ragas>=0.4.3,<0.5.0",
   # Ragas 0.4.3 still imports modules removed from the LangChain 1.x line.

@@ -89,6 +89,17 @@ class Settings(BaseSettings):
     )
     docling_ocr_enabled: bool = Field(default=False, alias="DOCLING_OCR_ENABLED")
     docling_device: str = Field(default="auto", alias="DOCLING_DEVICE")
+    # LlamaParse (LlamaCloud) is an optional, admin-selected alternative to Docling.
+    llamaparse_enabled: bool = Field(default=False, alias="LLAMAPARSE_ENABLED")
+    llama_cloud_api_key: str | None = Field(default=None, alias="LLAMA_CLOUD_API_KEY")
+    llamaparse_base_url: str | None = Field(default=None, alias="LLAMAPARSE_BASE_URL")
+    llamaparse_tier: str = Field(default="cost_effective", alias="LLAMAPARSE_TIER")
+    llamaparse_version: str = Field(default="latest", alias="LLAMAPARSE_VERSION")
+    llamaparse_language: str = Field(default="vi", alias="LLAMAPARSE_LANGUAGE")
+    llamaparse_timeout_seconds: float = Field(
+        default=900.0, ge=10.0, alias="LLAMAPARSE_TIMEOUT_SECONDS"
+    )
+    llamaparse_max_retries: int = Field(default=2, ge=0, alias="LLAMAPARSE_MAX_RETRIES")
     chunk_size: int = Field(default=900, alias="CHUNK_SIZE")
     chunk_overlap: int = Field(default=150, alias="CHUNK_OVERLAP")
     parent_child_chunking_enabled: bool = Field(

@@ -18,7 +18,7 @@ COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # CPU-only torch wheels keep the image far smaller than the default CUDA build.
 RUN pip install --upgrade pip \
-    && pip install --extra-index-url https://download.pytorch.org/whl/cpu ".[docling]" \
+    && pip install --extra-index-url https://download.pytorch.org/whl/cpu ".[docling,llamaparse]" \
     && sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
     && chmod +x /usr/local/bin/docker-entrypoint.sh \
     && useradd --create-home --uid 10001 appuser \
