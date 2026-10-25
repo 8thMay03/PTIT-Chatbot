@@ -144,30 +144,28 @@ class RagChain:
             scope = check_scope(question, history)
             scope_allowed = scope.allowed
             scope_reason = scope.reason
-            if not scope_allowed:
-                yield step_event("guardrail", {"allowed": False, "reason": scope_reason})
-                retrieval_debug = {
-                    "original_query": question,
-                    "rewritten_query": "",
-                    "retrieval_queries": [],
-                    "requested_top_k": top_k,
-                    "candidate_count": 0,
-                    "retrieved_chunks": [],
-                    "selected_chunks": [],
+        yield step_event("guardrail", {"allowed": scope_allowed, "reason": scope_reason})
+        if not scope_allowed:
+            retrieval_debug = {
+                "original_query": question,
+                "rewritten_query": "",
+                "retrieval_queries": [],
+                "requested_top_k": top_k,
+                "candidate_count": 0,
+                "retrieved_chunks": [],
+                "selected_chunks": [],
+                "strong_context": False,
+                "guardrail": {"allowed": False, "reason": scope_reason},
+            }
+            yield {
+                "result": {
+                    "contexts": [],
+                    "retrieval_debug": retrieval_debug,
                     "strong_context": False,
-                    "guardrail": {"allowed": False, "reason": scope_reason},
+                    "guardrail_allowed": False,
                 }
-                yield {
-                    "result": {
-                        "contexts": [],
-                        "retrieval_debug": retrieval_debug,
-                        "strong_context": False,
-                        "guardrail_allowed": False,
-                    }
-                }
-                return
-        else:
-            yield step_event("guardrail", {"allowed": True, "reason": scope_reason})
+            }
+            return
 
         rewritten_query = self.query_rewriter.rewrite(question, history=history)
         yield step_event("query_rewrite", {"rewritten_query": rewritten_query})

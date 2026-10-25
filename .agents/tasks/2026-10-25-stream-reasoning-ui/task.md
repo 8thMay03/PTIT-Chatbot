@@ -1,11 +1,11 @@
 # Task: Hiển thị quá trình reasoning của chatbot trên UI khi đang tìm câu trả lời
 
 - ID: `2026-10-25-stream-reasoning-ui`
-- Trạng thái: `in_progress`
+- Trạng thái: `done`
 - Coordinator: `zcode-main`
 - Người yêu cầu: `8thMay03`
 - Tạo lúc: `2026-10-25T23:42:05+07:00`
-- Cập nhật lúc: `2026-10-25T23:42:05+07:00`
+- Cập nhật lúc: `2026-10-26T00:01:45+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -24,11 +24,11 @@ Reasoning và timeline được lưu vào lịch sử hội thoại, mở lại 
 
 ## Tiêu chí nghiệm thu
 
-- [ ] AC-01: `/chat/stream` phát event `step` tuần tự theo pipeline và event `reasoning` khi model có thinking.
-- [ ] AC-02: UI hiển thị timeline + panel suy luận trong lúc chờ, tự thu gọn khi câu trả lời bắt đầu stream.
-- [ ] AC-03: Reasoning + steps được lưu vào message metadata và hiển thị lại khi mở hội thoại cũ.
-- [ ] AC-04: Model không hỗ trợ thinking (gpt-4.1-mini) → chỉ hiện timeline, không lỗi.
-- [ ] AC-05: Toàn bộ test backend pass (`pytest backend/tests`).
+- [x] AC-01: `/chat/stream` phát event `step` tuần tự theo pipeline và event `reasoning` khi model có thinking.
+- [x] AC-02: UI hiển thị timeline + panel suy luận trong lúc chờ, tự thu gọn khi câu trả lời bắt đầu stream.
+- [x] AC-03: Reasoning + steps được lưu vào message metadata và hiển thị lại khi mở hội thoại cũ.
+- [x] AC-04: Model không hỗ trợ thinking (gpt-4.1-mini) → chỉ hiện timeline, không lỗi.
+- [x] AC-05: Toàn bộ test backend pass (`pytest backend/tests`).
 
 ## Tài liệu và phụ thuộc
 
@@ -42,10 +42,11 @@ Reasoning và timeline được lưu vào lịch sử hội thoại, mở lại 
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: Đã duyệt kế hoạch, tạo nhánh `feat/stream-reasoning-ui`, bắt đầu triển khai backend.
+- Tóm tắt: Hoàn tất toàn bộ S-01 → S-04. pytest 361 passed, 1 skipped; kiểm tra thủ công trên UI thật đạt (timeline, reasoning stream, auto-thu gọn, khôi phục hội thoại cũ). Review `approved` (self_review).
 - Blocker: không có.
-- Bước tiếp theo: `zcode-main` triển khai S-01 → S-04.
+- Bước tiếp theo: không có (task done); follow-up tiềm năng: o-series reasoning summary, cắt reasoning dài khi lưu, kiểm chứng includeThoughts trên Gemini thật.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
 - `2026-10-25T23:42:05+07:00` — `zcode-main`: Tạo task sau khi duyệt kế hoạch; người dùng chọn "Timeline bước RAG + thinking model" và "Có lưu reasoning vào lịch sử".
+- `2026-10-26T00:01:45+07:00` — `zcode-main`: Toàn bộ AC có bằng chứng, review approved → chuyển `done`. Phát hiện và sửa trong quá trình kiểm chứng: step `guardrail` thiếu khi guardrail bật và cho phép (giờ phát đều ở mọi nhánh).

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { API_BASE_URL } from "./api";
 import { renderMarkdownHtml } from "./lib/format";
+import ReasoningPanel from "./components/ReasoningPanel";
 
 const SUGGESTIONS = [
   {
@@ -42,6 +43,16 @@ const SUGGESTIONS = [
 const GREETING =
   "Xin chào 👋 Mình là trợ lý ảo dựa trên **sổ tay sinh viên PTIT**. " +
   "Hỏi mình về học phí, quy chế, kế hoạch đào tạo hay điều kiện tốt nghiệp nhé!";
+
+/** Trạng thái đọc cho screen reader khi từng bước pipeline hoàn tất. */
+const STEP_STATUS_TEXT = {
+  guardrail: "Đang kiểm tra câu hỏi...",
+  query_rewrite: "Đang chuẩn hóa truy vấn...",
+  multi_query: "Đang sinh biến thể truy vấn...",
+  retrieve: "Đang tìm kiếm trong tài liệu...",
+  rerank: "Đang xếp hạng đoạn văn...",
+  generate: "Đang soạn câu trả lời...",
+};
 
 /**
  * Phân loại lỗi để báo đúng nguyên nhân.
@@ -182,6 +193,10 @@ const ChatView = forwardRef(function ChatView(
           role: message.role,
           content: message.content,
           sources: message.sources ?? [],
+          // Reasoning/steps lưu trong metadata: mở lại hội thoại vẫn xem được.
+          reasoning: message.reasoning ?? "",
+          steps: message.steps ?? [],
+          reasoningOpen: false,
         }));
         setMessages(restored.length ? restored : [{ role: "assistant", content: GREETING, sources: [] }]);
         setConversationId(id);
@@ -209,9 +224,41 @@ const ChatView = forwardRef(function ChatView(
 
   function appendChunk(content) {
     setMessages((current) =>
+      current.map((message, index) => {
+        if (index !== current.length - 1) return message;
+        const next = { ...message, content: message.content + content };
+        // Phần câu trả lời bắt đầu stream: tự thu gọn panel suy luận đúng một
+        // lần để người dùng tập trung vào câu trả lời; vẫn mở lại được.
+        if (!next.reasoningAutoCollapsed) {
+          next.reasoningOpen = false;
+          next.reasoningAutoCollapsed = true;
+        }
+        return next;
+      })
+    );
+  }
+
+  function appendReasoning(content) {
+    setMessages((current) =>
       current.map((message, index) =>
-        index === current.length - 1 ? { ...message, content: message.content + content } : message
+        index === current.length - 1
+          ? { ...message, reasoning: (message.reasoning || "") + content }
+          : message
       )
+    );
+  }
+
+  function appendStep(step) {
+    setMessages((current) =>
+      current.map((message, index) =>
+        index === current.length - 1 ? { ...message, steps: [...(message.steps || []), step] } : message
+      )
+    );
+  }
+
+  function toggleReasoning(index) {
+    setMessages((current) =>
+      current.map((message, i) => (i === index ? { ...message, reasoningOpen: !message.reasoningOpen } : message))
     );
   }
 
@@ -220,7 +267,7 @@ const ChatView = forwardRef(function ChatView(
     setMessages((current) =>
       current.map((message, index) =>
         index === current.length - 1
-          ? { role: "assistant", content: "", sources: [], streaming: false, error: described }
+          ? { ...message, content: "", sources: [], streaming: false, error: described }
           : message
       )
     );
@@ -238,7 +285,15 @@ const ChatView = forwardRef(function ChatView(
     setMessages((current) => [
       ...current,
       { role: "user", content: text, sources: [] },
-      { role: "assistant", content: "", sources: [], streaming: true },
+      {
+        role: "assistant",
+        content: "",
+        sources: [],
+        streaming: true,
+        steps: [],
+        reasoning: "",
+        reasoningOpen: true,
+      },
     ]);
     setLoading(true);
     setLiveStatus("Đang tìm trong tài liệu...");
@@ -279,6 +334,13 @@ const ChatView = forwardRef(function ChatView(
           }
           if (eventData.type === "start") {
             setConversationId(eventData.conversation_id);
+          } else if (eventData.type === "step") {
+            appendStep(eventData);
+            if (STEP_STATUS_TEXT[eventData.step]) {
+              setLiveStatus(STEP_STATUS_TEXT[eventData.step]);
+            }
+          } else if (eventData.type === "reasoning") {
+            appendReasoning(eventData.content);
           } else if (eventData.type === "delta") {
             appendChunk(eventData.content);
           } else if (eventData.type === "error") {
@@ -303,6 +365,9 @@ const ChatView = forwardRef(function ChatView(
                       ...message,
                       content: eventData.answer,
                       sources: eventData.sources ?? [],
+                      // Bước generate hoàn tất và reasoning đầy đủ chỉ có ở done.
+                      steps: eventData.steps ?? message.steps,
+                      reasoning: eventData.reasoning ?? message.reasoning ?? "",
                       streaming: false,
                     }
                   : message
@@ -433,8 +498,11 @@ const ChatView = forwardRef(function ChatView(
           </div>
         ) : (
           messages.map((message, index) => {
+            const hasReasoning = (message.steps?.length ?? 0) > 0 || !!message.reasoning;
+            // Placeholder chờ chỉ hiện khi chưa có event step/reasoning nào;
+            // sau đó panel suy luận thay chỗ, thông tin hơn ba dấu chấm.
             const showTypingPlaceholder =
-              message.role === "assistant" && message.streaming && !message.content;
+              message.role === "assistant" && message.streaming && !message.content && !hasReasoning;
             const html = message.error
               ? ""
               : injectCitations(renderMarkdownHtml(message.content), message.sources);
@@ -448,6 +516,16 @@ const ChatView = forwardRef(function ChatView(
                   <span className="role-name">
                     {message.role === "assistant" ? "PTIT Assistant" : "Bạn"}
                   </span>
+
+                  {message.role === "assistant" && hasReasoning && (
+                    <ReasoningPanel
+                      steps={message.steps}
+                      reasoning={message.reasoning}
+                      streaming={message.streaming}
+                      open={message.reasoningOpen ?? !message.streaming}
+                      onToggle={() => toggleReasoning(index)}
+                    />
+                  )}
 
                   {message.error ? (
                     <div className="bubble is-error" role="alert">
@@ -470,25 +548,21 @@ const ChatView = forwardRef(function ChatView(
                         </div>
                       </div>
                     </div>
-                  ) : (
-                    <div className={`bubble ${showTypingPlaceholder ? "loading" : ""}`}>
-                      {showTypingPlaceholder ? (
-                        <>
-                          <span className="thinking-dots" aria-hidden="true">
-                            <span />
-                            <span />
-                            <span />
-                          </span>
-                          <span>Đang tìm trong tài liệu...</span>
-                        </>
-                      ) : (
-                        <div className="md" dangerouslySetInnerHTML={{ __html: html }} />
-                      )}
-                      {message.streaming && !showTypingPlaceholder && (
-                        <span className="typing-cursor" aria-hidden="true" />
-                      )}
+                  ) : showTypingPlaceholder ? (
+                    <div className="bubble loading">
+                      <span className="thinking-dots" aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                      <span>Đang tìm trong tài liệu...</span>
                     </div>
-                  )}
+                  ) : message.content ? (
+                    <div className="bubble">
+                      <div className="md" dangerouslySetInnerHTML={{ __html: html }} />
+                      {message.streaming && <span className="typing-cursor" aria-hidden="true" />}
+                    </div>
+                  ) : null}
 
                   {!message.streaming && message.content && (
                     <div className="bubble-actions">
