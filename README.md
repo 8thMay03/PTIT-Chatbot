@@ -185,11 +185,31 @@ uvicorn app.main:app --reload --port 8000
 
 Tài liệu hỗ trợ: `.md`, `.txt`, `.pdf`, `.docx`. File PDF/DOCX được [Docling](https://github.com/docling-project/docling) chuyển sang Markdown (giữ heading và bảng), kết quả cache tại `backend/storage/converted/` theo hash nội dung file, nên chỉ chuyển đổi lại khi file thay đổi. Lần chạy đầu Docling sẽ tải model layout/bảng từ HuggingFace. PDF scan không có lớp text cần bật `DOCLING_OCR_ENABLED=true`. File `.doc` (Word 97-2003) chưa được hỗ trợ, hãy lưu lại dưới dạng `.docx`.
 
-Upload được parse và tạo embeddings trong vùng tạm trước khi thay file nguồn. Nếu conversion, embeddings hoặc transaction PostgreSQL thất bại, file cũ và dữ liệu đã index được giữ nguyên; upload mới thất bại không để lại file trong kho tài liệu.
+#### Hai bước: parse và chia đoạn
+
+Ingest tách thành hai bước để có thể kiểm tra, sửa Markdown và chia đoạn lại mà không phải parse lại:
+
+1. **Parse**: parser (+ chuẩn hóa heading) tạo Markdown và lưu vào `documents.parsed_text`; tài liệu chuyển trạng thái `parsed`. Các đoạn cũ (nếu có) vẫn phục vụ hỏi đáp cho tới khi chia đoạn lại. Parse lại ra đúng nội dung cũ thì tài liệu giữ `active`.
+2. **Chia đoạn**: đọc `parsed_text`, chia đoạn, tạo embeddings rồi thay toàn bộ đoạn của tài liệu trong một transaction; trạng thái chuyển `active`. Bước này không đọc file gốc hay gọi parser. Nếu Markdown bị parse lại/sửa trong lúc đang chia đoạn, API trả 409 và giữ nguyên các đoạn cũ.
+
+Upload (`POST /api/documents`) **chỉ parse** và dừng ở `parsed`: mở tài liệu, kiểm tra bản Markdown rồi bấm **Chia đoạn**. Upload được parse trong vùng tạm trước khi thay file nguồn; nếu conversion hoặc transaction PostgreSQL thất bại, file cũ và dữ liệu đã lưu được giữ nguyên, upload mới thất bại không để lại file trong kho tài liệu.
+
+Khi parser đọc sai, nút **Sửa Markdown** mở màn soạn Markdown thô cạnh bản render để đối chiếu. Lưu chỉ ghi `parsed_text` (đánh dấu `metadata.markdown_edited`) và đưa tài liệu về `parsed`; kho tri thức dùng bản mới sau khi bấm Chia đoạn. **Nạp lại toàn bộ** và `--stage parse` giữ nguyên bản sửa tay; **Parse lại** một tài liệu thì ghi đè bản sửa tay (giao diện cảnh báo trước).
+
+| API | Bước |
+| --- | --- |
+| `POST /api/documents` | Tải lên + parse |
+| `POST /api/documents/{id}/parse?parser_name=` | Parse lại một tài liệu |
+| `GET` / `PUT /api/documents/{id}/markdown` | Đọc / lưu Markdown sửa tay (`PUT` nhận `base_hash` để tránh ghi đè thay đổi của người khác, lệch thì 409) |
+| `POST /api/documents/{id}/chunk` | Chia đoạn + embed một tài liệu |
+| `POST /api/ingest/chunk` | Chia đoạn lại mọi tài liệu từ Markdown đã lưu, ví dụ sau khi đổi `CHUNK_SIZE`; trả thêm `skipped` |
+| `POST /api/ingest` | Nạp lại toàn bộ: parse + chia đoạn mọi file trong `DOCUMENTS_PATH` |
+
+Tài liệu được index trước migration `0004_document_parsed_text` chưa có `parsed_text`: vẫn xem và hỏi đáp bình thường, nhưng phải parse lại (hoặc Nạp lại toàn bộ một lần) trước khi chia đoạn riêng hoặc sửa Markdown; `POST /api/ingest/chunk` bỏ qua và báo số tài liệu này.
 
 Rebuild toàn bộ chỉ thay knowledge base sau khi mọi tài liệu có định dạng hỗ trợ đã đọc thành công và có nội dung. Nếu một file lỗi hoặc rỗng, rebuild dừng và giữ nguyên dữ liệu đã index; `POST /api/ingest` trả HTTP 422 kèm tên file cần xử lý. Chuẩn hóa bảng chỉ rút gọn khoảng trắng, giữ nguyên các ô có giá trị giống nhau.
 
-Parser nằm riêng trong `backend/app/parsers/`: `base.py` định nghĩa interface `DocumentParser` và lỗi `DocumentParseError`, `registry.py` chọn implementation theo định dạng hoặc tên, `text.py` đọc MD/TXT, `docling.py` parse PDF/DOCX và quản lý cache. Ingestion chỉ gọi `read_document_text()` để nhận text/Markdown, sau đó mới chunking, embedding và lưu dữ liệu.
+Parser nằm riêng trong `backend/app/parsers/`: `base.py` định nghĩa interface `DocumentParser` và lỗi `DocumentParseError`, `registry.py` chọn implementation theo định dạng hoặc tên, `text.py` đọc MD/TXT, `docling.py` parse PDF/DOCX và quản lý cache. Bước parse chỉ gọi `read_document_text()` để nhận text/Markdown và lưu vào `documents.parsed_text`; bước chia đoạn đọc lại bản đã lưu để chunking, embedding và lưu dữ liệu.
 
 Để thêm parser, implement `name`, `extensions` (các suffix chữ thường dạng `.pdf`) và `parse(path, *, convert=True) -> str | None`, rồi đăng ký instance trong `app/parsers/__init__.py`. Loader và upload lấy danh sách định dạng từ registry; các định dạng binary mới được parser tự kiểm tra nội dung. Với `convert=False`, parser chỉ đọc trực tiếp hoặc dùng cache, không chạy conversion nặng.
 
@@ -201,7 +221,7 @@ text = read_document_text(path, parser_name="my_pdf")
 # Khi đăng ký, thêm default=True nếu muốn parser mới trở thành mặc định.
 ```
 
-Upload luôn dùng parser mặc định theo định dạng; sau đó có thể parse lại một tài liệu bằng parser khác trong giao diện quản lý tài liệu (`GET /api/documents/{id}/parsers`, `POST /api/documents/{id}/parse?parser_name=...`). Parser đã dùng được lưu trong `documents.metadata.parser`, nên màn xem tài liệu, preview và rebuild toàn bộ tiếp tục đọc tài liệu đó bằng đúng parser này; nếu parser không còn được đăng ký thì dùng parser mặc định và ghi cảnh báo. `app.ingestion.converters` giữ các public import cũ để tương thích, còn parser mới được triển khai trong `app.parsers`.
+Upload dùng parser mặc định theo định dạng (hoặc parser chọn trong modal khi có nhiều lựa chọn); sau đó có thể parse lại một tài liệu bằng parser khác trong giao diện quản lý tài liệu (`GET /api/documents/{id}/parsers`, `POST /api/documents/{id}/parse?parser_name=...`). Parser đã dùng được lưu trong `documents.metadata.parser`, nên màn xem tài liệu, preview và rebuild toàn bộ tiếp tục đọc tài liệu đó bằng đúng parser này; nếu parser không còn được đăng ký thì dùng parser mặc định và ghi cảnh báo. `app.ingestion.converters` giữ các public import cũ để tương thích, còn parser mới được triển khai trong `app.parsers`.
 
 Docling chạy nhanh hơn nhiều trên GPU NVIDIA. `pip install` mặc định có thể kéo torch bản CPU, khi đó cài lại torch bản CUDA (chọn bản cu khớp driver, xem `nvidia-smi`), rồi kiểm tra bằng `python -c "import torch; print(torch.cuda.is_available())"`:
 
@@ -240,7 +260,9 @@ Có thể nạp tài liệu mới trực tiếp trên giao diện **Tài liệu*
 
 ```powershell
 cd backend
-python -m scripts.ingest
+python -m scripts.ingest                 # parse + chia đoạn toàn bộ (mặc định, --stage all)
+python -m scripts.ingest --stage parse   # chỉ parse và lưu Markdown, giữ nguyên các đoạn hiện có
+python -m scripts.ingest --stage chunk   # chia đoạn lại từ Markdown đã lưu, không parse lại
 ```
 
 ### 3. Chạy frontend
@@ -277,11 +299,13 @@ Sau khi các service khởi động thành công (PostgreSQL đạt trạng thá
 - Swagger UI: `http://localhost:8000/docs`
 - Health check (bao gồm trạng thái kết nối DB): `http://localhost:8000/api/health`
 
-Nạp lại tài liệu khi có thay đổi:
+Nạp lại tài liệu khi có thay đổi (thêm `--stage parse` hoặc `--stage chunk` để chạy riêng từng bước):
 
 ```powershell
 docker compose exec backend python -m scripts.ingest
 ```
+
+Backend dev mount trực tiếp `backend/app` và `backend/alembic`, nên khi code có migration mới mà container không khởi động lại thì chạy `docker compose exec backend python -m alembic upgrade head`.
 
 Dừng hệ thống:
 
