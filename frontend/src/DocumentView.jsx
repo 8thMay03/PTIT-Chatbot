@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
   FileText,
   Loader2,
   Play,
@@ -11,6 +12,10 @@ import {
   X,
 } from "lucide-react";
 import { API_BASE_URL } from "./api";
+import OriginalDocumentViewer, {
+  BROWSER_VIEWABLE_TYPES,
+  documentFileUrl,
+} from "./components/OriginalDocumentViewer";
 import { EMPTY, formatDate, formatSize, renderMarkdownHtml } from "./lib/format";
 
 const PAGE_SIZES = [20, 50, 100];
@@ -20,6 +25,16 @@ const VIEW_MODES = [
   { key: "full", label: "Toàn văn" },
   { key: "ellipse", label: "Rút gọn" },
   { key: "markdown", label: "Markdown" },
+];
+
+// Markdown là mặc định: đánh dấu vị trí đoạn khi trỏ chuột chỉ hoạt động trên bản này.
+const DOC_VIEW_MODES = [
+  {
+    key: "original",
+    label: "Bản gốc",
+    title: "Xem tệp gốc đã tải lên. Đánh dấu vị trí đoạn khi trỏ chuột chỉ có ở chế độ Markdown.",
+  },
+  { key: "markdown", label: "Markdown", title: "Văn bản đã parse, dùng để chia đoạn" },
 ];
 
 function cleanMarkdown(s) {
@@ -119,6 +134,10 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
     const saved = localStorage.getItem("ptit_chunk_mode");
     return VIEW_MODES.some((m) => m.key === saved) ? saved : "full";
   });
+  const [docViewMode, setDocViewMode] = useState(() => {
+    const saved = localStorage.getItem("ptit_doc_view_mode");
+    return DOC_VIEW_MODES.some((m) => m.key === saved) ? saved : "markdown";
+  });
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
@@ -144,6 +163,10 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
   useEffect(() => {
     localStorage.setItem("ptit_chunk_mode", chunkMode);
   }, [chunkMode]);
+
+  useEffect(() => {
+    localStorage.setItem("ptit_doc_view_mode", docViewMode);
+  }, [docViewMode]);
 
   // Gõ tới đâu tìm tới đó sẽ gọi API liên tục — chờ người dùng ngừng gõ 350ms.
   useEffect(() => {
@@ -399,6 +422,8 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
 
   const isParsingThis = parsingDocId === documentId;
   const fileName = docDetail?.file_name || docDetail?.title || EMPTY;
+  const fileType = (docDetail?.file_type || docDetail?.file_name?.split(".").pop() || "").toLowerCase();
+  const showOriginal = docViewMode === "original" && docDetail;
 
   return (
     <div className="doc-view-page">
@@ -430,13 +455,48 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
             <h2 className="doc-view-filename" title={fileName}>
               {fileName}
             </h2>
-            <div className="doc-view-meta-info">
-              <span>Dung lượng: {formatSize(docDetail?.size_bytes)}</span>
-              <span className="doc-meta-sep">Tải lên: {formatDate(docDetail?.created_at)}</span>
+            <div className="doc-view-meta-row">
+              <div className="doc-view-meta-info">
+                <span>Dung lượng: {formatSize(docDetail?.size_bytes)}</span>
+                <span className="doc-meta-sep">Tải lên: {formatDate(docDetail?.created_at)}</span>
+              </div>
+
+              <div className="doc-view-mode-actions">
+                {docDetail && BROWSER_VIEWABLE_TYPES.has(fileType) && (
+                  <a
+                    className="doc-open-original-link"
+                    href={documentFileUrl(documentId, { inline: true })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Mở bản gốc trong tab mới"
+                    aria-label="Mở bản gốc trong tab mới"
+                  >
+                    <ExternalLink size={13} />
+                  </a>
+                )}
+                <div className="chunk-mode-toggle" role="group" aria-label="Kiểu hiển thị tài liệu">
+                  {DOC_VIEW_MODES.map((mode) => (
+                    <button
+                      key={mode.key}
+                      type="button"
+                      className={`chunk-mode-btn ${docViewMode === mode.key ? "active" : ""}`}
+                      aria-pressed={docViewMode === mode.key}
+                      title={mode.title}
+                      onClick={() => setDocViewMode(mode.key)}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="doc-view-content-pane" aria-busy={docDetailLoading} ref={docContentRef}>
+          <div
+            className={`doc-view-content-pane ${showOriginal ? "is-original" : ""}`}
+            aria-busy={docDetailLoading}
+            ref={docContentRef}
+          >
             {docDetailLoading ? (
               <div style={{ padding: 16 }}>
                 {Array.from({ length: 10 }, (_, i) => (
@@ -455,6 +515,8 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
                 <h3>Không mở được tài liệu</h3>
                 <p>{docError}</p>
               </div>
+            ) : showOriginal ? (
+              <OriginalDocumentViewer documentId={documentId} fileType={fileType} fileName={fileName} />
             ) : (
               <div
                 className="doc-markdown-rendered-view"
