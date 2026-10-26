@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Download,
   Eye,
+  FilePenLine,
   FileText,
   Loader2,
   Play,
@@ -18,9 +19,10 @@ import {
 } from "lucide-react";
 import { API_BASE_URL } from "./api";
 import { apiError, formatDate, formatSize } from "./lib/format";
-import { documentStatus, needsChunking } from "./lib/documentStatus";
+import { canEditMarkdown, documentStatus, needsChunking, NO_MARKDOWN_HINT } from "./lib/documentStatus";
 import DocumentView from "./DocumentView";
 import ParserSelectionModal, { parserTitle } from "./components/ParserSelectionModal";
+import MarkdownEditorView from "./components/MarkdownEditorView";
 import Modal from "./components/Modal";
 import { useToast } from "./components/Toast";
 
@@ -49,6 +51,8 @@ export default function DatasetView({ onChanged }) {
   const toast = useToast();
 
   const [selectedDocId, setSelectedDocId] = useState(null);
+  // Tài liệu đang mở màn sửa Markdown trực tiếp từ danh sách.
+  const [markdownDoc, setMarkdownDoc] = useState(null);
 
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -458,6 +462,24 @@ export default function DatasetView({ onChanged }) {
   const uploadDialog = uploadTarget && <ParserSelectionModal upload={uploadTarget}
     busy={uploading} progress={uploadProgress} onClose={() => setUploadTarget(null)} onConfirm={confirmUpload} />;
 
+  if (markdownDoc) {
+    return (
+      <MarkdownEditorView
+        documentId={markdownDoc.id}
+        fileName={markdownDoc.file_name || markdownDoc.title}
+        fileType={markdownDoc.file_type}
+        backLabel="Quay lại kho tài liệu"
+        onClose={(saved) => {
+          setMarkdownDoc(null);
+          if (saved) {
+            loadDocuments();
+            onChanged?.();
+          }
+        }}
+      />
+    );
+  }
+
   if (selectedDocId) {
     return (
       <>
@@ -748,6 +770,16 @@ export default function DatasetView({ onChanged }) {
                               disabled={pipelineBusy}
                             >
                               {isChunking ? <Loader2 size={14} className="spin" /> : <Scissors size={14} />}
+                            </button>
+                            <button
+                              type="button"
+                              className="act-btn"
+                              title={canEditMarkdown(doc) ? `Sửa Markdown của ${fileName}` : NO_MARKDOWN_HINT}
+                              aria-label={`Sửa Markdown của ${fileName}`}
+                              onClick={() => setMarkdownDoc(doc)}
+                              disabled={pipelineBusy || !canEditMarkdown(doc)}
+                            >
+                              <FilePenLine size={14} />
                             </button>
                             <button
                               type="button"

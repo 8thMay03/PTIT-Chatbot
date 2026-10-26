@@ -27,3 +27,10 @@ export function documentStatus(doc) {
 export function needsChunking(doc) {
   return doc?.status === "parsed";
 }
+
+/** Chỉ tài liệu đã lưu Markdown (parse sau khi tách hai bước) mới sửa được Markdown. */
+export function canEditMarkdown(doc) {
+  return Boolean(doc?.parsed_at);
+}
+
+export const NO_MARKDOWN_HINT = "Tài liệu chưa có bản Markdown đã lưu; hãy Parse lại trước khi sửa.";

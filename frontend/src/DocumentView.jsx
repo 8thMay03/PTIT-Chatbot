@@ -4,8 +4,8 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
-  Edit3,
   ExternalLink,
+  FilePenLine,
   FileText,
   Loader2,
   Play,
@@ -19,7 +19,7 @@ import OriginalDocumentViewer, {
   documentFileUrl,
 } from "./components/OriginalDocumentViewer";
 import { EMPTY, formatDate, formatSize } from "./lib/format";
-import { documentStatus, needsChunking } from "./lib/documentStatus";
+import { canEditMarkdown, documentStatus, needsChunking, NO_MARKDOWN_HINT } from "./lib/documentStatus";
 import MarkdownView from "./components/MarkdownView";
 import MarkdownEditorView from "./components/MarkdownEditorView";
 
@@ -444,6 +444,7 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
       <MarkdownEditorView
         documentId={documentId}
         fileName={fileName}
+        fileType={fileType}
         onClose={(saved) => {
           setEditingMarkdown(false);
           if (saved) setReloadToken((t) => t + 1);
@@ -466,10 +467,14 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
               type="button"
               className="btn-outline-dataset"
               onClick={() => setEditingMarkdown(true)}
-              disabled={pipelineBusy}
-              title="Sửa tay bản Markdown khi parser đọc sai, đối chiếu với bản render"
+              disabled={pipelineBusy || !canEditMarkdown(docDetail)}
+              title={
+                canEditMarkdown(docDetail)
+                  ? "Sửa tay bản Markdown khi parser đọc sai, đối chiếu với bản gốc và bản render"
+                  : NO_MARKDOWN_HINT
+              }
             >
-              <Edit3 size={14} />
+              <FilePenLine size={14} />
               <span>Sửa Markdown</span>
             </button>
             <button

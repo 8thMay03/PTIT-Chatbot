@@ -1,5 +1,5 @@
 /* ==========================================================================
-   SỬA MARKDOWN: soạn thô (trái) và bản render (phải) để đối chiếu
+   SỬA MARKDOWN: bản gốc, Markdown thô (nơi sửa) và bản render để đối chiếu
    ========================================================================== */
 .md-editor-page {
   display: flex;
@@ -46,6 +46,10 @@
   white-space: nowrap;
 }
 
+.md-editor-pane-toggle {
+  flex-shrink: 0;
+}
+
 .md-editor-actions {
   display: flex;
   align-items: center;
@@ -80,7 +84,8 @@
 
 .md-editor-panes {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  /* Số cột theo các cột đang bật (--md-editor-pane-count đặt inline). */
+  grid-template-columns: repeat(var(--md-editor-pane-count, 3), minmax(0, 1fr));
   gap: 16px;
   flex: 1;
   min-height: 0;
@@ -115,6 +120,36 @@
   font-size: 12.5px;
   font-weight: 600;
   color: var(--text-secondary);
+}
+
+.md-editor-pane-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.md-editor-open-original {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+}
+
+.md-editor-open-original:hover {
+  background: var(--surface-sunken);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.md-editor-original {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px;
 }
 
 .md-editor-sync {
@@ -152,6 +187,12 @@
   min-height: 0;
   overflow-y: auto;
   padding: 14px 18px;
+}
+
+@media (max-width: 1200px) {
+  .md-editor-panes {
+    gap: 10px;
+  }
 }
 
 @media (max-width: 900px) {

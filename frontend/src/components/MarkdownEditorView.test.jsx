@@ -22,6 +22,20 @@ function markdown(text, contentHash, extra = {}) {
   };
 }
 
+// Tệp gốc (cột "Bản gốc") đi qua /file; mọi lời gọi khác là API Markdown.
+function routedFetch(markdownHandler) {
+  return vi.fn((url, options = {}) => {
+    if (String(url).includes("/file")) {
+      return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve("# Bản gốc thô") });
+    }
+    return markdownHandler(url, options);
+  });
+}
+
+function pane(label) {
+  return document.body.querySelector(`section[aria-label="${label}"]`);
+}
+
 function button(label) {
   return [...document.body.querySelectorAll("button")].find((item) => item.textContent.trim() === label);
 }
@@ -46,6 +60,7 @@ describe("MarkdownEditorView", () => {
   let onClose;
 
   beforeEach(async () => {
+    localStorage.clear();
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -63,14 +78,14 @@ describe("MarkdownEditorView", () => {
     await act(async () => {
       root.render(
         <ToastProvider>
-          <MarkdownEditorView documentId="doc-1" fileName="policy.pdf" onClose={onClose} />
+          <MarkdownEditorView documentId="doc-1" fileName="policy.md" fileType="md" onClose={onClose} />
         </ToastProvider>
       );
     });
   }
 
   it("hiện Markdown thô cạnh bản render và lưu kèm content_hash mới nhất", async () => {
-    const fetchMock = vi.fn((url, options = {}) => {
+    const fetchMock = routedFetch((url, options) => {
       if (!options.method) return jsonResponse(markdown("# Học phí\n\nBản parser", "hash-1"));
       const body = JSON.parse(options.body);
       return jsonResponse(markdown(body.text, `hash-after-${body.base_hash}`, { markdown_edited: true }));
@@ -103,8 +118,31 @@ describe("MarkdownEditorView", () => {
     expect(JSON.parse(fetchMock.mock.lastCall[1].body).base_hash).toBe("hash-after-hash-1");
   });
 
+  it("hiện ba cột để đối chiếu và nhớ cột đã bật/tắt", async () => {
+    await renderEditor(routedFetch(() => jsonResponse(markdown("# Học phí", "hash-1"))));
+
+    expect(pane("Bản gốc").querySelector(".doc-original-text").textContent).toBe("# Bản gốc thô");
+    expect(pane("Markdown thô").querySelector("textarea").value).toBe("# Học phí");
+    expect(pane("Bản render").querySelector("h1").textContent).toBe("Học phí");
+
+    await click(button("Bản gốc"));
+    await click(button("Markdown thô"));
+    expect(pane("Bản gốc")).toBeNull();
+    expect(pane("Markdown thô")).toBeNull();
+    // Cột cuối cùng không tắt được.
+    await click(button("Bản render"));
+    expect(pane("Bản render")).not.toBeNull();
+    expect(JSON.parse(localStorage.getItem("ptit_md_editor_panes"))).toEqual(["rendered"]);
+
+    await click(button("Bản gốc"));
+    expect([...document.body.querySelectorAll("section[aria-label]")].map((item) => item.getAttribute("aria-label"))).toEqual([
+      "Bản gốc",
+      "Bản render",
+    ]);
+  });
+
   it("hỏi trước khi bỏ thay đổi chưa lưu", async () => {
-    await renderEditor(vi.fn(() => jsonResponse(markdown("# A", "hash-1"))));
+    await renderEditor(routedFetch(() => jsonResponse(markdown("# A", "hash-1"))));
 
     await type(container.querySelector("textarea"), "# B");
     await click(button("Quay lại tài liệu"));
@@ -118,7 +156,7 @@ describe("MarkdownEditorView", () => {
 
   it("báo lỗi khi tài liệu chưa có bản parse", async () => {
     await renderEditor(
-      vi.fn(() => jsonResponse({ detail: "Tài liệu chưa có bản parse đã lưu; hãy parse lại." }, 409))
+      routedFetch(() => jsonResponse({ detail: "Tài liệu chưa có bản parse đã lưu; hãy parse lại." }, 409))
     );
 
     expect(container.querySelector("[role='alert']").textContent).toContain("chưa có bản parse");
