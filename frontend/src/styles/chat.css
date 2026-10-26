@@ -887,6 +887,34 @@
   color: var(--on-solid);
 }
 
+.bubble .md .doc-pre {
+  margin: 10px 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.bubble .md .doc-pre .doc-code-block {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre;
+  tab-size: 2;
+}
+
+.message-row.user .bubble .md .doc-pre {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.message-row.user .bubble .md .doc-pre .doc-code-block {
+  color: var(--on-solid);
+}
+
 .message-row.user .bubble .md .doc-link {
   color: var(--on-solid);
 }

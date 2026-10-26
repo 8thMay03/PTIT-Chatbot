@@ -440,6 +440,26 @@
   font-size: 12.5px;
 }
 
+/* Khối code (fence) và code block thụt lề */
+.doc-pre {
+  margin: 8px 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.doc-pre .doc-code-block {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre;
+  tab-size: 2;
+}
+
 .doc-table-wrapper {
   overflow-x: auto;
   margin: 12px 0;

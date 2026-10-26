@@ -16,7 +16,8 @@ import OriginalDocumentViewer, {
   BROWSER_VIEWABLE_TYPES,
   documentFileUrl,
 } from "./components/OriginalDocumentViewer";
-import { EMPTY, formatDate, formatSize, renderMarkdownHtml } from "./lib/format";
+import { EMPTY, formatDate, formatSize } from "./lib/format";
+import MarkdownView from "./components/MarkdownView";
 
 const PAGE_SIZES = [20, 50, 100];
 const FETCH_ALL_BATCH = 500;
@@ -283,11 +284,10 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
     return allChunks.filter((c) => c.text && c.text.toLowerCase().includes(needle));
   }, [searchTerm, allChunks]);
 
-  const renderedDocHtml = useMemo(() => {
-    const content = docDetail?.full_text || docDetail?.preview;
-    if (!content) return "<p><em>Tài liệu chưa có nội dung văn bản.</em></p>";
-    return renderMarkdownHtml(content);
-  }, [docDetail?.full_text, docDetail?.preview]);
+  const renderedDocContent = useMemo(
+    () => docDetail?.full_text || docDetail?.preview || "",
+    [docDetail?.full_text, docDetail?.preview]
+  );
 
   const isSearching = Boolean(searchTerm);
   const visibleTotal = isSearching ? searchResults?.length ?? 0 : chunkTotal;
@@ -518,11 +518,9 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
             ) : showOriginal ? (
               <OriginalDocumentViewer documentId={documentId} fileType={fileType} fileName={fileName} />
             ) : (
-              <div
+              <MarkdownView
                 className="doc-markdown-rendered-view"
-                dangerouslySetInnerHTML={{
-                  __html: renderedDocHtml,
-                }}
+                content={renderedDocContent || "*Tài liệu chưa có nội dung văn bản.*"}
               />
             )}
           </div>
@@ -668,10 +666,7 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
                     </div>
 
                     {chunkMode === "markdown" ? (
-                      <div
-                        className="chunk-card-markdown-view"
-                        dangerouslySetInnerHTML={{ __html: renderMarkdownHtml(chunk.text) }}
-                      />
+                      <MarkdownView className="chunk-card-markdown-view" content={chunk.text} />
                     ) : (
                       <div className={`chunk-card-text ${chunkMode === "ellipse" ? "is-ellipse" : ""}`}>
                         {chunk.text}

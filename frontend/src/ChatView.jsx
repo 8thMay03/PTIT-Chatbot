@@ -14,7 +14,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { API_BASE_URL } from "./api";
-import { renderMarkdownHtml } from "./lib/format";
+import MarkdownView from "./components/MarkdownView";
 import ReasoningPanel from "./components/ReasoningPanel";
 
 const SUGGESTIONS = [
@@ -93,20 +93,6 @@ function describeError(error, status) {
       error?.message ||
       "Có lỗi ngoài dự kiến. Kiểm tra server FastAPI và chắc chắn tài liệu đã được ingest.",
   };
-}
-
-function injectCitations(html, sources) {
-  if (!sources || sources.length === 0) return html;
-  return html.replace(/\[(\d+)\]/g, (match, num) => {
-    const id = Number(num);
-    const source = sources.find((item) => item.citation_id === id);
-    if (!source) return match;
-    const label = source.locator || source.section_path || source.heading || source.source_name || "";
-    return (
-      `<button type="button" class="citation-chip" data-citation-id="${id}" ` +
-      `aria-label="Xem nguồn trích dẫn số ${id}${label ? `: ${label}` : ""}">${num}</button>`
-    );
-  });
 }
 
 const ChatView = forwardRef(function ChatView(
@@ -503,9 +489,6 @@ const ChatView = forwardRef(function ChatView(
             // sau đó panel suy luận thay chỗ, thông tin hơn ba dấu chấm.
             const showTypingPlaceholder =
               message.role === "assistant" && message.streaming && !message.content && !hasReasoning;
-            const html = message.error
-              ? ""
-              : injectCitations(renderMarkdownHtml(message.content), message.sources);
 
             return (
               <div className={`message-row ${message.role}`} key={index}>
@@ -559,7 +542,11 @@ const ChatView = forwardRef(function ChatView(
                     </div>
                   ) : message.content ? (
                     <div className="bubble">
-                      <div className="md" dangerouslySetInnerHTML={{ __html: html }} />
+                      <MarkdownView
+                        className="md"
+                        content={message.content}
+                        sources={message.sources}
+                      />
                       {message.streaming && <span className="typing-cursor" aria-hidden="true" />}
                     </div>
                   ) : null}
