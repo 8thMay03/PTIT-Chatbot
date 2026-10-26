@@ -194,7 +194,7 @@ Ingest tách thành hai bước để có thể kiểm tra, sửa Markdown và c
 
 Upload (`POST /api/documents`) **chỉ parse** và dừng ở `parsed`: mở tài liệu, kiểm tra bản Markdown rồi bấm **Chia đoạn**. Upload được parse trong vùng tạm trước khi thay file nguồn; nếu conversion hoặc transaction PostgreSQL thất bại, file cũ và dữ liệu đã lưu được giữ nguyên, upload mới thất bại không để lại file trong kho tài liệu.
 
-Khi parser đọc sai, nút **Sửa Markdown** mở màn soạn Markdown thô cạnh bản render để đối chiếu. Lưu chỉ ghi `parsed_text` (đánh dấu `metadata.markdown_edited`) và đưa tài liệu về `parsed`; kho tri thức dùng bản mới sau khi bấm Chia đoạn. **Nạp lại toàn bộ** và `--stage parse` giữ nguyên bản sửa tay; **Parse lại** một tài liệu thì ghi đè bản sửa tay (giao diện cảnh báo trước).
+Khi parser đọc sai, nút **Sửa Markdown** (ở từng dòng trong danh sách tài liệu và trên trang chi tiết) mở màn ba cột để đối chiếu: **bản gốc** (PDF/DOCX/MD/TXT, cuộn riêng), **Markdown thô** (nơi sửa) và **bản render** (cuộn đồng bộ với Markdown thô); có thể bật/tắt từng cột. Lưu chỉ ghi `parsed_text` (đánh dấu `metadata.markdown_edited`) và đưa tài liệu về `parsed`; kho tri thức dùng bản mới sau khi bấm Chia đoạn. **Nạp lại toàn bộ** và `--stage parse` giữ nguyên bản sửa tay; **Parse lại** một tài liệu thì ghi đè bản sửa tay (giao diện cảnh báo trước).
 
 | API | Bước |
 | --- | --- |
@@ -202,6 +202,7 @@ Khi parser đọc sai, nút **Sửa Markdown** mở màn soạn Markdown thô c�
 | `POST /api/documents/{id}/parse?parser_name=` | Parse lại một tài liệu |
 | `GET` / `PUT /api/documents/{id}/markdown` | Đọc / lưu Markdown sửa tay (`PUT` nhận `base_hash` để tránh ghi đè thay đổi của người khác, lệch thì 409) |
 | `POST /api/documents/{id}/chunk` | Chia đoạn + embed một tài liệu |
+| `GET /api/documents` | Danh sách; `parsed_at` khác `null` khi tài liệu đã lưu Markdown (sửa/chia đoạn riêng được) |
 | `POST /api/ingest/chunk` | Chia đoạn lại mọi tài liệu từ Markdown đã lưu, ví dụ sau khi đổi `CHUNK_SIZE`; trả thêm `skipped` |
 | `POST /api/ingest` | Nạp lại toàn bộ: parse + chia đoạn mọi file trong `DOCUMENTS_PATH` |
 

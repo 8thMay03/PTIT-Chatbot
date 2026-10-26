@@ -5,7 +5,7 @@
 - Coordinator: `claude-code`
 - Người yêu cầu: người dùng (phiên Claude Code 2026-10-26: "nên tách ingest ra làm 2 bước: parse và chunk chứ không nên gộp vào như bây giờ"; bổ sung: "thêm 1 màn hình cho phép sửa file markdown bằng tay trong trường hợp parse bị lỗi, màn này cho phép xem file raw md và file md đã được render để đối chiếu trực tiếp")
 - Tạo lúc: `2026-10-26T23:36:15+07:00`
-- Cập nhật lúc: `2026-10-27T00:01:20+07:00`
+- Cập nhật lúc: `2026-10-27T00:17:12+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -39,6 +39,8 @@ Kết quả cần có:
 - [x] AC-06: `python -m scripts.ingest --stage all|parse|chunk` hoạt động; mặc định `all` như cũ.
 - [x] AC-07: Giao diện: badge trạng thái (Đã nạp / Chờ chia đoạn / Cần chia đoạn lại), nút Chia đoạn từng tài liệu và Chia đoạn lại toàn bộ; màn sửa Markdown hai cột (thô / render) có Lưu, Hủy, cảnh báo khi rời trang chưa lưu; modal parse lại cảnh báo khi tài liệu đã sửa tay.
 - [x] AC-08: Toàn bộ `backend/tests` pass; `npm run build` và test frontend pass.
+- [x] AC-09: Màn sửa Markdown hiển thị ba cột đối chiếu — bản gốc (PDF/DOCX/MD/TXT), Markdown thô (sửa được), bản render; bật/tắt từng cột (giữ ít nhất một, nhớ lựa chọn), Markdown thô ↔ bản render cuộn đồng bộ.
+- [x] AC-10: Nút Sửa Markdown ở từng dòng của danh sách tài liệu mở thẳng màn sửa (quay lại về danh sách); nút bị khóa kèm gợi ý khi tài liệu chưa lưu Markdown (`DocumentItem.parsed_at` = `null`).
 
 ## Tài liệu và phụ thuộc
 
@@ -53,7 +55,7 @@ Kết quả cần có:
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: S-01…S-03 xong trên working tree nhánh `feat/split-parse-chunk` (tách từ `dev` tại `1a59682`), đã commit `55806ad` (backend) và `966599d` (frontend), cộng một commit README + task; chưa push. AC-01…AC-08 có bằng chứng (backend 383 passed / 1 skipped, frontend build + 43 test pass, kiểm tra UI trên dev server); self_review `approved`, R-01/R-02 (low) deferred. DB Postgres dev đã lên revision `0004_document_parsed_text`.
+- Tóm tắt: S-01…S-03 xong trên working tree nhánh `feat/split-parse-chunk` (tách từ `dev` tại `1a59682`), đã commit `55806ad` (backend) và `966599d` (frontend), cộng một commit README + task (`74bf3ad`); S-04 (màn ba cột, AC-09) và S-05 (nút ở danh sách, AC-10) đã commit `0bf6609` (backend) + `177e52d` (frontend) cùng commit docs kèm theo; chưa push. AC-01…AC-10 có bằng chứng (backend 383 passed / 1 skipped, frontend build + 45 test pass, kiểm tra UI trên dev server); self_review `approved`, R-01/R-02 (low) deferred. DB Postgres dev đã lên revision `0004_document_parsed_text`.
 - Blocker: không có.
 - Bước tiếp theo: người dùng thử Chia đoạn trên UI (gọi embedding OpenAI, chưa chạy) và quyết định push/PR vào `dev`; coordinator chuyển `done` sau đó.
 
@@ -63,3 +65,6 @@ Kết quả cần có:
 - `2026-10-26T23:36:15+07:00` — `claude-code`: người dùng bổ sung màn sửa Markdown bằng tay (thô + render đối chiếu); gộp vào task vì dựa trực tiếp trên `parsed_text`. Quyết định mặc định: Lưu không tự chia đoạn; Nạp lại toàn bộ giữ bản sửa tay; parse lại đơn lẻ ghi đè có cảnh báo; PUT dùng `base_hash` chống ghi đè lẫn nhau.
 - `2026-10-26T23:55:47+07:00` — `claude-code`: `PUT /documents/{id}/markdown` trả `DocumentMarkdown` (có `content_hash` mới) thay vì `DocumentItem` để trình sửa lưu nhiều lần vẫn kiểm tra xung đột; `parsed_text` đặt `deferred`. Chuyển `in_review`.
 - `2026-10-27T00:01:20+07:00` — `claude-code`: người dùng yêu cầu commit; commit `55806ad` (backend), `966599d` (frontend) và commit README + task trên `feat/split-parse-chunk`. Giữ `in_review` chờ thử Chia đoạn thật và PR.
+- `2026-10-27T00:12:00+07:00` — `claude-code`: người dùng muốn theo dõi cùng lúc định dạng gốc, Markdown thô và Markdown render để đối chiếu và sửa → thêm S-04/AC-09 (màn sửa ba cột). Làm tiếp trên `feat/split-parse-chunk` vì màn sửa Markdown chưa merge vào `dev`. Không làm WYSIWYG sửa trực tiếp trên bản render (chuyển HTML ngược về Markdown sẽ định dạng lại cả tài liệu, ảnh hưởng heading/bảng mà chunker dựa vào).
+- `2026-10-27T00:12:44+07:00` — `claude-code`: người dùng đề nghị đặt nút Sửa Markdown ngoài màn danh sách → S-05/AC-10. `DocumentItem` thêm `parsed_at` để khóa nút cho tài liệu chưa lưu Markdown thay vì mở rồi báo 409.
+- `2026-10-27T00:17:12+07:00` — `claude-code`: người dùng yêu cầu commit S-04/S-05: `0bf6609` (backend), `177e52d` (frontend) và commit README + task. Giữ `in_review` chờ PR.

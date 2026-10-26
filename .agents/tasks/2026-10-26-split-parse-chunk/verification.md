@@ -65,14 +65,31 @@
 - Kết quả thực tế: backend `383 passed, 1 skipped` (trước task: 365 passed, 1 skipped); frontend build thành công; vitest `4 files, 43 tests passed`.
 - Trạng thái: `passed`.
 
+### V-09 — AC-09
+
+- Người thực hiện / thời gian: `claude-code` / `2026-10-27T00:12:00+07:00`.
+- Loại: test component + kiểm tra thủ công trên dev server.
+- Lệnh / thao tác: `npm test` (test mới "hiện ba cột để đối chiếu và nhớ cột đã bật/tắt": ba cột có nội dung đúng, tắt cột, không tắt được cột cuối, `localStorage`, thứ tự cột khi bật lại); `npm run build`. Thủ công: tải lên PDF thử `ui-check-three-panes.pdf` (Docling parse sai thứ tự: tiêu đề mất heading và dính vào dòng cuối), mở Sửa Markdown → ba cột: PDF trong trình xem của trình duyệt lấp đầy cột, Markdown thô, bản render; sửa lại thành `# ...` + hai đoạn → bản render khớp bản gốc; tắt cột Bản gốc → còn hai cột; bật lại; Hoàn tác (không lưu). Console không lỗi. Đã xóa tài liệu thử, `data/` sạch.
+- Kết quả thực tế: frontend `4 files, 44 tests passed`; build thành công; giao diện đúng như mô tả.
+- Trạng thái: `passed`.
+- Bằng chứng: ảnh `screenshot-1793034457209-5.jpg` (ba cột với PDF thử), quan sát ở trên.
+
+### V-10 — AC-10
+
+- Người thực hiện / thời gian: `claude-code` / `2026-10-27T00:12:44+07:00`.
+- Loại: test tự động + kiểm tra trên dev server.
+- Lệnh / thao tác: backend `pytest -q` (assert `parsed_at` null cho tài liệu cũ, khác null sau parse); `npm test` (`canEditMarkdown`), `npm run build`. Trên `#documents`: đọc thuộc tính nút bằng JS — `ui-check-parse-chunk.md` và `Opus-5.5-Effort-Levels.pdf` (đã parse sau migration) bật; hai tài liệu Sổ tay (index trước migration) `disabled` với title "Tài liệu chưa có bản Markdown đã lưu; hãy Parse lại trước khi sửa.". Màn sửa của Opus PDF mở từ danh sách hiển thị nút "Quay lại kho tài liệu" và ba cột.
+- Kết quả thực tế: backend `383 passed, 1 skipped`; frontend `45 passed`; build thành công; quan sát đúng như trên. Đã xóa tài liệu thử.
+- Trạng thái: `passed`.
+
 ## Lỗi, kiểm tra lại và phần chưa xác minh
 
 - Trong lúc viết test, một test dùng `monkeypatch.undo()` làm mất patch session và chạy một câu `SELECT` vào Postgres dev (lỗi ngay vì thiếu cột, không ghi gì). Đã sửa test chỉ khôi phục `embed`; chạy lại pass.
 - Sau khi đặt `parsed_text` là `deferred`, 5 test lỗi `DetachedInstanceError` do helper đọc cột sau khi đóng session; đã `undefer` trong helper, chạy lại toàn bộ pass. API dev kiểm tra lại: list 200, detail 200, markdown tài liệu cũ 409.
-- Chia đoạn trên môi trường thật: `not_run` (xem V-07).
+- Chia đoạn trên môi trường thật: `claude-code` không chạy (xem V-07); log backend dev lúc khoảng `2026-10-27T00:00+07:00` ghi người dùng đã chạy `POST /api/ingest/chunk` → 200 và `POST /api/documents/<Opus PDF>/chunk` → 200 sau khi parse lại bằng LlamaParse.
 
 ## Kết luận
 
-- Tiêu chí đã đạt: AC-01…AC-08.
+- Tiêu chí đã đạt: AC-01…AC-10.
 - Tiêu chí chưa đạt/chưa xác minh: không có; riêng thao tác Chia đoạn thật trên giao diện chưa chạy (V-07).
 - Đề xuất: bàn giao reviewer; người dùng thử Chia đoạn trên giao diện trước khi mở PR.

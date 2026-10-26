@@ -35,6 +35,22 @@ S-01, S-02, S-03 xong trên working tree nhánh `feat/split-parse-chunk` (tách 
 - Đã làm: README mục "Hai bước: parse và chia đoạn" (luồng, bảng API, tài liệu cũ), `--stage`, ghi chú chạy migration khi container dev không khởi động lại.
 - File thay đổi: `README.md`.
 
+### S-04 — claude-code
+
+- Cập nhật lúc: `2026-10-27T00:12:00+07:00`.
+- Đã làm: `MarkdownEditorView` thêm cột **Bản gốc** (dùng lại `OriginalDocumentViewer`: PDF qua iframe, DOCX render trang, MD/TXT văn bản thô; nút mở tab mới cho PDF/MD/TXT), nhóm nút bật/tắt cột trên thanh trên (giữ ít nhất một cột, thứ tự cố định, lưu `localStorage` `ptit_md_editor_panes`, mặc định đủ ba), lưới cột theo số cột đang bật; ô "Cuộn đồng bộ" chỉ hiện khi có cột Markdown thô. Bản gốc cuộn riêng (PDF trong iframe không điều khiển được, bố cục trang khác Markdown). `DocumentView` truyền `fileType`.
+- File thay đổi: `frontend/src/components/{MarkdownEditorView.jsx,MarkdownEditorView.test.jsx}`, `frontend/src/DocumentView.jsx`, `frontend/src/styles/markdown-editor.css`, `README.md`; commit `177e52d` (frontend, chung với S-05), tài liệu ở commit docs kèm theo.
+- Kiểm tra đã chạy: `V-09`.
+- Còn lại/blocker: không có.
+
+### S-05 — claude-code
+
+- Cập nhật lúc: `2026-10-27T00:12:44+07:00`.
+- Đã làm: `serialize_document`/`DocumentItem` trả `parsed_at`; `lib/documentStatus.js` thêm `canEditMarkdown` + `NO_MARKDOWN_HINT`; `DatasetView` thêm nút Sửa Markdown (icon `FilePenLine`, khác icon Đổi tiêu đề) ở từng dòng, mở `MarkdownEditorView` thay danh sách, quay lại thì tải lại danh sách nếu đã lưu; `MarkdownEditorView` nhận `backLabel`; `DocumentView` đổi sang cùng icon và khóa nút khi chưa có Markdown.
+- File thay đổi: xem S-05 trong `plan.md`; commit `0bf6609` (backend `parsed_at`), `177e52d` (frontend).
+- Kiểm tra đã chạy: `V-10`.
+- Còn lại/blocker: không có.
+
 ## Trao đổi giữa agents
 
 ### MSG-claude-code-001

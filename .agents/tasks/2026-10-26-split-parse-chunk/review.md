@@ -4,7 +4,7 @@
 - Hình thức: `self_review` (cùng agent triển khai; không phải review độc lập).
 - Trạng thái: `approved`.
 - Bản được review: working tree nhánh `feat/split-parse-chunk` (nền `1a59682`) — toàn bộ diff trong `git status` lúc `2026-10-26T23:55:47+07:00`; nội dung được commit nguyên trạng thành `55806ad` + `966599d`.
-- Cập nhật lúc: `2026-10-26T23:55:47+07:00`.
+- Cập nhật lúc: `2026-10-27T00:12:44+07:00`.
 
 ## Phạm vi và cơ sở đánh giá
 
@@ -43,6 +43,10 @@
 
 ## Lịch sử các vòng review
 
+- `2026-10-27T00:12:44+07:00` — `claude-code` — vòng 3, working tree S-05 — `approved`; không có nhận xét mới. Đã đọc: `parsed_at` chỉ có khi có `parsed_text` (cả `save_parsed_document` và `replace_knowledge_base`), không cần nạp cột `parsed_text` (deferred) để biết; nút ở danh sách tôn trọng `pipelineBusy`; quay lại tải lại danh sách chỉ khi đã lưu.
+
+- `2026-10-27T00:12:00+07:00` — `claude-code` — vòng 2, working tree S-04 (`MarkdownEditorView.jsx`, test, `DocumentView.jsx`, `markdown-editor.css`, README) trên nền `74bf3ad` — `approved`; không có nhận xét mới. Đã đọc: thứ tự cột cố định, không tắt được cột cuối, lựa chọn cột đọc/ghi `localStorage` có try/catch, `OriginalDocumentViewer` dùng lại nguyên trạng (giữ sanitize link DOCX, `nosniff`), cuộn đồng bộ tự bỏ qua khi thiếu cột.
+
 - `2026-10-26T23:55:47+07:00` — `claude-code` — working tree `feat/split-parse-chunk` — `approved`; R-01, R-02 `low` deferred.
 
 ## Kết luận
@@ -50,5 +54,5 @@
 - Kết luận: `approved`.
 - Nhận xét bắt buộc còn mở: không có.
 - Nhận xét hoãn lại: R-01, R-02.
-- Phần chưa review / giới hạn: self_review; Chia đoạn trên môi trường thật chưa chạy.
+- Phần chưa review / giới hạn: self_review; Chia đoạn trên môi trường thật chưa chạy. Vòng 2 (S-04) và 3 (S-05) review trên working tree, sau đó commit nguyên trạng thành `0bf6609` + `177e52d`.
 - Bước tiếp theo: người dùng thử Chia đoạn trên UI và quyết định push/PR; coordinator chuyển `done` sau đó.

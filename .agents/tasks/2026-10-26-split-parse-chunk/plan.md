@@ -31,11 +31,29 @@
 - Phụ thuộc: S-01, S-02.
 - Người nhận: reviewer.
 
+### S-04 — Màn sửa Markdown ba cột
+
+- Agent: `claude-code`
+- Trạng thái: `done`
+- Mục tiêu: thêm cột bản gốc (dùng lại `OriginalDocumentViewer`) cạnh Markdown thô và bản render; bật/tắt từng cột; phục vụ `AC-09`.
+- Phạm vi file được sửa: `frontend/src/components/{MarkdownEditorView.jsx,MarkdownEditorView.test.jsx}`, `frontend/src/DocumentView.jsx`, `frontend/src/styles/markdown-editor.css`, `README.md`.
+- Phụ thuộc: S-02.
+- Người nhận: verifier.
+
+### S-05 — Nút Sửa Markdown trên danh sách tài liệu
+
+- Agent: `claude-code`
+- Trạng thái: `done`
+- Mục tiêu: mở màn sửa Markdown trực tiếp từ danh sách; khóa nút khi chưa có Markdown; phục vụ `AC-10`.
+- Phạm vi file được sửa: `backend/app/db/repositories.py`, `backend/app/api/schemas.py` (`DocumentItem.parsed_at`), `backend/tests/{test_document_api.py,test_document_pipeline.py}`, `frontend/src/{DatasetView.jsx,DocumentView.jsx}`, `frontend/src/components/MarkdownEditorView.jsx` (`backLabel`), `frontend/src/lib/{documentStatus.js,documentStatus.test.js}`, `README.md`.
+- Phụ thuộc: S-04.
+- Người nhận: verifier.
+
 ## Hợp đồng dùng chung
 
 - DB: `documents.parsed_text TEXT NULL` (Markdown đã chuẩn hóa hoặc bản sửa tay; ORM `deferred`), `documents.parsed_at TIMESTAMPTZ NULL`. `documents.content_hash` = sha256 của `parsed_text`. `metadata.markdown_edited: true` khi đang dùng bản sửa tay.
 - `status`: `parsed` — `parsed_text` mới hơn chunk (chunk_count 0: chưa chia; > 0: chunk cũ vẫn phục vụ); `active` — chunk khớp `parsed_text`.
-- `DocumentItem` thêm `markdown_edited: bool`.
+- `DocumentItem` thêm `markdown_edited: bool` và `parsed_at: datetime | null` (null = chưa lưu Markdown, không sửa/chia đoạn riêng được).
 - `POST /api/documents` (multipart `file`, `parser_name?`) → `DocumentItem` (`status=parsed`). Lỗi giữ nguyên: 400/413 upload, 422 parse.
 - `POST /api/documents/{id}/parse?parser_name=` → `DocumentItem`; chỉ parse; xóa dấu sửa tay.
 - `POST /api/documents/{id}/chunk` → `DocumentItem` (`status=active`); 404 không có tài liệu; 409 chưa có bản parse / bản parse đổi trong lúc chia đoạn.
