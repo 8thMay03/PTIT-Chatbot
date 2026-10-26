@@ -42,6 +42,21 @@ Copy-Item -Path '.agents/tasks/_template/*.md' -Destination $taskPath
 
 Điền các chỗ `<...>` trước khi triển khai. Chọn một coordinator chịu trách nhiệm trạng thái chung, phân công và tích hợp. Một agent có thể kiêm nhiều vai trò khi làm việc một mình.
 
+## Nhánh Git
+
+Mỗi tính năng mới được triển khai trên một nhánh riêng checkout từ `dev`. Trước khi sửa mã, cập nhật `dev` rồi tạo nhánh:
+
+```powershell
+git checkout dev
+git pull origin dev
+git checkout -b feat/<ten-ngan>
+```
+
+- Tên nhánh dùng tiền tố `feat/` và tên ngắn, chữ thường, không dấu, nối bằng gạch ngang, ví dụ `feat/stream-reasoning-ui`.
+- Không commit tính năng trực tiếp lên `dev` hoặc `main`.
+- Nếu working tree đang có thay đổi chưa commit, hoặc tính năng cần dựa trên một nhánh chưa merge vào `dev`, hỏi người dùng/coordinator trước khi đổi nhánh; không tự stash hay bỏ thay đổi.
+- Ghi nhánh và commit nền trong `implementation.md`, ví dụ: nhánh `feat/<ten-ngan>` (tách từ `dev` tại `<commit>`).
+
 ## Nhận việc và triển khai
 
 1. Đọc cả năm file, xác định đúng task và các thay đổi đã có trong working tree.
