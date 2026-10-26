@@ -20,6 +20,7 @@
 .parser-options:disabled .parser-card { cursor: wait; opacity: .7; }
 .parser-notice { display: flex; align-items: flex-start; gap: 9px; margin-top: 16px; color: var(--text-muted); font-size: 12px; line-height: 1.6; }
 .parser-notice svg { flex-shrink: 0; margin-top: 2px; }
+.parser-notice.is-warning { color: var(--warning-text); font-weight: 600; }
 .parser-state { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 26px 10px; text-align: center; font-size: 13px; color: var(--text-muted); }
 .modal .parser-state p { margin: 0; overflow-wrap: anywhere; }
 .parser-error > svg { color: var(--danger-text); }

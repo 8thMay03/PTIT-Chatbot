@@ -146,6 +146,34 @@
   transform: none;
 }
 
+/* Thao tác phụ cạnh nút chính (chia đoạn lại, sửa Markdown, parse lại) */
+.btn-outline-dataset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-outline-dataset:hover:not(:disabled) {
+  background: var(--surface-sunken);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.btn-outline-dataset:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* Banners */
 
 /* Table Container & Table */
@@ -332,6 +360,17 @@
   color: var(--text);
 }
 
+.act-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Tài liệu đang chờ chia đoạn */
+.act-btn.is-attention {
+  background: var(--warning-subtle);
+  color: var(--warning-text);
+}
+
 .act-btn.delete:hover {
   background: var(--brand-subtle-strong);
   color: var(--danger-text);
@@ -473,6 +512,23 @@
 .doc-status-badge.is-active {
   background: var(--success-subtle);
   color: var(--success-text);
+}
+
+/* Đã parse, chưa chia đoạn: chưa dùng khi hỏi đáp */
+.doc-status-badge.is-parsed {
+  background: var(--info-subtle);
+  color: var(--info-text);
+}
+
+/* Markdown đổi sau lần chia đoạn gần nhất: đoạn cũ vẫn đang được dùng */
+.doc-status-badge.is-stale {
+  background: var(--warning-subtle);
+  color: var(--warning-text);
+}
+
+.doc-status-badge.is-edited {
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
 }
 
 .th-status,

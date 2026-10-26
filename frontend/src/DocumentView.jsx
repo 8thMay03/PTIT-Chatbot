@@ -4,10 +4,12 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Edit3,
   ExternalLink,
   FileText,
   Loader2,
   Play,
+  Scissors,
   Search,
   X,
 } from "lucide-react";
@@ -17,7 +19,9 @@ import OriginalDocumentViewer, {
   documentFileUrl,
 } from "./components/OriginalDocumentViewer";
 import { EMPTY, formatDate, formatSize } from "./lib/format";
+import { documentStatus, needsChunking } from "./lib/documentStatus";
 import MarkdownView from "./components/MarkdownView";
+import MarkdownEditorView from "./components/MarkdownEditorView";
 
 const PAGE_SIZES = [20, 50, 100];
 const FETCH_ALL_BATCH = 500;
@@ -121,8 +125,9 @@ function findMatchingElements(chunkText, chunkIndex, totalChunks, elements) {
 }
 
 /** Màn chi tiết, mở khi bấm vào một tài liệu trong danh sách kho. */
-export default function DocumentView({ documentId, onBack, parsingDocId, reindexing, onParse }) {
+export default function DocumentView({ documentId, onBack, busy: pipelineBusy, parsingDocId, chunkingDocId, onParse, onChunk }) {
   const [docDetail, setDocDetail] = useState(null);
+  const [editingMarkdown, setEditingMarkdown] = useState(false);
   const [docDetailLoading, setDocDetailLoading] = useState(false);
   const [docError, setDocError] = useState("");
 
@@ -420,10 +425,32 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
     setReloadToken((t) => t + 1);
   }
 
+  async function handleChunk() {
+    if (!docDetail) return;
+    await onChunk?.(docDetail);
+    setReloadToken((t) => t + 1);
+  }
+
   const isParsingThis = parsingDocId === documentId;
+  const isChunkingThis = chunkingDocId === documentId;
+  const status = documentStatus(docDetail);
+  const awaitingChunking = needsChunking(docDetail);
   const fileName = docDetail?.file_name || docDetail?.title || EMPTY;
   const fileType = (docDetail?.file_type || docDetail?.file_name?.split(".").pop() || "").toLowerCase();
   const showOriginal = docViewMode === "original" && docDetail;
+
+  if (editingMarkdown) {
+    return (
+      <MarkdownEditorView
+        documentId={documentId}
+        fileName={fileName}
+        onClose={(saved) => {
+          setEditingMarkdown(false);
+          if (saved) setReloadToken((t) => t + 1);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="doc-view-page">
@@ -434,19 +461,49 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
         </button>
 
         {docDetail && (
-          <button
-            type="button"
-            className="btn-parse-dataset"
-            style={{ marginLeft: "auto" }}
-            onClick={handleReparse}
-            disabled={isParsingThis || reindexing}
-            title="Parse lại file này và cập nhật vector embedding"
-          >
-            {isParsingThis ? <Loader2 size={14} className="spin" /> : <Play size={13} fill="currentColor" />}
-            <span>{isParsingThis ? "Đang parse..." : "Parse lại"}</span>
-          </button>
+          <div className="doc-view-top-actions">
+            <button
+              type="button"
+              className="btn-outline-dataset"
+              onClick={() => setEditingMarkdown(true)}
+              disabled={pipelineBusy}
+              title="Sửa tay bản Markdown khi parser đọc sai, đối chiếu với bản render"
+            >
+              <Edit3 size={14} />
+              <span>Sửa Markdown</span>
+            </button>
+            <button
+              type="button"
+              className="btn-outline-dataset"
+              onClick={handleReparse}
+              disabled={pipelineBusy}
+              title="Parse lại file gốc thành Markdown; các đoạn hiện có giữ nguyên tới khi chia đoạn"
+            >
+              {isParsingThis ? <Loader2 size={14} className="spin" /> : <Play size={13} fill="currentColor" />}
+              <span>{isParsingThis ? "Đang parse..." : "Parse lại"}</span>
+            </button>
+            <button
+              type="button"
+              className={awaitingChunking ? "btn-parse-dataset" : "btn-outline-dataset"}
+              onClick={handleChunk}
+              disabled={pipelineBusy}
+              title="Chia bản Markdown hiện tại thành các đoạn và nhúng vector"
+            >
+              {isChunkingThis ? <Loader2 size={14} className="spin" /> : <Scissors size={14} />}
+              <span>{isChunkingThis ? "Đang chia đoạn..." : awaitingChunking ? "Chia đoạn" : "Chia đoạn lại"}</span>
+            </button>
+          </div>
         )}
       </div>
+
+      {awaitingChunking && (
+        <div className="inline-alert is-warning doc-view-status-note" role="status">
+          <AlertTriangle size={16} />
+          <span>
+            {status.hint} Kiểm tra bản Markdown (sửa tay nếu parser đọc sai) rồi bấm <strong>Chia đoạn</strong>.
+          </span>
+        </div>
+      )}
 
       <div className="doc-view-split-layout">
         {/* ---- Cột trái: nội dung tài liệu ---- */}
@@ -457,6 +514,16 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
             </h2>
             <div className="doc-view-meta-row">
               <div className="doc-view-meta-info">
+                {docDetail && (
+                  <span className={`doc-status-badge is-${status.key}`} title={status.hint}>
+                    {status.label}
+                  </span>
+                )}
+                {docDetail?.markdown_edited && (
+                  <span className="doc-status-badge is-edited" title="Markdown của tài liệu đã được sửa tay">
+                    Đã sửa tay
+                  </span>
+                )}
                 <span>Dung lượng: {formatSize(docDetail?.size_bytes)}</span>
                 <span className="doc-meta-sep">Tải lên: {formatDate(docDetail?.created_at)}</span>
               </div>
@@ -619,7 +686,7 @@ export default function DocumentView({ documentId, onBack, parsingDocId, reindex
                 <p>
                   {isSearching
                     ? "Thử từ khóa khác, hoặc xóa ô tìm kiếm để xem toàn bộ."
-                    : "Bấm “Parse lại” để chia tài liệu thành các đoạn và nhúng vector."}
+                    : "Bấm “Chia đoạn” để chia bản Markdown thành các đoạn và nhúng vector."}
                 </p>
               </div>
             ) : (

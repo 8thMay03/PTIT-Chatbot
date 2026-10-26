@@ -41,6 +41,25 @@
   border-color: var(--border-strong);
 }
 
+.doc-view-top-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.doc-view-status-note {
+  margin-bottom: 12px;
+  font-size: 12.5px;
+}
+
+.doc-view-status-note svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
 .doc-view-split-layout {
   display: grid;
   grid-template-columns: 38% 1fr;

@@ -11,12 +11,14 @@ import {
   Loader2,
   Play,
   Plus,
+  Scissors,
   Search,
   Trash2,
   X,
 } from "lucide-react";
 import { API_BASE_URL } from "./api";
-import { apiError, EMPTY, formatDate, formatSize } from "./lib/format";
+import { apiError, formatDate, formatSize } from "./lib/format";
+import { documentStatus, needsChunking } from "./lib/documentStatus";
 import DocumentView from "./DocumentView";
 import ParserSelectionModal, { parserTitle } from "./components/ParserSelectionModal";
 import Modal from "./components/Modal";
@@ -71,9 +73,13 @@ export default function DatasetView({ onChanged }) {
   const [uploadTarget, setUploadTarget] = useState(null);
   const [uploadProgress, setUploadProgress] = useState("");
   const [reindexing, setReindexing] = useState(false);
+  const [rechunking, setRechunking] = useState(false);
   const [parseTarget, setParseTarget] = useState(null);
   const parseResolve = useRef(null);
   const [parsingDocId, setParsingDocId] = useState(null);
+  const [chunkingDocId, setChunkingDocId] = useState(null);
+  // Parse, chia đoạn và nạp lại cùng ghi vào kho: chỉ chạy một thao tác mỗi lúc.
+  const pipelineBusy = reindexing || rechunking || Boolean(parsingDocId) || Boolean(chunkingDocId);
   const [deleting, setDeleting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
@@ -261,10 +267,11 @@ export default function DatasetView({ onChanged }) {
     setUploading(false);
     setUploadProgress("");
 
+    const nextStep = "Kiểm tra Markdown rồi bấm “Chia đoạn” để đưa vào kho tri thức.";
     if (uploaded && !failures.length) {
-      toast.success(`Đã nạp ${uploaded} tài liệu vào kho${parserName ? ` bằng ${parserTitle(parserName)}` : ""}.`);
+      toast.success(`Đã parse ${uploaded} tài liệu${parserName ? ` bằng ${parserTitle(parserName)}` : ""}. ${nextStep}`);
     } else if (uploaded) {
-      toast.warning(`Đã nạp ${uploaded} tài liệu. ${failures.length} file bị lỗi: ${failures.join(" · ")}`);
+      toast.warning(`Đã parse ${uploaded} tài liệu. ${failures.length} file bị lỗi: ${failures.join(" · ")}`);
     } else {
       toast.error(failures.join(" · ") || "Không tải lên được tài liệu nào.");
     }
@@ -328,7 +335,7 @@ export default function DatasetView({ onChanged }) {
   }
 
   async function reindexAll() {
-    if (reindexing) return;
+    if (pipelineBusy) return;
     setReindexing(true);
     try {
       const response = await fetch(`${API_BASE_URL}/ingest`, { method: "POST" });
@@ -345,8 +352,32 @@ export default function DatasetView({ onChanged }) {
     }
   }
 
+  async function rechunkAll() {
+    if (pipelineBusy) return;
+    setRechunking(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/ingest/chunk`, { method: "POST" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(apiError(payload, "Không chia đoạn lại được kho tri thức."));
+      const detail = `${payload.documents ?? 0} tài liệu · ${payload.chunks ?? 0} đoạn`;
+      if (payload.skipped) {
+        toast.warning(
+          `Đã chia đoạn lại ${detail}. Bỏ qua ${payload.skipped} tài liệu chưa có bản parse đã lưu — hãy parse lại chúng.`
+        );
+      } else {
+        toast.success(`Đã chia đoạn lại ${detail}.`);
+      }
+      await loadDocuments();
+      onChanged?.();
+    } catch (err) {
+      toast.error(err.message || "Không chia đoạn lại được kho tri thức.");
+    } finally {
+      setRechunking(false);
+    }
+  }
+
   function requestParse(doc) {
-    if (!doc || parsingDocId || reindexing || parseTarget) return Promise.resolve();
+    if (!doc || pipelineBusy || parseTarget) return Promise.resolve();
     setParseTarget(doc);
     return new Promise((resolve) => { parseResolve.current = resolve; });
   }
@@ -358,20 +389,42 @@ export default function DatasetView({ onChanged }) {
   }
 
   async function parseDocument(doc, parserName) {
-    if (!doc || parsingDocId || reindexing) return;
+    if (!doc || pipelineBusy) return;
     setParsingDocId(doc.id);
     try {
       const response = await fetch(`${API_BASE_URL}/documents/${doc.id}/parse?parser_name=${encodeURIComponent(parserName)}`, { method: "POST" });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(apiError(payload, "Không parse được tài liệu."));
       const label = payload.title || payload.file_name || doc.file_name;
-      toast.success(`Đã parse “${label}” thành ${payload.chunk_count ?? 0} đoạn.`);
+      if (needsChunking(payload)) {
+        toast.success(`Đã parse lại “${label}”. Bấm “Chia đoạn” để kho tri thức dùng bản mới.`);
+      } else {
+        toast.success(`Đã parse lại “${label}”; nội dung không đổi nên các đoạn hiện có vẫn khớp.`);
+      }
       await loadDocuments();
       onChanged?.();
     } catch (err) {
       toast.error(err.message || "Lỗi khi parse tài liệu.");
     } finally {
       setParsingDocId(null);
+    }
+  }
+
+  async function chunkDocument(doc) {
+    if (!doc || pipelineBusy) return;
+    setChunkingDocId(doc.id);
+    try {
+      const response = await fetch(`${API_BASE_URL}/documents/${doc.id}/chunk`, { method: "POST" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(apiError(payload, "Không chia đoạn được tài liệu."));
+      const label = payload.title || payload.file_name || doc.file_name;
+      toast.success(`Đã chia “${label}” thành ${payload.chunk_count ?? 0} đoạn.`);
+      await loadDocuments();
+      onChanged?.();
+    } catch (err) {
+      toast.error(err.message || "Lỗi khi chia đoạn tài liệu.");
+    } finally {
+      setChunkingDocId(null);
     }
   }
 
@@ -412,9 +465,11 @@ export default function DatasetView({ onChanged }) {
       <DocumentView
         documentId={selectedDocId}
         onBack={() => setSelectedDocId(null)}
+        busy={pipelineBusy}
         parsingDocId={parsingDocId}
-        reindexing={reindexing}
+        chunkingDocId={chunkingDocId}
         onParse={requestParse}
+        onChunk={chunkDocument}
       />
       </>
     );
@@ -451,16 +506,27 @@ export default function DatasetView({ onChanged }) {
           <header className="dataset-view-header">
             <div className="dataset-view-title">
               <h2>Tài liệu</h2>
-              <p>Hãy đợi tài liệu parse xong trước khi bắt đầu hỏi đáp.</p>
+              <p>Tài liệu được parse khi tải lên; chỉ dùng được khi hỏi đáp sau khi đã chia đoạn.</p>
             </div>
 
             <div className="dataset-view-toolbar">
               <button
                 type="button"
+                className="btn-outline-dataset"
+                title="Chia đoạn và nhúng vector lại mọi tài liệu từ bản Markdown đã lưu, không parse lại (dùng sau khi đổi cấu hình chia đoạn)"
+                onClick={rechunkAll}
+                disabled={pipelineBusy}
+              >
+                {rechunking ? <Loader2 size={14} className="spin" /> : <Scissors size={14} />}
+                <span>{rechunking ? "Đang chia đoạn..." : "Chia đoạn lại toàn bộ"}</span>
+              </button>
+
+              <button
+                type="button"
                 className="btn-parse-dataset"
-                title="Chạy lại toàn bộ pipeline parse và nạp vector cho mọi tài liệu"
+                title="Parse lại mọi file gốc rồi chia đoạn và nhúng vector; bản Markdown đã sửa tay được giữ nguyên"
                 onClick={reindexAll}
-                disabled={reindexing || Boolean(parsingDocId)}
+                disabled={pipelineBusy}
               >
                 {reindexing ? <Loader2 size={14} className="spin" /> : <Play size={13} fill="currentColor" />}
                 <span>{reindexing ? "Đang nạp lại..." : "Nạp lại toàn bộ"}</span>
@@ -598,7 +664,9 @@ export default function DatasetView({ onChanged }) {
                     const isSelected = selectedIds.has(doc.id);
                     const fileName = localTitles[doc.id] || doc.file_name || doc.title || "tài liệu";
                     const isParsing = parsingDocId === doc.id;
+                    const isChunking = chunkingDocId === doc.id;
                     const isEnabled = enabledDocs[doc.id] !== false;
+                    const status = documentStatus(doc);
 
                     return (
                       <tr key={doc.id} className={isSelected ? "is-selected-row" : ""}>
@@ -646,8 +714,8 @@ export default function DatasetView({ onChanged }) {
                         </td>
 
                         <td className="td-status" data-label="Trạng thái">
-                          <span className={`doc-status-badge is-${doc.status || "active"}`}>
-                            {doc.status === "active" ? "Đã nạp" : doc.status || EMPTY}
+                          <span className={`doc-status-badge is-${status.key}`} title={status.hint}>
+                            {status.label}
                           </span>
                         </td>
 
@@ -667,9 +735,19 @@ export default function DatasetView({ onChanged }) {
                               title={`Parse lại ${fileName}`}
                               aria-label={`Parse lại ${fileName}`}
                               onClick={() => requestParse(doc)}
-                              disabled={isParsing || reindexing}
+                              disabled={pipelineBusy}
                             >
                               {isParsing ? <Loader2 size={14} className="spin" /> : <Play size={13} fill="currentColor" />}
+                            </button>
+                            <button
+                              type="button"
+                              className={`act-btn ${needsChunking(doc) ? "is-attention" : ""}`}
+                              title={`${needsChunking(doc) ? "Chia đoạn" : "Chia đoạn lại"} ${fileName}`}
+                              aria-label={`Chia đoạn ${fileName}`}
+                              onClick={() => chunkDocument(doc)}
+                              disabled={pipelineBusy}
+                            >
+                              {isChunking ? <Loader2 size={14} className="spin" /> : <Scissors size={14} />}
                             </button>
                             <button
                               type="button"

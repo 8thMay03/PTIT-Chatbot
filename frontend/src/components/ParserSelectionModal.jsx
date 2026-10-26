@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import Modal from "./Modal";
 import { API_BASE_URL } from "../api";
 import { apiError } from "../lib/format";
-import { FileText, Layers, Loader2, AlertCircle, RefreshCw, ArrowRight, Info, Upload } from "lucide-react";
+import { FileText, Layers, Loader2, AlertCircle, AlertTriangle, RefreshCw, ArrowRight, Info, Upload } from "lucide-react";
 import "../styles/parser-selection.css";
 
 const PARSER_DETAILS = {
@@ -60,11 +60,16 @@ export default function ParserSelectionModal({ document, upload, busy, progress,
   const files = upload?.files || [];
   const otherCount = files.length - (upload?.choiceCount ?? files.length);
   const busyText = upload
-    ? `Đang tải lên và xử lý${progress ? ` (${progress})` : ""}. PDF lớn có thể mất vài phút; vui lòng chờ hoàn tất.`
-    : "Đang xử lý và cập nhật kho tri thức. PDF lớn có thể mất vài phút; vui lòng chờ hoàn tất.";
-  const idleText = upload
-    ? `Tài liệu được parse ngay sau khi tải lên${otherCount > 0 ? `; ${otherCount} tệp không hỗ trợ parser này sẽ dùng parser mặc định` : ""}. Có thể parse lại bằng parser khác sau.`
-    : "Parse lại sẽ cập nhật các đoạn nội dung và dữ liệu tìm kiếm của tài liệu này.";
+    ? `Đang tải lên và parse${progress ? ` (${progress})` : ""}. PDF lớn có thể mất vài phút; vui lòng chờ hoàn tất.`
+    : "Đang parse lại tài liệu. PDF lớn có thể mất vài phút; vui lòng chờ hoàn tất.";
+  // Parse lại ghi đè bản Markdown đã sửa tay: cảnh báo trước khi người dùng xác nhận.
+  const overwritesEdit = !upload && Boolean(document?.markdown_edited);
+  let idleText = "Parse lại chỉ cập nhật bản Markdown; các đoạn hiện có vẫn được dùng khi hỏi đáp tới khi bấm “Chia đoạn”.";
+  if (upload) {
+    idleText = `Tài liệu được parse ngay sau khi tải lên${otherCount > 0 ? `; ${otherCount} tệp không hỗ trợ parser này sẽ dùng parser mặc định` : ""}, rồi chờ bạn kiểm tra Markdown và bấm “Chia đoạn”. Có thể parse lại bằng parser khác sau.`;
+  } else if (overwritesEdit) {
+    idleText = "Tài liệu này có bản Markdown đã sửa tay; parse lại sẽ ghi đè các chỉnh sửa đó. Các đoạn hiện có vẫn được dùng khi hỏi đáp tới khi bấm “Chia đoạn”.";
+  }
 
   return (
     <Modal open onClose={() => { if (!busy) onClose(); }}
@@ -107,8 +112,8 @@ export default function ParserSelectionModal({ document, upload, busy, progress,
             </label>;
           })}
         </fieldset> : <div className="parser-state" role="alert"><AlertCircle size={24} /><strong>Chưa có parser tương thích</strong><p>Định dạng tài liệu này chưa được hỗ trợ.</p></div>)}
-        {!loading && !error && parsers.length > 0 && <div className="parser-notice" role={busy ? "status" : undefined}>
-          {busy ? <Loader2 size={16} className="parser-spinner" /> : <Info size={16} />}
+        {!loading && !error && parsers.length > 0 && <div className={`parser-notice ${overwritesEdit && !busy ? "is-warning" : ""}`} role={busy ? "status" : undefined}>
+          {busy ? <Loader2 size={16} className="parser-spinner" /> : overwritesEdit ? <AlertTriangle size={16} /> : <Info size={16} />}
           <span>{busy ? busyText : idleText}</span>
         </div>}
       </div>
