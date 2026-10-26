@@ -293,3 +293,51 @@ def test_get_document_reads_text_with_stored_parser(monkeypatch, tmp_path) -> No
     assert response.status_code == 200
     assert response.json()["full_text"] == "# From alternative\n"
     assert preview_calls == [{"parser_name": "alternative"}]
+
+
+def _source_file_document(monkeypatch, source) -> None:
+    document = SimpleNamespace(id="doc-file", source_path=source.name)
+    monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 1))
+    monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: source)
+
+
+def test_document_file_downloads_as_attachment_by_default(monkeypatch, tmp_path) -> None:
+    source = tmp_path / "policy.pdf"
+    source.write_bytes(b"%PDF-1.7 body")
+    _source_file_document(monkeypatch, source)
+
+    response = client.get("/api/documents/doc-file/file")
+
+    assert response.status_code == 200
+    assert response.content == b"%PDF-1.7 body"
+    assert response.headers["content-disposition"].startswith("attachment;")
+
+
+def test_document_file_inline_for_original_view(monkeypatch, tmp_path) -> None:
+    source = tmp_path / "Sổ tay.pdf"
+    source.write_bytes(b"%PDF-1.7 body")
+    _source_file_document(monkeypatch, source)
+
+    response = client.get("/api/documents/doc-file/file", params={"inline": "true"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.headers["content-disposition"].startswith("inline;")
+    assert response.headers["x-content-type-options"] == "nosniff"
+
+
+def test_document_file_inline_text_is_plain_text(monkeypatch, tmp_path) -> None:
+    source = tmp_path / "notes.md"
+    source.write_text("# <script>alert(1)</script>", encoding="utf-8")
+    _source_file_document(monkeypatch, source)
+
+    response = client.get("/api/documents/doc-file/file", params={"inline": "true"})
+
+    assert response.headers["content-type"] == "text/plain; charset=utf-8"
+    assert response.headers["x-content-type-options"] == "nosniff"
+
+
+def test_document_file_missing_source_returns_404(monkeypatch, tmp_path) -> None:
+    _source_file_document(monkeypatch, tmp_path / "gone.pdf")
+
+    assert client.get("/api/documents/doc-file/file", params={"inline": "true"}).status_code == 404

@@ -238,7 +238,11 @@ def get_document_chunks_api(
 
 
 @router.get("/documents/{document_id}/file")
-def download_document(document_id: str, session: Session = Depends(get_session)) -> FileResponse:
+def download_document(
+    document_id: str,
+    inline: bool = Query(default=False),
+    session: Session = Depends(get_session),
+) -> FileResponse:
     row = get_document_with_chunk_count(session, document_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
@@ -249,7 +253,15 @@ def download_document(document_id: str, session: Session = Depends(get_session))
         raise HTTPException(status_code=404, detail="File nguồn không còn trên đĩa.")
 
     media_type = "text/plain; charset=utf-8" if path.suffix.lower() in {".md", ".txt"} else None
-    return FileResponse(path, filename=path.name, media_type=media_type)
+    # inline: trình duyệt hiển thị bản gốc (vd. trình xem PDF) thay vì tải xuống.
+    # nosniff giữ đúng kiểu đã khai báo để tệp người dùng tải lên không bị đoán thành HTML.
+    return FileResponse(
+        path,
+        filename=path.name,
+        media_type=media_type,
+        content_disposition_type="inline" if inline else "attachment",
+        headers={"X-Content-Type-Options": "nosniff"},
+    )
 
 
 @router.get("/parsers")
