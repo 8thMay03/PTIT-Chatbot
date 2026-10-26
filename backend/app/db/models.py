@@ -21,7 +21,12 @@ class Document(Base):
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     file_type: Mapped[str | None] = mapped_column(String, nullable=True)
     content_hash: Mapped[str] = mapped_column(String, nullable=False)
+    # "parsed": parsed_text is newer than the chunks; "active": chunks match parsed_text.
     status: Mapped[str] = mapped_column(String, nullable=False, default="active")
+    # Output of the parse step (or a manual edit) that the chunk step reads. Deferred:
+    # document listings must not load every handbook's full text.
+    parsed_text: Mapped[str | None] = mapped_column(Text, nullable=True, deferred=True)
+    parsed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     document_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

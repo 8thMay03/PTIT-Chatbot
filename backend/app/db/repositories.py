@@ -20,6 +20,7 @@ class DocumentRecord:
     file_type: str | None
     content_hash: str
     metadata: dict | None = None
+    parsed_text: str | None = None
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ def replace_knowledge_base(
     session.execute(delete(Document))
     session.flush()
 
+    parsed_at = datetime.now(timezone.utc)
     session.add_all(
         Document(
             id=document.id,
@@ -51,25 +53,14 @@ def replace_knowledge_base(
             file_type=document.file_type,
             content_hash=document.content_hash,
             status="active",
+            parsed_text=document.parsed_text,
+            parsed_at=parsed_at if document.parsed_text is not None else None,
             document_metadata=document.metadata,
         )
         for document in documents
     )
     session.flush()
-    session.add_all(
-        Chunk(
-            id=chunk.id,
-            document_id=chunk.document_id,
-            chunk_index=chunk.chunk_index,
-            text=chunk.text,
-            search_text=chunk.search_text or chunk.text,
-            token_count=chunk.token_count,
-            vector_id=chunk.vector_id,
-            embedding=chunk.embedding,
-            chunk_metadata=chunk.metadata,
-        )
-        for chunk in chunks
-    )
+    session.add_all(_chunk_model(chunk) for chunk in chunks)
     session.flush()
 
 
@@ -116,50 +107,68 @@ def get_document_parsers(session: Session) -> dict[str, str]:
     return parsers
 
 
-def upsert_document(
-    session: Session,
-    document: DocumentRecord,
-    chunks: list[ChunkRecord],
-) -> Document:
+def get_edited_markdown(session: Session) -> dict[str, str]:
+    """Map source_path to manually edited Markdown, which bulk re-parsing must keep."""
+    rows = session.execute(
+        select(Document.source_path, Document.parsed_text, Document.document_metadata).where(
+            Document.parsed_text.is_not(None)
+        )
+    )
+    return {
+        source_path: text
+        for source_path, text, metadata in rows
+        if (metadata or {}).get("markdown_edited")
+    }
+
+
+def save_parsed_document(session: Session, document: DocumentRecord) -> Document:
+    """Store a parse result or manual edit without touching the document's chunks.
+
+    Existing chunks keep serving retrieval until the chunk step replaces them. The
+    document stays "active" only when its text is unchanged since they were built.
+    """
+    now = datetime.now(timezone.utc)
     existing = session.get(Document, document.id)
     if existing is None:
-        existing = Document(
-            id=document.id,
-            source_path=document.source_path,
-            title=document.title,
-            file_type=document.file_type,
-            content_hash=document.content_hash,
-            status="active",
-            document_metadata=document.metadata,
-        )
+        existing = Document(id=document.id, status="parsed")
         session.add(existing)
     else:
-        existing.source_path = document.source_path
-        existing.title = document.title
-        existing.file_type = document.file_type
-        existing.content_hash = document.content_hash
-        existing.status = "active"
-        existing.document_metadata = document.metadata
-        existing.updated_at = datetime.now(timezone.utc)
-        session.execute(delete(Chunk).where(Chunk.document_id == document.id))
-
-    session.flush()
-    session.add_all(
-        Chunk(
-            id=chunk.id,
-            document_id=chunk.document_id,
-            chunk_index=chunk.chunk_index,
-            text=chunk.text,
-            search_text=chunk.search_text or chunk.text,
-            token_count=chunk.token_count,
-            vector_id=chunk.vector_id,
-            embedding=chunk.embedding,
-            chunk_metadata=chunk.metadata,
-        )
-        for chunk in chunks
-    )
+        if existing.status != "active" or existing.content_hash != document.content_hash:
+            existing.status = "parsed"
+        existing.updated_at = now
+    existing.source_path = document.source_path
+    existing.title = document.title
+    existing.file_type = document.file_type
+    existing.content_hash = document.content_hash
+    existing.parsed_text = document.parsed_text
+    existing.parsed_at = now
+    existing.document_metadata = document.metadata
     session.flush()
     return existing
+
+
+def replace_document_chunks(session: Session, document: Document, chunks: list[ChunkRecord]) -> None:
+    """Replace every chunk of a document; its chunks now match its parsed text."""
+    session.execute(delete(Chunk).where(Chunk.document_id == document.id))
+    session.flush()
+    session.add_all(_chunk_model(chunk) for chunk in chunks)
+    document.status = "active"
+    document.updated_at = datetime.now(timezone.utc)
+    session.flush()
+
+
+def _chunk_model(chunk: ChunkRecord) -> Chunk:
+    return Chunk(
+        id=chunk.id,
+        document_id=chunk.document_id,
+        chunk_index=chunk.chunk_index,
+        text=chunk.text,
+        search_text=chunk.search_text or chunk.text,
+        token_count=chunk.token_count,
+        vector_id=chunk.vector_id,
+        embedding=chunk.embedding,
+        chunk_metadata=chunk.metadata,
+    )
 
 
 def delete_document(session: Session, document_id: str) -> Document | None:
@@ -232,10 +241,23 @@ def serialize_document(document: Document, chunk_count: int, size_bytes: int | N
         "source_path": document.source_path,
         "file_type": document.file_type,
         "status": document.status,
+        "markdown_edited": bool(metadata.get("markdown_edited")),
         "chunk_count": chunk_count,
         "size_bytes": size_bytes,
         "created_at": document.created_at,
         "updated_at": document.updated_at,
+    }
+
+
+def serialize_markdown(document: Document) -> dict:
+    """A document's stored Markdown with the hash an editor sends back to detect conflicts."""
+    return {
+        "document_id": document.id,
+        "text": document.parsed_text,
+        "content_hash": document.content_hash,
+        "status": document.status,
+        "parsed_at": document.parsed_at,
+        "markdown_edited": bool((document.document_metadata or {}).get("markdown_edited")),
     }
 
 

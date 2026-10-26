@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
@@ -6,8 +8,11 @@ from app.db.repositories import (
     ChunkRecord,
     DocumentRecord,
     delete_document,
+    get_edited_markdown,
     list_documents,
-    upsert_document,
+    replace_document_chunks,
+    save_parsed_document,
+    serialize_document,
 )
 
 
@@ -25,6 +30,7 @@ def _document(doc_id: str = "doc-1", title: str = "Handbook") -> tuple[DocumentR
         file_type="md",
         content_hash="abc",
         metadata={"size_bytes": 12},
+        parsed_text="# Handbook\nNội dung tài liệu",
     )
     chunks = [
         ChunkRecord(
@@ -39,45 +45,92 @@ def _document(doc_id: str = "doc-1", title: str = "Handbook") -> tuple[DocumentR
     return record, chunks
 
 
-def test_upsert_document_inserts_and_replaces_chunks() -> None:
-    session = _session()
-    record, chunks = _document()
+def _index(session: Session, record: DocumentRecord, chunks: list[ChunkRecord]) -> Document:
+    document = save_parsed_document(session, record)
+    replace_document_chunks(session, document, chunks)
+    session.commit()
+    return document
 
-    upsert_document(session, record, chunks)
+
+def test_save_parsed_document_stores_text_without_chunks() -> None:
+    session = _session()
+    record, _chunks = _document()
+
+    document = save_parsed_document(session, record)
     session.commit()
 
+    assert document.status == "parsed"
+    assert document.parsed_text == record.parsed_text
+    assert document.parsed_at is not None
+    assert list_documents(session)[0][1] == 0
+
+
+def test_replace_document_chunks_activates_and_replaces() -> None:
+    session = _session()
+    record, chunks = _document()
+    document = _index(session, record, chunks)
+    assert document.status == "active"
+
     updated_chunks = [
-        ChunkRecord(
-            id="doc-1-chunk-0",
-            document_id="doc-1",
-            chunk_index=0,
-            text="Nội dung mới",
-            vector_id="doc-1-chunk-0",
-        ),
-        ChunkRecord(
-            id="doc-1-chunk-1",
-            document_id="doc-1",
-            chunk_index=1,
-            text="Đoạn thứ hai",
-            vector_id="doc-1-chunk-1",
-        ),
+        ChunkRecord(id="doc-1-chunk-0", document_id="doc-1", chunk_index=0, text="Nội dung mới", vector_id="doc-1-chunk-0"),
+        ChunkRecord(id="doc-1-chunk-1", document_id="doc-1", chunk_index=1, text="Đoạn thứ hai", vector_id="doc-1-chunk-1"),
     ]
-    upsert_document(session, record, updated_chunks)
+    replace_document_chunks(session, document, updated_chunks)
     session.commit()
 
     documents = list_documents(session)
     assert len(documents) == 1
-    document, chunk_count = documents[0]
-    assert document.id == "doc-1"
-    assert chunk_count == 2
-    assert session.get(Chunk, "doc-1-chunk-1") is not None
+    assert documents[0][0].id == "doc-1"
+    assert documents[0][1] == 2
+    assert session.get(Chunk, "doc-1-chunk-1").text == "Đoạn thứ hai"
+
+
+def test_reparse_keeps_chunks_and_status_follows_content() -> None:
+    session = _session()
+    record, chunks = _document()
+    _index(session, record, chunks)
+
+    # Same text again: the chunks still match it.
+    same = save_parsed_document(session, record)
+    session.commit()
+    assert same.status == "active"
+
+    changed = save_parsed_document(session, replace(record, content_hash="def", parsed_text="# Mới"))
+    session.commit()
+    assert changed.status == "parsed"
+    assert changed.parsed_text == "# Mới"
+    # Old chunks keep serving retrieval until the chunk step replaces them.
+    assert session.get(Chunk, "doc-1-chunk-0") is not None
+
+    # Back to the indexed text is still "parsed": the chunks were not rebuilt in between.
+    restored = save_parsed_document(session, record)
+    session.commit()
+    assert restored.status == "parsed"
+
+
+def test_edited_markdown_and_serialized_flag() -> None:
+    session = _session()
+    record, _chunks = _document()
+    save_parsed_document(session, record)
+    edited, _ = _document("doc-2")
+    edited = replace(
+        edited,
+        source_path="data/edited.md",
+        metadata={"markdown_edited": True},
+        parsed_text="# Sửa tay",
+    )
+    document = save_parsed_document(session, edited)
+    session.commit()
+
+    assert get_edited_markdown(session) == {"data/edited.md": "# Sửa tay"}
+    assert serialize_document(document, 0)["markdown_edited"] is True
+    assert serialize_document(session.get(Document, "doc-1"), 0)["markdown_edited"] is False
 
 
 def test_delete_document_removes_chunks() -> None:
     session = _session()
     record, chunks = _document()
-    upsert_document(session, record, chunks)
-    session.commit()
+    _index(session, record, chunks)
 
     deleted = delete_document(session, "doc-1")
     session.commit()

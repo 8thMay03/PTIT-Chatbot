@@ -61,6 +61,11 @@ class IngestResponse(BaseModel):
     collection: str
 
 
+class ChunkAllResponse(IngestResponse):
+    # Documents without a stored parse result (indexed before parse/chunk were split).
+    skipped: int = 0
+
+
 class DocumentItem(BaseModel):
     id: str
     title: str
@@ -68,6 +73,7 @@ class DocumentItem(BaseModel):
     source_path: str
     file_type: str | None = None
     status: str = "active"
+    markdown_edited: bool = False
     chunk_count: int = 0
     size_bytes: int | None = None
     created_at: datetime | None = None
@@ -77,6 +83,32 @@ class DocumentItem(BaseModel):
 class DocumentDetail(DocumentItem):
     preview: str | None = None
     full_text: str | None = None
+
+
+# Large handbooks parse to a few hundred thousand characters; the cap only rejects abuse.
+MAX_MARKDOWN_CHARS = 5_000_000
+
+
+class DocumentMarkdown(BaseModel):
+    document_id: str
+    text: str
+    content_hash: str
+    status: str
+    parsed_at: datetime | None = None
+    markdown_edited: bool = False
+
+
+class UpdateMarkdownRequest(BaseModel):
+    text: str = Field(max_length=MAX_MARKDOWN_CHARS)
+    # content_hash the editor started from; a mismatch means someone else changed it.
+    base_hash: str | None = None
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Markdown không được để trống.")
+        return value
 
 
 class ChunkItem(BaseModel):

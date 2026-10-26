@@ -77,7 +77,7 @@ def test_pipeline_embeds_configured_field(
         encoding="utf-8",
     )
 
-    pipeline.ingest_path(source)
+    pipeline.chunk_document(pipeline.parse_path(source)["id"])
 
     assert embedding_model.embedded, "pipeline phải gọi embedding model"
     for embedded in embedding_model.embedded:
@@ -105,7 +105,7 @@ def test_pipeline_payload_search_text_matches_record(tmp_path: Path, monkeypatch
         encoding="utf-8",
     )
 
-    pipeline.ingest_path(source)
+    pipeline.chunk_document(pipeline.parse_path(source)["id"])
 
     with sessionmaker(bind=engine)() as session:
         chunks = session.scalars(select(Chunk)).all()

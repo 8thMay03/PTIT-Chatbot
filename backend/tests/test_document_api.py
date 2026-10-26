@@ -49,15 +49,15 @@ def test_list_documents_returns_serialized_items(monkeypatch) -> None:
 def test_upload_document_uses_ingestion_pipeline(monkeypatch) -> None:
     monkeypatch.setattr(
         routes.ingestion_pipeline,
-        "ingest_upload",
+        "parse_upload",
         lambda filename, content: {
             "id": "doc-1",
             "title": "faq",
             "file_name": "faq.md",
             "source_path": "data/faq.md",
             "file_type": "md",
-            "status": "active",
-            "chunk_count": 2,
+            "status": "parsed",
+            "chunk_count": 0,
             "size_bytes": len(content),
             "created_at": None,
             "updated_at": None,
@@ -71,14 +71,15 @@ def test_upload_document_uses_ingestion_pipeline(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json()["file_name"] == "faq.md"
-    assert response.json()["chunk_count"] == 2
+    assert response.json()["status"] == "parsed"
+    assert response.json()["chunk_count"] == 0
 
 
 def test_upload_document_maps_validation_errors(monkeypatch) -> None:
     def fail_upload(filename, content):
         raise DocumentUploadError("Chỉ hỗ trợ tài liệu .md, .txt.")
 
-    monkeypatch.setattr(routes.ingestion_pipeline, "ingest_upload", fail_upload)
+    monkeypatch.setattr(routes.ingestion_pipeline, "parse_upload", fail_upload)
 
     response = client.post(
         "/api/documents",
@@ -113,7 +114,7 @@ def test_parse_single_document_passes_existing_identity(monkeypatch, tmp_path) -
     monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: source)
     calls = []
 
-    def ingest_path(path, *, document_id=None):
+    def parse_path(path, *, document_id=None):
         calls.append((path, document_id))
         return {
             "id": document_id or "new-path-id",
@@ -121,14 +122,14 @@ def test_parse_single_document_passes_existing_identity(monkeypatch, tmp_path) -
             "file_name": "moved.docx",
             "source_path": document.source_path,
             "file_type": "docx",
-            "status": "active",
+            "status": "parsed",
             "chunk_count": 3,
             "size_bytes": source.stat().st_size,
             "created_at": None,
             "updated_at": None,
         }
 
-    monkeypatch.setattr(routes.ingestion_pipeline, "ingest_path", ingest_path)
+    monkeypatch.setattr(routes.ingestion_pipeline, "parse_path", parse_path)
 
     response = client.post("/api/documents/historical-id/parse")
 
@@ -152,7 +153,7 @@ def test_parser_options_and_explicit_selection(monkeypatch, tmp_path) -> None:
         calls.append(options)
         raise routes.DocumentParseError("unsupported selection")
 
-    monkeypatch.setattr(routes.ingestion_pipeline, "ingest_path", reject)
+    monkeypatch.setattr(routes.ingestion_pipeline, "parse_path", reject)
     response = client.post("/api/documents/note/parse?parser_name=docling")
     assert response.status_code == 422
     assert calls == [{"document_id": "note", "parser_name": "docling"}]
@@ -186,7 +187,7 @@ def test_upload_document_passes_selected_parser(monkeypatch) -> None:
         calls.append((filename, options))
         raise DocumentParseError("Parser 'llamaparse' chưa được đăng ký.")
 
-    monkeypatch.setattr(routes.ingestion_pipeline, "ingest_upload", reject)
+    monkeypatch.setattr(routes.ingestion_pipeline, "parse_upload", reject)
 
     response = client.post(
         "/api/documents",
@@ -214,6 +215,7 @@ def test_get_document_returns_full_text(monkeypatch, tmp_path) -> None:
         source_path="full-doc.md",
         file_type="md",
         status="active",
+        parsed_text=None,
         document_metadata=None,
         created_at=None,
         updated_at=None,
@@ -237,6 +239,7 @@ def test_get_document_falls_back_to_chunks_when_source_missing(monkeypatch) -> N
         source_path="data/missing.md",
         file_type="md",
         status="active",
+        parsed_text=None,
         document_metadata=None,
         created_at=None,
         updated_at=None,
@@ -277,6 +280,7 @@ def test_get_document_reads_text_with_stored_parser(monkeypatch, tmp_path) -> No
         source_path="chosen.custom",
         file_type="custom",
         status="active",
+        parsed_text=None,
         document_metadata={"parser": "alternative"},
         created_at=None,
         updated_at=None,
@@ -341,3 +345,162 @@ def test_document_file_missing_source_returns_404(monkeypatch, tmp_path) -> None
     _source_file_document(monkeypatch, tmp_path / "gone.pdf")
 
     assert client.get("/api/documents/doc-file/file", params={"inline": "true"}).status_code == 404
+
+
+def _stored_document(**overrides):
+    values = dict(
+        id="doc-md",
+        title="policy",
+        source_path="data/policy.pdf",
+        file_type="pdf",
+        status="parsed",
+        content_hash="hash-1",
+        parsed_text="# Chính sách\n\nNội dung đã parse.",
+        parsed_at=None,
+        document_metadata={"markdown_edited": True},
+        created_at=None,
+        updated_at=None,
+    )
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
+def _document_item(**overrides) -> dict:
+    item = {
+        "id": "doc-md",
+        "title": "policy",
+        "file_name": "policy.pdf",
+        "source_path": "data/policy.pdf",
+        "file_type": "pdf",
+        "status": "active",
+        "markdown_edited": False,
+        "chunk_count": 5,
+        "size_bytes": 10,
+        "created_at": None,
+        "updated_at": None,
+    }
+    item.update(overrides)
+    return item
+
+
+def test_get_document_prefers_stored_markdown(monkeypatch) -> None:
+    document = _stored_document(parsed_text="# Stored\n" + "x" * 3000)
+    monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 2))
+    monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: None)
+
+    def fail(*args, **kwargs):
+        raise AssertionError("stored Markdown must not be re-read from the parser cache")
+
+    monkeypatch.setattr(routes, "read_document_text", fail)
+    monkeypatch.setattr(routes, "read_preview", fail)
+
+    response = client.get("/api/documents/doc-md")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["full_text"] == document.parsed_text
+    assert data["preview"].startswith("# Stored") and data["preview"].endswith("…")
+    assert len(data["preview"]) <= routes.PREVIEW_CHAR_LIMIT + 1
+    assert data["status"] == "parsed"
+    assert data["markdown_edited"] is True
+
+
+def test_chunk_single_document(monkeypatch) -> None:
+    calls = []
+
+    def chunk(document_id):
+        calls.append(document_id)
+        if document_id == "missing":
+            return None
+        if document_id == "legacy":
+            raise routes.DocumentStateError("Tài liệu chưa có bản parse đã lưu.")
+        return _document_item(id=document_id)
+
+    monkeypatch.setattr(routes.ingestion_pipeline, "chunk_document", chunk)
+
+    response = client.post("/api/documents/doc-md/chunk")
+    assert response.status_code == 200
+    assert response.json()["status"] == "active"
+    assert client.post("/api/documents/missing/chunk").status_code == 404
+    response = client.post("/api/documents/legacy/chunk")
+    assert response.status_code == 409
+    assert "chưa có bản parse" in response.json()["detail"]
+    assert calls == ["doc-md", "missing", "legacy"]
+
+
+def test_chunk_all_documents(monkeypatch) -> None:
+    monkeypatch.setattr(
+        routes.ingestion_pipeline,
+        "chunk_documents",
+        lambda: {"documents": 3, "chunks": 42, "skipped": 1, "collection": "ptit"},
+    )
+
+    response = client.post("/api/ingest/chunk")
+
+    assert response.status_code == 200
+    assert response.json() == {"documents": 3, "chunks": 42, "skipped": 1, "collection": "ptit"}
+
+    def conflict():
+        raise routes.DocumentStateError("Tài liệu vừa được parse lại trong lúc chia đoạn.")
+
+    monkeypatch.setattr(routes.ingestion_pipeline, "chunk_documents", conflict)
+    assert client.post("/api/ingest/chunk").status_code == 409
+
+
+def test_get_document_markdown(monkeypatch) -> None:
+    documents = {"doc-md": _stored_document(), "legacy": _stored_document(id="legacy", parsed_text=None)}
+    monkeypatch.setattr(
+        routes,
+        "get_document_with_chunk_count",
+        lambda session, doc_id: (documents[doc_id], 1) if doc_id in documents else None,
+    )
+
+    response = client.get("/api/documents/doc-md/markdown")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "document_id": "doc-md",
+        "text": "# Chính sách\n\nNội dung đã parse.",
+        "content_hash": "hash-1",
+        "status": "parsed",
+        "parsed_at": None,
+        "markdown_edited": True,
+    }
+    assert client.get("/api/documents/missing/markdown").status_code == 404
+    assert client.get("/api/documents/legacy/markdown").status_code == 409
+
+
+def test_update_document_markdown(monkeypatch) -> None:
+    calls = []
+
+    def save(document_id, text, *, base_hash=None):
+        calls.append((document_id, text, base_hash))
+        if document_id == "missing":
+            return None
+        if base_hash == "stale":
+            raise routes.DocumentStateError("Markdown của tài liệu đã thay đổi.")
+        return {
+            "document_id": document_id,
+            "text": text,
+            "content_hash": "hash-2",
+            "status": "parsed",
+            "parsed_at": None,
+            "markdown_edited": True,
+        }
+
+    monkeypatch.setattr(routes.ingestion_pipeline, "save_markdown", save)
+
+    response = client.put("/api/documents/doc-md/markdown", json={"text": "# Sửa tay", "base_hash": "hash-1"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "parsed"
+    assert response.json()["markdown_edited"] is True
+    # The new hash lets the editor detect a conflicting change on its next save.
+    assert response.json()["content_hash"] == "hash-2"
+    assert client.put("/api/documents/doc-md/markdown", json={"text": "# Sửa", "base_hash": "stale"}).status_code == 409
+    assert client.put("/api/documents/missing/markdown", json={"text": "# Sửa"}).status_code == 404
+    assert client.put("/api/documents/doc-md/markdown", json={"text": "  \n "}).status_code == 422
+    assert calls == [
+        ("doc-md", "# Sửa tay", "hash-1"),
+        ("doc-md", "# Sửa", "stale"),
+        ("missing", "# Sửa", None),
+    ]

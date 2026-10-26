@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.api.schemas import (
     ChatRequest,
     ChatResponse,
+    ChunkAllResponse,
     ChunkItem,
     ConversationDetail,
     ConversationItem,
@@ -21,6 +22,7 @@ from app.api.schemas import (
     DocumentDetail,
     DocumentItem,
     DocumentListResponse,
+    DocumentMarkdown,
     FullConfigResponse,
     IngestResponse,
     RenameConversationRequest,
@@ -28,6 +30,7 @@ from app.api.schemas import (
     TestLLMRequest,
     TestLLMResponse,
     UpdateConfigRequest,
+    UpdateMarkdownRequest,
 )
 from app.db import check_db_health, get_session
 from app.core.config import (
@@ -53,6 +56,7 @@ from app.db.repositories import (
     list_documents,
     rename_conversation,
     serialize_document,
+    serialize_markdown,
 )
 from app.generation.rag_chain import rag_chain
 from app.guardrails import OUT_OF_SCOPE_ANSWER, filter_safe_history
@@ -60,8 +64,9 @@ from app.generation.citations import public_citations
 from app.generation.llm import _normalize_answer_citations, stream_answer_deltas_with_llm
 from app.llm import CONTENT_DELTA, REASONING_DELTA, LLMStreamError, StreamDelta
 from app.ingestion import ingestion_pipeline
+from app.ingestion.pipeline import DocumentStateError
 from app.parsers import DocumentParseError, read_document_text, registry, resolve_parser_name
-from app.ingestion.uploads import DocumentUploadError, read_preview, resolve_source_path
+from app.ingestion.uploads import PREVIEW_CHAR_LIMIT, DocumentUploadError, read_preview, resolve_source_path
 from app.llm.factory import create_llm_provider_from_config
 
 router = APIRouter()
@@ -161,6 +166,16 @@ def ingest() -> IngestResponse:
     return IngestResponse(**result)
 
 
+@router.post("/ingest/chunk", response_model=ChunkAllResponse)
+def chunk_all_documents() -> ChunkAllResponse:
+    """Re-chunk every document from its stored Markdown, e.g. after changing chunk settings."""
+    try:
+        result = ingestion_pipeline.chunk_documents()
+    except DocumentStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return ChunkAllResponse(**result)
+
+
 @router.get("/documents", response_model=DocumentListResponse)
 def get_documents(session: Session = Depends(get_session)) -> DocumentListResponse:
     documents = [
@@ -177,8 +192,32 @@ def get_document(document_id: str, session: Session = Depends(get_session)) -> D
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
 
     document, chunk_count = row
-    stored_parser = (document.document_metadata or {}).get("parser")
     source_p = resolve_source_path(document.source_path)
+    if document.parsed_text is not None:
+        # The stored parse result (or manual edit) is exactly what the chunk step reads.
+        full_text = document.parsed_text
+        preview = full_text
+        if len(preview) > PREVIEW_CHAR_LIMIT:
+            preview = preview[:PREVIEW_CHAR_LIMIT].rstrip() + "…"
+    else:
+        # Documents indexed before parse results were stored in the database.
+        full_text, preview = _legacy_document_text(session, document, source_p)
+
+    # Tự động đồng bộ lại source_path nếu file nằm ở thư mục con khác với đường dẫn cũ trong DB
+    if source_p is not None and source_p.is_file():
+        try:
+            rel_posix = source_p.relative_to(PROJECT_ROOT.resolve()).as_posix()
+            if rel_posix != document.source_path:
+                document.source_path = rel_posix
+                session.commit()
+        except Exception:
+            pass
+
+    return DocumentDetail(**_document_payload(document, chunk_count), preview=preview, full_text=full_text)
+
+
+def _legacy_document_text(session: Session, document, source_p: Path | None) -> tuple[str | None, str | None]:
+    stored_parser = (document.document_metadata or {}).get("parser")
     full_text = None
     if source_p is not None and source_p.is_file():
         try:
@@ -195,18 +234,7 @@ def get_document(document_id: str, session: Session = Depends(get_session)) -> D
     )
     if not full_text:
         full_text = preview
-
-    # Tự động đồng bộ lại source_path nếu file nằm ở thư mục con khác với đường dẫn cũ trong DB
-    if source_p is not None and source_p.is_file():
-        try:
-            rel_posix = source_p.relative_to(PROJECT_ROOT.resolve()).as_posix()
-            if rel_posix != document.source_path:
-                document.source_path = rel_posix
-                session.commit()
-        except Exception:
-            pass
-
-    return DocumentDetail(**_document_payload(document, chunk_count), preview=preview, full_text=full_text)
+    return full_text, preview
 
 
 @router.get("/documents/{document_id}/chunks", response_model=DocumentChunksResponse)
@@ -274,11 +302,12 @@ def parsers_for_file(file_name: str = Query(min_length=1)) -> dict:
 def upload_document(
     file: UploadFile = File(...), parser_name: str | None = Form(default=None, min_length=1)
 ) -> DocumentItem:
-    # Sync handler: Docling conversion and embedding run in FastAPI's threadpool
-    # instead of blocking the event loop.
+    # Upload only parses: the document waits in "parsed" until it is chunked, so its
+    # Markdown can be reviewed or fixed first. Sync handler: Docling conversion runs in
+    # FastAPI's threadpool instead of blocking the event loop.
     try:
         options = {"parser_name": parser_name} if parser_name is not None else {}
-        payload = ingestion_pipeline.ingest_upload(file.filename or "", file.file.read(), **options)
+        payload = ingestion_pipeline.parse_upload(file.filename or "", file.file.read(), **options)
     except DocumentUploadError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     except DocumentParseError as exc:
@@ -307,10 +336,46 @@ def parse_single_document(document_id: str, session: Session = Depends(get_sessi
 
     try:
         options = {"parser_name": parser_name} if parser_name is not None else {}
-        result = ingestion_pipeline.ingest_path(path, document_id=document.id, **options)
+        result = ingestion_pipeline.parse_path(path, document_id=document.id, **options)
     except DocumentParseError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return DocumentItem(**result)
+
+
+@router.post("/documents/{document_id}/chunk", response_model=DocumentItem)
+def chunk_single_document(document_id: str) -> DocumentItem:
+    try:
+        result = ingestion_pipeline.chunk_document(document_id)
+    except DocumentStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
+    return DocumentItem(**result)
+
+
+@router.get("/documents/{document_id}/markdown", response_model=DocumentMarkdown)
+def get_document_markdown(document_id: str, session: Session = Depends(get_session)) -> DocumentMarkdown:
+    row = get_document_with_chunk_count(session, document_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
+    document = row[0]
+    if document.parsed_text is None:
+        raise HTTPException(
+            status_code=409, detail="Tài liệu chưa có bản parse đã lưu; hãy parse lại trước khi sửa Markdown."
+        )
+    return DocumentMarkdown(**serialize_markdown(document))
+
+
+@router.put("/documents/{document_id}/markdown", response_model=DocumentMarkdown)
+def update_document_markdown(document_id: str, request: UpdateMarkdownRequest) -> DocumentMarkdown:
+    """Save a manual Markdown fix; the document then waits in "parsed" to be chunked."""
+    try:
+        result = ingestion_pipeline.save_markdown(document_id, request.text, base_hash=request.base_hash)
+    except DocumentStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
+    return DocumentMarkdown(**result)
 
 
 @router.delete("/documents/{document_id}", response_model=DocumentDeleteResponse)

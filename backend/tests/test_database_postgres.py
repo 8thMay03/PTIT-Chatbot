@@ -26,8 +26,9 @@ from app.db.repositories import (
     get_document_with_chunk_count,
     get_recent_conversation_history,
     list_documents,
+    replace_document_chunks,
     replace_knowledge_base,
-    upsert_document,
+    save_parsed_document,
 )
 from app.db.session import check_db_health, create_app_engine, get_engine_options
 from app.main import app
@@ -170,7 +171,8 @@ def test_repository_document_and_chunks_upsert_and_cascade(memory_db: Session) -
         ),
     ]
 
-    upsert_document(session, doc, chunks)
+    stored = save_parsed_document(session, doc)
+    replace_document_chunks(session, stored, chunks)
     session.commit()
 
     docs = list_documents(session)
