@@ -242,6 +242,8 @@ def serialize_document(document: Document, chunk_count: int, size_bytes: int | N
         "file_type": document.file_type,
         "status": document.status,
         "markdown_edited": bool(metadata.get("markdown_edited")),
+        # Set only once Markdown is stored, so clients know whether it can be edited or chunked.
+        "parsed_at": document.parsed_at,
         "chunk_count": chunk_count,
         "size_bytes": size_bytes,
         "created_at": document.created_at,

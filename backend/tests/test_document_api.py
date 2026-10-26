@@ -30,6 +30,7 @@ def test_list_documents_returns_serialized_items(monkeypatch) -> None:
         source_path="data/so-tay.md",
         file_type="md",
         status="active",
+        parsed_at=None,
         document_metadata={"size_bytes": 24},
         created_at=None,
         updated_at=None,
@@ -44,6 +45,7 @@ def test_list_documents_returns_serialized_items(monkeypatch) -> None:
     assert payload["documents"][0]["id"] == "doc-1"
     assert payload["documents"][0]["file_name"] == "so-tay.md"
     assert payload["documents"][0]["chunk_count"] == 4
+    assert payload["documents"][0]["parsed_at"] is None
 
 
 def test_upload_document_uses_ingestion_pipeline(monkeypatch) -> None:
@@ -216,6 +218,7 @@ def test_get_document_returns_full_text(monkeypatch, tmp_path) -> None:
         file_type="md",
         status="active",
         parsed_text=None,
+        parsed_at=None,
         document_metadata=None,
         created_at=None,
         updated_at=None,
@@ -240,6 +243,7 @@ def test_get_document_falls_back_to_chunks_when_source_missing(monkeypatch) -> N
         file_type="md",
         status="active",
         parsed_text=None,
+        parsed_at=None,
         document_metadata=None,
         created_at=None,
         updated_at=None,
@@ -281,6 +285,7 @@ def test_get_document_reads_text_with_stored_parser(monkeypatch, tmp_path) -> No
         file_type="custom",
         status="active",
         parsed_text=None,
+        parsed_at=None,
         document_metadata={"parser": "alternative"},
         created_at=None,
         updated_at=None,

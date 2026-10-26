@@ -74,6 +74,7 @@ class DocumentItem(BaseModel):
     file_type: str | None = None
     status: str = "active"
     markdown_edited: bool = False
+    parsed_at: datetime | None = None
     chunk_count: int = 0
     size_bytes: int | None = None
     created_at: datetime | None = None

@@ -418,6 +418,7 @@ def test_upload_only_parses_and_waits_for_chunking(upload_pipeline, monkeypatch)
     assert item["status"] == "parsed"
     assert item["chunk_count"] == 0
     assert item["markdown_edited"] is False
+    assert item["parsed_at"] is not None
     assert store.added == []
     document = _document_row(engine, item["id"])
     assert "Nội dung chờ kiểm tra" in document.parsed_text
