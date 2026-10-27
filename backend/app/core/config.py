@@ -175,6 +175,34 @@ class Settings(BaseSettings):
     # Allowlist origin (scheme://host[:port]) cho base_url/endpoint LLM, phân tách bằng dấu phẩy.
     # Hỗ trợ host wildcard dạng https://*.openai.azure.com. Bỏ trống thì suy ra từ env lúc khởi động.
     llm_base_url_allowlist: str = Field(default="", alias="LLM_BASE_URL_ALLOWLIST")
+    # IP/CIDR của reverse proxy tin cậy (nginx, Vite dev proxy), phân tách bằng dấu phẩy.
+    # Chỉ khi request đi tới từ các địa chỉ này mới đọc X-Forwarded-For để lấy IP thật
+    # cho chặn dò mật khẩu; bỏ trống thì dùng IP kết nối trực tiếp.
+    trusted_proxy_ips: str = Field(default="", alias="TRUSTED_PROXY_IPS")
+
+    # ==========================================
+    # Tài khoản người dùng (landing-user-auth)
+    # ==========================================
+    # Khóa ký cookie ptit_user; khác ADMIN_SESSION_SECRET. Bỏ trống thì sinh ngẫu nhiên lúc
+    # khởi động (người dùng bị đăng xuất khi restart).
+    user_session_secret: str | None = Field(default=None, alias="USER_SESSION_SECRET")
+    user_session_ttl_days: float = Field(default=30.0, gt=0, alias="USER_SESSION_TTL_DAYS")
+    # false -> POST /api/auth/register trả 503 (đăng nhập tài khoản cũ vẫn hoạt động).
+    user_registration_enabled: bool = Field(default=True, alias="USER_REGISTRATION_ENABLED")
+    # Tên miền email được phép đăng ký, phân tách bằng dấu phẩy; bỏ trống = mọi tên miền.
+    user_email_domains: str = Field(default="", alias="USER_EMAIL_DOMAINS")
+    # Chặn dò: quá N lần sai (đăng nhập theo IP + email, email trùng khi đăng ký theo IP)
+    # trong cửa sổ thời gian thì trả 429.
+    user_auth_max_failures: int = Field(default=5, ge=1, alias="USER_AUTH_MAX_FAILURES")
+    user_auth_window_seconds: float = Field(default=300.0, gt=0, alias="USER_AUTH_WINDOW_SECONDS")
+
+    @property
+    def allowed_email_domains(self) -> list[str]:
+        return [
+            domain.strip().lower().lstrip("@")
+            for domain in self.user_email_domains.split(",")
+            if domain.strip()
+        ]
 
     @property
     def cors_origins(self) -> list[str]:
@@ -230,6 +258,13 @@ _RESET_EXCLUDED_FIELDS = frozenset(
         "admin_session_ttl_hours",
         "cookie_secure",
         "llm_base_url_allowlist",
+        "trusted_proxy_ips",
+        "user_session_secret",
+        "user_session_ttl_days",
+        "user_registration_enabled",
+        "user_email_domains",
+        "user_auth_max_failures",
+        "user_auth_window_seconds",
     }
 )
 

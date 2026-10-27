@@ -1,16 +1,20 @@
 import json
 import time
 from collections.abc import Iterator
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.schemas import (
     AdminLoginRequest,
     AdminSessionResponse,
+    AuthSessionResponse,
+    AuthUser,
     ChatRequest,
     ChatResponse,
     ChunkAllResponse,
@@ -27,8 +31,10 @@ from app.api.schemas import (
     DocumentMarkdown,
     FullConfigResponse,
     IngestResponse,
+    LoginRequest,
     ParseJobItem,
     ParseJobListResponse,
+    RegisterRequest,
     RenameConversationRequest,
     RetrievalTestRequest,
     TestLLMRequest,
@@ -36,7 +42,7 @@ from app.api.schemas import (
     UpdateConfigRequest,
     UpdateMarkdownRequest,
 )
-from app.core import auth
+from app.core import auth, user_auth
 from app.core.auth import require_admin
 from app.core.config import (
     PROJECT_ROOT,
@@ -51,6 +57,8 @@ from app.db import check_db_health, get_session
 from app.db.repositories import (
     add_message,
     add_message_sources,
+    claim_anonymous_conversations,
+    create_user,
     delete_conversation,
     ensure_conversation,
     get_conversation,
@@ -61,6 +69,7 @@ from app.db.repositories import (
     get_document_with_chunk_count,
     get_owned_conversation,
     get_recent_conversation_history,
+    get_user_by_email,
     list_conversations,
     list_documents,
     rename_conversation,
@@ -109,6 +118,10 @@ PUBLIC_API_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/admin/login"),
         ("POST", "/api/admin/logout"),
         ("GET", "/api/admin/session"),
+        ("POST", "/api/auth/register"),
+        ("POST", "/api/auth/login"),
+        ("POST", "/api/auth/logout"),
+        ("GET", "/api/auth/me"),
     }
 )
 
@@ -170,6 +183,121 @@ def get_admin_session(request: Request) -> AdminSessionResponse:
         configured=auth.is_admin_configured(),
     )
 
+
+# ==========================================
+# Tài khoản người dùng (landing-user-auth)
+# ==========================================
+USER_LOGIN_FAILED_DETAIL = "Email hoặc mật khẩu không đúng."
+USER_THROTTLED_DETAIL = "Quá nhiều lần thử. Vui lòng thử lại sau ít phút."
+EMAIL_TAKEN_DETAIL = "Email đã được đăng ký."
+
+
+def _auth_session_payload(user=None) -> AuthSessionResponse:
+    return AuthSessionResponse(
+        authenticated=user is not None,
+        user=(
+            AuthUser(
+                id=user.id,
+                email=user.email,
+                full_name=user.full_name,
+                created_at=user.created_at,
+            )
+            if user is not None
+            else None
+        ),
+        registration_enabled=settings.user_registration_enabled,
+    )
+
+
+def _sign_in(session: Session, http_request: Request, response: Response, user) -> None:
+    """Gắn cookie người dùng và chuyển hội thoại ẩn danh của trình duyệt này sang tài khoản.
+
+    Gọi trước commit để chuyển hội thoại nằm cùng transaction với tạo user/cập nhật login.
+    """
+    client = auth.get_client_session(http_request)
+    claim_anonymous_conversations(session, client.anon_owner_key, user_auth.user_owner_key(user.id))
+    # Giữ ptit_sid (cấp mới nếu chưa có) để đăng xuất quay về ẩn danh.
+    client.apply(response)
+    user_auth.issue_user_cookie(response, user)
+
+
+@router.post("/auth/register", response_model=AuthSessionResponse, status_code=201)
+def register_user(
+    payload: RegisterRequest,
+    http_request: Request,
+    response: Response,
+    session: Session = Depends(get_session),
+) -> AuthSessionResponse:
+    if not settings.user_registration_enabled:
+        raise HTTPException(status_code=503, detail="Hệ thống đang tạm dừng đăng ký tài khoản mới.")
+    ip_key = auth.client_ip(http_request)
+    if auth.user_register_limiter.is_blocked(ip_key):
+        raise HTTPException(status_code=429, detail=USER_THROTTLED_DETAIL)
+    if get_user_by_email(session, payload.email) is not None:
+        auth.user_register_limiter.record_failure(ip_key)
+        raise HTTPException(status_code=409, detail=EMAIL_TAKEN_DETAIL)
+
+    password_hash = user_auth.hash_password(payload.password)
+    try:
+        user = create_user(
+            session, email=payload.email, full_name=payload.full_name, password_hash=password_hash
+        )
+        _sign_in(session, http_request, response, user)
+        session.commit()
+    except IntegrityError as exc:
+        # Hai request đăng ký cùng email chạy song song: unique constraint chặn bản thứ hai.
+        session.rollback()
+        auth.user_register_limiter.record_failure(ip_key)
+        raise HTTPException(status_code=409, detail=EMAIL_TAKEN_DETAIL) from exc
+    session.refresh(user)
+    return _auth_session_payload(user)
+
+
+@router.post("/auth/login", response_model=AuthSessionResponse)
+def login_user(
+    payload: LoginRequest,
+    http_request: Request,
+    response: Response,
+    session: Session = Depends(get_session),
+) -> AuthSessionResponse:
+    throttle_key = auth.user_login_key(http_request, payload.email)
+    if auth.user_login_limiter.is_blocked(throttle_key):
+        raise HTTPException(status_code=429, detail=USER_THROTTLED_DETAIL)
+
+    user = get_user_by_email(session, payload.email)
+    if user is None:
+        # Vẫn băm một lần để thời gian phản hồi không lộ email nào đã đăng ký.
+        user_auth.burn_password_check(payload.password)
+        verified = False
+    else:
+        verified = user_auth.verify_password(payload.password, user.password_hash)
+    if not verified:
+        auth.user_login_limiter.record_failure(throttle_key)
+        raise HTTPException(status_code=401, detail=USER_LOGIN_FAILED_DETAIL)
+
+    auth.user_login_limiter.clear(throttle_key)
+    user.last_login_at = datetime.now(timezone.utc)
+    _sign_in(session, http_request, response, user)
+    session.commit()
+    return _auth_session_payload(user)
+
+
+@router.post("/auth/logout", response_model=AuthSessionResponse)
+def logout_user(response: Response) -> AuthSessionResponse:
+    # Không lưu phiên phía server: xoá cookie và luôn thành công. Cấp ptit_sid mới để
+    # trình duyệt bắt đầu phiên ẩn danh khác, không gắn với phiên trước khi đăng nhập.
+    user_auth.clear_user_cookie(response)
+    auth.issue_fresh_anon_session(response)
+    return _auth_session_payload(None)
+
+
+@router.get("/auth/me", response_model=AuthSessionResponse)
+def get_current_user(
+    http_request: Request,
+    session: Session = Depends(get_session),
+) -> AuthSessionResponse:
+    """Route công khai: cookie sai/hết hạn/user đã xoá đều là chưa đăng nhập, không 401."""
+    return _auth_session_payload(user_auth.resolve_user(http_request, session))
 
 
 @router.get("/config", response_model=FullConfigResponse, dependencies=[Depends(require_admin)])
@@ -545,8 +673,8 @@ def chat(
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message must not be empty.")
 
-    # Phiên ẩn danh quyết định owner; user_id client gửi bị bỏ qua.
-    client = auth.get_client_session(http_request)
+    # Phiên (tài khoản hoặc ẩn danh) quyết định owner; user_id client gửi bị bỏ qua.
+    client = auth.get_client_session(http_request, session)
     conversation = ensure_conversation(
         session,
         request.conversation_id,
@@ -607,8 +735,8 @@ def chat_stream(
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message must not be empty.")
 
-    # Phiên ẩn danh quyết định owner; user_id client gửi bị bỏ qua.
-    client = auth.get_client_session(http_request)
+    # Phiên (tài khoản hoặc ẩn danh) quyết định owner; user_id client gửi bị bỏ qua.
+    client = auth.get_client_session(http_request, session)
     conversation = ensure_conversation(
         session,
         request.conversation_id,
@@ -781,13 +909,13 @@ def list_conversation_history(
     offset: int = 0,
     session: Session = Depends(get_session),
 ) -> ConversationListResponse:
-    """Danh sách hội thoại của phiên ẩn danh hiện tại (cookie ptit_sid).
+    """Danh sách hội thoại của phiên hiện tại: tài khoản (ptit_user) hoặc ẩn danh (ptit_sid).
 
     Luôn lọc theo owner của phiên — kể cả khi trình duyệt đang có cookie admin.
     """
     limit = max(1, min(limit, 200))
     offset = max(0, offset)
-    client = auth.get_client_session(http_request)
+    client = auth.get_client_session(http_request, session)
     client.apply(response)
     rows, total = list_conversations(session, limit=limit, offset=offset, user_id=client.owner_key)
     return ConversationListResponse(
@@ -803,7 +931,7 @@ def get_conversation_detail(
     http_request: Request = None,
     session: Session = Depends(get_session),
 ) -> ConversationDetail:
-    client = auth.get_client_session(http_request)
+    client = auth.get_client_session(http_request, session)
     client.apply(response)
     conversation = get_owned_conversation(session, conversation_id, client.owner_key)
     if conversation is None:
@@ -841,7 +969,7 @@ def rename_conversation_title(
     http_request: Request = None,
     session: Session = Depends(get_session),
 ) -> ConversationItem:
-    client = auth.get_client_session(http_request)
+    client = auth.get_client_session(http_request, session)
     client.apply(response)
     conversation = get_owned_conversation(session, conversation_id, client.owner_key)
     if conversation is None:
@@ -861,7 +989,7 @@ def remove_conversation(
     http_request: Request = None,
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
-    client = auth.get_client_session(http_request)
+    client = auth.get_client_session(http_request, session)
     client.apply(response)
     conversation = get_owned_conversation(session, conversation_id, client.owner_key)
     if conversation is None:

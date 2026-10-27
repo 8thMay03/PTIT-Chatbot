@@ -9,7 +9,7 @@ from pathlib import Path
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
-from app.db.models import Chunk, Conversation, Document, Message, MessageSource
+from app.db.models import Chunk, Conversation, Document, Message, MessageSource, User
 
 
 @dataclass(frozen=True)
@@ -460,3 +460,35 @@ def delete_conversation(session: Session, conversation_id: str) -> bool:
     session.delete(conversation)
     session.flush()
     return True
+
+
+# ==========================================
+# Tài khoản người dùng (landing-user-auth)
+# ==========================================
+def get_user_by_email(session: Session, email: str) -> User | None:
+    """Tra theo email đã chuẩn hoá (trim + chữ thường)."""
+    return session.scalar(select(User).where(User.email == email))
+
+
+def create_user(session: Session, email: str, full_name: str, password_hash: str) -> User:
+    user = User(id=str(uuid4()), email=email, full_name=full_name, password_hash=password_hash)
+    session.add(user)
+    session.flush()
+    return user
+
+
+def claim_anonymous_conversations(session: Session, anon_owner: str, user_owner: str) -> int:
+    """Chuyển hội thoại của phiên ẩn danh hiện tại sang tài khoản; trả số hội thoại đã chuyển.
+
+    Chỉ đụng hội thoại của đúng owner ẩn danh truyền vào (sid của trình duyệt đang
+    đăng nhập). Giữ nguyên updated_at để thứ tự sidebar không đổi.
+    """
+    if not anon_owner.startswith("anon:") or anon_owner == user_owner:
+        return 0
+    result = session.execute(
+        update(Conversation)
+        .where(Conversation.user_id == anon_owner)
+        .values(user_id=user_owner, updated_at=Conversation.updated_at)
+        .execution_options(synchronize_session="fetch")
+    )
+    return result.rowcount or 0

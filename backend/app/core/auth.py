@@ -11,19 +11,29 @@ Hai cơ chế cookie HttpOnly dùng chung module này:
 
 Fail closed: chưa cấu hình ``ADMIN_PASSWORD`` thì login trả 503 và mọi route
 admin luôn trả 401.
+
+Owner key của request (``get_client_session``): cookie ``ptit_user`` hợp lệ
+(``app.core.user_auth``) → ``user:<id>``, ngược lại ``anon:<hash(sid)>``.
+
+Chặn dò mật khẩu (admin và người dùng) đếm theo IP thật của client: chỉ đọc
+``X-Forwarded-For`` khi request tới từ proxy trong ``TRUSTED_PROXY_IPS``.
 """
 
 from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
 import logging
 import secrets
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from fastapi import HTTPException, Request, Response
+from sqlalchemy.orm import Session
 
+from app.core import user_auth
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -35,7 +45,7 @@ ADMIN_COOKIE_NAME = "ptit_admin"
 ADMIN_COOKIE_PATH = "/api"
 ADMIN_401_DETAIL = "Cần đăng nhập quản trị."
 
-# Chặn dò mật khẩu trong bộ nhớ: quá 5 lần sai trong 5 phút theo IP thì 429.
+# Chặn dò mật khẩu admin trong bộ nhớ: quá 5 lần sai trong 5 phút theo IP thì 429.
 # Chỉ đúng khi chạy một worker uvicorn (cấu hình hiện tại); xem README.
 LOGIN_MAX_FAILURES = 5
 LOGIN_WINDOW_SECONDS = 300.0
@@ -51,7 +61,6 @@ ANON_SID_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345
 ANON_SID_MIN_LENGTH = 32
 ANON_SID_MAX_LENGTH = 128
 
-_login_failures: dict[str, list[float]] = {}
 
 
 def _random_admin_session_secret() -> None:
@@ -159,39 +168,130 @@ def verify_admin_password(candidate: str | None) -> bool:
     return hmac.compare_digest(password.encode("utf-8"), candidate.encode("utf-8"))
 
 
+# ==========================================
+# Chặn dò mật khẩu (dùng chung admin/người dùng)
+# ==========================================
+class FailureLimiter:
+    """Đếm lần thất bại theo khóa trong cửa sổ trượt (bộ nhớ, một worker).
+
+    Ngưỡng/cửa sổ đọc qua callable để test và settings đổi lúc chạy vẫn có hiệu lực.
+    """
+
+    def __init__(self, max_failures: Callable[[], int], window_seconds: Callable[[], float]):
+        self._max_failures = max_failures
+        self._window_seconds = window_seconds
+        self._failures: dict[str, list[float]] = {}
+
+    def _prune(self, now: float) -> None:
+        window = self._window_seconds()
+        for key in list(self._failures):
+            recent = [t for t in self._failures[key] if now - t < window]
+            if recent:
+                self._failures[key] = recent
+            else:
+                del self._failures[key]
+
+    def is_blocked(self, key: str) -> bool:
+        self._prune(time.monotonic())
+        return len(self._failures.get(key, [])) >= self._max_failures()
+
+    def record_failure(self, key: str) -> None:
+        now = time.monotonic()
+        self._prune(now)
+        self._failures.setdefault(key, []).append(now)
+
+    def clear(self, key: str) -> None:
+        self._failures.pop(key, None)
+
+    def reset(self) -> None:
+        self._failures.clear()
+
+
+admin_login_limiter = FailureLimiter(lambda: LOGIN_MAX_FAILURES, lambda: LOGIN_WINDOW_SECONDS)
+# Đăng nhập người dùng: khóa theo IP + email, nên dò một tài khoản không khoá tài khoản khác
+# và client ở IP khác vẫn đăng nhập được.
+user_login_limiter = FailureLimiter(
+    lambda: settings.user_auth_max_failures, lambda: settings.user_auth_window_seconds
+)
+# Đăng ký: đếm lần gặp email đã tồn tại theo IP (chống dò email qua 409).
+user_register_limiter = FailureLimiter(
+    lambda: settings.user_auth_max_failures, lambda: settings.user_auth_window_seconds
+)
+
+
+def _trusted_proxies() -> list[ipaddress.IPv4Network | ipaddress.IPv6Network | str]:
+    entries: list[ipaddress.IPv4Network | ipaddress.IPv6Network | str] = []
+    for raw in (settings.trusted_proxy_ips or "").split(","):
+        value = raw.strip()
+        if not value:
+            continue
+        try:
+            entries.append(ipaddress.ip_network(value, strict=False))
+        except ValueError:
+            # Tên host không phải IP (ví dụ "testclient" của TestClient): so khớp nguyên văn.
+            entries.append(value)
+    return entries
+
+
+def _is_trusted_proxy(host: str, trusted: list) -> bool:
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        address = None
+    for entry in trusted:
+        if isinstance(entry, str):
+            if host == entry:
+                return True
+        elif address is not None and address.version == entry.version and address in entry:
+            return True
+    return False
+
+
 def client_ip(request: Request) -> str:
+    """IP thật của client cho chặn dò.
+
+    Chỉ tin ``X-Forwarded-For`` khi kết nối tới từ proxy tin cậy; đi từ phải sang
+    trái bỏ qua các proxy tin cậy, phần tử đầu tiên không tin cậy là client. Gọi
+    thẳng cổng backend từ ngoài không giả được IP vì header bị bỏ qua.
+    """
     client = getattr(request, "client", None)
-    return client.host if client else "unknown"
-
-
-def _prune_login_failures(now: float) -> None:
-    for ip in list(_login_failures):
-        recent = [t for t in _login_failures[ip] if now - t < LOGIN_WINDOW_SECONDS]
-        if recent:
-            _login_failures[ip] = recent
-        else:
-            del _login_failures[ip]
+    peer = client.host if client else "unknown"
+    trusted = _trusted_proxies()
+    if not trusted or not _is_trusted_proxy(peer, trusted):
+        return peer
+    forwarded = [
+        part.strip()
+        for header in request.headers.getlist("x-forwarded-for")
+        for part in header.split(",")
+        if part.strip()
+    ]
+    for hop in reversed(forwarded):
+        if not _is_trusted_proxy(hop, trusted):
+            return hop
+    return forwarded[0] if forwarded else peer
 
 
 def is_login_throttled(request: Request) -> bool:
-    now = time.monotonic()
-    _prune_login_failures(now)
-    return len(_login_failures.get(client_ip(request), [])) >= LOGIN_MAX_FAILURES
+    return admin_login_limiter.is_blocked(client_ip(request))
 
 
 def register_failed_login(request: Request) -> None:
-    now = time.monotonic()
-    _prune_login_failures(now)
-    _login_failures.setdefault(client_ip(request), []).append(now)
+    admin_login_limiter.record_failure(client_ip(request))
 
 
 def register_successful_login(request: Request) -> None:
-    _login_failures.pop(client_ip(request), None)
+    admin_login_limiter.clear(client_ip(request))
+
+
+def user_login_key(request: Request, email: str) -> str:
+    return f"{client_ip(request)}|{email}"
 
 
 def reset_login_attempts() -> None:
     """Xoá trạng thái chặn dò (dùng để cách ly test và sau khi đổi mật khẩu)."""
-    _login_failures.clear()
+    admin_login_limiter.reset()
+    user_login_limiter.reset()
+    user_register_limiter.reset()
 
 
 async def require_admin(request: Request) -> None:
@@ -217,26 +317,34 @@ def _is_valid_sid(value: str | None) -> bool:
 def anon_owner_key(sid: str) -> str:
     """Owner key lưu vào conversations.user_id; không lưu sid gốc.
 
-    Tiền tố "anon:" để phân biệt với user SSO nếu bổ sung sau này.
+    Tiền tố "anon:" phân biệt với hội thoại của tài khoản ("user:<id>").
     """
     return "anon:" + hashlib.sha256(sid.encode("utf-8")).hexdigest()[:32]
 
 
-def _new_client_session(sid: str, issued: bool) -> ClientSession:
-    return ClientSession(sid=sid, owner_key=anon_owner_key(sid), issued=issued)
+def _new_client_session(sid: str, issued: bool, user_id: str | None = None) -> ClientSession:
+    owner_key = user_auth.user_owner_key(user_id) if user_id else anon_owner_key(sid)
+    return ClientSession(sid=sid, owner_key=owner_key, issued=issued, user_id=user_id)
 
 
 @dataclass(frozen=True)
 class ClientSession:
-    """Phiên ẩn danh của request hiện tại.
+    """Phiên của request hiện tại.
 
-    ``issued=True`` nghĩa là request chưa mang cookie hợp lệ và route cần gắn
-    Set-Cookie cho sid vừa cấp.
+    ``owner_key`` là ``user:<id>`` khi có cookie người dùng hợp lệ, ngược lại
+    ``anon:<hash(sid)>``. ``anon_owner_key`` luôn là owner của sid (dùng khi chuyển
+    hội thoại ẩn danh sang tài khoản). ``issued=True`` nghĩa là request chưa mang
+    cookie ptit_sid hợp lệ và route cần gắn Set-Cookie cho sid vừa cấp.
     """
 
     sid: str
     owner_key: str
     issued: bool
+    user_id: str | None = None
+
+    @property
+    def anon_owner_key(self) -> str:
+        return anon_owner_key(self.sid)
 
     def apply(self, response: Response | None) -> None:
         """Gán Set-Cookie cho phiên mới lên response; no-op nếu response là None.
@@ -273,16 +381,26 @@ class ClientSession:
         return "; ".join(parts)
 
 
-def get_client_session(request: Request | None) -> ClientSession:
+def get_client_session(request: Request | None, session: Session | None = None) -> ClientSession:
     """Đọc cookie ptit_sid hợp lệ hoặc cấp sid mới (chưa ghi Set-Cookie).
+
+    Có ``session`` (DB) thì cookie ptit_user hợp lệ trỏ tới user còn tồn tại quyết
+    định owner ``user:<id>``; ptit_sid vẫn được giữ/cấp để đăng xuất quay về ẩn danh.
 
     Dùng trực tiếp trong route (thay vì Depends) để hàm route vẫn gọi được trong
     unit test không có Request: khi đó sid tạm không đánh dấu issued để không cấp
     cookie ngoài ngữ cảnh HTTP.
     """
     if request is not None:
+        user = user_auth.resolve_user(request, session)
+        user_id = user.id if user is not None else None
         raw = request.cookies.get(ANON_COOKIE_NAME)
         if _is_valid_sid(raw):
-            return _new_client_session(raw, issued=False)
-        return _new_client_session(secrets.token_urlsafe(32), issued=True)
+            return _new_client_session(raw, issued=False, user_id=user_id)
+        return _new_client_session(secrets.token_urlsafe(32), issued=True, user_id=user_id)
     return _new_client_session(secrets.token_urlsafe(32), issued=False)
+
+
+def issue_fresh_anon_session(response: Response) -> None:
+    """Cấp ptit_sid mới (khi đăng xuất) để trình duyệt bắt đầu phiên ẩn danh khác."""
+    _new_client_session(secrets.token_urlsafe(32), issued=True).apply(response)

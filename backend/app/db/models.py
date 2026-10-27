@@ -12,6 +12,24 @@ class Base(DeclarativeBase):
     pass
 
 
+class User(Base):
+    """Tài khoản người dùng (sinh viên). Admin không nằm trong bảng này (FE-06)."""
+
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    # Đã chuẩn hoá (trim + chữ thường) trước khi ghi nên unique không phân biệt hoa/thường.
+    email: Mapped[str] = mapped_column(String(254), unique=True, nullable=False)
+    full_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    # Chuỗi `scrypt$n$r$p$<salt_b64>$<hash_b64>` (app.core.user_auth); không bao giờ là mật khẩu gốc.
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
 
 class Document(Base):
     __tablename__ = "documents"

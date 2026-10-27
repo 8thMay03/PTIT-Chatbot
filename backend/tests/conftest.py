@@ -8,6 +8,8 @@
 - ``admin_client``: TestClient đã có cookie phiên admin hợp lệ.
 - ``api_db``: thay dependency ``get_session`` bằng SQLite tạm trong ``tmp_path``
   để test hội thoại không ghi vào DB dev.
+- ``register_user`` / ``login_user``: đăng ký/đăng nhập tài khoản người dùng cho một
+  TestClient (landing-user-auth); cần ``api_db``.
 """
 
 from __future__ import annotations
@@ -25,11 +27,12 @@ from app.main import app
 
 ADMIN_TEST_PASSWORD = "unit-test-admin-password"
 ADMIN_TEST_SECRET = "unit-test-session-secret"
+USER_TEST_PASSWORD = "mat-khau-sinh-vien-1"
 
 
 @pytest.fixture(autouse=True)
 def _isolated_admin_login_state():
-    """Mỗi test bắt đầu/kết thúc với bộ đếm chặn dò mật khẩu sạch (state bộ nhớ)."""
+    """Mỗi test bắt đầu/kết thúc với bộ đếm chặn dò mật khẩu sạch (admin và người dùng)."""
     auth.reset_login_attempts()
     yield
     auth.reset_login_attempts()
@@ -89,3 +92,39 @@ def api_db(tmp_path):
     finally:
         app.dependency_overrides.pop(get_session, None)
         engine.dispose()
+
+
+@pytest.fixture
+def register_user(api_db):
+    """Đăng ký tài khoản trên TestClient được truyền vào; trả response JSON."""
+
+    def _register(
+        test_client: TestClient,
+        email: str = "sv@stu.ptit.edu.vn",
+        password: str = USER_TEST_PASSWORD,
+        full_name: str = "Nguyễn Văn A",
+    ) -> dict:
+        response = test_client.post(
+            "/api/auth/register",
+            json={"email": email, "password": password, "full_name": full_name},
+        )
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    return _register
+
+
+@pytest.fixture
+def login_user(api_db):
+    """Đăng nhập tài khoản có sẵn trên TestClient được truyền vào; trả response JSON."""
+
+    def _login(
+        test_client: TestClient,
+        email: str = "sv@stu.ptit.edu.vn",
+        password: str = USER_TEST_PASSWORD,
+    ) -> dict:
+        response = test_client.post("/api/auth/login", json={"email": email, "password": password})
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    return _login

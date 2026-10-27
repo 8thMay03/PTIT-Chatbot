@@ -1,7 +1,9 @@
 from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
+from pydantic_core import PydanticCustomError
 
+from app.core import user_auth
 from app.core.config import settings
 
 
@@ -318,6 +320,93 @@ class AdminSessionResponse(BaseModel):
     authenticated: bool = False
     expires_at: str | None = None
     configured: bool = False
+
+
+# ==========================================
+# User account schemas (landing-user-auth)
+# ==========================================
+# Lỗi 422 giữ định dạng mặc định FastAPI (detail[].loc/msg); msg tiếng Việt để
+# frontend hiện thẳng cạnh ô tương ứng.
+def _validate_email(value: str) -> str:
+    email = user_auth.normalize_email(value)
+    if not user_auth.is_valid_email(email):
+        raise PydanticCustomError("email_format", "Email không đúng định dạng.")
+    return email
+
+
+class RegisterRequest(BaseModel):
+    full_name: str
+    email: str
+    password: str
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_full_name(cls, value: str) -> str:
+        name = " ".join(value.split())
+        if not name:
+            raise PydanticCustomError("full_name_empty", "Vui lòng nhập họ tên.")
+        if len(name) > user_auth.FULL_NAME_MAX_LENGTH:
+            raise PydanticCustomError(
+                "full_name_too_long",
+                "Họ tên tối đa {max} ký tự.",
+                {"max": user_auth.FULL_NAME_MAX_LENGTH},
+            )
+        return name
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        email = _validate_email(value)
+        if not user_auth.is_allowed_email_domain(email):
+            raise PydanticCustomError(
+                "email_domain",
+                "Chỉ chấp nhận email thuộc tên miền: {domains}.",
+                {"domains": ", ".join(settings.allowed_email_domains)},
+            )
+        return email
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        if len(value) < user_auth.PASSWORD_MIN_LENGTH:
+            raise PydanticCustomError(
+                "password_too_short",
+                "Mật khẩu phải có ít nhất {min} ký tự.",
+                {"min": user_auth.PASSWORD_MIN_LENGTH},
+            )
+        if len(value) > user_auth.PASSWORD_MAX_LENGTH:
+            raise PydanticCustomError(
+                "password_too_long",
+                "Mật khẩu tối đa {max} ký tự.",
+                {"max": user_auth.PASSWORD_MAX_LENGTH},
+            )
+        return value
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(max_length=1024)
+    # Không áp quy tắc độ dài của đăng ký: mật khẩu sai độ dài chỉ là sai mật khẩu (401).
+    password: str = Field(min_length=1, max_length=1024)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        return _validate_email(value)
+
+
+class AuthUser(BaseModel):
+    id: str
+    email: str
+    full_name: str
+    created_at: datetime | None = None
+
+
+class AuthSessionResponse(BaseModel):
+    """Trạng thái phiên người dùng; GET /auth/me luôn 200, không bao giờ 401."""
+
+    authenticated: bool = False
+    user: AuthUser | None = None
+    registration_enabled: bool = True
 
 
 # ==========================================
