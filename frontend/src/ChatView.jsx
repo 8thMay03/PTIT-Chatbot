@@ -14,7 +14,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { chatApi, conversationsApi, describeError, isAbortError } from "./api";
-import MarkdownView from "./components/MarkdownView";
+import MarkdownView, { preloadMarkdownView } from "./components/LazyMarkdownView";
 import ReasoningPanel from "./components/ReasoningPanel";
 
 const SUGGESTIONS = [
@@ -70,6 +70,9 @@ const CHAT_ERROR_CONTEXT = {
 function describeChatError(error, overrides = {}) {
   return describeError(error, { ...CHAT_ERROR_CONTEXT, ...overrides });
 }
+
+// Renderer Markdown là chunk riêng: tải song song ngay khi module chat được nạp.
+preloadMarkdownView().catch(() => {});
 
 const ChatView = forwardRef(function ChatView(
   { hidden, onLoadingChange, onConversationSaved, headerActions },

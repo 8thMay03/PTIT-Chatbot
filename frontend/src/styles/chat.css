@@ -924,3 +924,8 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* Văn bản thuần hiện trong tích tắc chunk renderer Markdown đang tải (LazyMarkdownView). */
+.markdown-pending {
+  white-space: pre-wrap;
+}
