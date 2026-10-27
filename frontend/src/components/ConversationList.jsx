@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, MessageSquare, Pencil, Trash2, X } from "lucide-react";
-import { API_BASE_URL } from "../api";
+import { conversationsApi, describeError, errorMessage, queryKeys } from "../api";
 import Modal from "./Modal";
 import { useToast } from "./Toast";
 
@@ -24,38 +25,26 @@ function groupByRecency(conversations) {
   ].filter((group) => group.items.length > 0);
 }
 
-export default function ConversationList({ activeId, onOpen, reloadToken }) {
+export default function ConversationList({ activeId, onOpen }) {
   const toast = useToast();
-  const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
+  const conversationsQuery = useQuery({
+    queryKey: queryKeys.conversationList,
+    queryFn: ({ signal }) => conversationsApi.list({ limit: 50, signal }),
+  });
+  const conversations = conversationsQuery.data?.conversations ?? [];
+  const loading = conversationsQuery.isPending;
+  const describedError = conversationsQuery.error
+    ? describeError(conversationsQuery.error, {
+        fallbackTitle: "Không tải được lịch sử hội thoại",
+        fallbackDetail: "Không tải được lịch sử hội thoại.",
+      })
+    : null;
   const [pendingDelete, setPendingDelete] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editTitle, setEditTitle] = useState("");
   const [busy, setBusy] = useState(false);
   const editInputRef = useRef(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const response = await fetch(`${API_BASE_URL}/conversations?limit=50`);
-      if (!response.ok) throw new Error("Máy chủ trả về lỗi.");
-      const payload = await response.json();
-      setConversations(payload.conversations ?? []);
-    } catch (err) {
-      setConversations([]);
-      setError(
-        err instanceof TypeError ? "Không kết nối được máy chủ." : "Không tải được lịch sử hội thoại."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load, reloadToken]);
 
   useEffect(() => {
     if (editingId) editInputRef.current?.focus();
@@ -71,18 +60,21 @@ export default function ConversationList({ activeId, onOpen, reloadToken }) {
     }
     setBusy(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/conversations/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      });
-      if (!response.ok) throw new Error("Không đổi được tên hội thoại.");
-      setConversations((current) =>
-        current.map((item) => (item.id === id ? { ...item, title } : item))
+      const updated = await conversationsApi.rename(id, title);
+      queryClient.setQueryData(queryKeys.conversationList, (current) =>
+        current
+          ? {
+              ...current,
+              conversations: current.conversations.map((item) =>
+                item.id === id ? { ...item, ...updated } : item
+              ),
+            }
+          : current
       );
+      await queryClient.invalidateQueries({ queryKey: queryKeys.conversationList });
       setEditingId(null);
     } catch (err) {
-      toast.error(err.message || "Không đổi được tên hội thoại.");
+      toast.error(errorMessage(err, "Không đổi được tên hội thoại."));
     } finally {
       setBusy(false);
     }
@@ -90,18 +82,24 @@ export default function ConversationList({ activeId, onOpen, reloadToken }) {
 
   async function confirmDelete() {
     if (!pendingDelete) return;
+    const target = pendingDelete;
     setBusy(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/conversations/${pendingDelete.id}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) throw new Error("Không xóa được hội thoại.");
-      setConversations((current) => current.filter((item) => item.id !== pendingDelete.id));
-      if (activeId === pendingDelete.id) onOpen?.(null);
+      await conversationsApi.remove(target.id);
+      queryClient.setQueryData(queryKeys.conversationList, (current) =>
+        current
+          ? {
+              ...current,
+              conversations: current.conversations.filter((item) => item.id !== target.id),
+            }
+          : current
+      );
+      await queryClient.invalidateQueries({ queryKey: queryKeys.conversationList });
+      if (activeId === target.id) onOpen?.(null);
       toast.success("Đã xóa hội thoại.");
       setPendingDelete(null);
     } catch (err) {
-      toast.error(err.message || "Không xóa được hội thoại.");
+      toast.error(errorMessage(err, "Không xóa được hội thoại."));
     } finally {
       setBusy(false);
     }
@@ -117,8 +115,10 @@ export default function ConversationList({ activeId, onOpen, reloadToken }) {
             <div key={i} className="conv-skeleton" />
           ))}
         </div>
-      ) : error ? (
-        <p className="conv-empty">{error}</p>
+      ) : describedError ? (
+        <p className="conv-empty">
+          {describedError.title}. {describedError.detail}
+        </p>
       ) : conversations.length === 0 ? (
         <p className="conv-empty">Chưa có hội thoại nào được lưu. Hãy đặt câu hỏi đầu tiên.</p>
       ) : (

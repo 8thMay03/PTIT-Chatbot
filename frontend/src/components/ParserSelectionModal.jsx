@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Modal from "./Modal";
-import { API_BASE_URL } from "../api";
-import { apiError } from "../lib/format";
+import { documentsApi, errorMessage, isAbortError } from "../api";
 import { FileText, Layers, Loader2, AlertCircle, AlertTriangle, RefreshCw, ArrowRight, Info, Upload } from "lucide-react";
 import "../styles/parser-selection.css";
 
@@ -43,17 +42,21 @@ export default function ParserSelectionModal({ document, upload, busy, progress,
     setLoading(true);
     setError("");
     setSelected("");
-    fetch(`${API_BASE_URL}/documents/${documentId}/parsers`, { signal: controller.signal })
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(apiError(payload, "Không tải được danh sách parser."));
+    documentsApi
+      .parsersForDocument(documentId, { signal: controller.signal })
+      .then((payload) => {
         if (controller.signal.aborted) return;
         const options = payload.parsers || [];
         setParsers(options);
         setSelected(defaultParser(options));
       })
-      .catch((err) => { if (!controller.signal.aborted) setError(err.message); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+      .catch((err) => {
+        if (controller.signal.aborted || isAbortError(err)) return;
+        setError(errorMessage(err, "Không tải được danh sách parser."));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
     return () => controller.abort();
   }, [documentId, attempt]);
 

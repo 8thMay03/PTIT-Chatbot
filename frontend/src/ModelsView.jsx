@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   AlertTriangle,
@@ -23,8 +24,7 @@ import {
   Undo2,
   Zap,
 } from "lucide-react";
-import { API_BASE_URL } from "./api";
-import { apiError } from "./lib/format";
+import { configApi, describeError, errorMessage, queryKeys } from "./api";
 import { useToast } from "./components/Toast";
 
 /*
@@ -509,28 +509,35 @@ function SectionActions({ dirty, saving, onReset, onSave, children }) {
   );
 }
 
-async function putConfig(payload) {
-  const response = await fetch(`${API_BASE_URL}/config`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(apiError(data, "Máy chủ từ chối cập nhật cấu hình."));
-  return data;
-}
-
-function describeSaveError(err) {
-  return err instanceof TypeError ? "Không kết nối được máy chủ." : err.message;
+/** Ghi cấu hình mới vào cache chung rồi yêu cầu đọc lại để hai tab cùng đồng bộ. */
+async function saveConfig(queryClient, payload) {
+  const next = await configApi.update(payload);
+  queryClient.setQueryData(queryKeys.config, next);
+  await queryClient.invalidateQueries({ queryKey: queryKeys.config });
+  return next;
 }
 
 // ---------------------------------------------------------------------------
 // Mục LLM
 // ---------------------------------------------------------------------------
 
-function LlmSection({ llm, onSaved }) {
+function LlmSection({ llm }) {
   const toast = useToast();
-  const initial = useMemo(() => llmDraftFromConfig(llm), [llm]);
+  const queryClient = useQueryClient();
+  // Chỉ tạo lại bản nháp khi trường liên quan đến LLM đổi; lưu temperature ở tab
+  // Cấu hình RAG không được xoá mô hình/API key đang nhập dở.
+  const initialKey = [
+    llm.provider,
+    llm.openai_model,
+    llm.base_url,
+    llm.gemini_model,
+    llm.azure_openai_endpoint,
+    llm.azure_openai_deployment_name,
+    llm.azure_openai_api_version,
+    llm.openai_compatible_base_url,
+    llm.openai_compatible_model,
+  ].join("\u0000");
+  const initial = useMemo(() => llmDraftFromConfig(llm), [initialKey]);
   const [draft, setDraft] = useState(initial);
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -595,16 +602,13 @@ function LlmSection({ llm, onSaved }) {
     setTesting(true);
     setTestResult(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/config/test-llm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildTestPayload(draft)),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(apiError(data, "Máy chủ từ chối yêu cầu kiểm tra."));
+      const data = await configApi.testLlm(buildTestPayload(draft));
       setTestResult(data);
     } catch (err) {
-      setTestResult({ success: false, message: describeSaveError(err) });
+      setTestResult({
+        success: false,
+        message: errorMessage(err, "Máy chủ từ chối yêu cầu kiểm tra."),
+      });
     } finally {
       setTesting(false);
     }
@@ -614,11 +618,17 @@ function LlmSection({ llm, onSaved }) {
     if (!ensureValid()) return;
     setSaving(true);
     try {
-      const next = await putConfig(buildLlmPayload(draft, initial));
-      onSaved(next);
+      const next = await saveConfig(queryClient, buildLlmPayload(draft, initial));
+      // Lưu chỉ API key không đổi provider/model, nên effect theo `initialKey` không chạy.
+      // Đồng bộ lại bản nháp từ response để khoá đã lưu không còn nằm trong input.
+      setDraft(llmDraftFromConfig(next.llm ?? {}));
+      setShowErrors(false);
+      setTestResult(null);
       toast.success(`Chatbot đã chuyển sang ${next.llm?.model ?? "mô hình mới"} · ${llmProviderName(provider)}.`);
     } catch (err) {
-      toast.error(`Chưa lưu được mô hình LLM. ${describeSaveError(err)}`);
+      toast.error(
+        `Chưa lưu được mô hình LLM. ${errorMessage(err, "Máy chủ từ chối cập nhật cấu hình.")}`
+      );
     } finally {
       setSaving(false);
     }
@@ -812,9 +822,11 @@ function EmbeddingSection({ embedding, openaiHasKey }) {
 // Mục Reranker
 // ---------------------------------------------------------------------------
 
-function RerankerSection({ reranker, onSaved }) {
+function RerankerSection({ reranker }) {
   const toast = useToast();
-  const initial = useMemo(() => rerankerDraftFromConfig(reranker), [reranker]);
+  const queryClient = useQueryClient();
+  const initialKey = `${reranker.provider ?? ""}\u0000${reranker.model ?? ""}`;
+  const initial = useMemo(() => rerankerDraftFromConfig(reranker), [initialKey]);
   const [draft, setDraft] = useState(initial);
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -841,15 +853,16 @@ function RerankerSection({ reranker, onSaved }) {
     try {
       const payload = { reranker: { provider: draft.provider } };
       if (usesModel) payload.reranker.model = draft.model.trim();
-      const next = await putConfig(payload);
-      onSaved(next);
+      const next = await saveConfig(queryClient, payload);
       toast.success(
         usesModel
           ? `Đã chuyển reranker sang ${next.reranker?.model ?? draft.model}.`
           : "Đã chuyển reranker sang heuristic."
       );
     } catch (err) {
-      toast.error(`Chưa lưu được reranker. ${describeSaveError(err)}`);
+      toast.error(
+        `Chưa lưu được reranker. ${errorMessage(err, "Máy chủ từ chối cập nhật cấu hình.")}`
+      );
     } finally {
       setSaving(false);
     }
@@ -936,40 +949,30 @@ function RerankerSection({ reranker, onSaved }) {
 // ---------------------------------------------------------------------------
 
 export default function ModelsView() {
-  const [config, setConfig] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setLoadError("");
-    try {
-      const response = await fetch(`${API_BASE_URL}/config`);
-      if (!response.ok) throw new Error("Máy chủ trả về lỗi khi đọc cấu hình.");
-      setConfig(await response.json());
-    } catch (err) {
-      setLoadError(err instanceof TypeError ? "Không kết nối được máy chủ." : err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const configQuery = useQuery({
+    queryKey: queryKeys.config,
+    queryFn: ({ signal }) => configApi.get({ signal }),
+  });
+  const config = configQuery.data ?? null;
+  const loading = configQuery.isPending;
+  const loadError = configQuery.error
+    ? describeError(configQuery.error, {
+        fallbackTitle: "Không đọc được cấu hình mô hình",
+        fallbackDetail: "Máy chủ trả về lỗi khi đọc cấu hình.",
+      })
+    : null;
 
   useEffect(() => {
-    load();
     // Dọn dữ liệu của màn cũ: danh sách "nhà cung cấp đã thêm" chỉ từng tồn tại trên giao diện.
     try {
       localStorage.removeItem("ptit_added_providers");
     } catch {
       /* storage bị chặn — không có gì để dọn */
     }
-  }, [load]);
+  }, []);
 
-  // Mỗi mục chỉ nhận phần cấu hình của mình; giữ tham chiếu cũ khi nội dung không
-  // đổi để lưu ở mục này không xoá bản nháp đang sửa ở mục kia.
-  const llmKey = JSON.stringify(config?.llm ?? null);
-  const rerankerKey = JSON.stringify(config?.reranker ?? null);
-  const llm = useMemo(() => JSON.parse(llmKey) ?? {}, [llmKey]);
-  const reranker = useMemo(() => JSON.parse(rerankerKey) ?? {}, [rerankerKey]);
+  const llm = config?.llm ?? {};
+  const reranker = config?.reranker ?? {};
 
   let body;
   if (loading && !config) {
@@ -985,10 +988,15 @@ export default function ModelsView() {
         <span className="state-icon">
           <AlertTriangle size={24} />
         </span>
-        <h3>Không đọc được cấu hình mô hình</h3>
-        <p>{loadError} Màn này cần cấu hình thật của máy chủ trước khi cho phép thay đổi.</p>
-        <button type="button" className="primary-btn" onClick={load} disabled={loading}>
-          {loading ? <Loader2 size={15} className="spin" /> : <RefreshCw size={15} />}
+        <h3>{loadError.title}</h3>
+        <p>{loadError.detail} Màn này cần cấu hình thật của máy chủ trước khi cho phép thay đổi.</p>
+        <button
+          type="button"
+          className="primary-btn"
+          onClick={() => configQuery.refetch()}
+          disabled={configQuery.isFetching}
+        >
+          {configQuery.isFetching ? <Loader2 size={15} className="spin" /> : <RefreshCw size={15} />}
           Thử lại
         </button>
       </div>
@@ -1003,8 +1011,8 @@ export default function ModelsView() {
             khởi động lại backend, cấu hình quay về giá trị trong <code>.env</code>.
           </span>
         </div>
-        <LlmSection llm={llm} onSaved={setConfig} />
-        <RerankerSection reranker={reranker} onSaved={setConfig} />
+        <LlmSection llm={llm} />
+        <RerankerSection reranker={reranker} />
         <EmbeddingSection embedding={config.embedding ?? {}} openaiHasKey={Boolean(llm.openai_has_key)} />
       </>
     );

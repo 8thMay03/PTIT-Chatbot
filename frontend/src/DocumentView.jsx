@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -13,7 +14,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { API_BASE_URL } from "./api";
+import { describeError, documentsApi, queryKeys } from "./api";
 import OriginalDocumentViewer, {
   BROWSER_VIEWABLE_TYPES,
   documentFileUrl,
@@ -24,7 +25,6 @@ import MarkdownView from "./components/MarkdownView";
 import MarkdownEditorView from "./components/MarkdownEditorView";
 
 const PAGE_SIZES = [20, 50, 100];
-const FETCH_ALL_BATCH = 500;
 
 const VIEW_MODES = [
   { key: "full", label: "Toàn văn" },
@@ -126,15 +126,8 @@ function findMatchingElements(chunkText, chunkIndex, totalChunks, elements) {
 
 /** Màn chi tiết, mở khi bấm vào một tài liệu trong danh sách kho. */
 export default function DocumentView({ documentId, onBack, busy: pipelineBusy, parsingDocId, chunkingDocId, onParse, onChunk }) {
-  const [docDetail, setDocDetail] = useState(null);
+  const queryClient = useQueryClient();
   const [editingMarkdown, setEditingMarkdown] = useState(false);
-  const [docDetailLoading, setDocDetailLoading] = useState(false);
-  const [docError, setDocError] = useState("");
-
-  const [chunks, setChunks] = useState([]);
-  const [chunkTotal, setChunkTotal] = useState(0);
-  const [chunksLoading, setChunksLoading] = useState(false);
-  const [chunkError, setChunkError] = useState("");
 
   const [chunkMode, setChunkMode] = useState(() => {
     const saved = localStorage.getItem("ptit_chunk_mode");
@@ -148,15 +141,10 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [reloadToken, setReloadToken] = useState(0);
   // Chọn và bật/tắt từng đoạn: backend chưa lưu trạng thái này, nên cả hai chỉ
   // tồn tại trong phiên làm việc. Tooltip trên công tắc nói rõ điều đó.
   const [selectedChunkIds, setSelectedChunkIds] = useState(new Set());
   const [enabledChunks, setEnabledChunks] = useState({});
-
-  // Khi tìm kiếm, phải có toàn bộ đoạn trong tay vì máy chủ chưa hỗ trợ lọc.
-  const [allChunks, setAllChunks] = useState(null);
-  const [loadingAll, setLoadingAll] = useState(false);
 
   // Highlight & auto-scroll khi trỏ chuột vào chunk
   const [hoveredChunkId, setHoveredChunkId] = useState(null);
@@ -165,6 +153,57 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
   const currentHighlightedElsRef = useRef([]);
 
   const searchTimer = useRef(null);
+
+  // ---- Thông tin tài liệu ----
+  const detailQuery = useQuery({
+    queryKey: queryKeys.document(documentId),
+    queryFn: ({ signal }) => documentsApi.get(documentId, { signal }),
+    enabled: Boolean(documentId),
+  });
+  const docDetail = detailQuery.data ?? null;
+  const docDetailLoading = detailQuery.isLoading;
+  const docError = detailQuery.error
+    ? describeError(detailQuery.error, {
+        fallbackTitle: "Không mở được tài liệu",
+        fallbackDetail: "Không tải được nội dung tài liệu từ máy chủ.",
+      }).detail
+    : "";
+
+  // ---- Các đoạn: chỉ tải đúng trang đang xem ----
+  // Bản trước tải TOÀN BỘ đoạn (lô 500, lặp tới hết) ngay khi mở màn, khiến
+  // tài liệu lớn phải chờ rất lâu mới hiện được gì.
+  const offset = (page - 1) * pageSize;
+  const chunksQuery = useQuery({
+    queryKey: queryKeys.documentChunks(documentId, offset, pageSize),
+    queryFn: ({ signal }) =>
+      documentsApi.chunks(documentId, { offset, limit: pageSize, signal }),
+    enabled: Boolean(documentId) && !searchTerm,
+  });
+  const chunks = chunksQuery.data?.chunks ?? [];
+  const chunkTotal = chunksQuery.data?.total ?? 0;
+  const chunksLoading = chunksQuery.isFetching;
+  const chunksError = chunksQuery.error
+    ? describeError(chunksQuery.error, {
+        fallbackTitle: "Không tải được các đoạn",
+        fallbackDetail: "Không tải được danh sách đoạn văn bản.",
+      }).detail
+    : "";
+
+  // ---- Tìm kiếm: nạp toàn bộ một lần rồi lọc tại chỗ, cache theo tài liệu ----
+  const allChunksQuery = useQuery({
+    queryKey: queryKeys.documentAllChunks(documentId),
+    queryFn: ({ signal }) => documentsApi.allChunks(documentId, { signal }),
+    enabled: Boolean(documentId) && Boolean(searchTerm),
+  });
+  const allChunks = allChunksQuery.data ?? null;
+  const loadingAll = allChunksQuery.isFetching;
+  const allChunksError = allChunksQuery.error
+    ? describeError(allChunksQuery.error, {
+        fallbackTitle: "Không tải được toàn bộ đoạn để tìm kiếm",
+        fallbackDetail: "Không tải được toàn bộ đoạn để tìm kiếm.",
+      }).detail
+    : "";
+  const chunkError = searchTerm ? allChunksError : chunksError;
 
   useEffect(() => {
     localStorage.setItem("ptit_chunk_mode", chunkMode);
@@ -184,104 +223,10 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
     return () => clearTimeout(searchTimer.current);
   }, [searchInput]);
 
-  // ---- Thông tin tài liệu ----
+  // Đổi tài liệu thì quay về trang đầu; dữ liệu trang cũ đã được query cache tách riêng.
   useEffect(() => {
-    if (!documentId) return undefined;
-    let cancelled = false;
-    setDocDetailLoading(true);
-    setDocError("");
-
-    fetch(`${API_BASE_URL}/documents/${documentId}`)
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("lỗi"))))
-      .then((payload) => {
-        if (!cancelled) setDocDetail(payload);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setDocDetail(null);
-          setDocError("Không tải được nội dung tài liệu từ máy chủ.");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setDocDetailLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [documentId, reloadToken]);
-
-  // ---- Các đoạn: chỉ tải đúng trang đang xem ----
-  // Bản trước tải TOÀN BỘ đoạn (lô 500, lặp tới hết) ngay khi mở màn, khiến
-  // tài liệu lớn phải chờ rất lâu mới hiện được gì.
-  useEffect(() => {
-    if (!documentId || searchTerm) return undefined;
-    let cancelled = false;
-    setChunksLoading(true);
-    setChunkError("");
-
-    const offset = (page - 1) * pageSize;
-    fetch(`${API_BASE_URL}/documents/${documentId}/chunks?offset=${offset}&limit=${pageSize}`)
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("lỗi"))))
-      .then((payload) => {
-        if (cancelled) return;
-        setChunks(payload.chunks ?? []);
-        setChunkTotal(payload.total ?? 0);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setChunks([]);
-          setChunkError("Không tải được danh sách đoạn văn bản.");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setChunksLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [documentId, page, pageSize, searchTerm, reloadToken]);
-
-  // ---- Tìm kiếm: nạp toàn bộ một lần rồi lọc tại chỗ ----
-  const fetchAllChunks = useCallback(async () => {
-    setLoadingAll(true);
-    setChunkError("");
-    const collected = [];
-    try {
-      let offset = 0;
-      let total = Infinity;
-      while (offset < total) {
-        const response = await fetch(
-          `${API_BASE_URL}/documents/${documentId}/chunks?offset=${offset}&limit=${FETCH_ALL_BATCH}`
-        );
-        if (!response.ok) throw new Error("lỗi");
-        const payload = await response.json();
-        const list = payload.chunks ?? [];
-        collected.push(...list);
-        total = payload.total ?? collected.length;
-        offset += FETCH_ALL_BATCH;
-        if (list.length === 0) break;
-      }
-      setAllChunks(collected);
-      setChunkTotal(collected.length);
-    } catch {
-      setAllChunks([]);
-      setChunkError("Không tải được toàn bộ đoạn để tìm kiếm.");
-    } finally {
-      setLoadingAll(false);
-    }
-  }, [documentId]);
-
-  useEffect(() => {
-    if (searchTerm && allChunks === null && !loadingAll) fetchAllChunks();
-  }, [searchTerm, allChunks, loadingAll, fetchAllChunks]);
-
-  // Tài liệu đổi hoặc vừa parse lại thì bộ nhớ đệm tìm kiếm không còn đúng nữa
-  useEffect(() => {
-    setAllChunks(null);
     setPage(1);
-  }, [documentId, reloadToken]);
+  }, [documentId]);
 
   const searchResults = useMemo(() => {
     if (!searchTerm || !allChunks) return null;
@@ -375,7 +320,7 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
     [highlightAndScrollToChunk]
   );
 
-  // Xóa highlight khi đổi tài liệu, đổi trang hoặc reload
+  // Xóa highlight khi đổi tài liệu, đổi trang hoặc dữ liệu vừa được tải lại
   useEffect(() => {
     setHoveredChunkId(null);
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
@@ -383,7 +328,7 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
       currentHighlightedElsRef.current.forEach((el) => el.classList.remove("doc-chunk-highlight"));
       currentHighlightedElsRef.current = [];
     }
-  }, [documentId, reloadToken, page]);
+  }, [documentId, page, chunksQuery.dataUpdatedAt, detailQuery.dataUpdatedAt]);
 
   useEffect(() => {
     return () => {
@@ -422,13 +367,11 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
   async function handleReparse() {
     if (!docDetail) return;
     await onParse?.(docDetail);
-    setReloadToken((t) => t + 1);
   }
 
   async function handleChunk() {
     if (!docDetail) return;
     await onChunk?.(docDetail);
-    setReloadToken((t) => t + 1);
   }
 
   const isParsingThis = parsingDocId === documentId;
@@ -447,7 +390,7 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
         fileType={fileType}
         onClose={(saved) => {
           setEditingMarkdown(false);
-          if (saved) setReloadToken((t) => t + 1);
+          if (saved) queryClient.invalidateQueries({ queryKey: queryKeys.documents });
         }}
       />
     );

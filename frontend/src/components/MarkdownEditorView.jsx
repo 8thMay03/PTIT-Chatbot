@@ -1,7 +1,6 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, ExternalLink, Info, Loader2, RefreshCw, RotateCcw, Save } from "lucide-react";
-import { API_BASE_URL } from "../api";
-import { apiError } from "../lib/format";
+import { describeError, documentsApi, errorMessage, isAbortError } from "../api";
 import MarkdownView from "./MarkdownView";
 import Modal from "./Modal";
 import OriginalDocumentViewer, { BROWSER_VIEWABLE_TYPES, documentFileUrl } from "./OriginalDocumentViewer";
@@ -24,13 +23,6 @@ function savedPanes() {
     // Giá trị hỏng hoặc không đọc được localStorage: hiện đủ ba cột.
   }
   return PANES.map((pane) => pane.key);
-}
-
-async function requestJson(url, options, fallback) {
-  const response = await fetch(url, options);
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(apiError(payload, fallback));
-  return payload;
 }
 
 /**
@@ -90,20 +82,21 @@ export default function MarkdownEditorView({
     const controller = new AbortController();
     setLoading(true);
     setLoadError("");
-    requestJson(
-      `${API_BASE_URL}/documents/${documentId}/markdown`,
-      { signal: controller.signal },
-      "Không tải được bản Markdown của tài liệu."
-    )
+    documentsApi
+      .markdown(documentId, { signal: controller.signal })
       .then((payload) => {
         if (controller.signal.aborted) return;
         setStored(payload);
         setText(payload.text);
       })
       .catch((err) => {
-        if (!controller.signal.aborted) {
-          setLoadError(err instanceof TypeError ? "Không kết nối được máy chủ." : err.message);
-        }
+        if (controller.signal.aborted || isAbortError(err)) return;
+        setLoadError(
+          describeError(err, {
+            fallbackTitle: "Không tải được bản Markdown",
+            fallbackDetail: "Không tải được bản Markdown của tài liệu.",
+          }).detail
+        );
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -130,20 +123,16 @@ export default function MarkdownEditorView({
     }
     setSaving(true);
     try {
-      const payload = await requestJson(
-        `${API_BASE_URL}/documents/${documentId}/markdown`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, base_hash: stored.content_hash }),
-        },
-        "Không lưu được Markdown."
-      );
+      const payload = await documentsApi.saveMarkdown(documentId, {
+        text,
+        baseHash: stored.content_hash,
+      });
       setStored(payload);
       setSavedCount((count) => count + 1);
       toast.success("Đã lưu Markdown. Bấm “Chia đoạn” để kho tri thức dùng bản mới.");
     } catch (err) {
-      toast.error(err instanceof TypeError ? "Không kết nối được máy chủ." : err.message);
+      if (isAbortError(err)) return;
+      toast.error(errorMessage(err, "Không lưu được Markdown."));
     } finally {
       setSaving(false);
     }

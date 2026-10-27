@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   Flame,
@@ -10,7 +11,8 @@ import {
   ShieldCheck,
   Sliders,
 } from "lucide-react";
-import { API_BASE_URL } from "./api";
+import { configApi, describeError, errorMessage, queryKeys } from "./api";
+import { mergeConfigDraft } from "./lib/configDraft";
 import Modal from "./components/Modal";
 import { useToast } from "./components/Toast";
 
@@ -30,70 +32,90 @@ const DEFAULTS = {
   candidateMultiplier: 3,
 };
 
+function valuesFromConfig(data) {
+  return {
+    temperature: data?.llm?.temperature ?? DEFAULTS.temperature,
+    llmTimeout: data?.llm?.timeout ?? DEFAULTS.llmTimeout,
+    maxRetries: data?.llm?.max_retries ?? DEFAULTS.maxRetries,
+    topK: data?.retrieval?.top_k ?? DEFAULTS.topK,
+    hybridVectorWeight:
+      data?.retrieval?.hybrid_vector_weight ?? DEFAULTS.hybridVectorWeight,
+    multiQueryEnabled: Boolean(data?.retrieval?.multi_query_enabled),
+    multiQueryCount:
+      data?.retrieval?.multi_query_count ?? DEFAULTS.multiQueryCount,
+    multiQueryUseLlm: Boolean(data?.retrieval?.multi_query_use_llm),
+    scopeEnabled: Boolean(data?.guardrails?.scope_enabled),
+    minVectorScore:
+      data?.guardrails?.min_vector_score ?? DEFAULTS.minVectorScore,
+    minBm25Score: data?.guardrails?.min_bm25_score ?? DEFAULTS.minBm25Score,
+    rerankerEnabled: Boolean(data?.reranker?.enabled),
+    candidateMultiplier:
+      data?.reranker?.candidate_multiplier ?? DEFAULTS.candidateMultiplier,
+  };
+}
+
 export default function ConfigView() {
   const toast = useToast();
+  const queryClient = useQueryClient();
 
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
-  const [loadError, setLoadError] = useState("");
 
   const [values, setValues] = useState(DEFAULTS);
   // Ảnh chụp giá trị lần đọc gần nhất từ máy chủ, dùng để biết có thay đổi chưa lưu.
-  const savedSnapshot = useRef(DEFAULTS);
+  const [savedSnapshot, setSavedSnapshot] = useState(DEFAULTS);
+  const [hydrated, setHydrated] = useState(false);
+  const previousServerRef = useRef(null);
+
+  const configQuery = useQuery({
+    queryKey: queryKeys.config,
+    queryFn: ({ signal }) => configApi.get({ signal }),
+  });
+  const serverValues = useMemo(
+    () => (configQuery.data ? valuesFromConfig(configQuery.data) : null),
+    [configQuery.data]
+  );
+  const loading = configQuery.isPending || (!hydrated && !configQuery.error);
+  const configError = configQuery.error
+    ? describeError(configQuery.error, {
+        fallbackTitle: "Không đọc được cấu hình",
+        fallbackDetail: "Máy chủ trả về lỗi khi đọc cấu hình.",
+      })
+    : null;
+
+  // Cache `/config` dùng chung với tab Mô hình: nhận giá trị mới nhưng giữ lại
+  // đúng những trường người dùng đang sửa dở ở tab này.
+  useEffect(() => {
+    if (!serverValues) return;
+    const previous = previousServerRef.current;
+
+    setValues((current) => {
+      if (!previous) return serverValues;
+      return mergeConfigDraft(current, previous, serverValues);
+    });
+    previousServerRef.current = serverValues;
+    setSavedSnapshot(serverValues);
+    setHydrated(true);
+  }, [serverValues]);
+
+  /** Sau khi máy chủ trả cấu hình mới, đồng bộ form ngay cả khi cache không đổi tham chiếu. */
+  const applyServerConfig = useCallback((config) => {
+    const nextValues = valuesFromConfig(config);
+    previousServerRef.current = nextValues;
+    setValues(nextValues);
+    setSavedSnapshot(nextValues);
+    setHydrated(true);
+  }, []);
 
   const set = useCallback((key, value) => {
     setValues((current) => ({ ...current, [key]: value }));
   }, []);
 
   const isDirty = useMemo(
-    () => JSON.stringify(values) !== JSON.stringify(savedSnapshot.current),
-    [values]
+    () => JSON.stringify(values) !== JSON.stringify(savedSnapshot),
+    [values, savedSnapshot]
   );
-
-  const fetchBackendConfig = useCallback(async () => {
-    setLoading(true);
-    setLoadError("");
-    try {
-      const res = await fetch(`${API_BASE_URL}/config`);
-      if (!res.ok) throw new Error("Máy chủ trả về lỗi khi đọc cấu hình.");
-      const data = await res.json();
-
-      const next = {
-        temperature: data.llm?.temperature ?? DEFAULTS.temperature,
-        llmTimeout: data.llm?.timeout ?? DEFAULTS.llmTimeout,
-        maxRetries: data.llm?.max_retries ?? DEFAULTS.maxRetries,
-        topK: data.retrieval?.top_k ?? DEFAULTS.topK,
-        hybridVectorWeight: data.retrieval?.hybrid_vector_weight ?? DEFAULTS.hybridVectorWeight,
-        multiQueryEnabled: Boolean(data.retrieval?.multi_query_enabled),
-        multiQueryCount: data.retrieval?.multi_query_count ?? DEFAULTS.multiQueryCount,
-        multiQueryUseLlm: Boolean(data.retrieval?.multi_query_use_llm),
-        scopeEnabled: Boolean(data.guardrails?.scope_enabled),
-        minVectorScore: data.guardrails?.min_vector_score ?? DEFAULTS.minVectorScore,
-        minBm25Score: data.guardrails?.min_bm25_score ?? DEFAULTS.minBm25Score,
-        rerankerEnabled: Boolean(data.reranker?.enabled),
-        candidateMultiplier: data.reranker?.candidate_multiplier ?? DEFAULTS.candidateMultiplier,
-      };
-
-      setValues(next);
-      savedSnapshot.current = next;
-    } catch (err) {
-      // Bản trước chỉ console.warn rồi hiện giá trị mặc định như thể đó là cấu
-      // hình thật của hệ thống — người dùng không có cách nào biết là đã lỗi.
-      setLoadError(
-        err instanceof TypeError
-          ? "Không kết nối được máy chủ. Các giá trị bên dưới là mặc định của giao diện, KHÔNG phải cấu hình đang chạy."
-          : `${err.message} Các giá trị bên dưới là mặc định của giao diện, KHÔNG phải cấu hình đang chạy.`
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchBackendConfig();
-  }, [fetchBackendConfig]);
 
   // Cảnh báo khi rời trang mà còn thay đổi chưa lưu
   useEffect(() => {
@@ -109,16 +131,15 @@ export default function ConfigView() {
   async function handleResetConfig() {
     setResetting(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/config/reset`, { method: "POST" });
-      if (!res.ok) throw new Error("Máy chủ từ chối yêu cầu khôi phục.");
-      await fetchBackendConfig();
+      const next = await configApi.reset();
+      applyServerConfig(next);
+      queryClient.setQueryData(queryKeys.config, next);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.config });
       toast.success("Đã khôi phục toàn bộ cấu hình về mặc định.");
       setResetOpen(false);
     } catch (err) {
       toast.error(
-        err instanceof TypeError
-          ? "Không kết nối được máy chủ. Cấu hình chưa được khôi phục."
-          : err.message || "Khôi phục cấu hình thất bại."
+        `${errorMessage(err, "Khôi phục cấu hình thất bại.")} Cấu hình chưa được khôi phục.`
       );
     } finally {
       setResetting(false);
@@ -152,27 +173,16 @@ export default function ConfigView() {
         },
       };
 
-      const res = await fetch(`${API_BASE_URL}/config`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const detail = await res.json().catch(() => ({}));
-        throw new Error(detail?.detail || "Máy chủ từ chối cập nhật cấu hình.");
-      }
-
-      savedSnapshot.current = values;
-      setLoadError("");
+      const next = await configApi.update(payload);
+      applyServerConfig(next);
+      queryClient.setQueryData(queryKeys.config, next);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.config });
       toast.success("Đã lưu cấu hình RAG lên máy chủ.");
     } catch (err) {
       // Bản trước bắt lỗi rồi hiện toast MÀU XANH "Đã lưu cấu hình cục bộ",
       // trong khi không hề có cơ chế lưu cục bộ nào — cấu hình đã mất trắng.
       toast.error(
-        err instanceof TypeError
-          ? "Không kết nối được máy chủ. Cấu hình CHƯA được lưu."
-          : `${err.message} Cấu hình CHƯA được lưu.`
+        `${errorMessage(err, "Máy chủ từ chối cập nhật cấu hình.")} Cấu hình CHƯA được lưu.`
       );
     } finally {
       setSaving(false);
@@ -234,10 +244,14 @@ export default function ConfigView() {
         </div>
       </div>
 
-      {loadError && (
+      {configError && (
         <div className="inline-alert is-warning" role="alert" style={{ margin: "0 24px 16px" }}>
           <AlertTriangle size={16} />
-          <span>{loadError}</span>
+          <span>
+            {configError.title}. {configError.detail}
+            {!configQuery.data &&
+              " Các giá trị bên dưới là mặc định của giao diện, KHÔNG phải cấu hình đang chạy."}
+          </span>
         </div>
       )}
 

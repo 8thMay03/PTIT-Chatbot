@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Download, FileText, Loader2 } from "lucide-react";
-import { API_BASE_URL } from "../api";
-import { apiError } from "../lib/format";
+import { describeError, documentsApi, isAbortError } from "../api";
 
 const TEXT_TYPES = new Set(["md", "txt"]);
 /** Định dạng trình duyệt tự hiển thị được khi mở tệp trong tab mới. */
@@ -10,8 +9,7 @@ export const BROWSER_VIEWABLE_TYPES = new Set(["pdf", ...TEXT_TYPES]);
 const SAFE_HREF = /^(https?:|mailto:|#)/i;
 
 export function documentFileUrl(documentId, { inline = false } = {}) {
-  const url = `${API_BASE_URL}/documents/${documentId}/file`;
-  return inline ? `${url}?inline=true` : url;
+  return documentsApi.fileUrl(documentId, { inline });
 }
 
 function neutralizeUnsafeLinks(root) {
@@ -65,21 +63,28 @@ export default function OriginalDocumentViewer({ documentId, fileType, fileName 
     setText(null);
 
     (async () => {
-      const response = await fetch(inlineUrl, { signal: controller.signal });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(apiError(payload, "Không tải được tệp gốc từ máy chủ."));
-      }
-
       if (type === "pdf") {
         // Chỉ cần biết tệp còn trên máy chủ; iframe tự tải và hiển thị bằng trình xem PDF.
+        const response = await documentsApi.file(documentId, {
+          inline: true,
+          responseType: "response",
+          signal: controller.signal,
+        });
         await response.body?.cancel();
       } else if (TEXT_TYPES.has(type)) {
-        const content = await response.text();
+        const content = await documentsApi.file(documentId, {
+          inline: true,
+          responseType: "text",
+          signal: controller.signal,
+        });
         if (controller.signal.aborted) return;
         setText(content);
       } else {
-        const data = await response.arrayBuffer();
+        const data = await documentsApi.file(documentId, {
+          inline: true,
+          responseType: "arrayBuffer",
+          signal: controller.signal,
+        });
         const { renderAsync } = await import("docx-preview");
         const container = docxRef.current;
         if (controller.signal.aborted || !container) return;
@@ -97,8 +102,12 @@ export default function OriginalDocumentViewer({ documentId, fileType, fileName 
       }
       if (!controller.signal.aborted) setStatus("ready");
     })().catch((err) => {
-      if (controller.signal.aborted) return;
-      setErrorMessage(err?.message || "Không hiển thị được tệp gốc.");
+      if (controller.signal.aborted || isAbortError(err)) return;
+      const described = describeError(err, {
+        fallbackTitle: "Không hiển thị được tệp gốc",
+        fallbackDetail: "Không tải được tệp gốc từ máy chủ.",
+      });
+      setErrorMessage(described.detail);
       setStatus("error");
     });
 

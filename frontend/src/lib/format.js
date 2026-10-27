@@ -33,9 +33,4 @@ export function formatSize(bytes) {
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function apiError(payload, fallback) {
-  if (typeof payload?.detail === "string") return payload.detail;
-  return fallback;
-}
-
 

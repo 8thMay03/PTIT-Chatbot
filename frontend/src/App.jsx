@@ -9,13 +9,14 @@ import {
   PanelLeftOpen,
   Sparkles,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import ChatView from "./ChatView";
 import DatasetView from "./DatasetView";
 import SettingsView from "./SettingsView";
 import ConversationList from "./components/ConversationList";
 import { ToastProvider } from "./components/Toast";
 import { useTheme } from "./lib/theme";
-import { API_BASE_URL } from "./api";
+import { queryKeys } from "./api";
 
 const REPO_URL = "https://github.com/8thMay03/PTIT-Chatbot";
 
@@ -64,10 +65,9 @@ export default function App() {
     return false;
   });
   const [activeConversationId, setActiveConversationId] = useState(null);
-  // Tăng lên mỗi khi một lượt hỏi đáp kết thúc, để danh sách hội thoại tải lại.
-  const [conversationsToken, setConversationsToken] = useState(0);
   const { theme, setTheme } = useTheme();
   const chatRef = useRef(null);
+  const queryClient = useQueryClient();
 
   // Theo dõi kích thước màn hình
   useEffect(() => {
@@ -140,11 +140,6 @@ export default function App() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [mobileSidebarOpen]);
 
-  const refreshDocCount = useCallback(() => {
-    // Giữ lại để các màn con báo có thay đổi; số liệu hiển thị nằm trong DatasetView.
-    fetch(`${API_BASE_URL}/documents`).catch(() => {});
-  }, []);
-
   const startNewChat = useCallback(() => {
     chatRef.current?.reset();
     setActiveConversationId(null);
@@ -164,10 +159,13 @@ export default function App() {
     setMobileSidebarOpen(false);
   }, []);
 
-  const handleConversationSaved = useCallback((conversationId) => {
-    setActiveConversationId(conversationId);
-    setConversationsToken((token) => token + 1);
-  }, []);
+  const handleConversationSaved = useCallback(
+    (conversationId) => {
+      setActiveConversationId(conversationId);
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversationList });
+    },
+    [queryClient]
+  );
 
   return (
     <ToastProvider>
@@ -264,7 +262,6 @@ export default function App() {
             <ConversationList
               activeId={view === "chat" ? activeConversationId : null}
               onOpen={openConversation}
-              reloadToken={conversationsToken}
             />
           </div>
           <div className="sidebar-footer">
@@ -319,7 +316,7 @@ export default function App() {
             onLoadingChange={setChatLoading}
             onConversationSaved={handleConversationSaved}
           />
-          {view === "documents" && <DatasetView onChanged={refreshDocCount} />}
+          {view === "documents" && <DatasetView />}
           {view === "settings" && (
             <SettingsView
               activeTab={settingsTab}

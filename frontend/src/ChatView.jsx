@@ -13,7 +13,7 @@ import {
   Square,
   WifiOff,
 } from "lucide-react";
-import { API_BASE_URL } from "./api";
+import { chatApi, conversationsApi, describeError, isAbortError } from "./api";
 import MarkdownView from "./components/MarkdownView";
 import ReasoningPanel from "./components/ReasoningPanel";
 
@@ -55,44 +55,20 @@ const STEP_STATUS_TEXT = {
 };
 
 /**
- * Phân loại lỗi để báo đúng nguyên nhân.
- *
- * Trước đây mọi lỗi đều hiện chung một câu "Có lỗi khi gọi backend", khiến
- * người dùng không phân biệt được mất mạng với việc kho tài liệu chưa nạp.
+ * Ngữ cảnh câu chữ cho màn chat; cách phân loại lỗi nằm trong `api/errors.js`.
  */
-function describeError(error, status) {
-  if (error instanceof TypeError) {
-    return {
-      title: "Không kết nối được máy chủ",
-      detail:
-        "Trình duyệt không gọi được API. Kiểm tra kết nối mạng, hoặc xem server FastAPI đã chạy chưa.",
-    };
-  }
-  if (status === 404) {
-    return {
-      title: "Không tìm thấy API chat",
-      detail: "Đường dẫn API không đúng. Kiểm tra biến VITE_API_BASE_URL của frontend.",
-    };
-  }
-  if (status === 503 || status === 500) {
-    return {
-      title: "Máy chủ gặp sự cố",
-      detail:
-        "Backend trả về lỗi khi xử lý câu hỏi. Kiểm tra log server và cấu hình LLM trong màn Mô hình.",
-    };
-  }
-  if (status === 429) {
-    return {
-      title: "Vượt quá giới hạn gọi mô hình",
-      detail: "Nhà cung cấp LLM đang chặn tạm thời. Thử lại sau ít phút.",
-    };
-  }
-  return {
-    title: "Không lấy được câu trả lời",
-    detail:
-      error?.message ||
-      "Có lỗi ngoài dự kiến. Kiểm tra server FastAPI và chắc chắn tài liệu đã được ingest.",
-  };
+const CHAT_ERROR_CONTEXT = {
+  notFoundTitle: "Không tìm thấy API chat",
+  notFoundDetail: "Đường dẫn API không đúng. Kiểm tra biến VITE_API_BASE_URL của frontend.",
+  serverDetail:
+    "Backend trả về lỗi khi xử lý câu hỏi. Kiểm tra log server và cấu hình LLM trong màn Mô hình.",
+  fallbackTitle: "Không lấy được câu trả lời",
+  fallbackDetail:
+    "Có lỗi ngoài dự kiến. Kiểm tra server FastAPI và chắc chắn tài liệu đã được ingest.",
+};
+
+function describeChatError(error, overrides = {}) {
+  return describeError(error, { ...CHAT_ERROR_CONTEXT, ...overrides });
 }
 
 const ChatView = forwardRef(function ChatView(
@@ -113,6 +89,7 @@ const ChatView = forwardRef(function ChatView(
   const messagesRef = useRef(null);
   const textareaRef = useRef(null);
   const abortRef = useRef(null);
+  const conversationAbortRef = useRef(null);
   const bottomRef = useRef(null);
   const lastQuestionRef = useRef("");
 
@@ -123,6 +100,9 @@ const ChatView = forwardRef(function ChatView(
   useEffect(() => {
     onLoadingChange?.(loading);
   }, [loading, onLoadingChange]);
+
+  // Huỷ request mở hội thoại nếu ChatView bị gỡ khỏi cây React.
+  useEffect(() => () => conversationAbortRef.current?.abort(), []);
 
   // Chỉ tự cuộn khi người dùng đang ở cuối danh sách. Nếu họ đang đọc lại đoạn
   // phía trên, kéo họ xuống giữa chừng là hành vi gây khó chịu.
@@ -152,6 +132,8 @@ const ChatView = forwardRef(function ChatView(
 
   const resetConversation = useCallback(() => {
     if (loading) return;
+    conversationAbortRef.current?.abort();
+    conversationAbortRef.current = null;
     setConversationId(null);
     setMessages([
       {
@@ -169,12 +151,13 @@ const ChatView = forwardRef(function ChatView(
   const loadConversation = useCallback(
     async (id) => {
       if (!id || loading) return;
+      conversationAbortRef.current?.abort();
+      const controller = new AbortController();
+      conversationAbortRef.current = controller;
       setLiveStatus("Đang mở hội thoại...");
       setMessages([{ role: "assistant", content: "", sources: [], streaming: true }]);
       try {
-        const response = await fetch(`${API_BASE_URL}/conversations/${id}`);
-        if (!response.ok) throw new Error("Không mở được hội thoại này.");
-        const payload = await response.json();
+        const payload = await conversationsApi.get(id, { signal: controller.signal });
         const restored = (payload.messages ?? []).map((message) => ({
           role: message.role,
           content: message.content,
@@ -189,14 +172,24 @@ const ChatView = forwardRef(function ChatView(
         setAtBottom(true);
         setLiveStatus("Đã mở hội thoại.");
       } catch (error) {
+        if (isAbortError(error)) return;
         setMessages([
           {
             role: "assistant",
             content: "",
             sources: [],
-            error: describeError(error, 0),
+            error: describeChatError(error, {
+              fallbackTitle: "Không mở được hội thoại",
+              fallbackDetail: "Không mở được hội thoại này.",
+              notFoundTitle: "Không tìm thấy hội thoại",
+              notFoundDetail: "Hội thoại có thể đã bị xóa hoặc chưa được lưu.",
+            }),
           },
         ]);
+      } finally {
+        if (conversationAbortRef.current === controller) {
+          conversationAbortRef.current = null;
+        }
       }
     },
     [loading]
@@ -248,8 +241,8 @@ const ChatView = forwardRef(function ChatView(
     );
   }
 
-  function failLastMessage(error, status, describedOverride) {
-    const described = describedOverride ?? describeError(error, status);
+  function failLastMessage(error, describedOverride) {
+    const described = describedOverride ?? describeChatError(error);
     setMessages((current) =>
       current.map((message, index) =>
         index === current.length - 1
@@ -286,87 +279,58 @@ const ChatView = forwardRef(function ChatView(
 
     const controller = new AbortController();
     abortRef.current = controller;
-    let status = 0;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/chat/stream`, {
-        method: "POST",
+      for await (const eventData of chatApi.streamChat({
+        message: text,
+        conversationId,
+        topK: 4,
         signal: controller.signal,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, conversation_id: conversationId, top_k: 4 }),
-      });
-      status = response.status;
-
-      if (!response.ok) throw new Error("Máy chủ trả về lỗi.");
-      if (!response.body) throw new Error("Trình duyệt không hỗ trợ streaming.");
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let finished = false;
-      while (!finished) {
-        const { value, done } = await reader.read();
-        finished = done;
-        buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          let eventData;
-          try {
-            eventData = JSON.parse(line);
-          } catch {
-            continue;
+      })) {
+        if (eventData.type === "start") {
+          setConversationId(eventData.conversation_id);
+        } else if (eventData.type === "step") {
+          appendStep(eventData);
+          if (STEP_STATUS_TEXT[eventData.step]) {
+            setLiveStatus(STEP_STATUS_TEXT[eventData.step]);
           }
-          if (eventData.type === "start") {
-            setConversationId(eventData.conversation_id);
-          } else if (eventData.type === "step") {
-            appendStep(eventData);
-            if (STEP_STATUS_TEXT[eventData.step]) {
-              setLiveStatus(STEP_STATUS_TEXT[eventData.step]);
-            }
-          } else if (eventData.type === "reasoning") {
-            appendReasoning(eventData.content);
-          } else if (eventData.type === "delta") {
-            appendChunk(eventData.content);
-          } else if (eventData.type === "error") {
-            // LLM lỗi sau khi đã stream một phần: backend không gửi `done` sau
-            // event này, nên hiển thị lỗi kèm nút "Thử lại" để gửi lại câu hỏi.
-            failLastMessage(
-              new Error(eventData.message || "LLM streaming failed."),
-              0,
-              {
-                title: "Tạo câu trả lời bị gián đoạn",
-                detail:
-                  eventData.message ||
-                  "Mô hình gặp lỗi giữa chừng khi trả lời. Thử gửi lại câu hỏi.",
-              }
-            );
-          } else if (eventData.type === "done") {
-            setConversationId(eventData.conversation_id);
-            setMessages((current) =>
-              current.map((message, index) =>
-                index === current.length - 1
-                  ? {
-                      ...message,
-                      content: eventData.answer,
-                      sources: eventData.sources ?? [],
-                      // Bước generate hoàn tất và reasoning đầy đủ chỉ có ở done.
-                      steps: eventData.steps ?? message.steps,
-                      reasoning: eventData.reasoning ?? message.reasoning ?? "",
-                      streaming: false,
-                    }
-                  : message
-              )
-            );
-            setLiveStatus("Đã có câu trả lời.");
-            onConversationSaved?.(eventData.conversation_id);
-          }
+        } else if (eventData.type === "reasoning") {
+          appendReasoning(eventData.content);
+        } else if (eventData.type === "delta") {
+          appendChunk(eventData.content);
+        } else if (eventData.type === "error") {
+          // LLM lỗi sau khi đã stream một phần: backend không gửi `done` sau
+          // event này, nên hiển thị lỗi kèm nút "Thử lại" để gửi lại câu hỏi.
+          failLastMessage(new Error(eventData.message || "LLM streaming failed."), {
+            title: "Tạo câu trả lời bị gián đoạn",
+            detail:
+              eventData.message ||
+              "Mô hình gặp lỗi giữa chừng khi trả lời. Thử gửi lại câu hỏi.",
+          });
+        } else if (eventData.type === "done") {
+          setConversationId(eventData.conversation_id);
+          setMessages((current) =>
+            current.map((message, index) =>
+              index === current.length - 1
+                ? {
+                    ...message,
+                    content: eventData.answer,
+                    sources: eventData.sources ?? [],
+                    // Bước generate hoàn tất và reasoning đầy đủ chỉ có ở done.
+                    steps: eventData.steps ?? message.steps,
+                    reasoning: eventData.reasoning ?? message.reasoning ?? "",
+                    streaming: false,
+                  }
+                : message
+            )
+          );
+          setLiveStatus("Đã có câu trả lời.");
+          onConversationSaved?.(eventData.conversation_id);
         }
       }
     } catch (error) {
-      if (error?.name === "AbortError") return;
-      failLastMessage(error, status);
+      if (isAbortError(error)) return;
+      failLastMessage(error);
     } finally {
       setLoading(false);
       abortRef.current = null;

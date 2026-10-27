@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowUpDown,
@@ -17,8 +18,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { API_BASE_URL } from "./api";
-import { apiError, formatDate, formatSize } from "./lib/format";
+import { describeError, documentsApi, errorMessage, queryKeys } from "./api";
+import { formatDate, formatSize } from "./lib/format";
 import { canEditMarkdown, documentStatus, needsChunking, NO_MARKDOWN_HINT } from "./lib/documentStatus";
 import DocumentView from "./DocumentView";
 import ParserSelectionModal, { parserTitle } from "./components/ParserSelectionModal";
@@ -29,6 +30,7 @@ import { useToast } from "./components/Toast";
 const ACCEPTED_TYPES =
   ".md,.txt,.pdf,.docx,text/markdown,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const PAGE_SIZES = [10, 20, 50, 100];
+const NO_DOCUMENTS = [];
 
 function fileExtension(name) {
   const dot = name.lastIndexOf(".");
@@ -39,24 +41,32 @@ function fileExtension(name) {
 async function loadParsersByExtension(files) {
   const samples = new Map(files.map((file) => [fileExtension(file.name), file.name]));
   const entries = await Promise.all([...samples].map(async ([ext, name]) => {
-    const response = await fetch(`${API_BASE_URL}/parsers?file_name=${encodeURIComponent(name)}`);
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(apiError(payload, "Không tải được danh sách parser."));
+    const payload = await documentsApi.parsersForFile(name);
     return [ext, payload.parsers || []];
   }));
   return Object.fromEntries(entries);
 }
 
-export default function DatasetView({ onChanged }) {
+export default function DatasetView() {
   const toast = useToast();
+  const queryClient = useQueryClient();
 
   const [selectedDocId, setSelectedDocId] = useState(null);
   // Tài liệu đang mở màn sửa Markdown trực tiếp từ danh sách.
   const [markdownDoc, setMarkdownDoc] = useState(null);
 
-  const [documents, setDocuments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+  const documentsQuery = useQuery({
+    queryKey: queryKeys.documentList,
+    queryFn: ({ signal }) => documentsApi.list({ signal }),
+  });
+  const documents = documentsQuery.data?.documents ?? NO_DOCUMENTS;
+  const loading = documentsQuery.isPending;
+  const loadError = documentsQuery.error
+    ? describeError(documentsQuery.error, {
+        fallbackTitle: "Không tải được danh sách tài liệu",
+        fallbackDetail: "Máy chủ trả về lỗi khi lấy danh sách tài liệu.",
+      })
+    : null;
   const [query, setQuery] = useState("");
   const [sortField, setSortField] = useState("created_at");
   const [sortAsc, setSortAsc] = useState(false);
@@ -89,37 +99,22 @@ export default function DatasetView({ onChanged }) {
 
   const fileRef = useRef(null);
 
-  const loadDocuments = useCallback(async () => {
-    setLoading(true);
-    setLoadError("");
-    try {
-      const response = await fetch(`${API_BASE_URL}/documents`);
-      if (!response.ok) throw new Error("Máy chủ trả về lỗi khi lấy danh sách tài liệu.");
-      const payload = await response.json();
-      const docs = payload.documents ?? [];
-      setDocuments(docs);
-      setEnabledDocs((prev) => {
-        const next = { ...prev };
-        docs.forEach((doc) => {
-          if (next[doc.id] === undefined) next[doc.id] = true;
-        });
-        return next;
-      });
-    } catch (err) {
-      setDocuments([]);
-      setLoadError(
-        err instanceof TypeError
-          ? "Không kết nối được máy chủ. Kiểm tra server FastAPI đã chạy chưa."
-          : err.message || "Không tải được danh sách tài liệu."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Danh sách, chi tiết và các đoạn đều nằm dưới tiền tố `["documents"]`, nên một
+  // lần invalidate sau thao tác ghi là mọi màn đang mở cùng cập nhật.
+  const refreshDocuments = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.documents }),
+    [queryClient]
+  );
 
   useEffect(() => {
-    loadDocuments();
-  }, [loadDocuments]);
+    setEnabledDocs((prev) => {
+      const next = { ...prev };
+      documents.forEach((doc) => {
+        if (next[doc.id] === undefined) next[doc.id] = true;
+      });
+      return next;
+    });
+  }, [documents]);
 
   const filtered = useMemo(() => {
     let list = [...documents];
@@ -247,27 +242,21 @@ export default function DatasetView({ onChanged }) {
 
     for (const [index, file] of files.entries()) {
       setUploadProgress(files.length > 1 ? `${index + 1}/${files.length}` : "");
-      const form = new FormData();
-      form.append("file", file);
       // Tệp không hỗ trợ parser đã chọn (vd. .md khi chọn LlamaParse) giữ parser mặc định.
-      if (parserName && (parsersByExt[fileExtension(file.name)] || []).some((item) => item.name === parserName)) {
-        form.append("parser_name", parserName);
-      }
+      const chosenParser =
+        parserName &&
+        (parsersByExt[fileExtension(file.name)] || []).some((item) => item.name === parserName)
+          ? parserName
+          : null;
       try {
-        const response = await fetch(`${API_BASE_URL}/documents`, { method: "POST", body: form });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          failures.push(`${file.name}: ${apiError(payload, "không tải lên được")}`);
-          continue;
-        }
+        await documentsApi.upload(file, { parserName: chosenParser });
         uploaded += 1;
-      } catch {
-        failures.push(`${file.name}: không kết nối được máy chủ`);
+      } catch (err) {
+        failures.push(`${file.name}: ${errorMessage(err, "không tải lên được")}`);
       }
     }
 
-    await loadDocuments();
-    onChanged?.();
+    await refreshDocuments();
     setUploading(false);
     setUploadProgress("");
 
@@ -282,11 +271,7 @@ export default function DatasetView({ onChanged }) {
   }
 
   async function deleteDocument(doc) {
-    const response = await fetch(`${API_BASE_URL}/documents/${doc.id}`, { method: "DELETE" });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(apiError(payload, `Không xóa được “${doc.title || doc.file_name}”.`));
-    }
+    await documentsApi.remove(doc.id);
   }
 
   async function confirmDelete() {
@@ -303,10 +288,9 @@ export default function DatasetView({ onChanged }) {
       });
       toast.success(`Đã xóa “${label}”.`);
       setPendingDelete(null);
-      await loadDocuments();
-      onChanged?.();
+      await refreshDocuments();
     } catch (err) {
-      toast.error(err.message);
+      toast.error(errorMessage(err, `Không xóa được “${label}”.`));
     } finally {
       setDeleting(false);
     }
@@ -324,7 +308,9 @@ export default function DatasetView({ onChanged }) {
         await deleteDocument(doc);
         done += 1;
       } catch (err) {
-        failures.push(err.message);
+        failures.push(
+          `${doc.title || doc.file_name}: ${errorMessage(err, "không xóa được")}`
+        );
       }
     }
 
@@ -334,23 +320,19 @@ export default function DatasetView({ onChanged }) {
     setSelectedIds(new Set());
     setBulkDeleteOpen(false);
     setDeleting(false);
-    await loadDocuments();
-    onChanged?.();
+    await refreshDocuments();
   }
 
   async function reindexAll() {
     if (pipelineBusy) return;
     setReindexing(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/ingest`, { method: "POST" });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(apiError(payload, "Không nạp lại được kho tri thức."));
+      const payload = await documentsApi.reindex();
       const detail = `${payload.documents ?? 0} tài liệu · ${payload.chunks ?? 0} đoạn`;
       toast.success(`Đã nạp lại ${detail}.`);
-      await loadDocuments();
-      onChanged?.();
+      await refreshDocuments();
     } catch (err) {
-      toast.error(err.message || "Không nạp lại được kho tri thức.");
+      toast.error(errorMessage(err, "Không nạp lại được kho tri thức."));
     } finally {
       setReindexing(false);
     }
@@ -360,9 +342,7 @@ export default function DatasetView({ onChanged }) {
     if (pipelineBusy) return;
     setRechunking(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/ingest/chunk`, { method: "POST" });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(apiError(payload, "Không chia đoạn lại được kho tri thức."));
+      const payload = await documentsApi.rechunk();
       const detail = `${payload.documents ?? 0} tài liệu · ${payload.chunks ?? 0} đoạn`;
       if (payload.skipped) {
         toast.warning(
@@ -371,10 +351,9 @@ export default function DatasetView({ onChanged }) {
       } else {
         toast.success(`Đã chia đoạn lại ${detail}.`);
       }
-      await loadDocuments();
-      onChanged?.();
+      await refreshDocuments();
     } catch (err) {
-      toast.error(err.message || "Không chia đoạn lại được kho tri thức.");
+      toast.error(errorMessage(err, "Không chia đoạn lại được kho tri thức."));
     } finally {
       setRechunking(false);
     }
@@ -396,19 +375,16 @@ export default function DatasetView({ onChanged }) {
     if (!doc || pipelineBusy) return;
     setParsingDocId(doc.id);
     try {
-      const response = await fetch(`${API_BASE_URL}/documents/${doc.id}/parse?parser_name=${encodeURIComponent(parserName)}`, { method: "POST" });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(apiError(payload, "Không parse được tài liệu."));
+      const payload = await documentsApi.parse(doc.id, parserName);
       const label = payload.title || payload.file_name || doc.file_name;
       if (needsChunking(payload)) {
         toast.success(`Đã parse lại “${label}”. Bấm “Chia đoạn” để kho tri thức dùng bản mới.`);
       } else {
         toast.success(`Đã parse lại “${label}”; nội dung không đổi nên các đoạn hiện có vẫn khớp.`);
       }
-      await loadDocuments();
-      onChanged?.();
+      await refreshDocuments();
     } catch (err) {
-      toast.error(err.message || "Lỗi khi parse tài liệu.");
+      toast.error(errorMessage(err, "Lỗi khi parse tài liệu."));
     } finally {
       setParsingDocId(null);
     }
@@ -418,15 +394,12 @@ export default function DatasetView({ onChanged }) {
     if (!doc || pipelineBusy) return;
     setChunkingDocId(doc.id);
     try {
-      const response = await fetch(`${API_BASE_URL}/documents/${doc.id}/chunk`, { method: "POST" });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(apiError(payload, "Không chia đoạn được tài liệu."));
+      const payload = await documentsApi.chunk(doc.id);
       const label = payload.title || payload.file_name || doc.file_name;
       toast.success(`Đã chia “${label}” thành ${payload.chunk_count ?? 0} đoạn.`);
-      await loadDocuments();
-      onChanged?.();
+      await refreshDocuments();
     } catch (err) {
-      toast.error(err.message || "Lỗi khi chia đoạn tài liệu.");
+      toast.error(errorMessage(err, "Lỗi khi chia đoạn tài liệu."));
     } finally {
       setChunkingDocId(null);
     }
@@ -434,9 +407,7 @@ export default function DatasetView({ onChanged }) {
 
   async function downloadDocument(doc) {
     try {
-      const response = await fetch(`${API_BASE_URL}/documents/${doc.id}/file`);
-      if (!response.ok) throw new Error("Không tải được file nguồn.");
-      const blob = await response.blob();
+      const blob = await documentsApi.file(doc.id, { responseType: "blob" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -444,7 +415,7 @@ export default function DatasetView({ onChanged }) {
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      toast.error(err.message || "Không tải được file nguồn.");
+      toast.error(errorMessage(err, "Không tải được file nguồn."));
     }
   }
 
@@ -471,10 +442,7 @@ export default function DatasetView({ onChanged }) {
         backLabel="Quay lại kho tài liệu"
         onClose={(saved) => {
           setMarkdownDoc(null);
-          if (saved) {
-            loadDocuments();
-            onChanged?.();
-          }
+          if (saved) refreshDocuments();
         }}
       />
     );
@@ -596,7 +564,9 @@ export default function DatasetView({ onChanged }) {
           {loadError && (
             <div className="inline-alert is-error" role="alert" style={{ marginBottom: 12 }}>
               <AlertTriangle size={16} />
-              <span>{loadError}</span>
+              <span>
+                {loadError.title}. {loadError.detail}
+              </span>
             </div>
           )}
 
