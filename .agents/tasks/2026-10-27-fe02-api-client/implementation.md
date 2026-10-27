@@ -3,7 +3,7 @@
 ## Bàn giao
 
 - Nhánh: `feat/api-client-state` (tách từ `dev` tại `fbeca75`, `dev` đã cập nhật từ `origin/dev`).
-- Trạng thái: đã triển khai, kiểm chứng và tự review; chưa commit (working tree của nhánh).
+- Trạng thái: đã triển khai, kiểm chứng, tự review và commit tại `4e4d297`.
 - Phụ thuộc mới: `@tanstack/react-query@5.105.0`.
 
 ## Nhật ký
@@ -73,7 +73,7 @@
 
 - Chưa có test tích hợp chạy backend thật; kiểm chứng dùng mock fetch và test component.
 - Upload/parse cực lớn vượt 5 phút vẫn báo timeout; ngoài phạm vi tối ưu hàng đợi.
-- Không commit/merge; người dùng review diff trên nhánh `feat/api-client-state`.
+- Đã commit trên nhánh `feat/api-client-state`; chưa merge vào `dev`.
 
 ## Người nhận và bước tiếp theo
 

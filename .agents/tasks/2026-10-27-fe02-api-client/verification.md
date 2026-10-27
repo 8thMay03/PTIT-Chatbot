@@ -2,7 +2,7 @@
 
 - Trạng thái tổng: `passed`
 - Bản được kiểm: working tree nhánh `feat/api-client-state` tại thời điểm
-  `2026-10-27T07:41:08+07:00` (chưa commit).
+  `2026-10-27T07:41:08+07:00`, nội dung đã commit tại `4e4d297`.
 - Môi trường: Windows, Node `v24.14.0`, npm `11.21.1`, Vite `5.4.21`,
   `@tanstack/react-query@5.105.0`.
 
@@ -42,7 +42,7 @@
 
 - Trạng thái: `passed`
 - Lệnh: `npm test`
-- Kết quả: `7 test files passed`, `54 tests passed`, gồm 5 test của `src/api/client.test.js`:
+- Kết quả: `8 test files passed`, `58 tests passed`, gồm 5 test của `src/api/client.test.js`:
   lỗi mạng, 4xx kèm `detail`, 5xx, timeout 30 giây, caller abort.
 
 ## AC-05 — Phân loại lỗi tập trung

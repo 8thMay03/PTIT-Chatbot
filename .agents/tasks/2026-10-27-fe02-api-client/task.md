@@ -2,10 +2,11 @@
 
 - ID: `2026-10-27-fe02-api-client`
 - Trạng thái: `done`
-- Coordinator / người thực hiện: `opencode-agent` (kiêm verifier và reviewer, `self_review`)
+- Coordinator / người thực hiện: `opencode-agent`
+- Reviewer: vòng 1 `opencode-agent` (`self_review`); vòng 2–3 `cursor-reviewer` (độc lập)
 - Người yêu cầu: người dùng (phiếu FE-02)
 - Tạo lúc: `2026-10-27T00:33:25+07:00`
-- Cập nhật lúc: `2026-10-27T07:41:08+07:00`
+- Cập nhật lúc: `2026-10-27T07:54:21+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -61,7 +62,7 @@ TanStack Query cho cache `/config` + danh sách tài liệu/hội thoại, và m
   cache `/config` dùng chung; xử lý vòng review R-05 … R-08. `npm test` 58 test đạt, `npm run build`
   thành công.
 - Blocker: không.
-- Bước tiếp theo: người dùng review diff trên nhánh `feat/api-client-state` và commit/merge khi đồng ý.
+- Bước tiếp theo: đã commit thay đổi trên nhánh `feat/api-client-state`; chờ merge vào `dev`.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
@@ -71,3 +72,6 @@ TanStack Query cho cache `/config` + danh sách tài liệu/hội thoại, và m
 - `2026-10-27T07:41:08+07:00` — `opencode-agent`: xử lý R-05 (reset/save đồng bộ form trực tiếp),
   R-06 (reset draft sau lưu API key), R-07 (huỷ request mở hội thoại), R-08 (giữ detail 5xx); kiểm chứng
   lại và giữ trạng thái `done`.
+- `2026-10-27T07:45:42+07:00` — `cursor-reviewer`: xác nhận vòng 3, `approved`.
+- `2026-10-27T07:53:22+07:00` — `opencode-agent`: commit thay đổi trên nhánh `feat/api-client-state`
+  (`4e4d297`).
