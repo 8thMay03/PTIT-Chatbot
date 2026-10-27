@@ -29,6 +29,9 @@ services:
       DOCUMENTS_PATH: /app/data
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       PTIT_AUTO_INGEST: ${PTIT_AUTO_INGEST:-true}
+      # Backend chỉ thấy IP container proxy (Vite/nginx); tin X-Forwarded-For từ mạng riêng
+      # để chặn dò mật khẩu theo IP thật của client.
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-172.16.0.0/12,10.0.0.0/8,192.168.0.0/16}
     volumes:
       - ./data:/app/data
       - ./backend/app:/app/backend/app

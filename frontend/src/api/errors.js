@@ -5,7 +5,7 @@
  * dành cho người dùng, `code` phân biệt lỗi mạng/timeout với lỗi HTTP.
  */
 export class ApiError extends Error {
-  constructor({ status = 0, detail = "", code = "http", url, cause } = {}) {
+  constructor({ status = 0, detail = "", code = "http", url, cause, payload } = {}) {
     const message = detail || "Đã xảy ra lỗi khi gọi máy chủ.";
     super(message);
     this.name = "ApiError";
@@ -13,8 +13,29 @@ export class ApiError extends Error {
     this.detail = message;
     this.code = code;
     this.url = url;
+    // Body JSON gốc của response lỗi (nếu có), ví dụ để đọc lỗi 422 theo trường.
+    this.payload = payload;
     if (cause !== undefined) this.cause = cause;
   }
+}
+
+/**
+ * Lỗi 422 mặc định của FastAPI (`detail[].loc`, `detail[].msg`) → `{ trường: thông điệp }`.
+ *
+ * Chỉ lấy lỗi trong body (`loc[0] === "body"`), trường là phần tử cuối của `loc`;
+ * mỗi trường giữ thông điệp đầu tiên. Lỗi khác 422 hoặc không có chi tiết → `{}`.
+ */
+export function fieldErrors(error) {
+  const result = {};
+  const detail = error instanceof ApiError && error.status === 422 ? error.payload?.detail : null;
+  if (!Array.isArray(detail)) return result;
+  for (const item of detail) {
+    const loc = Array.isArray(item?.loc) ? item.loc : [];
+    if (loc[0] !== "body" || loc.length < 2) continue;
+    const field = String(loc[loc.length - 1]);
+    if (!(field in result) && item?.msg) result[field] = String(item.msg);
+  }
+  return result;
 }
 
 const NETWORK_DETAIL =

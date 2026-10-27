@@ -56,6 +56,8 @@ export default defineConfig({
       "/api": {
         target: process.env.VITE_PROXY_TARGET ?? "http://localhost:8000",
         changeOrigin: true,
+        // Gửi X-Forwarded-For để backend (TRUSTED_PROXY_IPS) chặn dò theo IP thật.
+        xfwd: true,
       },
     },
   },

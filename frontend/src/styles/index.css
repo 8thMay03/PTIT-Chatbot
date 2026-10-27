@@ -16,4 +16,6 @@
 @import "./document.css";
 @import "./config.css";
 @import "./models.css";
+@import "./landing.css";
+@import "./auth.css";
 @import "./responsive.css";

@@ -86,6 +86,8 @@ describe("request", () => {
     expect(error).toBeInstanceOf(ApiError);
     expect(error.status).toBe(422);
     expect(error.detail).toBe("Tên tài liệu không hợp lệ.");
+    // Body gốc được giữ để đọc lỗi theo trường (fieldErrors).
+    expect(error.payload).toEqual({ detail: "Tên tài liệu không hợp lệ." });
   });
 
   it("giữ mã trạng thái và nội dung lỗi khi 5xx", async () => {

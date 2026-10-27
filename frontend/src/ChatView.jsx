@@ -72,7 +72,7 @@ function describeChatError(error, overrides = {}) {
 }
 
 const ChatView = forwardRef(function ChatView(
-  { hidden, onLoadingChange, onConversationSaved },
+  { hidden, onLoadingChange, onConversationSaved, headerActions },
   ref
 ) {
   const [messages, setMessages] = useState([
@@ -391,6 +391,7 @@ const ChatView = forwardRef(function ChatView(
           <span>{loading ? "Đang trả lời..." : "Sẵn sàng hỗ trợ"}</span>
         </div>
         <div className="header-actions">
+          {headerActions}
           <button
             className="icon-btn"
             onClick={resetConversation}

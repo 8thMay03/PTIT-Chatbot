@@ -5,10 +5,12 @@ export {
   errorMessage,
   isAbortError,
   isTimeoutError,
+  fieldErrors,
   isUnauthorized,
 } from "./errors";
 export { queryClient, queryKeys } from "./queryClient";
 export * as adminApi from "./admin";
+export * as authApi from "./auth";
 export * as chatApi from "./chat";
 export * as configApi from "./config";
 export * as conversationsApi from "./conversations";

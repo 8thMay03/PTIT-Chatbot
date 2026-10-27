@@ -14,6 +14,7 @@ import ConversationList from "./components/ConversationList";
 import Modal from "./components/Modal";
 import ThemePicker from "./components/ThemePicker";
 import { ToastProvider } from "./components/Toast";
+import UserMenu, { GuestHint } from "./components/UserMenu";
 import { isAppearanceHash, legacyHashToAdmin, navigateTo } from "./lib/appRoute";
 import { useSidebar } from "./lib/useSidebar";
 import { useTheme } from "./lib/theme";
@@ -22,7 +23,8 @@ import { queryKeys } from "./api";
 const REPO_URL = "https://github.com/8thMay03/PTIT-Chatbot";
 
 /**
- * App sinh viên: chat, lịch sử hội thoại của phiên và bộ chọn giao diện.
+ * App sinh viên tại `/chat`: chat, lịch sử hội thoại (của tài khoản khi đã đăng
+ * nhập, ngược lại của phiên ẩn danh), khối tài khoản và bộ chọn giao diện.
  *
  * Không import bất kỳ màn quản trị nào (Dataset/Settings nằm trong chunk
  * `admin/` lazy-load tại `/admin`); hash cũ của các màn đó chuyển sang `/admin`.
@@ -80,6 +82,13 @@ export default function App() {
     [setMobileOpen]
   );
 
+  // Đăng xuất: cache hội thoại đã bị xoá (useLogout); đưa màn chat về hội thoại mới
+  // để không còn hiện hội thoại của tài khoản.
+  const handleLoggedOut = useCallback(() => {
+    chatRef.current?.reset();
+    setActiveConversationId(null);
+  }, []);
+
   const handleConversationSaved = useCallback(
     (conversationId) => {
       setActiveConversationId(conversationId);
@@ -115,7 +124,7 @@ export default function App() {
           inert={isMobile && !mobileOpen ? "" : undefined}
         >
           <div className="sidebar-brand-row">
-            <div className="brand sidebar-brand is-static">
+            <a className="brand sidebar-brand" href="/" aria-label="PTIT Chatbot — Trang chủ">
               <span className="brand-mark">
                 <Sparkles size={19} />
               </span>
@@ -123,7 +132,7 @@ export default function App() {
                 <strong>PTIT Chatbot</strong>
                 <small>Trợ lý học vụ</small>
               </span>
-            </div>
+            </a>
             <button
               type="button"
               className="sidebar-collapse-btn"
@@ -165,6 +174,7 @@ export default function App() {
             <ConversationList activeId={activeConversationId} onOpen={openConversation} />
           </div>
           <div className="sidebar-footer">
+            <GuestHint />
             <button
               type="button"
               className="sidebar-nav-item"
@@ -214,6 +224,7 @@ export default function App() {
             ref={chatRef}
             onLoadingChange={setChatLoading}
             onConversationSaved={handleConversationSaved}
+            headerActions={<UserMenu onLoggedOut={handleLoggedOut} />}
           />
         </div>
       </main>

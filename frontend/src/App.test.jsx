@@ -58,7 +58,11 @@ describe("App sinh viên", () => {
     Element.prototype.scrollIntoView ??= vi.fn();
     vi.stubGlobal(
       "fetch",
-      vi.fn(() => jsonResponse({ total: 0, conversations: [] }))
+      vi.fn((url) =>
+        String(url).includes("/auth/me")
+          ? jsonResponse({ authenticated: false, user: null, registration_enabled: true })
+          : jsonResponse({ total: 0, conversations: [] })
+      )
     );
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -98,7 +102,7 @@ describe("App sinh viên", () => {
     expect(container.querySelector('a[href^="/admin"]')).toBeNull();
 
     const urls = fetch.mock.calls.map(([url]) => String(url));
-    expect(urls.every((url) => /\/api\/conversations/.test(url))).toBe(true);
+    expect(urls.every((url) => /\/api\/(conversations|auth\/me)/.test(url))).toBe(true);
   });
 
   it("nút Giao diện mở bộ chọn chủ đề và đổi được chủ đề", async () => {
@@ -146,5 +150,73 @@ describe("App sinh viên", () => {
       });
       expect(navigateTo).toHaveBeenLastCalledWith(target);
     }
+  });
+
+  it("khách thấy nút Đăng nhập trên header chat và lời nhắc đóng được", async () => {
+    await renderApp();
+
+    const login = await waitFor(() => container.querySelector(".chat-header a.user-login-btn"));
+    expect(login.textContent.trim()).toBe("Đăng nhập");
+    expect(login.getAttribute("href")).toBe("/login");
+    expect(container.querySelector("a.sidebar-brand").getAttribute("href")).toBe("/");
+
+    const hint = container.querySelector(".guest-hint");
+    expect(hint.textContent).toContain("lưu lịch sử trên mọi thiết bị");
+    await act(async () => {
+      hint.querySelector("button").click();
+    });
+    expect(container.querySelector(".guest-hint")).toBeNull();
+    expect(localStorage.getItem("ptit_chatbot_guest_hint_dismissed")).toBe("1");
+  });
+
+  it("đã đăng nhập: header hiện tên + Đăng xuất; đăng xuất xoá cache hội thoại và về khách", async () => {
+    let authenticated = true;
+    const accountList = {
+      total: 1,
+      conversations: [
+        {
+          id: "conv-tk",
+          title: "Hội thoại của tài khoản",
+          message_count: 2,
+          created_at: "2026-10-28T00:00:00Z",
+          updated_at: "2026-10-28T00:00:00Z",
+        },
+      ],
+    };
+    fetch.mockImplementation((url, options = {}) => {
+      const path = String(url);
+      if (path.includes("/auth/logout")) {
+        authenticated = false;
+        return jsonResponse({ authenticated: false, user: null, registration_enabled: true });
+      }
+      if (path.includes("/auth/me")) {
+        return jsonResponse(
+          authenticated
+            ? {
+                authenticated: true,
+                user: { id: "u-1", email: "an@stu.ptit.edu.vn", full_name: "Nguyễn Văn An" },
+                registration_enabled: true,
+              }
+            : { authenticated: false, user: null, registration_enabled: true }
+        );
+      }
+      return jsonResponse(authenticated ? accountList : { total: 0, conversations: [] });
+    });
+    await renderApp();
+
+    await waitFor(() => container.querySelector(".chat-header .user-name"));
+    expect(container.querySelector(".chat-header .user-name").textContent).toBe("Nguyễn Văn An");
+    expect(container.querySelector(".guest-hint")).toBeNull();
+    await waitFor(() => container.textContent.includes("Hội thoại của tài khoản"));
+
+    const logout = container.querySelector('.chat-header button[title="Đăng xuất"]');
+    expect(logout.getAttribute("aria-label")).toBe("Đăng xuất (Nguyễn Văn An)");
+    await act(async () => {
+      logout.click();
+    });
+
+    await waitFor(() => container.querySelector(".chat-header a.user-login-btn"));
+    await waitFor(() => !container.textContent.includes("Hội thoại của tài khoản"));
+    expect(fetch.mock.calls.some(([url, options]) => String(url).includes("/auth/logout") && options?.method === "POST")).toBe(true);
   });
 });

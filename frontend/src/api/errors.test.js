@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiError, describeError, isUnauthorized } from "./errors";
+import { ApiError, describeError, fieldErrors, isUnauthorized } from "./errors";
 
 describe("describeError", () => {
   it("giữ chi tiết backend khi 5xx để người dùng biết nguyên nhân", () => {
@@ -56,5 +56,33 @@ describe("isUnauthorized", () => {
     expect(isUnauthorized(new ApiError({ status: 0, code: "network" }))).toBe(false);
     expect(isUnauthorized(new TypeError("boom"))).toBe(false);
     expect(isUnauthorized(null)).toBe(false);
+  });
+});
+
+describe("fieldErrors", () => {
+  it("đọc lỗi 422 mặc định FastAPI theo trường trong body", () => {
+    const error = new ApiError({
+      status: 422,
+      detail: "email: Email không đúng định dạng.",
+      payload: {
+        detail: [
+          { loc: ["body", "email"], msg: "Email không đúng định dạng.", type: "email_format" },
+          { loc: ["body", "password"], msg: "Mật khẩu phải có ít nhất 8 ký tự." },
+          { loc: ["body", "password"], msg: "Lỗi thứ hai bị bỏ qua." },
+          { loc: ["query", "limit"], msg: "Không thuộc body." },
+        ],
+      },
+    });
+
+    expect(fieldErrors(error)).toEqual({
+      email: "Email không đúng định dạng.",
+      password: "Mật khẩu phải có ít nhất 8 ký tự.",
+    });
+  });
+
+  it("trả rỗng với lỗi khác 422 hoặc không có chi tiết theo trường", () => {
+    expect(fieldErrors(new ApiError({ status: 409, payload: { detail: "Email đã được đăng ký." } }))).toEqual({});
+    expect(fieldErrors(new ApiError({ status: 422, payload: { detail: "Sai." } }))).toEqual({});
+    expect(fieldErrors(new Error("x"))).toEqual({});
   });
 });

@@ -94,7 +94,7 @@ export default function AdminLogin({ configured = true, onSuccess }) {
           </div>
         </div>
         <AdminLoginForm configured={configured} onSuccess={onSuccess} />
-        <a className="admin-login-back" href="/">
+        <a className="admin-login-back" href="/chat">
           ← Về trang chat
         </a>
       </section>

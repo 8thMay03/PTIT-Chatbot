@@ -15,10 +15,10 @@ Thay vì để mô hình trả lời hoàn toàn từ kiến thức có sẵn, c
 - Confidence gate từ chối trả lời khi không tìm thấy bằng chứng đủ mạnh.
 - Câu trả lời có citation tới tài liệu, mục, Điều, Khoản hoặc Điểm.
 - Streaming câu trả lời trên giao diện web.
-- Tách trang chat cho sinh viên (`/`) và trang quản trị (`/admin`, đăng nhập bằng mật khẩu) để quản lý tài liệu và cấu hình.
+- Trang giới thiệu (`/`), trang chat cho sinh viên (`/chat`), đăng ký/đăng nhập tài khoản người dùng (`/register`, `/login`) và trang quản trị riêng (`/admin`, đăng nhập bằng mật khẩu) để quản lý tài liệu và cấu hình.
 - Quản lý tài liệu trên trang quản trị: tải lên, xem trước, tải xuống và xóa.
 - Parse tài liệu chạy nền: tải lên hoặc parse lại trả job ngay, có thanh tiến trình theo trang/pha và người dùng tiếp tục làm việc khác trong lúc chờ.
-- Lưu lịch sử hội thoại theo từng trình duyệt (phiên ẩn danh) và thông tin debug retrieval.
+- Lưu lịch sử hội thoại theo tài khoản (xem trên mọi thiết bị) hoặc theo trình duyệt khi chưa đăng nhập, kèm thông tin debug retrieval.
 - Đánh giá chất lượng bằng Ragas.
 
 ## Tech stack
@@ -282,11 +282,20 @@ npm install
 npm run dev
 ```
 
-Giao diện chạy tại `http://localhost:5173` (trang chat) và `http://localhost:5173/admin` (trang quản trị, xem mục 4).
+Giao diện chạy tại `http://localhost:5173`:
+
+| Đường dẫn | Trang |
+|---|---|
+| `/` | Trang giới thiệu (landing): tính năng, cách hoạt động, lưu ý giới hạn, nút vào chat/đăng nhập/đăng ký |
+| `/chat` | Trang chat; khách dùng được ngay, đã đăng nhập thì lịch sử theo tài khoản |
+| `/login`, `/register` | Đăng nhập, đăng ký tài khoản người dùng (nhận `?next=/duong-dan-noi-bo`, mặc định `/chat`) — xem mục 5 |
+| `/admin` | Trang quản trị — xem mục 4 |
+
+Đường dẫn lạ mở trang landing. Link cũ của app chat ở `/` (`/#chat`, `/#settings/appearance`) tự chuyển sang `/chat`; link cũ `#documents`, `#config`, `#models`, `#settings/...` chuyển sang `/admin`. Mỗi trang là một chunk tải riêng: landing và trang tài khoản không tải mã chat (render Markdown) hay mã quản trị. Khi tự triển khai sau web server khác, cấu hình fallback SPA cho mọi đường dẫn trên về `index.html` (như `try_files` trong `frontend/nginx.conf`).
 
 Frontend gọi API qua đường dẫn tương đối `/api`; proxy của Vite chuyển tiếp tới `http://localhost:8000` (đổi đích bằng biến `VITE_PROXY_TARGET`). Nhờ cùng origin, trình duyệt luôn gửi cookie phiên chat và phiên admin. Chỉ đặt `VITE_API_BASE_URL` trong `frontend/.env.local` khi buộc phải gọi thẳng backend ở địa chỉ khác; khi đó frontend và backend phải cùng site (ví dụ cùng `localhost`, không trộn `localhost` với `127.0.0.1`) và origin của frontend phải có trong `CORS_ORIGINS`, nếu không đăng nhập admin và lịch sử chat sẽ không hoạt động.
 
-Kiểm tra trang chat không tải mã quản trị (build lại `dist/`, liệt kê JS tải ban đầu và tổng gzip):
+Kiểm tra JS tải ban đầu của từng trang (build lại `dist/`, liệt kê chunk và tổng gzip): landing/đăng nhập/đăng ký không chứa mã chat (`ChatView`, `markdown-it`, `dompurify`) hay mã quản trị; trang chat không chứa mã quản trị và không vượt mức gzip đo sau FE-06:
 
 ```powershell
 npm run check:bundle
@@ -294,7 +303,7 @@ npm run check:bundle
 
 ### 4. Tài khoản quản trị (`/admin`)
 
-Trang chat (`/`) chỉ có chat, lịch sử hội thoại của chính trình duyệt đó và bộ chọn giao diện. Dataset và Settings nằm ở trang quản trị `/admin`, cần đăng nhập; trang chat không có liên kết tới `/admin`. Link cũ `#documents`, `#config`, `#models`, `#settings/...` tự chuyển sang `/admin`.
+Trang chat (`/chat`) chỉ có chat, lịch sử hội thoại, khối tài khoản người dùng và bộ chọn giao diện. Dataset và Settings nằm ở trang quản trị `/admin`, cần đăng nhập bằng `ADMIN_PASSWORD`; trang chat không có liên kết tới `/admin`. Admin **không** nằm trong bảng tài khoản người dùng: tài khoản sinh viên (mục 5) không mở được bất kỳ API quản trị nào.
 
 Đặt trong `.env` rồi khởi động lại backend:
 
@@ -309,11 +318,12 @@ COOKIE_SECURE=false
 - `ADMIN_PASSWORD` để trống: đăng nhập trả `503`, mọi API quản trị trả `401` (fail closed).
 - `ADMIN_SESSION_SECRET` để trống: backend sinh khóa tạm lúc khởi động và ghi cảnh báo; mọi phiên admin mất khi restart. Đổi `ADMIN_PASSWORD` cũng làm mọi phiên cũ mất hiệu lực.
 - Phiên admin nằm trong cookie `ptit_admin` (`HttpOnly`, `SameSite=Strict`, `Path=/api`) ký HMAC-SHA256, hết hạn sau `ADMIN_SESSION_TTL_HOURS` giờ; server không lưu phiên, đăng xuất chỉ xóa cookie. Phiên hết hạn khi đang sửa thì trang hiện lại form đăng nhập mà không mất nội dung đang sửa.
-- `COOKIE_SECURE=true` khi chạy sau HTTPS (áp dụng cho cả `ptit_admin` và `ptit_sid`). Giữ `false` khi chạy dev qua HTTP, vì trình duyệt không lưu cookie `Secure` trên HTTP.
-- Đăng nhập sai quá 5 lần trong 5 phút từ một IP bị chặn tạm (`429`). Bộ đếm nằm trong bộ nhớ tiến trình nên chỉ chính xác khi chạy một worker uvicorn.
-- Route công khai: `GET /api/health`, `POST /api/chat`, `POST /api/chat/stream`, `GET|PATCH|DELETE /api/conversations*`, `POST /api/admin/login`, `POST /api/admin/logout`, `GET /api/admin/session`. Mọi route khác dưới `/api` (cấu hình, tài liệu, parse, ingest, retrieval test, `/api/admin/conversations*`) cần phiên admin. Route mới phải gắn `require_admin` hoặc được thêm có chủ đích vào `PUBLIC_API_ROUTES` (`backend/app/api/routes.py`); test `backend/tests/test_admin_auth.py` quét toàn bộ route để bắt trường hợp quên.
+- `COOKIE_SECURE=true` khi chạy sau HTTPS (áp dụng cho `ptit_admin`, `ptit_user` và `ptit_sid`). Giữ `false` khi chạy dev qua HTTP, vì trình duyệt không lưu cookie `Secure` trên HTTP.
+- Đăng nhập sai quá 5 lần trong 5 phút từ một IP bị chặn tạm (`429`) — chỉ IP đó, client khác vẫn đăng nhập được. Bộ đếm nằm trong bộ nhớ tiến trình nên chỉ chính xác khi chạy một worker uvicorn.
+- IP thật sau reverse proxy: backend chỉ đọc `X-Forwarded-For` khi request tới từ địa chỉ trong `TRUSTED_PROXY_IPS` (IP hoặc CIDR, phân tách bằng dấu phẩy). Để trống thì dùng IP kết nối trực tiếp — sau proxy mà không đặt biến này thì mọi người dùng chung một IP (của proxy). Docker Compose đặt mặc định các dải mạng riêng (`172.16.0.0/12,10.0.0.0/8,192.168.0.0/16`) vì backend chỉ thấy IP container proxy; nginx (`frontend/nginx.conf`) và proxy Vite (`xfwd`) đều gửi `X-Forwarded-For`. Không đưa dải mạng mà client có thể gọi thẳng cổng backend vào danh sách này, nếu không client tự khai được IP.
+- Route công khai: `GET /api/health`, `POST /api/chat`, `POST /api/chat/stream`, `GET|PATCH|DELETE /api/conversations*`, `POST /api/admin/login`, `POST /api/admin/logout`, `GET /api/admin/session`, `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`. Mọi route khác dưới `/api` (cấu hình, tài liệu, parse, ingest, retrieval test, `/api/admin/conversations*`) cần phiên admin. Route mới phải gắn `require_admin` hoặc được thêm có chủ đích vào `PUBLIC_API_ROUTES` (`backend/app/api/routes.py`); test `backend/tests/test_admin_auth.py` quét toàn bộ route để bắt trường hợp quên.
 
-Hội thoại của sinh viên gắn với phiên ẩn danh qua cookie `ptit_sid` (`HttpOnly`, `SameSite=Lax`, 180 ngày). Mỗi trình duyệt chỉ thấy, đổi tên, xóa và nối tiếp hội thoại của mình; `user_id` client gửi lên bị bỏ qua. Hội thoại tạo trước khi có tính năng này không hiện ở trang chat. Admin xem mọi hội thoại qua `GET /api/admin/conversations` (lọc tùy chọn `owner`, `limit`, `offset`) và `GET /api/admin/conversations/{id}`.
+Hội thoại của khách gắn với phiên ẩn danh qua cookie `ptit_sid` (`HttpOnly`, `SameSite=Lax`, 180 ngày); khi đã đăng nhập thì gắn với tài khoản (mục 5). Mỗi phiên/tài khoản chỉ thấy, đổi tên, xóa và nối tiếp hội thoại của mình; `user_id` client gửi lên bị bỏ qua. Hội thoại tạo trước khi có tính năng này không hiện ở trang chat. Admin xem mọi hội thoại qua `GET /api/admin/conversations` (lọc tùy chọn `owner`, `limit`, `offset`) và `GET /api/admin/conversations/{id}`; `owner` là `anon:<hash>` cho khách và `user:<id>` cho tài khoản.
 
 #### Allowlist `base_url` của LLM
 
@@ -327,6 +337,39 @@ LLM_BASE_URL_ALLOWLIST=https://api.openai.com,http://localhost:11434,https://*.o
 - Để trống: allowlist gồm `https://api.openai.com` và origin của `OPENAI_BASE_URL`, `OPENAI_COMPATIBLE_BASE_URL`, `AZURE_OPENAI_ENDPOINT` đọc từ env lúc khởi động.
 - Chỉ nhận `http`/`https`, không chứa `user:pass@`; cổng phải khớp (mục không ghi cổng chỉ khớp cổng mặc định 80/443). Giá trị rỗng được phép (dùng mặc định của SDK).
 
+### 5. Tài khoản người dùng (`/register`, `/login`)
+
+Sinh viên đăng ký bằng họ tên + email + mật khẩu để giữ lịch sử hội thoại trên mọi thiết bị. Không đăng nhập vẫn chat được như trước (phiên ẩn danh theo trình duyệt).
+
+```env
+USER_SESSION_SECRET=<chuỗi ngẫu nhiên, khác ADMIN_SESSION_SECRET>
+USER_SESSION_TTL_DAYS=30
+USER_REGISTRATION_ENABLED=true
+USER_EMAIL_DOMAINS=
+USER_AUTH_MAX_FAILURES=5
+USER_AUTH_WINDOW_SECONDS=300
+```
+
+- `USER_SESSION_SECRET`: khóa ký cookie `ptit_user`. Sinh bằng `python -c "import secrets; print(secrets.token_urlsafe(32))"`. Để trống thì backend sinh khóa tạm lúc khởi động và ghi cảnh báo — mọi người dùng bị đăng xuất khi restart.
+- `USER_SESSION_TTL_DAYS`: thời hạn phiên (mặc định 30 ngày). Cookie `ptit_user` là `HttpOnly`, `SameSite=Lax`, `Path=/api`, `Secure` theo `COOKIE_SECURE`; ký HMAC-SHA256, server không lưu phiên (đăng xuất chỉ xóa cookie trên trình duyệt đó, không có "đăng xuất mọi thiết bị"). Mỗi request vẫn kiểm tài khoản còn tồn tại.
+- `USER_REGISTRATION_ENABLED=false`: `POST /api/auth/register` trả `503`, trang `/register` ẩn form; tài khoản đã có vẫn đăng nhập được.
+- `USER_EMAIL_DOMAINS`: danh sách tên miền được phép đăng ký, phân tách bằng dấu phẩy (ví dụ `stu.ptit.edu.vn,ptit.edu.vn`, khớp đúng tên miền, không gồm tên miền con). Để trống = mọi tên miền.
+- `USER_AUTH_MAX_FAILURES` / `USER_AUTH_WINDOW_SECONDS`: ngưỡng chặn dò. Đăng nhập sai quá ngưỡng trong cửa sổ theo cặp IP + email → `429` cho cặp đó (tài khoản khác và client ở IP khác không bị khóa); đăng ký gặp email đã tồn tại quá ngưỡng theo IP → `429`. IP thật đọc theo `TRUSTED_PROXY_IPS` (mục 4); bộ đếm trong bộ nhớ, chỉ chính xác với một worker uvicorn.
+
+API (prefix `/api`, đều công khai):
+
+| Route | Kết quả |
+|---|---|
+| `POST /auth/register` `{full_name, email, password}` | `201` + cookie; email trùng `409`; dữ liệu sai/ngoài tên miền `422` (lỗi theo trường, định dạng FastAPI); tắt đăng ký `503`; dò quá ngưỡng `429` |
+| `POST /auth/login` `{email, password}` | `200` + cookie; sai email **hoặc** mật khẩu cùng `401` "Email hoặc mật khẩu không đúng."; dò quá ngưỡng `429` |
+| `POST /auth/logout` | `200`, xóa `ptit_user` và cấp `ptit_sid` mới (quay về phiên ẩn danh mới) |
+| `GET /auth/me` | `200 {authenticated, user, registration_enabled}`; cookie sai/hết hạn/tài khoản đã xóa = chưa đăng nhập, không bao giờ `401` |
+
+- Email được chuẩn hóa (bỏ khoảng trắng, chữ thường); họ tên 1–100 ký tự; mật khẩu 8–128 ký tự, băm bằng `hashlib.scrypt` (salt ngẫu nhiên 16 byte, tham số lưu trong chuỗi hash), không lưu hay ghi log mật khẩu gốc. Email không tồn tại vẫn băm một mật khẩu giả để thời gian phản hồi không lộ email nào đã đăng ký.
+- Khi đăng ký/đăng nhập, hội thoại ẩn danh của **trình duyệt hiện tại** (cookie `ptit_sid`) được chuyển sang tài khoản. Trên máy dùng chung, hội thoại khách của người trước trên cùng trình duyệt cũng sẽ được chuyển — hãy đăng xuất sau khi dùng.
+- Giới hạn hiện tại: chưa xác thực email (có thể đăng ký bằng email của người khác), chưa có quên/đổi mật khẩu, chưa có trang hồ sơ; `409` cho email trùng cho phép biết một email đã có tài khoản (giảm bằng chặn dò theo IP). Bảng `users` tạo bởi migration `0005_users` (Docker chạy `alembic upgrade head` lúc khởi động; chạy tay thì `python -m alembic upgrade head`).
+- Tài khoản người dùng không có quyền quản trị; admin vẫn dùng `ADMIN_PASSWORD` riêng (mục 4).
+
 ### Chạy bằng Docker Compose (PostgreSQL Production Ready)
 
 Hệ thống đi kèm cấu hình Docker Compose đầy đủ bao gồm **PostgreSQL 16**, **FastAPI Backend** (tự động chạy Alembic migrations khi khởi động), và **React Frontend**:
@@ -336,11 +379,11 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
-Đặt `ADMIN_PASSWORD` (và `ADMIN_SESSION_SECRET`) trong `.env` trước khi chạy nếu cần trang quản trị; backend đọc toàn bộ `.env` qua `env_file`.
+Đặt `ADMIN_PASSWORD` (và `ADMIN_SESSION_SECRET`) trong `.env` trước khi chạy nếu cần trang quản trị, và `USER_SESSION_SECRET` để người dùng không bị đăng xuất khi restart; backend đọc toàn bộ `.env` qua `env_file`. `TRUSTED_PROXY_IPS` mặc định là các dải mạng riêng trong compose (đặt trong `.env` để đổi).
 
 Sau khi các service khởi động thành công (PostgreSQL đạt trạng thái `healthy` trước khi backend khởi chạy):
 
-- Frontend: `http://localhost:5173` (trang chat), `http://localhost:5173/admin` (trang quản trị)
+- Frontend: `http://localhost:5173` (landing), `/chat` (trang chat), `/login`, `/register`, `/admin` (trang quản trị)
 - Backend API: `http://localhost:8000`
 - Swagger UI: `http://localhost:8000/docs`
 - Health check (bao gồm trạng thái kết nối DB): `http://localhost:8000/api/health`
@@ -481,6 +524,12 @@ Test xác thực admin, allowlist `base_url` và tách hội thoại theo phiên
 
 ```powershell
 pytest tests/test_admin_auth.py tests/test_llm_url_allowlist.py tests/test_conversation_sessions.py
+```
+
+Test tài khoản người dùng (đăng ký/đăng nhập, chặn dò, hội thoại theo tài khoản):
+
+```powershell
+pytest tests/test_user_auth.py tests/test_user_conversations.py
 ```
 
 Frontend:

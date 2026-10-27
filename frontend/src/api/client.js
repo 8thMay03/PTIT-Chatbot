@@ -94,11 +94,13 @@ function extractDetail(payload) {
 
 async function responseToApiError(response) {
   let detail = "";
+  let payload;
   const contentType = response.headers?.get?.("content-type") || "";
 
   try {
     if (contentType.includes("application/json")) {
-      detail = extractDetail(await response.json());
+      payload = await response.json();
+      detail = extractDetail(payload);
     } else if (contentType) {
       const text = await response.text();
       // Không đưa nguyên trang HTML lỗi của proxy vào thông báo cho người dùng.
@@ -108,7 +110,8 @@ async function responseToApiError(response) {
     } else {
       // FastAPI luôn trả JSON; một số proxy/test double không gắn content-type.
       try {
-        detail = extractDetail(await response.json());
+        payload = await response.json();
+        detail = extractDetail(payload);
       } catch {
         const text = await response.text();
         if (text && text.length <= 500 && !text.trim().startsWith("<")) {
@@ -132,6 +135,7 @@ async function responseToApiError(response) {
     detail,
     code: "http",
     url: response.url,
+    payload,
   });
 }
 
