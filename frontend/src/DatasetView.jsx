@@ -21,10 +21,13 @@ import {
 import { describeError, documentsApi, errorMessage, queryKeys } from "./api";
 import { formatDate, formatSize } from "./lib/format";
 import { canEditMarkdown, documentStatus, needsChunking, NO_MARKDOWN_HINT } from "./lib/documentStatus";
+import { isActiveParseJob, parseJobLabel } from "./lib/parseJobs";
+import useParseJobs from "./lib/useParseJobs";
 import DocumentView from "./DocumentView";
 import ParserSelectionModal, { parserTitle } from "./components/ParserSelectionModal";
 import MarkdownEditorView from "./components/MarkdownEditorView";
 import Modal from "./components/Modal";
+import ParseProgress from "./components/ParseProgress";
 import { useToast } from "./components/Toast";
 
 const ACCEPTED_TYPES =
@@ -90,10 +93,11 @@ export default function DatasetView() {
   const [rechunking, setRechunking] = useState(false);
   const [parseTarget, setParseTarget] = useState(null);
   const parseResolve = useRef(null);
-  const [parsingDocId, setParsingDocId] = useState(null);
+  const [parseSubmitting, setParseSubmitting] = useState(false);
   const [chunkingDocId, setChunkingDocId] = useState(null);
-  // Parse, chia đoạn và nạp lại cùng ghi vào kho: chỉ chạy một thao tác mỗi lúc.
-  const pipelineBusy = reindexing || rechunking || Boolean(parsingDocId) || Boolean(chunkingDocId);
+  // Parse chạy nền không còn khóa màn hình; chỉ nạp lại/chia đoạn đồng bộ vẫn
+  // giữ khóa để tránh hai thao tác cùng ghi vào kho.
+  const pipelineBusy = reindexing || rechunking || Boolean(chunkingDocId);
   const [deleting, setDeleting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
@@ -104,6 +108,45 @@ export default function DatasetView() {
   const refreshDocuments = useCallback(
     () => queryClient.invalidateQueries({ queryKey: queryKeys.documents }),
     [queryClient]
+  );
+
+  const handleParseJobFinished = useCallback(
+    (job) => {
+      const label = parseJobLabel(job);
+      if (job.status === "succeeded") {
+        if (job.kind === "upload" || needsChunking(job.result)) {
+          toast.success(`Đã parse “${label}”. Bấm “Chia đoạn” để kho tri thức dùng bản mới.`);
+        } else {
+          toast.success(`Đã parse “${label}”; nội dung không đổi nên các đoạn hiện có vẫn khớp.`);
+        }
+        refreshDocuments();
+      } else if (job.status === "failed") {
+        toast.error(`Parse “${label}” thất bại: ${job.error || "lỗi không xác định"}`);
+      }
+    },
+    [toast, refreshDocuments]
+  );
+
+  // Job nền nằm ở backend; hook tự nạp lại và poll khi còn job đang chạy.
+  const { jobs: parseJobs, track: trackParseJobs } = useParseJobs({
+    onFinished: handleParseJobFinished,
+  });
+  const activeParseJobs = useMemo(() => parseJobs.filter(isActiveParseJob), [parseJobs]);
+  const parseJobByDocument = useMemo(() => {
+    const map = new Map();
+    for (const job of activeParseJobs) {
+      if (job.document_id) map.set(job.document_id, job);
+    }
+    return map;
+  }, [activeParseJobs]);
+  const activeParseSummary = useMemo(() => {
+    const labels = activeParseJobs.slice(0, 3).map(parseJobLabel);
+    const extra = activeParseJobs.length - labels.length;
+    return `${labels.join(", ")}${extra > 0 ? ` và ${extra} tài liệu khác` : ""}`;
+  }, [activeParseJobs]);
+  const runningParseJob = useMemo(
+    () => activeParseJobs.find((job) => job.status === "running") ?? activeParseJobs[0] ?? null,
+    [activeParseJobs]
   );
 
   useEffect(() => {
@@ -238,7 +281,7 @@ export default function DatasetView() {
   async function uploadFiles(files, parserName = null, parsersByExt = {}) {
     setUploading(true);
     const failures = [];
-    let uploaded = 0;
+    const jobs = [];
 
     for (const [index, file] of files.entries()) {
       setUploadProgress(files.length > 1 ? `${index + 1}/${files.length}` : "");
@@ -249,24 +292,30 @@ export default function DatasetView() {
           ? parserName
           : null;
       try {
-        await documentsApi.upload(file, { parserName: chosenParser });
-        uploaded += 1;
+        const job = await documentsApi.upload(file, { parserName: chosenParser });
+        jobs.push(job);
       } catch (err) {
         failures.push(`${file.name}: ${errorMessage(err, "không tải lên được")}`);
       }
     }
 
-    await refreshDocuments();
     setUploading(false);
     setUploadProgress("");
 
-    const nextStep = "Kiểm tra Markdown rồi bấm “Chia đoạn” để đưa vào kho tri thức.";
-    if (uploaded && !failures.length) {
-      toast.success(`Đã parse ${uploaded} tài liệu${parserName ? ` bằng ${parserTitle(parserName)}` : ""}. ${nextStep}`);
-    } else if (uploaded) {
-      toast.warning(`Đã parse ${uploaded} tài liệu. ${failures.length} file bị lỗi: ${failures.join(" · ")}`);
-    } else {
-      toast.error(failures.join(" · ") || "Không tải lên được tài liệu nào.");
+    if (jobs.length) {
+      trackParseJobs(jobs);
+      toast.info(
+        `Đã đưa ${jobs.length} tài liệu${parserName ? ` (${parserTitle(parserName)})` : ""} vào hàng đợi parse nền. ` +
+          "Bạn có thể tiếp tục làm việc khác; tài liệu sẽ xuất hiện khi parse xong."
+      );
+    }
+    if (failures.length) {
+      toast.warning(
+        `${jobs.length ? `Đã đưa ${jobs.length} tài liệu vào hàng đợi. ` : ""}` +
+          `${failures.length} file bị lỗi: ${failures.join(" · ")}`
+      );
+    } else if (!jobs.length) {
+      toast.error("Không tải lên được tài liệu nào.");
     }
   }
 
@@ -324,7 +373,7 @@ export default function DatasetView() {
   }
 
   async function reindexAll() {
-    if (pipelineBusy) return;
+    if (pipelineBusy || activeParseJobs.length > 0) return;
     setReindexing(true);
     try {
       const payload = await documentsApi.reindex();
@@ -339,7 +388,7 @@ export default function DatasetView() {
   }
 
   async function rechunkAll() {
-    if (pipelineBusy) return;
+    if (pipelineBusy || activeParseJobs.length > 0) return;
     setRechunking(true);
     try {
       const payload = await documentsApi.rechunk();
@@ -360,7 +409,7 @@ export default function DatasetView() {
   }
 
   function requestParse(doc) {
-    if (!doc || pipelineBusy || parseTarget) return Promise.resolve();
+    if (!doc || pipelineBusy || parseTarget || parseJobByDocument.has(doc.id)) return Promise.resolve();
     setParseTarget(doc);
     return new Promise((resolve) => { parseResolve.current = resolve; });
   }
@@ -372,26 +421,23 @@ export default function DatasetView() {
   }
 
   async function parseDocument(doc, parserName) {
-    if (!doc || pipelineBusy) return;
-    setParsingDocId(doc.id);
+    if (!doc || pipelineBusy || parseJobByDocument.has(doc.id)) return;
+    setParseSubmitting(true);
     try {
-      const payload = await documentsApi.parse(doc.id, parserName);
-      const label = payload.title || payload.file_name || doc.file_name;
-      if (needsChunking(payload)) {
-        toast.success(`Đã parse lại “${label}”. Bấm “Chia đoạn” để kho tri thức dùng bản mới.`);
-      } else {
-        toast.success(`Đã parse lại “${label}”; nội dung không đổi nên các đoạn hiện có vẫn khớp.`);
-      }
-      await refreshDocuments();
+      const job = await documentsApi.parse(doc.id, parserName);
+      trackParseJobs(job);
+      toast.info(
+        `Đang parse lại “${parseJobLabel(job)}” ở chế độ nền. Bạn có thể tiếp tục làm việc khác.`
+      );
     } catch (err) {
-      toast.error(errorMessage(err, "Lỗi khi parse tài liệu."));
+      toast.error(errorMessage(err, "Không bắt đầu được job parse."));
     } finally {
-      setParsingDocId(null);
+      setParseSubmitting(false);
     }
   }
 
   async function chunkDocument(doc) {
-    if (!doc || pipelineBusy) return;
+    if (!doc || pipelineBusy || parseJobByDocument.has(doc.id)) return;
     setChunkingDocId(doc.id);
     try {
       const payload = await documentsApi.chunk(doc.id);
@@ -427,7 +473,7 @@ export default function DatasetView() {
 
   // Màn chi tiết tài liệu, mở từ danh sách bên dưới
   const parserDialog = parseTarget && <ParserSelectionModal document={parseTarget}
-    busy={Boolean(parsingDocId)} onClose={closeParserSelection}
+    busy={parseSubmitting} onClose={closeParserSelection}
     onConfirm={async (name) => { await parseDocument(parseTarget, name); closeParserSelection(); }} />;
 
   const uploadDialog = uploadTarget && <ParserSelectionModal upload={uploadTarget}
@@ -456,7 +502,7 @@ export default function DatasetView() {
         documentId={selectedDocId}
         onBack={() => setSelectedDocId(null)}
         busy={pipelineBusy}
-        parsingDocId={parsingDocId}
+        parseJob={parseJobByDocument.get(selectedDocId) ?? null}
         chunkingDocId={chunkingDocId}
         onParse={requestParse}
         onChunk={chunkDocument}
@@ -503,9 +549,13 @@ export default function DatasetView() {
               <button
                 type="button"
                 className="btn-outline-dataset"
-                title="Chia đoạn và nhúng vector lại mọi tài liệu từ bản Markdown đã lưu, không parse lại (dùng sau khi đổi cấu hình chia đoạn)"
+                title={
+                  activeParseJobs.length > 0
+                    ? "Chờ các job parse nền đang chạy xong trước khi chia đoạn lại toàn bộ"
+                    : "Chia đoạn và nhúng vector lại mọi tài liệu từ bản Markdown đã lưu, không parse lại (dùng sau khi đổi cấu hình chia đoạn)"
+                }
                 onClick={rechunkAll}
-                disabled={pipelineBusy}
+                disabled={pipelineBusy || activeParseJobs.length > 0}
               >
                 {rechunking ? <Loader2 size={14} className="spin" /> : <Scissors size={14} />}
                 <span>{rechunking ? "Đang chia đoạn..." : "Chia đoạn lại toàn bộ"}</span>
@@ -514,9 +564,13 @@ export default function DatasetView() {
               <button
                 type="button"
                 className="btn-parse-dataset"
-                title="Parse lại mọi file gốc rồi chia đoạn và nhúng vector; bản Markdown đã sửa tay được giữ nguyên"
+                title={
+                  activeParseJobs.length > 0
+                    ? "Chờ các job parse nền đang chạy xong trước khi nạp lại toàn bộ"
+                    : "Parse lại mọi file gốc rồi chia đoạn và nhúng vector; bản Markdown đã sửa tay được giữ nguyên"
+                }
                 onClick={reindexAll}
-                disabled={pipelineBusy}
+                disabled={pipelineBusy || activeParseJobs.length > 0}
               >
                 {reindexing ? <Loader2 size={14} className="spin" /> : <Play size={13} fill="currentColor" />}
                 <span>{reindexing ? "Đang nạp lại..." : "Nạp lại toàn bộ"}</span>
@@ -560,6 +614,29 @@ export default function DatasetView() {
               </button>
             </div>
           </header>
+
+          {activeParseJobs.length > 0 && (
+            <div className="inline-alert is-info parse-jobs-banner" role="status" style={{ marginBottom: 12 }}>
+              <Loader2 size={16} className="spin" />
+              <div className="parse-jobs-banner-body">
+                <span>
+                  Đang xử lý nền {activeParseJobs.length} tài liệu
+                  {activeParseSummary ? `: ${activeParseSummary}` : ""}. Bạn có thể tiếp tục xem, sửa
+                  hoặc thao tác trên tài liệu khác.
+                </span>
+                {runningParseJob && (
+                  <ParseProgress
+                    progress={runningParseJob.progress}
+                    message={runningParseJob.progress_message}
+                    label={parseJobLabel(runningParseJob)}
+                    indeterminate={
+                      runningParseJob.status === "queued" || !runningParseJob.progress
+                    }
+                  />
+                )}
+              </div>
+            </div>
+          )}
 
           {loadError && (
             <div className="inline-alert is-error" role="alert" style={{ marginBottom: 12 }}>
@@ -655,8 +732,10 @@ export default function DatasetView() {
                   {paged.map((doc) => {
                     const isSelected = selectedIds.has(doc.id);
                     const fileName = localTitles[doc.id] || doc.file_name || doc.title || "tài liệu";
-                    const isParsing = parsingDocId === doc.id;
+                    const parseJob = parseJobByDocument.get(doc.id);
+                    const isParsing = Boolean(parseJob);
                     const isChunking = chunkingDocId === doc.id;
+                    const rowBusy = pipelineBusy || isParsing || isChunking;
                     const isEnabled = enabledDocs[doc.id] !== false;
                     const status = documentStatus(doc);
 
@@ -706,9 +785,27 @@ export default function DatasetView() {
                         </td>
 
                         <td className="td-status" data-label="Trạng thái">
-                          <span className={`doc-status-badge is-${status.key}`} title={status.hint}>
-                            {status.label}
-                          </span>
+                          {isParsing ? (
+                            <div className="doc-status-stack">
+                              <span
+                                className="doc-status-badge is-parsing"
+                                title="Đang parse trong nền; bạn vẫn có thể làm việc khác"
+                              >
+                                Đang parse
+                              </span>
+                              <ParseProgress
+                                compact
+                                progress={parseJob.progress}
+                                message={parseJob.progress_message}
+                                label="Tiến trình"
+                                indeterminate={parseJob.status === "queued" || !parseJob.progress}
+                              />
+                            </div>
+                          ) : (
+                            <span className={`doc-status-badge is-${status.key}`} title={status.hint}>
+                              {status.label}
+                            </span>
+                          )}
                         </td>
 
                         <td className="td-chunks" data-label="Số đoạn">
@@ -724,20 +821,24 @@ export default function DatasetView() {
                             <button
                               type="button"
                               className="act-btn"
-                              title={`Parse lại ${fileName}`}
+                              title={isParsing ? `Đang parse ${fileName} trong nền` : `Parse lại ${fileName}`}
                               aria-label={`Parse lại ${fileName}`}
                               onClick={() => requestParse(doc)}
-                              disabled={pipelineBusy}
+                              disabled={rowBusy}
                             >
                               {isParsing ? <Loader2 size={14} className="spin" /> : <Play size={13} fill="currentColor" />}
                             </button>
                             <button
                               type="button"
                               className={`act-btn ${needsChunking(doc) ? "is-attention" : ""}`}
-                              title={`${needsChunking(doc) ? "Chia đoạn" : "Chia đoạn lại"} ${fileName}`}
+                              title={
+                                isParsing
+                                  ? "Chờ parse nền xong rồi chia đoạn"
+                                  : `${needsChunking(doc) ? "Chia đoạn" : "Chia đoạn lại"} ${fileName}`
+                              }
                               aria-label={`Chia đoạn ${fileName}`}
                               onClick={() => chunkDocument(doc)}
-                              disabled={pipelineBusy}
+                              disabled={rowBusy}
                             >
                               {isChunking ? <Loader2 size={14} className="spin" /> : <Scissors size={14} />}
                             </button>
@@ -747,7 +848,7 @@ export default function DatasetView() {
                               title={canEditMarkdown(doc) ? `Sửa Markdown của ${fileName}` : NO_MARKDOWN_HINT}
                               aria-label={`Sửa Markdown của ${fileName}`}
                               onClick={() => setMarkdownDoc(doc)}
-                              disabled={pipelineBusy || !canEditMarkdown(doc)}
+                              disabled={rowBusy || !canEditMarkdown(doc)}
                             >
                               <FilePenLine size={14} />
                             </button>

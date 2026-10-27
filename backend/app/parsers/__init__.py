@@ -1,9 +1,10 @@
 """Public document parsing API shared by ingestion, uploads and previews."""
 
+import inspect
 import logging
 from pathlib import Path
 
-from app.parsers.base import DocumentParseError, DocumentParser
+from app.parsers.base import DocumentParseError, DocumentParser, ProgressCallback
 from app.parsers.docling import DoclingParser
 from app.parsers.llamaparse import LlamaParseParser, llamaparse_available
 from app.parsers.normalize import normalize_markdown
@@ -43,21 +44,41 @@ def resolve_parser_name(path: Path, stored: str | None) -> str | None:
 
 
 def read_document_text(
-    path: Path, *, convert: bool = True, parser_name: str | None = None
+    path: Path,
+    *,
+    convert: bool = True,
+    parser_name: str | None = None,
+    on_progress: ProgressCallback | None = None,
 ) -> str | None:
     parser = registry.get_parser(path, parser_name=parser_name)
-    text = parser.parse(path, convert=convert)
+    if on_progress is not None:
+        on_progress(8, "Đang đọc tài liệu")
+    if on_progress is not None and _parser_accepts_progress(parser):
+        text = parser.parse(path, convert=convert, on_progress=on_progress)
+    else:
+        text = parser.parse(path, convert=convert)
+    if on_progress is not None:
+        on_progress(92, "Đang chuẩn hóa Markdown")
     # One heading hierarchy for every parser, so chunk section paths do not depend on
     # which parser or export produced the Markdown.
     return normalize_markdown(text) if text is not None else None
 
 
+def _parser_accepts_progress(parser: DocumentParser) -> bool:
+    """Third-party parsers may still implement the old two-argument parse()."""
+    try:
+        return "on_progress" in inspect.signature(parser.parse).parameters
+    except (TypeError, ValueError):
+        return False
+
+
 __all__ = [
+    "DoclingParser",
     "DocumentParseError",
     "DocumentParser",
-    "DoclingParser",
     "LlamaParseParser",
     "ParserRegistry",
+    "ProgressCallback",
     "TextParser",
     "build_registry",
     "get_parser_name",

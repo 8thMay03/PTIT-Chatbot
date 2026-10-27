@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 import re
 from hashlib import sha256
 from pathlib import Path
-from threading import Lock
+from threading import Event, Lock, Thread, get_ident
 from typing import Any
 
 from app.core.config import settings
-from app.parsers.base import DocumentParseError
+from app.parsers.base import DocumentParseError, ProgressCallback
 
 logger = logging.getLogger(__name__)
 
@@ -27,20 +28,42 @@ _converter_options: tuple[bool, str] | None = None
 _converter_lock = Lock()
 _conversion_lock = Lock()
 
+# Docling builds a ConversionResult internally and never yields it while running.
+# The converter subclass records the current result for the worker thread so a
+# monitor thread can report how many pages have been assembled. This is a
+# best-effort read of Docling's page objects; parsing itself is unchanged.
+_conversion_results: dict[int, Any] = {}
+_conversion_results_lock = Lock()
+_instrumented_pipelines: set[int] = set()
+
 
 class DoclingParser:
     name = "docling"
     extensions = DOCLING_EXTENSIONS
 
-    def parse(self, path: Path, *, convert: bool = True) -> str | None:
+    def parse(
+        self,
+        path: Path,
+        *,
+        convert: bool = True,
+        on_progress: ProgressCallback | None = None,
+    ) -> str | None:
         # Raw exports are post-processed on every read, including cached previews.
         cache_path = _cache_path(path)
         if cache_path.is_file():
+            if on_progress is not None:
+                on_progress(80, "Đã có bản parse trong cache")
             return _postprocess_markdown(cache_path.read_text(encoding="utf-8"))
         if not convert:
             return None
 
-        exported = convert_with_docling(path)
+        exported = (
+            convert_with_docling(path, on_progress=on_progress)
+            if on_progress is not None
+            else convert_with_docling(path)
+        )
+        if on_progress is not None:
+            on_progress(94, "Đang xử lý Markdown")
         markdown = _postprocess_markdown(exported)
         if not markdown.strip():
             raise DocumentParseError(
@@ -51,20 +74,140 @@ class DoclingParser:
         return markdown
 
 
-def convert_with_docling(path: Path) -> str:
+def convert_with_docling(path: Path, *, on_progress: ProgressCallback | None = None) -> str:
     """Return Docling's raw Markdown export for a PDF/DOCX file."""
     logger.info("Converting %s with Docling...", path.name)
+    worker_id = get_ident()
+    stop = Event()
+    monitor: Thread | None = None
     try:
         converter = _get_converter()
         # Serialize runs: concurrent conversions on one converter compete for the same models.
         with _conversion_lock:
-            result = converter.convert(path)
+            try:
+                if on_progress is None:
+                    result = converter.convert(path)
+                else:
+                    on_progress(5, "Đang khởi động Docling")
+                    if _supports_native_progress(converter):
+                        result = converter.convert(
+                            path, progress_callback=_native_progress_callback(on_progress)
+                        )
+                    else:
+                        # Older Docling: read its ConversionResult while it runs.
+                        monitor = Thread(
+                            target=_monitor_conversion,
+                            args=(worker_id, stop, on_progress),
+                            name="docling-progress",
+                            daemon=True,
+                        )
+                        monitor.start()
+                        result = converter.convert(path)
+            finally:
+                stop.set()
+                if monitor is not None:
+                    monitor.join(timeout=1)
+                with _conversion_results_lock:
+                    _conversion_results.pop(worker_id, None)
     except DocumentParseError:
         raise
     except Exception as exc:
         raise DocumentParseError(f"Không thể chuyển đổi {path.name}: {exc}") from exc
 
+    if on_progress is not None:
+        on_progress(92, "Đang xuất Markdown")
     return result.document.export_to_markdown(image_placeholder="")
+
+
+def _supports_native_progress(converter: Any) -> bool:
+    """Docling >= 2.142 can report page progress without introspection."""
+    try:
+        return "progress_callback" in inspect.signature(converter.convert).parameters
+    except (TypeError, ValueError):
+        return False
+
+
+def _native_progress_callback(on_progress: ProgressCallback):
+    def callback(event: Any) -> None:
+        kind = _event_value(getattr(event, "kind", ""))
+        if kind == "document_started":
+            on_progress(5, "Bắt đầu xử lý tài liệu")
+        elif kind == "phase_started":
+            phase = _event_value(getattr(event, "phase", ""))
+            phases = {
+                "initialize": (8, "Đang khởi tạo Docling"),
+                "build": (10, "Đang phân tích trang"),
+                "assemble": (85, "Đang hoàn thiện cấu trúc tài liệu"),
+                "enrich": (88, "Đang xử lý bảng và nội dung"),
+            }
+            percent, message = phases.get(phase, (10, "Đang parse tài liệu"))
+            on_progress(percent, message)
+        elif kind == "page_completed":
+            total = int(getattr(event, "total_pages", 0) or 0)
+            done = int(getattr(event, "completed_pages", 0) or 0)
+            if total > 0:
+                on_progress(10 + round(70 * done / total), f"Đang parse {done}/{total} trang")
+        elif kind == "enrichment_progress":
+            total = int(getattr(event, "total_items", 0) or 0)
+            done = int(getattr(event, "completed_items", 0) or 0)
+            label = getattr(event, "label", "") or "nội dung"
+            if total > 0:
+                on_progress(88 + round(4 * done / total), f"Đang xử lý {label} ({done}/{total})")
+        elif kind == "document_completed":
+            on_progress(92, "Đã xử lý xong tài liệu")
+
+    return callback
+
+
+def _event_value(value: Any) -> str:
+    return str(getattr(value, "value", value) or "")
+
+
+def _monitor_conversion(worker_id: int, stop: Event, on_progress: ProgressCallback) -> None:
+    """Fallback for Docling versions without progress_callback."""
+    while not stop.wait(0.5):
+        with _conversion_results_lock:
+            conv_res = _conversion_results.get(worker_id)
+        if conv_res is None:
+            continue
+        update = _docling_progress(conv_res)
+        if update is not None:
+            on_progress(*update)
+
+
+def _docling_progress(conv_res: Any) -> tuple[int, str] | None:
+    """Map Docling's assembled pages to a 5–90% progress range."""
+    pages = list(getattr(conv_res, "pages", ()) or ())
+    total = len(pages)
+    if total <= 0:
+        total = int(getattr(getattr(conv_res, "input", None), "page_count", 0) or 0)
+    if total <= 0:
+        return None
+
+    done = sum(1 for page in pages if getattr(page, "assembled", None) is not None)
+    if done >= total:
+        return 90, "Đang hoàn thiện cấu trúc tài liệu"
+    percent = 5 + round(85 * done / total)
+    return percent, f"Đang parse {done}/{total} trang"
+
+
+def _instrument_pipeline(pipeline: Any) -> None:
+    """Wrap one Docling pipeline so its ConversionResult is visible while it runs."""
+    key = id(pipeline)
+    with _conversion_results_lock:
+        if key in _instrumented_pipelines:
+            return
+        original = getattr(pipeline, "_build_document", None)
+        if original is None:
+            return
+
+        def build_with_progress(conv_res: Any) -> Any:
+            with _conversion_results_lock:
+                _conversion_results[get_ident()] = conv_res
+            return original(conv_res)
+
+        pipeline._build_document = build_with_progress
+        _instrumented_pipelines.add(key)
 
 
 def _get_converter() -> Any:
@@ -97,7 +240,22 @@ def _get_converter() -> Any:
             pdf_options.table_batch_size = _GPU_BATCH_SIZE
         logger.info("Docling device: %s", "cuda" if use_gpu else "cpu")
 
-        _converter = DocumentConverter(
+        class _ProgressDocumentConverter(DocumentConverter):
+            """Expose the running pipeline so progress can read assembled pages."""
+
+            def _execute_pipeline(self, in_doc: Any, raises_on_error: bool, **kwargs: Any) -> Any:
+                try:
+                    pipeline = self._get_pipeline(in_doc.format)
+                    if pipeline is not None:
+                        _instrument_pipeline(pipeline)
+                except Exception:
+                    # Progress is best-effort; conversion must still work.
+                    logger.debug("Cannot instrument Docling pipeline for progress", exc_info=True)
+                return super()._execute_pipeline(
+                    in_doc, raises_on_error=raises_on_error, **kwargs
+                )
+
+        _converter = _ProgressDocumentConverter(
             allowed_formats=[InputFormat.PDF, InputFormat.DOCX],
             format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_options)},
         )

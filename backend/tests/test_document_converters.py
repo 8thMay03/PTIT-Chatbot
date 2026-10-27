@@ -1,12 +1,14 @@
 import logging
 import sys
+import threading
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from app.core.config import settings
-from app.parsers import DocumentParseError, docling, read_document_text
 from app.ingestion.loaders import load_documents
+from app.parsers import DocumentParseError, docling, read_document_text
 
 
 class _FakeDocument:
@@ -152,6 +154,43 @@ def test_resolve_cuda(monkeypatch, device: str, has_cuda: bool, expected: bool) 
     monkeypatch.setitem(sys.modules, "torch", _FakeTorch(has_cuda))
 
     assert docling._resolve_cuda(device) is expected
+
+
+def test_docling_progress_counts_assembled_pages() -> None:
+    pages = [
+        SimpleNamespace(assembled=None),
+        SimpleNamespace(assembled=object()),
+        SimpleNamespace(assembled=object()),
+        SimpleNamespace(assembled=None),
+    ]
+    conv_res = SimpleNamespace(pages=pages, input=SimpleNamespace(page_count=4))
+
+    assert docling._docling_progress(conv_res) == (47, "Đang parse 2/4 trang")
+
+    for page in pages:
+        page.assembled = object()
+    assert docling._docling_progress(conv_res) == (90, "Đang hoàn thiện cấu trúc tài liệu")
+    assert docling._docling_progress(SimpleNamespace(pages=[], input=SimpleNamespace(page_count=0))) is None
+
+
+def test_instrument_pipeline_exposes_conversion_result() -> None:
+    class FakePipeline:
+        def _build_document(self, conv_res):
+            return conv_res
+
+    pipeline = FakePipeline()
+    conv_res = object()
+    thread_id = threading.get_ident()
+    try:
+        docling._instrument_pipeline(pipeline)
+
+        assert pipeline._build_document(conv_res) is conv_res
+        with docling._conversion_results_lock:
+            assert docling._conversion_results[thread_id] is conv_res
+    finally:
+        with docling._conversion_results_lock:
+            docling._conversion_results.pop(thread_id, None)
+            docling._instrumented_pipelines.discard(id(pipeline))
 
 
 def test_resolve_cuda_warns_when_gpu_requested_but_torch_is_cpu_only(monkeypatch, caplog) -> None:

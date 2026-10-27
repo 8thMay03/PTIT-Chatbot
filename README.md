@@ -16,6 +16,7 @@ Thay vì để mô hình trả lời hoàn toàn từ kiến thức có sẵn, c
 - Câu trả lời có citation tới tài liệu, mục, Điều, Khoản hoặc Điểm.
 - Streaming câu trả lời trên giao diện web.
 - Quản lý tài liệu trên giao diện: tải lên, xem trước, tải xuống và xóa.
+- Parse tài liệu chạy nền: tải lên hoặc parse lại trả job ngay, có thanh tiến trình theo trang/pha và người dùng tiếp tục làm việc khác trong lúc chờ.
 - Lưu lịch sử hội thoại và thông tin debug retrieval.
 - Đánh giá chất lượng bằng Ragas.
 
@@ -192,19 +193,23 @@ Ingest tách thành hai bước để có thể kiểm tra, sửa Markdown và c
 1. **Parse**: parser (+ chuẩn hóa heading) tạo Markdown và lưu vào `documents.parsed_text`; tài liệu chuyển trạng thái `parsed`. Các đoạn cũ (nếu có) vẫn phục vụ hỏi đáp cho tới khi chia đoạn lại. Parse lại ra đúng nội dung cũ thì tài liệu giữ `active`.
 2. **Chia đoạn**: đọc `parsed_text`, chia đoạn, tạo embeddings rồi thay toàn bộ đoạn của tài liệu trong một transaction; trạng thái chuyển `active`. Bước này không đọc file gốc hay gọi parser. Nếu Markdown bị parse lại/sửa trong lúc đang chia đoạn, API trả 409 và giữ nguyên các đoạn cũ.
 
-Upload (`POST /api/documents`) **chỉ parse** và dừng ở `parsed`: mở tài liệu, kiểm tra bản Markdown rồi bấm **Chia đoạn**. Upload được parse trong vùng tạm trước khi thay file nguồn; nếu conversion hoặc transaction PostgreSQL thất bại, file cũ và dữ liệu đã lưu được giữ nguyên, upload mới thất bại không để lại file trong kho tài liệu.
+Upload (`POST /api/documents`) **chỉ parse** và dừng ở `parsed`: mở tài liệu, kiểm tra bản Markdown rồi bấm **Chia đoạn**. Upload được kiểm tra định dạng/dung lượng và ghi vào vùng tạm ngoài `DOCUMENTS_PATH` trước khi trả response; sau đó parse chạy nền. File nguồn chỉ được publish vào kho và ghi DB khi parse thành công; nếu conversion hoặc transaction PostgreSQL thất bại, file cũ và dữ liệu đã lưu được giữ nguyên.
+
+Parse lại (`POST /api/documents/{id}/parse`) và parse upload đều chạy trong **một worker nền tuần tự**. API trả `202` kèm job ngay thay vì chờ Docling/LlamaParse, nên giao diện không bị khóa khi PDF lớn đang xử lý. Trạng thái job được đọc qua `GET /api/parse-jobs`; giao diện poll khi còn job `queued`/`running`, hiển thị banner và spinner riêng cho tài liệu đang parse, tự tải lại danh sách/chi tiết khi xong. Chỉ thao tác ghi trên đúng tài liệu đang parse bị khóa; tài liệu khác vẫn xem, parse, chia đoạn hoặc sửa Markdown được. Job trả thêm `progress` (0–100) và `progress_message`: Docling báo theo số trang đã xử lý, LlamaParse báo theo pha/thời gian chờ (cloud không trả bộ đếm trang), parser text báo theo pha. Giao diện hiển thị thanh tiến trình ở banner job nền, cột trạng thái của bảng và màn chi tiết. Job state nằm trong bộ nhớ process: restart backend làm mất báo cáo tiến độ (job đang chạy không tiếp tục), nhưng `parsed_text`/chunk đã commit vẫn còn. Cấu hình hiện tại chạy một uvicorn worker; nếu chạy nhiều worker, mỗi process có hàng đợi riêng và client phải đọc trạng thái từ process đã nhận job. Bước chia đoạn và nạp lại toàn bộ vẫn chạy đồng bộ.
 
 Khi parser đọc sai, nút **Sửa Markdown** (ở từng dòng trong danh sách tài liệu và trên trang chi tiết) mở màn ba cột để đối chiếu: **bản gốc** (PDF/DOCX/MD/TXT, cuộn riêng), **Markdown thô** (nơi sửa) và **bản render** (cuộn đồng bộ với Markdown thô); có thể bật/tắt từng cột. Lưu chỉ ghi `parsed_text` (đánh dấu `metadata.markdown_edited`) và đưa tài liệu về `parsed`; kho tri thức dùng bản mới sau khi bấm Chia đoạn. **Nạp lại toàn bộ** và `--stage parse` giữ nguyên bản sửa tay; **Parse lại** một tài liệu thì ghi đè bản sửa tay (giao diện cảnh báo trước).
 
 | API | Bước |
 | --- | --- |
-| `POST /api/documents` | Tải lên + parse |
-| `POST /api/documents/{id}/parse?parser_name=` | Parse lại một tài liệu |
+| `POST /api/documents` | Tải lên + đưa parse vào hàng đợi; trả `202` kèm job |
+| `POST /api/documents/{id}/parse?parser_name=` | Đưa parse lại một tài liệu vào hàng đợi; trả `202` kèm job |
+| `GET /api/parse-jobs?document_id=&active_only=&limit=` | Danh sách job, mới nhất trước |
+| `GET /api/parse-jobs/{job_id}` | Trạng thái, `progress`/`progress_message`, thời điểm, lỗi/kết quả của một job |
 | `GET` / `PUT /api/documents/{id}/markdown` | Đọc / lưu Markdown sửa tay (`PUT` nhận `base_hash` để tránh ghi đè thay đổi của người khác, lệch thì 409) |
 | `POST /api/documents/{id}/chunk` | Chia đoạn + embed một tài liệu |
 | `GET /api/documents` | Danh sách; `parsed_at` khác `null` khi tài liệu đã lưu Markdown (sửa/chia đoạn riêng được) |
 | `POST /api/ingest/chunk` | Chia đoạn lại mọi tài liệu từ Markdown đã lưu, ví dụ sau khi đổi `CHUNK_SIZE`; trả thêm `skipped` |
-| `POST /api/ingest` | Nạp lại toàn bộ: parse + chia đoạn mọi file trong `DOCUMENTS_PATH` |
+| `POST /api/ingest` | Nạp lại toàn bộ: parse + chia đoạn mọi file trong `DOCUMENTS_PATH` (đồng bộ) |
 
 Tài liệu được index trước migration `0004_document_parsed_text` chưa có `parsed_text`: vẫn xem và hỏi đáp bình thường, nhưng phải parse lại (hoặc Nạp lại toàn bộ một lần) trước khi chia đoạn riêng hoặc sửa Markdown; `POST /api/ingest/chunk` bỏ qua và báo số tài liệu này.
 
@@ -248,7 +253,7 @@ LLAMAPARSE_TIER=cost_effective   # fast | cost_effective | agentic | agentic_plu
 
 - Mở tài liệu trong giao diện, chọn parse lại bằng **LlamaParse**. File được tải lên LlamaCloud và tính credit theo trang (tham khảo bảng giá: fast 1, cost_effective 3, agentic 10, agentic_plus 45 credit/trang).
 - Markdown được cache tại `backend/storage/converted/llamaparse/` theo hash file + tier + version + ngôn ngữ; xem lại tài liệu hoặc rebuild không gọi API lại trừ khi file hoặc cấu hình đổi.
-- Lỗi key (401), hết credit (402), giới hạn tần suất (429), timeout (`LLAMAPARSE_TIMEOUT_SECONDS`, mặc định 900 giây) trả HTTP 422 với thông báo rõ ràng. SDK tự retry lỗi tạm thời (`LLAMAPARSE_MAX_RETRIES`).
+- Lỗi key (401), hết credit (402), giới hạn tần suất (429), timeout (`LLAMAPARSE_TIMEOUT_SECONDS`, mặc định 900 giây) được ghi vào job `failed` với thông báo rõ ràng; tài liệu cũ không bị thay đổi. SDK tự retry lỗi tạm thời (`LLAMAPARSE_MAX_RETRIES`).
 - Dùng region EU: đặt `LLAMAPARSE_BASE_URL` theo hướng dẫn của LlamaCloud.
 
 Backend:

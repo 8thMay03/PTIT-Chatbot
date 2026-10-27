@@ -520,6 +520,12 @@
   color: var(--info-text);
 }
 
+/* Job parse đang chạy nền; tài liệu vẫn xem được, chỉ khóa thao tác ghi */
+.doc-status-badge.is-parsing {
+  background: var(--brand-subtle);
+  color: var(--brand-text);
+}
+
 /* Markdown đổi sau lần chia đoạn gần nhất: đoạn cũ vẫn đang được dùng */
 .doc-status-badge.is-stale {
   background: var(--warning-subtle);

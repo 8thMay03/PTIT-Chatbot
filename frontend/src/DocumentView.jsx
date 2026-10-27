@@ -23,6 +23,7 @@ import { EMPTY, formatDate, formatSize } from "./lib/format";
 import { canEditMarkdown, documentStatus, needsChunking, NO_MARKDOWN_HINT } from "./lib/documentStatus";
 import MarkdownView from "./components/MarkdownView";
 import MarkdownEditorView from "./components/MarkdownEditorView";
+import ParseProgress from "./components/ParseProgress";
 
 const PAGE_SIZES = [20, 50, 100];
 
@@ -125,7 +126,7 @@ function findMatchingElements(chunkText, chunkIndex, totalChunks, elements) {
 }
 
 /** Màn chi tiết, mở khi bấm vào một tài liệu trong danh sách kho. */
-export default function DocumentView({ documentId, onBack, busy: pipelineBusy, parsingDocId, chunkingDocId, onParse, onChunk }) {
+export default function DocumentView({ documentId, onBack, busy: pipelineBusy, parseJob, chunkingDocId, onParse, onChunk }) {
   const queryClient = useQueryClient();
   const [editingMarkdown, setEditingMarkdown] = useState(false);
 
@@ -374,8 +375,9 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
     await onChunk?.(docDetail);
   }
 
-  const isParsingThis = parsingDocId === documentId;
+  const isParsingThis = Boolean(parseJob);
   const isChunkingThis = chunkingDocId === documentId;
+  const actionsBusy = pipelineBusy || isParsingThis || isChunkingThis;
   const status = documentStatus(docDetail);
   const awaitingChunking = needsChunking(docDetail);
   const fileName = docDetail?.file_name || docDetail?.title || EMPTY;
@@ -410,7 +412,7 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
               type="button"
               className="btn-outline-dataset"
               onClick={() => setEditingMarkdown(true)}
-              disabled={pipelineBusy || !canEditMarkdown(docDetail)}
+              disabled={actionsBusy || !canEditMarkdown(docDetail)}
               title={
                 canEditMarkdown(docDetail)
                   ? "Sửa tay bản Markdown khi parser đọc sai, đối chiếu với bản gốc và bản render"
@@ -424,8 +426,8 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
               type="button"
               className="btn-outline-dataset"
               onClick={handleReparse}
-              disabled={pipelineBusy}
-              title="Parse lại file gốc thành Markdown; các đoạn hiện có giữ nguyên tới khi chia đoạn"
+              disabled={actionsBusy}
+              title="Parse lại file gốc thành Markdown ở chế độ nền; các đoạn hiện có giữ nguyên tới khi chia đoạn"
             >
               {isParsingThis ? <Loader2 size={14} className="spin" /> : <Play size={13} fill="currentColor" />}
               <span>{isParsingThis ? "Đang parse..." : "Parse lại"}</span>
@@ -434,7 +436,7 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
               type="button"
               className={awaitingChunking ? "btn-parse-dataset" : "btn-outline-dataset"}
               onClick={handleChunk}
-              disabled={pipelineBusy}
+              disabled={actionsBusy}
               title="Chia bản Markdown hiện tại thành các đoạn và nhúng vector"
             >
               {isChunkingThis ? <Loader2 size={14} className="spin" /> : <Scissors size={14} />}
@@ -444,7 +446,23 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
         )}
       </div>
 
-      {awaitingChunking && (
+      {isParsingThis ? (
+        <div className="inline-alert is-info doc-view-status-note" role="status">
+          <Loader2 size={16} className="spin" />
+          <div className="doc-view-parse-progress">
+            <span>
+              Đang parse lại ở chế độ nền. Bạn có thể quay lại kho tài liệu và làm việc khác;
+              bản Markdown cùng trạng thái sẽ tự cập nhật khi parse xong.
+            </span>
+            <ParseProgress
+              progress={parseJob.progress}
+              message={parseJob.progress_message}
+              label="Tiến trình parse lại"
+              indeterminate={parseJob.status === "queued" || !parseJob.progress}
+            />
+          </div>
+        </div>
+      ) : awaitingChunking && (
         <div className="inline-alert is-warning doc-view-status-note" role="status">
           <AlertTriangle size={16} />
           <span>

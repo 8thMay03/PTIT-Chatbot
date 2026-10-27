@@ -1,14 +1,31 @@
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
 from app.api import routes
-from app.parsers import DocumentParseError
+from app.ingestion.jobs import ParseJob
 from app.ingestion.uploads import DocumentUploadError
 from app.main import app
-
+from app.parsers import DocumentParseError
 
 client = TestClient(app)
+
+
+def _parse_job(**overrides) -> ParseJob:
+    values = {
+        "id": "job-1",
+        "kind": "parse",
+        "status": "queued",
+        "document_id": "doc-1",
+        "file_name": "policy.pdf",
+        "parser_name": None,
+        "created_at": datetime(2026, 10, 27, tzinfo=timezone.utc),
+        "progress": 0,
+        "progress_message": "Đang chờ trong hàng đợi",
+    }
+    values.update(overrides)
+    return ParseJob(**values)
 
 
 def test_rebuild_maps_conversion_error_to_422(monkeypatch):
@@ -48,40 +65,37 @@ def test_list_documents_returns_serialized_items(monkeypatch) -> None:
     assert payload["documents"][0]["parsed_at"] is None
 
 
-def test_upload_document_uses_ingestion_pipeline(monkeypatch) -> None:
-    monkeypatch.setattr(
-        routes.ingestion_pipeline,
-        "parse_upload",
-        lambda filename, content: {
-            "id": "doc-1",
-            "title": "faq",
-            "file_name": "faq.md",
-            "source_path": "data/faq.md",
-            "file_type": "md",
-            "status": "parsed",
-            "chunk_count": 0,
-            "size_bytes": len(content),
-            "created_at": None,
-            "updated_at": None,
-        },
-    )
+def test_upload_document_enqueues_parse_job(monkeypatch) -> None:
+    calls = []
+    job = _parse_job(id="job-upload", kind="upload", document_id=None, file_name="faq.md")
+
+    def enqueue(filename, content, **options):
+        calls.append((filename, content, options))
+        return job
+
+    monkeypatch.setattr(routes.parse_jobs, "enqueue_upload", enqueue)
 
     response = client.post(
         "/api/documents",
         files={"file": ("faq.md", b"# FAQ\n", "text/markdown")},
     )
 
-    assert response.status_code == 200
-    assert response.json()["file_name"] == "faq.md"
-    assert response.json()["status"] == "parsed"
-    assert response.json()["chunk_count"] == 0
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["id"] == "job-upload"
+    assert payload["kind"] == "upload"
+    assert payload["status"] == "queued"
+    assert payload["file_name"] == "faq.md"
+    assert payload["progress"] == 0
+    assert payload["progress_message"] == "Đang chờ trong hàng đợi"
+    assert calls == [("faq.md", b"# FAQ\n", {})]
 
 
 def test_upload_document_maps_validation_errors(monkeypatch) -> None:
-    def fail_upload(filename, content):
+    def fail_upload(filename, content, **options):
         raise DocumentUploadError("Chỉ hỗ trợ tài liệu .md, .txt.")
 
-    monkeypatch.setattr(routes.ingestion_pipeline, "parse_upload", fail_upload)
+    monkeypatch.setattr(routes.parse_jobs, "enqueue_upload", fail_upload)
 
     response = client.post(
         "/api/documents",
@@ -115,29 +129,37 @@ def test_parse_single_document_passes_existing_identity(monkeypatch, tmp_path) -
     monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda session, doc_id: (document, 4))
     monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: source)
     calls = []
+    job = _parse_job(id="job-parse", document_id=document.id, file_name="moved.docx")
 
-    def parse_path(path, *, document_id=None):
-        calls.append((path, document_id))
-        return {
-            "id": document_id or "new-path-id",
-            "title": "moved",
-            "file_name": "moved.docx",
-            "source_path": document.source_path,
-            "file_type": "docx",
-            "status": "parsed",
-            "chunk_count": 3,
-            "size_bytes": source.stat().st_size,
-            "created_at": None,
-            "updated_at": None,
-        }
+    def enqueue(document_id, path, **options):
+        calls.append((document_id, path, options))
+        return job
 
-    monkeypatch.setattr(routes.ingestion_pipeline, "parse_path", parse_path)
+    monkeypatch.setattr(routes.parse_jobs, "enqueue_parse", enqueue)
 
     response = client.post("/api/documents/historical-id/parse")
 
-    assert response.status_code == 200
-    assert response.json()["id"] == document.id
-    assert calls == [(source, document.id)]
+    assert response.status_code == 202
+    assert response.json()["id"] == "job-parse"
+    assert calls == [("historical-id", source, {"file_name": "moved.docx"})]
+
+
+def test_parse_conflict_returns_409(monkeypatch, tmp_path) -> None:
+    source = tmp_path / "note.md"
+    source.write_text("hello", encoding="utf-8")
+    document = SimpleNamespace(id="note", source_path="data/note.md")
+    monkeypatch.setattr(routes, "get_document_with_chunk_count", lambda *args: (document, 1))
+    monkeypatch.setattr(routes, "resolve_source_path", lambda *args: source)
+
+    def conflict(*args, **kwargs):
+        raise routes.ParseJobConflict("“note.md” đang được parse.")
+
+    monkeypatch.setattr(routes.parse_jobs, "enqueue_parse", conflict)
+
+    response = client.post("/api/documents/note/parse")
+
+    assert response.status_code == 409
+    assert "đang được parse" in response.json()["detail"]
 
 
 def test_parser_options_and_explicit_selection(monkeypatch, tmp_path) -> None:
@@ -151,14 +173,15 @@ def test_parser_options_and_explicit_selection(monkeypatch, tmp_path) -> None:
     assert response.json() == {"parsers": [{"name": "text", "is_default": True}]}
     calls = []
 
-    def reject(path, **options):
-        calls.append(options)
-        raise routes.DocumentParseError("unsupported selection")
+    def enqueue(document_id, path, **options):
+        calls.append((document_id, path, options))
+        return _parse_job(parser_name=options.get("parser_name"))
 
-    monkeypatch.setattr(routes.ingestion_pipeline, "parse_path", reject)
+    monkeypatch.setattr(routes.parse_jobs, "enqueue_parse", enqueue)
     response = client.post("/api/documents/note/parse?parser_name=docling")
-    assert response.status_code == 422
-    assert calls == [{"document_id": "note", "parser_name": "docling"}]
+    assert response.status_code == 202
+    assert response.json()["parser_name"] == "docling"
+    assert calls == [("note", source, {"file_name": "note.md", "parser_name": "docling"})]
 
 
 def test_parser_options_by_file_name_before_upload(monkeypatch) -> None:
@@ -184,12 +207,13 @@ def test_parser_options_by_file_name_before_upload(monkeypatch) -> None:
 
 def test_upload_document_passes_selected_parser(monkeypatch) -> None:
     calls = []
+    job = _parse_job(id="job-upload", kind="upload", document_id=None, file_name="policy.pdf")
 
-    def reject(filename, content, **options):
+    def enqueue(filename, content, **options):
         calls.append((filename, options))
-        raise DocumentParseError("Parser 'llamaparse' chưa được đăng ký.")
+        return job
 
-    monkeypatch.setattr(routes.ingestion_pipeline, "parse_upload", reject)
+    monkeypatch.setattr(routes.parse_jobs, "enqueue_upload", enqueue)
 
     response = client.post(
         "/api/documents",
@@ -197,9 +221,34 @@ def test_upload_document_passes_selected_parser(monkeypatch) -> None:
         data={"parser_name": "llamaparse"},
     )
 
-    assert response.status_code == 422
-    assert "llamaparse" in response.json()["detail"]
+    assert response.status_code == 202
+    assert response.json()["id"] == "job-upload"
     assert calls == [("policy.pdf", {"parser_name": "llamaparse"})]
+
+
+def test_parse_job_status_and_list(monkeypatch) -> None:
+    job = _parse_job(status="running")
+
+    monkeypatch.setattr(routes.parse_jobs, "get", lambda job_id: job if job_id == "job-1" else None)
+    response = client.get("/api/parse-jobs/job-1")
+    assert response.status_code == 200
+    assert response.json()["status"] == "running"
+    assert client.get("/api/parse-jobs/missing").status_code == 404
+
+    calls = []
+
+    def list_jobs(**kwargs):
+        calls.append(kwargs)
+        return [job]
+
+    monkeypatch.setattr(routes.parse_jobs, "list", list_jobs)
+    response = client.get(
+        "/api/parse-jobs",
+        params={"document_id": "doc-1", "active_only": "true", "limit": 7},
+    )
+    assert response.status_code == 200
+    assert response.json()["jobs"][0]["id"] == "job-1"
+    assert calls == [{"document_id": "doc-1", "active_only": True, "limit": 7}]
 
 
 def test_parser_options_missing_document(monkeypatch) -> None:

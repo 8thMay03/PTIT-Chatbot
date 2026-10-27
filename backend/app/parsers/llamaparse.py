@@ -10,11 +10,12 @@ import logging
 import re
 from hashlib import sha256
 from pathlib import Path
+from threading import Event, Thread
 from time import monotonic
 from typing import Any
 
 from app.core.config import settings
-from app.parsers.base import DocumentParseError
+from app.parsers.base import DocumentParseError, ProgressCallback
 
 logger = logging.getLogger(__name__)
 
@@ -35,15 +36,29 @@ class LlamaParseParser:
     name = "llamaparse"
     extensions = LLAMAPARSE_EXTENSIONS
 
-    def parse(self, path: Path, *, convert: bool = True) -> str | None:
+    def parse(
+        self,
+        path: Path,
+        *,
+        convert: bool = True,
+        on_progress: ProgressCallback | None = None,
+    ) -> str | None:
         # Raw exports are post-processed on every read, including cached previews.
         cache_path = _cache_path(path)
         if cache_path.is_file():
+            if on_progress is not None:
+                on_progress(80, "Đã có bản parse trong cache")
             return _postprocess_markdown(cache_path.read_text(encoding="utf-8"))
         if not convert:
             return None
 
-        exported = convert_with_llamaparse(path)
+        exported = (
+            convert_with_llamaparse(path, on_progress=on_progress)
+            if on_progress is not None
+            else convert_with_llamaparse(path)
+        )
+        if on_progress is not None:
+            on_progress(94, "Đang xử lý Markdown")
         markdown = _postprocess_markdown(exported)
         if not markdown.strip():
             raise DocumentParseError(f"LlamaParse không trích được nội dung văn bản từ {path.name}.")
@@ -52,7 +67,7 @@ class LlamaParseParser:
         return markdown
 
 
-def convert_with_llamaparse(path: Path) -> str:
+def convert_with_llamaparse(path: Path, *, on_progress: ProgressCallback | None = None) -> str:
     """Return LlamaParse's raw Markdown for a PDF/DOCX file, pages joined in order."""
     if not llamaparse_available():
         raise DocumentParseError(
@@ -60,7 +75,26 @@ def convert_with_llamaparse(path: Path) -> str:
         )
     logger.info("Parsing %s with LlamaParse (tier %s)...", path.name, settings.llamaparse_tier)
     started = monotonic()
-    result = _parse_remote(path)
+    stop = Event()
+    ticker: Thread | None = None
+    if on_progress is not None:
+        on_progress(10, "Đang gửi file lên LlamaCloud")
+        ticker = Thread(
+            target=_waiting_progress,
+            args=(started, stop, on_progress),
+            name="llamaparse-progress",
+            daemon=True,
+        )
+        ticker.start()
+    try:
+        result = _parse_remote(path)
+    finally:
+        stop.set()
+        if ticker is not None:
+            ticker.join(timeout=1)
+
+    if on_progress is not None:
+        on_progress(90, "Đang lấy kết quả từ LlamaCloud")
     markdown, page_count = _markdown_from_result(result, path.name)
     usage = getattr(getattr(result, "job", None), "usage", None)
     logger.info(
@@ -71,6 +105,14 @@ def convert_with_llamaparse(path: Path) -> str:
         monotonic() - started,
     )
     return markdown
+
+
+def _waiting_progress(started: float, stop: Event, on_progress: ProgressCallback) -> None:
+    """LlamaCloud exposes no page counter, so advance slowly while it works."""
+    while not stop.wait(1.0):
+        elapsed = monotonic() - started
+        percent = min(85, 15 + int(elapsed * 0.35))
+        on_progress(percent, f"Đang chờ LlamaCloud xử lý ({int(elapsed)} giây)")
 
 
 def _parse_remote(path: Path) -> Any:

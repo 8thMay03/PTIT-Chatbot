@@ -4,10 +4,15 @@ from pathlib import Path
 import pytest
 
 import app.parsers as parsers
+from app.core.config import settings
 from app.ingestion.loaders import load_documents
 from app.ingestion.uploads import prepare_upload
-from app.core.config import settings
-from app.parsers import DocumentParseError, build_registry, read_document_text, resolve_parser_name
+from app.parsers import (
+    DocumentParseError,
+    build_registry,
+    read_document_text,
+    resolve_parser_name,
+)
 from app.parsers.registry import ParserRegistry
 from app.parsers.text import TextParser
 
@@ -85,6 +90,43 @@ def test_facade_forwards_parser_choice_and_preview_flag(monkeypatch):
     assert read_document_text(source, convert=False) is None
     assert alternative.calls == [(source, True)]
     assert first.calls == [(source, False)]
+
+
+def test_facade_reports_progress_and_keeps_legacy_parsers_working(monkeypatch):
+    class ProgressParser(StubParser):
+        def parse(self, path, *, convert=True, on_progress=None):
+            if on_progress is not None:
+                on_progress(40, "Đang đọc thử")
+            return "# Tiến trình\n"
+
+    progress_parser = ProgressParser("progress")
+    legacy_parser = StubParser("legacy")
+    monkeypatch.setattr(
+        parsers,
+        "registry",
+        ParserRegistry([progress_parser]),
+    )
+    source = Path("file.custom")
+    events = []
+
+    assert (
+        read_document_text(
+            source, on_progress=lambda percent, message: events.append((percent, message))
+        )
+        == "# Tiến trình\n"
+    )
+    assert (40, "Đang đọc thử") in events
+    assert events[-1] == (92, "Đang chuẩn hóa Markdown")
+
+    events.clear()
+    monkeypatch.setattr(parsers, "registry", ParserRegistry([legacy_parser]))
+    assert (
+        read_document_text(
+            source, on_progress=lambda percent, message: events.append((percent, message))
+        )
+        == "# Parsed by legacy\n"
+    )
+    assert events == [(8, "Đang đọc tài liệu"), (92, "Đang chuẩn hóa Markdown")]
 
 
 def test_new_binary_format_is_discovered_by_uploads_and_loaders(monkeypatch, tmp_path):

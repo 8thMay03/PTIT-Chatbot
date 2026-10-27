@@ -47,6 +47,8 @@ export function upload(file, { parserName = null } = {}) {
   form.append("file", file);
   if (parserName) form.append("parser_name", parserName);
 
+  // Backend chỉ stage file rồi trả job parse nền, nên timeout dài chỉ còn dùng
+  // cho lúc tải bytes lên.
   return request("documents", {
     method: "POST",
     body: form,
@@ -76,8 +78,22 @@ export function parse(documentId, parserName) {
   return request(`documents/${documentId}/parse`, {
     method: "POST",
     query: { parser_name: parserName },
-    timeout: LONG_RUNNING_TIMEOUT_MS,
   });
+}
+
+export function parseJobs({ documentId, activeOnly = false, limit = 50, signal } = {}) {
+  return request("parse-jobs", {
+    query: {
+      document_id: documentId,
+      active_only: activeOnly || undefined,
+      limit,
+    },
+    signal,
+  });
+}
+
+export function parseJob(jobId, { signal } = {}) {
+  return request(`parse-jobs/${jobId}`, { signal });
 }
 
 export function chunk(documentId) {

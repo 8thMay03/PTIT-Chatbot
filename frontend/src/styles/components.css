@@ -312,6 +312,126 @@
 }
 
 /* --------------------------------------------------------------------------
+   Thanh tiến trình job parse chạy nền
+   -------------------------------------------------------------------------- */
+.parse-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  min-width: 150px;
+}
+
+.parse-progress.is-compact {
+  gap: 3px;
+  min-width: 96px;
+}
+
+.parse-progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.parse-progress-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parse-progress-value {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--brand-text);
+}
+
+.parse-progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken-strong);
+}
+
+.parse-progress.is-compact .parse-progress-track {
+  height: 5px;
+}
+
+.parse-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand-gradient);
+  transition: width 0.35s ease;
+}
+
+.parse-progress.is-indeterminate .parse-progress-fill {
+  width: 40%;
+  animation: parse-progress-slide 1.2s ease-in-out infinite;
+}
+
+.parse-progress-message {
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+@keyframes parse-progress-slide {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(360%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .parse-progress.is-indeterminate .parse-progress-fill {
+    animation: none;
+    width: 100%;
+    opacity: 0.45;
+  }
+}
+
+.parse-jobs-banner-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.parse-jobs-banner-body .parse-progress {
+  max-width: 520px;
+}
+
+.doc-status-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.doc-status-stack .parse-progress {
+  max-width: 112px;
+}
+
+.doc-view-parse-progress {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.doc-view-parse-progress .parse-progress {
+  max-width: 560px;
+}
+
+/* --------------------------------------------------------------------------
    Thanh hành động hàng loạt (hiện khi có dòng được chọn)
    -------------------------------------------------------------------------- */
 .bulk-bar {

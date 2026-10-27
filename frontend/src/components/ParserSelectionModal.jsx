@@ -63,15 +63,15 @@ export default function ParserSelectionModal({ document, upload, busy, progress,
   const files = upload?.files || [];
   const otherCount = files.length - (upload?.choiceCount ?? files.length);
   const busyText = upload
-    ? `Đang tải lên và parse${progress ? ` (${progress})` : ""}. PDF lớn có thể mất vài phút; vui lòng chờ hoàn tất.`
-    : "Đang parse lại tài liệu. PDF lớn có thể mất vài phút; vui lòng chờ hoàn tất.";
+    ? `Đang tải tệp lên${progress ? ` (${progress})` : ""}. Parse sẽ chạy nền sau khi tải xong.`
+    : "Đang đưa tài liệu vào hàng đợi parse nền...";
   // Parse lại ghi đè bản Markdown đã sửa tay: cảnh báo trước khi người dùng xác nhận.
   const overwritesEdit = !upload && Boolean(document?.markdown_edited);
-  let idleText = "Parse lại chỉ cập nhật bản Markdown; các đoạn hiện có vẫn được dùng khi hỏi đáp tới khi bấm “Chia đoạn”.";
+  let idleText = "Parse lại chạy ở chế độ nền: bạn có thể tiếp tục làm việc khác. Các đoạn hiện có vẫn được dùng khi hỏi đáp tới khi bấm “Chia đoạn”.";
   if (upload) {
-    idleText = `Tài liệu được parse ngay sau khi tải lên${otherCount > 0 ? `; ${otherCount} tệp không hỗ trợ parser này sẽ dùng parser mặc định` : ""}, rồi chờ bạn kiểm tra Markdown và bấm “Chia đoạn”. Có thể parse lại bằng parser khác sau.`;
+    idleText = `Tài liệu được đưa vào hàng đợi parse ngay sau khi tải lên${otherCount > 0 ? `; ${otherCount} tệp không hỗ trợ parser này sẽ dùng parser mặc định` : ""}, rồi chờ bạn kiểm tra Markdown và bấm “Chia đoạn”. Có thể parse lại bằng parser khác sau.`;
   } else if (overwritesEdit) {
-    idleText = "Tài liệu này có bản Markdown đã sửa tay; parse lại sẽ ghi đè các chỉnh sửa đó. Các đoạn hiện có vẫn được dùng khi hỏi đáp tới khi bấm “Chia đoạn”.";
+    idleText = "Tài liệu này có bản Markdown đã sửa tay; parse lại sẽ ghi đè các chỉnh sửa đó. Job chạy nền, các đoạn hiện có vẫn được dùng khi hỏi đáp tới khi bấm “Chia đoạn”.";
   }
 
   return (

@@ -40,9 +40,14 @@ from app.ingestion.chunker import (
     split_parent_child,
     split_text,
 )
-from app.parsers import DocumentParseError, get_parser_name, read_document_text
 from app.ingestion.loaders import SourceDocument, load_documents
 from app.ingestion.uploads import delete_source_file, prepare_upload, publish_upload
+from app.parsers import (
+    DocumentParseError,
+    ProgressCallback,
+    get_parser_name,
+    read_document_text,
+)
 from app.retrieval.bm25 import invalidate_bm25_cache
 from app.vectordb import VectorStore, create_vector_store
 
@@ -132,24 +137,54 @@ class IngestionPipeline:
             session.commit()
         return {"documents": len(documents)}
 
-    def parse_upload(self, filename: str, content: bytes, *, parser_name: str | None = None) -> dict:
+    def parse_upload(
+        self,
+        filename: str,
+        content: bytes,
+        *,
+        parser_name: str | None = None,
+        on_progress: ProgressCallback | None = None,
+    ) -> dict:
         # Parse outside the document tree so neither a replacement nor an
         # in-progress upload can affect existing sources or a concurrent scan.
-        options = {"parser_name": parser_name} if parser_name is not None else {}
         with TemporaryDirectory(prefix="ptit-upload-") as folder:
             staged_path = prepare_upload(filename, content, Path(folder))
-            text = read_document_text(staged_path, **options) or ""
-            if not text.strip():
-                raise DocumentParseError(f"{staged_path.name} không có nội dung văn bản.")
-            path = settings.documents_path / staged_path.name
-            document = SourceDocument(path=path, text=text, parser_name=get_parser_name(staged_path, parser_name))
-            return self._save_parsed(document, staged_path=staged_path)
+            return self.parse_staged_upload(
+                staged_path, parser_name=parser_name, on_progress=on_progress
+            )
 
-    def parse_path(self, path: Path, *, document_id: str | None = None, parser_name: str | None = None) -> dict:
+    def parse_staged_upload(
+        self,
+        staged_path: Path,
+        *,
+        parser_name: str | None = None,
+        on_progress: ProgressCallback | None = None,
+    ) -> dict:
+        """Parse a validated upload staged outside the document tree, then publish it."""
         options = {"parser_name": parser_name} if parser_name is not None else {}
-        text = read_document_text(path, **options) or ""
+        text = read_document_text(staged_path, on_progress=on_progress, **options) or ""
+        if not text.strip():
+            raise DocumentParseError(f"{staged_path.name} không có nội dung văn bản.")
+        if on_progress is not None:
+            on_progress(96, "Đang lưu kết quả parse")
+        path = settings.documents_path / staged_path.name
+        document = SourceDocument(path=path, text=text, parser_name=get_parser_name(staged_path, parser_name))
+        return self._save_parsed(document, staged_path=staged_path)
+
+    def parse_path(
+        self,
+        path: Path,
+        *,
+        document_id: str | None = None,
+        parser_name: str | None = None,
+        on_progress: ProgressCallback | None = None,
+    ) -> dict:
+        options = {"parser_name": parser_name} if parser_name is not None else {}
+        text = read_document_text(path, on_progress=on_progress, **options) or ""
         if not text.strip():
             raise DocumentParseError(f"{path.name} không có nội dung văn bản.")
+        if on_progress is not None:
+            on_progress(96, "Đang lưu kết quả parse")
         document = SourceDocument(path=path, text=text, parser_name=get_parser_name(path, parser_name))
         return self._save_parsed(document, document_id=document_id)
 
@@ -201,6 +236,10 @@ class IngestionPipeline:
                 # A repaired source path can differ from the path that originally
                 # generated the stored ID. Reuse that identity for uploads as well.
                 document_id = get_document_id_by_source_path(session, _source_path(path))
+            elif session.get(Document, document_id) is None:
+                # A background parse must not recreate a document deleted while
+                # the parser was running.
+                raise DocumentStateError("Tài liệu đã bị xóa trong lúc parse; hãy tải lại danh sách.")
             record = _document_record(document, document_id=document_id, size_bytes=_file_size(staged_path or path))
             stored = save_parsed_document(session, record)
             # Parsing and the DB flush have succeeded before publication.

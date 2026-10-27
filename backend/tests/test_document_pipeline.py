@@ -6,14 +6,14 @@ from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker, undefer
 from sqlalchemy.pool import StaticPool
 
-from app.db.models import Base, Chunk, Document
+import app.parsers as parsers
 from app.core.config import settings
+from app.db.models import Base, Chunk, Document
 from app.embeddings.models import HashEmbeddingModel
 from app.ingestion import uploads
-import app.parsers as parsers
+from app.ingestion.pipeline import DocumentStateError, IngestionPipeline
 from app.ingestion.uploads import read_preview
 from app.parsers import DocumentParseError, build_registry, docling, llamaparse
-from app.ingestion.pipeline import DocumentStateError, IngestionPipeline
 
 
 class RecordingVectorStore:
@@ -424,6 +424,28 @@ def test_upload_only_parses_and_waits_for_chunking(upload_pipeline, monkeypatch)
     assert "Nội dung chờ kiểm tra" in document.parsed_text
     assert document.parsed_at is not None
     assert (settings.documents_path / "policy.md").is_file()
+
+
+def test_parse_staged_upload_publishes_source(upload_pipeline, tmp_path: Path):
+    pipeline, engine, _store, _parsed_paths = upload_pipeline
+    staged = tmp_path / "staged-policy.md"
+    staged.write_text("# Staged\nNội dung đã stage", encoding="utf-8")
+
+    item = pipeline.parse_staged_upload(staged, parser_name="text")
+
+    assert item["status"] == "parsed"
+    assert item["file_name"] == "staged-policy.md"
+    assert (settings.documents_path / "staged-policy.md").is_file()
+    assert "Nội dung đã stage" in _document_row(engine, item["id"]).parsed_text
+
+
+def test_parse_path_rejects_explicit_missing_document(upload_pipeline, tmp_path: Path):
+    pipeline, _engine, _store, _parsed_paths = upload_pipeline
+    source = tmp_path / "deleted.md"
+    source.write_text("# Đã xóa\nNội dung", encoding="utf-8")
+
+    with pytest.raises(DocumentStateError, match="đã bị xóa"):
+        pipeline.parse_path(source, document_id="deleted-document")
 
 
 def test_reparse_with_same_text_keeps_document_active(upload_pipeline, monkeypatch):

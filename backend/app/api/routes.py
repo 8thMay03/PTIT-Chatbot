@@ -1,10 +1,10 @@
 import json
 import time
-from pathlib import Path
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,8 @@ from app.api.schemas import (
     DocumentMarkdown,
     FullConfigResponse,
     IngestResponse,
+    ParseJobItem,
+    ParseJobListResponse,
     RenameConversationRequest,
     RetrievalTestRequest,
     TestLLMRequest,
@@ -32,7 +34,6 @@ from app.api.schemas import (
     UpdateConfigRequest,
     UpdateMarkdownRequest,
 )
-from app.db import check_db_health, get_session
 from app.core.config import (
     PROJECT_ROOT,
     get_runtime_config_dict,
@@ -40,6 +41,7 @@ from app.core.config import (
     settings,
     update_runtime_config,
 )
+from app.db import check_db_health, get_session
 from app.db.repositories import (
     add_message,
     add_message_sources,
@@ -58,16 +60,30 @@ from app.db.repositories import (
     serialize_document,
     serialize_markdown,
 )
+from app.generation.citations import public_citations
+from app.generation.llm import (
+    _normalize_answer_citations,
+    stream_answer_deltas_with_llm,
+)
 from app.generation.rag_chain import rag_chain
 from app.guardrails import OUT_OF_SCOPE_ANSWER, filter_safe_history
-from app.generation.citations import public_citations
-from app.generation.llm import _normalize_answer_citations, stream_answer_deltas_with_llm
-from app.llm import CONTENT_DELTA, REASONING_DELTA, LLMStreamError, StreamDelta
 from app.ingestion import ingestion_pipeline
+from app.ingestion.jobs import ParseJob, ParseJobConflict, parse_jobs
 from app.ingestion.pipeline import DocumentStateError
-from app.parsers import DocumentParseError, read_document_text, registry, resolve_parser_name
-from app.ingestion.uploads import PREVIEW_CHAR_LIMIT, DocumentUploadError, read_preview, resolve_source_path
+from app.ingestion.uploads import (
+    PREVIEW_CHAR_LIMIT,
+    DocumentUploadError,
+    read_preview,
+    resolve_source_path,
+)
+from app.llm import CONTENT_DELTA, REASONING_DELTA, LLMStreamError, StreamDelta
 from app.llm.factory import create_llm_provider_from_config
+from app.parsers import (
+    DocumentParseError,
+    read_document_text,
+    registry,
+    resolve_parser_name,
+)
 
 router = APIRouter()
 
@@ -298,22 +314,43 @@ def parsers_for_file(file_name: str = Query(min_length=1)) -> dict:
     return {"parsers": registry.list_parsers(Path(file_name))}
 
 
-@router.post("/documents", response_model=DocumentItem)
+@router.post("/documents", response_model=ParseJobItem, status_code=202)
 def upload_document(
     file: UploadFile = File(...), parser_name: str | None = Form(default=None, min_length=1)
-) -> DocumentItem:
-    # Upload only parses: the document waits in "parsed" until it is chunked, so its
-    # Markdown can be reviewed or fixed first. Sync handler: Docling conversion runs in
-    # FastAPI's threadpool instead of blocking the event loop.
+) -> ParseJobItem:
+    """Validate and stage the upload, then parse it in a background job.
+
+    Only the cheap validation and the staging write happen before the response;
+    conversion/parse of large PDFs no longer blocks the client. The source file
+    is published into DOCUMENTS_PATH by the job after parsing and committing.
+    """
     try:
         options = {"parser_name": parser_name} if parser_name is not None else {}
-        payload = ingestion_pipeline.parse_upload(file.filename or "", file.file.read(), **options)
+        job = parse_jobs.enqueue_upload(file.filename or "", file.file.read(), **options)
     except DocumentUploadError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
-    except DocumentParseError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ParseJobConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    return DocumentItem(**payload)
+    return _parse_job_payload(job)
+
+
+@router.get("/parse-jobs", response_model=ParseJobListResponse)
+def list_parse_jobs(
+    document_id: str | None = Query(default=None),
+    active_only: bool = Query(default=False),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> ParseJobListResponse:
+    jobs = parse_jobs.list(document_id=document_id, active_only=active_only, limit=limit)
+    return ParseJobListResponse(jobs=[_parse_job_payload(job) for job in jobs])
+
+
+@router.get("/parse-jobs/{job_id}", response_model=ParseJobItem)
+def get_parse_job(job_id: str) -> ParseJobItem:
+    job = parse_jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy job parse.")
+    return _parse_job_payload(job)
 
 
 @router.get("/documents/{document_id}/parsers")
@@ -324,8 +361,8 @@ def document_parsers(document_id: str, session: Session = Depends(get_session)) 
     return {"parsers": registry.list_parsers(Path(row[0].source_path))}
 
 
-@router.post("/documents/{document_id}/parse", response_model=DocumentItem)
-def parse_single_document(document_id: str, session: Session = Depends(get_session), parser_name: str | None = Query(default=None, min_length=1)) -> DocumentItem:
+@router.post("/documents/{document_id}/parse", response_model=ParseJobItem, status_code=202)
+def parse_single_document(document_id: str, session: Session = Depends(get_session), parser_name: str | None = Query(default=None, min_length=1)) -> ParseJobItem:
     row = get_document_with_chunk_count(session, document_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
@@ -336,10 +373,15 @@ def parse_single_document(document_id: str, session: Session = Depends(get_sessi
 
     try:
         options = {"parser_name": parser_name} if parser_name is not None else {}
-        result = ingestion_pipeline.parse_path(path, document_id=document.id, **options)
-    except DocumentParseError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return DocumentItem(**result)
+        job = parse_jobs.enqueue_parse(
+            document.id,
+            path,
+            file_name=Path(document.source_path).name,
+            **options,
+        )
+    except ParseJobConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _parse_job_payload(job)
 
 
 @router.post("/documents/{document_id}/chunk", response_model=DocumentItem)
@@ -384,6 +426,24 @@ def remove_document(document_id: str) -> DocumentDeleteResponse:
     if result is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
     return DocumentDeleteResponse(**result)
+
+
+def _parse_job_payload(job: ParseJob) -> ParseJobItem:
+    return ParseJobItem(
+        id=job.id,
+        kind=job.kind,
+        status=job.status,
+        document_id=job.document_id,
+        file_name=job.file_name,
+        parser_name=job.parser_name,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        finished_at=job.finished_at,
+        error=job.error,
+        result=job.result,
+        progress=job.progress,
+        progress_message=job.progress_message,
+    )
 
 
 def _document_payload(document, chunk_count: int) -> dict:

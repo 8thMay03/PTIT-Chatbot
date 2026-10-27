@@ -86,6 +86,28 @@ class DocumentDetail(DocumentItem):
     full_text: str | None = None
 
 
+class ParseJobItem(BaseModel):
+    """Progress and result of a background parse run."""
+
+    id: str
+    kind: str
+    status: str
+    document_id: str | None = None
+    file_name: str | None = None
+    parser_name: str | None = None
+    created_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    error: str | None = None
+    result: DocumentItem | None = None
+    progress: int = 0
+    progress_message: str | None = None
+
+
+class ParseJobListResponse(BaseModel):
+    jobs: list[ParseJobItem]
+
+
 # Large handbooks parse to a few hundred thousand characters; the cap only rejects abuse.
 MAX_MARKDOWN_CHARS = 5_000_000
 
