@@ -12,6 +12,8 @@ export const queryClient = new QueryClient({
 });
 
 export const queryKeys = {
+  admin: ["admin"],
+  adminSession: ["admin", "session"],
   config: ["config"],
   documents: ["documents"],
   documentList: ["documents", "list"],

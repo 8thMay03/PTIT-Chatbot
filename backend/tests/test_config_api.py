@@ -1,10 +1,23 @@
 from unittest.mock import MagicMock, patch
+
+import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings, settings
 from app.main import app
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _admin_session(login_admin):
+    """Mọi test trong file gọi API quản trị (config/retrieval): đăng nhập admin.
+
+    require_admin vẫn hoạt động thật — fixture chỉ đi qua luồng login chuẩn.
+    """
+    login_admin(client)
+    yield
+    client.cookies.clear()
 
 
 def test_get_config_returns_full_structure() -> None:

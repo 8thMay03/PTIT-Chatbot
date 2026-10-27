@@ -15,9 +15,10 @@ Thay vì để mô hình trả lời hoàn toàn từ kiến thức có sẵn, c
 - Confidence gate từ chối trả lời khi không tìm thấy bằng chứng đủ mạnh.
 - Câu trả lời có citation tới tài liệu, mục, Điều, Khoản hoặc Điểm.
 - Streaming câu trả lời trên giao diện web.
-- Quản lý tài liệu trên giao diện: tải lên, xem trước, tải xuống và xóa.
+- Tách trang chat cho sinh viên (`/`) và trang quản trị (`/admin`, đăng nhập bằng mật khẩu) để quản lý tài liệu và cấu hình.
+- Quản lý tài liệu trên trang quản trị: tải lên, xem trước, tải xuống và xóa.
 - Parse tài liệu chạy nền: tải lên hoặc parse lại trả job ngay, có thanh tiến trình theo trang/pha và người dùng tiếp tục làm việc khác trong lúc chờ.
-- Lưu lịch sử hội thoại và thông tin debug retrieval.
+- Lưu lịch sử hội thoại theo từng trình duyệt (phiên ẩn danh) và thông tin debug retrieval.
 - Đánh giá chất lượng bằng Ragas.
 
 ## Tech stack
@@ -262,7 +263,7 @@ Backend:
 - Swagger UI: `http://localhost:8000/docs`
 - Health check: `http://localhost:8000/api/health`
 
-Có thể nạp tài liệu mới trực tiếp trên giao diện **Tài liệu**, hoặc khi file trong `data/` thay đổi thì chạy lại:
+Có thể nạp tài liệu mới trực tiếp trên màn **Dataset** của trang quản trị (`/admin`), hoặc khi file trong `data/` thay đổi thì chạy lại:
 
 ```powershell
 cd backend
@@ -281,13 +282,50 @@ npm install
 npm run dev
 ```
 
-Giao diện chạy tại `http://localhost:5173`.
+Giao diện chạy tại `http://localhost:5173` (trang chat) và `http://localhost:5173/admin` (trang quản trị, xem mục 4).
 
-Nếu backend không chạy tại địa chỉ mặc định, tạo `frontend/.env.local`:
+Frontend gọi API qua đường dẫn tương đối `/api`; proxy của Vite chuyển tiếp tới `http://localhost:8000` (đổi đích bằng biến `VITE_PROXY_TARGET`). Nhờ cùng origin, trình duyệt luôn gửi cookie phiên chat và phiên admin. Chỉ đặt `VITE_API_BASE_URL` trong `frontend/.env.local` khi buộc phải gọi thẳng backend ở địa chỉ khác; khi đó frontend và backend phải cùng site (ví dụ cùng `localhost`, không trộn `localhost` với `127.0.0.1`) và origin của frontend phải có trong `CORS_ORIGINS`, nếu không đăng nhập admin và lịch sử chat sẽ không hoạt động.
+
+Kiểm tra trang chat không tải mã quản trị (build lại `dist/`, liệt kê JS tải ban đầu và tổng gzip):
+
+```powershell
+npm run check:bundle
+```
+
+### 4. Tài khoản quản trị (`/admin`)
+
+Trang chat (`/`) chỉ có chat, lịch sử hội thoại của chính trình duyệt đó và bộ chọn giao diện. Dataset và Settings nằm ở trang quản trị `/admin`, cần đăng nhập; trang chat không có liên kết tới `/admin`. Link cũ `#documents`, `#config`, `#models`, `#settings/...` tự chuyển sang `/admin`.
+
+Đặt trong `.env` rồi khởi động lại backend:
 
 ```env
-VITE_API_BASE_URL=http://localhost:8000/api
+ADMIN_PASSWORD=<mật khẩu dài, không dùng lại>
+ADMIN_SESSION_SECRET=<chuỗi ngẫu nhiên>
+ADMIN_SESSION_TTL_HOURS=12
+COOKIE_SECURE=false
 ```
+
+- Sinh `ADMIN_SESSION_SECRET`: `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+- `ADMIN_PASSWORD` để trống: đăng nhập trả `503`, mọi API quản trị trả `401` (fail closed).
+- `ADMIN_SESSION_SECRET` để trống: backend sinh khóa tạm lúc khởi động và ghi cảnh báo; mọi phiên admin mất khi restart. Đổi `ADMIN_PASSWORD` cũng làm mọi phiên cũ mất hiệu lực.
+- Phiên admin nằm trong cookie `ptit_admin` (`HttpOnly`, `SameSite=Strict`, `Path=/api`) ký HMAC-SHA256, hết hạn sau `ADMIN_SESSION_TTL_HOURS` giờ; server không lưu phiên, đăng xuất chỉ xóa cookie. Phiên hết hạn khi đang sửa thì trang hiện lại form đăng nhập mà không mất nội dung đang sửa.
+- `COOKIE_SECURE=true` khi chạy sau HTTPS (áp dụng cho cả `ptit_admin` và `ptit_sid`). Giữ `false` khi chạy dev qua HTTP, vì trình duyệt không lưu cookie `Secure` trên HTTP.
+- Đăng nhập sai quá 5 lần trong 5 phút từ một IP bị chặn tạm (`429`). Bộ đếm nằm trong bộ nhớ tiến trình nên chỉ chính xác khi chạy một worker uvicorn.
+- Route công khai: `GET /api/health`, `POST /api/chat`, `POST /api/chat/stream`, `GET|PATCH|DELETE /api/conversations*`, `POST /api/admin/login`, `POST /api/admin/logout`, `GET /api/admin/session`. Mọi route khác dưới `/api` (cấu hình, tài liệu, parse, ingest, retrieval test, `/api/admin/conversations*`) cần phiên admin. Route mới phải gắn `require_admin` hoặc được thêm có chủ đích vào `PUBLIC_API_ROUTES` (`backend/app/api/routes.py`); test `backend/tests/test_admin_auth.py` quét toàn bộ route để bắt trường hợp quên.
+
+Hội thoại của sinh viên gắn với phiên ẩn danh qua cookie `ptit_sid` (`HttpOnly`, `SameSite=Lax`, 180 ngày). Mỗi trình duyệt chỉ thấy, đổi tên, xóa và nối tiếp hội thoại của mình; `user_id` client gửi lên bị bỏ qua. Hội thoại tạo trước khi có tính năng này không hiện ở trang chat. Admin xem mọi hội thoại qua `GET /api/admin/conversations` (lọc tùy chọn `owner`, `limit`, `offset`) và `GET /api/admin/conversations/{id}`.
+
+#### Allowlist `base_url` của LLM
+
+`PUT /api/config` (trường `openai_base_url`, `openai_compatible_base_url`, `base_url`, `azure_openai_endpoint`) và `POST /api/config/test-llm` (`base_url`, `endpoint`) chỉ nhận URL có origin trong allowlist, kể cả với admin, để API key đang lưu không bị gửi tới host lạ. Vi phạm trả `422` và cấu hình giữ nguyên.
+
+```env
+# Origin scheme://host[:port], phân tách bằng dấu phẩy; host có thể dùng wildcard *.
+LLM_BASE_URL_ALLOWLIST=https://api.openai.com,http://localhost:11434,https://*.openai.azure.com
+```
+
+- Để trống: allowlist gồm `https://api.openai.com` và origin của `OPENAI_BASE_URL`, `OPENAI_COMPATIBLE_BASE_URL`, `AZURE_OPENAI_ENDPOINT` đọc từ env lúc khởi động.
+- Chỉ nhận `http`/`https`, không chứa `user:pass@`; cổng phải khớp (mục không ghi cổng chỉ khớp cổng mặc định 80/443). Giá trị rỗng được phép (dùng mặc định của SDK).
 
 ### Chạy bằng Docker Compose (PostgreSQL Production Ready)
 
@@ -298,9 +336,11 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
+Đặt `ADMIN_PASSWORD` (và `ADMIN_SESSION_SECRET`) trong `.env` trước khi chạy nếu cần trang quản trị; backend đọc toàn bộ `.env` qua `env_file`.
+
 Sau khi các service khởi động thành công (PostgreSQL đạt trạng thái `healthy` trước khi backend khởi chạy):
 
-- Frontend: `http://localhost:5173`
+- Frontend: `http://localhost:5173` (trang chat), `http://localhost:5173/admin` (trang quản trị)
 - Backend API: `http://localhost:8000`
 - Swagger UI: `http://localhost:8000/docs`
 - Health check (bao gồm trạng thái kết nối DB): `http://localhost:8000/api/health`
@@ -435,6 +475,21 @@ Chạy riêng các test liên quan đến guardrail và generation:
 
 ```powershell
 pytest tests/test_guardrails.py tests/test_rag_chain.py tests/test_prompts.py
+```
+
+Test xác thực admin, allowlist `base_url` và tách hội thoại theo phiên:
+
+```powershell
+pytest tests/test_admin_auth.py tests/test_llm_url_allowlist.py tests/test_conversation_sessions.py
+```
+
+Frontend:
+
+```powershell
+cd frontend
+npm test
+npm run build
+npm run check:bundle
 ```
 
 ## Đánh giá bằng Ragas

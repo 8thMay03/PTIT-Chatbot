@@ -4,11 +4,13 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.schemas import (
+    AdminLoginRequest,
+    AdminSessionResponse,
     ChatRequest,
     ChatResponse,
     ChunkAllResponse,
@@ -34,12 +36,16 @@ from app.api.schemas import (
     UpdateConfigRequest,
     UpdateMarkdownRequest,
 )
+from app.core import auth
+from app.core.auth import require_admin
 from app.core.config import (
     PROJECT_ROOT,
+    ConfigValidationError,
     get_runtime_config_dict,
     reset_runtime_config,
     settings,
     update_runtime_config,
+    validate_llm_url,
 )
 from app.db import check_db_health, get_session
 from app.db.repositories import (
@@ -53,6 +59,7 @@ from app.db.repositories import (
     get_document_full_text,
     get_document_preview_text,
     get_document_with_chunk_count,
+    get_owned_conversation,
     get_recent_conversation_history,
     list_conversations,
     list_documents,
@@ -87,6 +94,24 @@ from app.parsers import (
 
 router = APIRouter()
 
+# Route API công khai (prefix /api) theo plan FE-06. Route mới mặc định KHÔNG
+# được thêm vào đây: phải gắn require_admin hoặc thêm vào danh sách này một cách
+# có chủ đích; test quét app.routes (test_admin_auth) bảo đảm điều đó.
+PUBLIC_API_ROUTES: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("GET", "/api/health"),
+        ("POST", "/api/chat"),
+        ("POST", "/api/chat/stream"),
+        ("GET", "/api/conversations"),
+        ("GET", "/api/conversations/{conversation_id}"),
+        ("PATCH", "/api/conversations/{conversation_id}"),
+        ("DELETE", "/api/conversations/{conversation_id}"),
+        ("POST", "/api/admin/login"),
+        ("POST", "/api/admin/logout"),
+        ("GET", "/api/admin/session"),
+    }
+)
+
 
 @router.get("/health")
 def health() -> dict[str, Any]:
@@ -99,27 +124,85 @@ def health() -> dict[str, Any]:
     }
 
 
+# ==========================================
+# Phiên quản trị (FE-06)
+# ==========================================
+@router.post("/admin/login", response_model=AdminSessionResponse)
+def admin_login(
+    payload: AdminLoginRequest,
+    request: Request,
+    response: Response,
+) -> AdminSessionResponse:
+    if not auth.is_admin_configured():
+        raise HTTPException(status_code=503, detail="Chưa cấu hình ADMIN_PASSWORD.")
+    if auth.is_login_throttled(request):
+        raise HTTPException(
+            status_code=429,
+            detail="Quá nhiều lần đăng nhập sai. Vui lòng thử lại sau ít phút.",
+        )
+    if not auth.verify_admin_password(payload.password):
+        auth.register_failed_login(request)
+        raise HTTPException(status_code=401, detail="Mật khẩu không đúng.")
+    auth.register_successful_login(request)
+    token, expires_at = auth.issue_admin_session()
+    auth.issue_admin_cookie(response, token)
+    return AdminSessionResponse(
+        authenticated=True,
+        expires_at=auth.iso_expires_at(expires_at),
+        configured=True,
+    )
 
-@router.get("/config", response_model=FullConfigResponse)
+
+@router.post("/admin/logout", response_model=AdminSessionResponse)
+def admin_logout(response: Response) -> AdminSessionResponse:
+    # Server không lưu phiên; đăng xuất chỉ xoá cookie và luôn thành công.
+    auth.clear_admin_cookie(response)
+    return AdminSessionResponse(authenticated=False, configured=auth.is_admin_configured())
+
+
+@router.get("/admin/session", response_model=AdminSessionResponse)
+def get_admin_session(request: Request) -> AdminSessionResponse:
+    """Route công khai: trả trạng thái phiên, không bao giờ 401."""
+    expires_at = auth.verify_admin_token(request.cookies.get(auth.ADMIN_COOKIE_NAME))
+    return AdminSessionResponse(
+        authenticated=expires_at is not None and auth.is_admin_configured(),
+        expires_at=auth.iso_expires_at(expires_at) if expires_at is not None else None,
+        configured=auth.is_admin_configured(),
+    )
+
+
+
+@router.get("/config", response_model=FullConfigResponse, dependencies=[Depends(require_admin)])
 def get_config() -> FullConfigResponse:
     return FullConfigResponse(**get_runtime_config_dict())
 
 
-@router.put("/config", response_model=FullConfigResponse)
+@router.put("/config", response_model=FullConfigResponse, dependencies=[Depends(require_admin)])
 def update_config(request: UpdateConfigRequest) -> FullConfigResponse:
     payload = request.model_dump(exclude_unset=True)
-    updated = update_runtime_config(payload)
+    try:
+        updated = update_runtime_config(payload)
+    except ConfigValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return FullConfigResponse(**updated)
 
 
-@router.post("/config/reset", response_model=FullConfigResponse)
+@router.post("/config/reset", response_model=FullConfigResponse, dependencies=[Depends(require_admin)])
 def reset_config() -> FullConfigResponse:
     reset_data = reset_runtime_config()
     return FullConfigResponse(**reset_data)
 
 
-@router.post("/config/test-llm", response_model=TestLLMResponse)
+@router.post("/config/test-llm", response_model=TestLLMResponse, dependencies=[Depends(require_admin)])
 def test_llm(request: TestLLMRequest) -> TestLLMResponse:
+    # Kiểm URL trước khi tạo provider: request ngoài allowlist bị từ chối, key
+    # đang lưu không bao giờ được gửi tới host lạ.
+    try:
+        validate_llm_url(request.base_url)
+        validate_llm_url(request.endpoint)
+    except ConfigValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     start_time = time.perf_counter()
     try:
         provider_instance = create_llm_provider_from_config(
@@ -160,7 +243,7 @@ def test_llm(request: TestLLMRequest) -> TestLLMResponse:
 
 
 
-@router.post("/retrieval/test")
+@router.post("/retrieval/test", dependencies=[Depends(require_admin)])
 def test_retrieval(request: RetrievalTestRequest) -> dict:
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="Query must not be empty.")
@@ -173,7 +256,7 @@ def test_retrieval(request: RetrievalTestRequest) -> dict:
     }
 
 
-@router.post("/ingest", response_model=IngestResponse)
+@router.post("/ingest", response_model=IngestResponse, dependencies=[Depends(require_admin)])
 def ingest() -> IngestResponse:
     try:
         result = ingestion_pipeline.ingest_documents()
@@ -182,7 +265,7 @@ def ingest() -> IngestResponse:
     return IngestResponse(**result)
 
 
-@router.post("/ingest/chunk", response_model=ChunkAllResponse)
+@router.post("/ingest/chunk", response_model=ChunkAllResponse, dependencies=[Depends(require_admin)])
 def chunk_all_documents() -> ChunkAllResponse:
     """Re-chunk every document from its stored Markdown, e.g. after changing chunk settings."""
     try:
@@ -192,7 +275,7 @@ def chunk_all_documents() -> ChunkAllResponse:
     return ChunkAllResponse(**result)
 
 
-@router.get("/documents", response_model=DocumentListResponse)
+@router.get("/documents", response_model=DocumentListResponse, dependencies=[Depends(require_admin)])
 def get_documents(session: Session = Depends(get_session)) -> DocumentListResponse:
     documents = [
         DocumentItem(**_document_payload(document, chunk_count))
@@ -201,7 +284,7 @@ def get_documents(session: Session = Depends(get_session)) -> DocumentListRespon
     return DocumentListResponse(documents=documents)
 
 
-@router.get("/documents/{document_id}", response_model=DocumentDetail)
+@router.get("/documents/{document_id}", response_model=DocumentDetail, dependencies=[Depends(require_admin)])
 def get_document(document_id: str, session: Session = Depends(get_session)) -> DocumentDetail:
     row = get_document_with_chunk_count(session, document_id)
     if row is None:
@@ -253,7 +336,7 @@ def _legacy_document_text(session: Session, document, source_p: Path | None) -> 
     return full_text, preview
 
 
-@router.get("/documents/{document_id}/chunks", response_model=DocumentChunksResponse)
+@router.get("/documents/{document_id}/chunks", response_model=DocumentChunksResponse, dependencies=[Depends(require_admin)])
 def get_document_chunks_api(
     document_id: str,
     offset: int = 0,
@@ -281,7 +364,7 @@ def get_document_chunks_api(
     return DocumentChunksResponse(total=chunk_count, chunks=items)
 
 
-@router.get("/documents/{document_id}/file")
+@router.get("/documents/{document_id}/file", dependencies=[Depends(require_admin)])
 def download_document(
     document_id: str,
     inline: bool = Query(default=False),
@@ -308,13 +391,13 @@ def download_document(
     )
 
 
-@router.get("/parsers")
+@router.get("/parsers", dependencies=[Depends(require_admin)])
 def parsers_for_file(file_name: str = Query(min_length=1)) -> dict:
     """Parsers able to read a file that has not been uploaded yet, by its extension."""
     return {"parsers": registry.list_parsers(Path(file_name))}
 
 
-@router.post("/documents", response_model=ParseJobItem, status_code=202)
+@router.post("/documents", response_model=ParseJobItem, status_code=202, dependencies=[Depends(require_admin)])
 def upload_document(
     file: UploadFile = File(...), parser_name: str | None = Form(default=None, min_length=1)
 ) -> ParseJobItem:
@@ -335,7 +418,7 @@ def upload_document(
     return _parse_job_payload(job)
 
 
-@router.get("/parse-jobs", response_model=ParseJobListResponse)
+@router.get("/parse-jobs", response_model=ParseJobListResponse, dependencies=[Depends(require_admin)])
 def list_parse_jobs(
     document_id: str | None = Query(default=None),
     active_only: bool = Query(default=False),
@@ -345,7 +428,7 @@ def list_parse_jobs(
     return ParseJobListResponse(jobs=[_parse_job_payload(job) for job in jobs])
 
 
-@router.get("/parse-jobs/{job_id}", response_model=ParseJobItem)
+@router.get("/parse-jobs/{job_id}", response_model=ParseJobItem, dependencies=[Depends(require_admin)])
 def get_parse_job(job_id: str) -> ParseJobItem:
     job = parse_jobs.get(job_id)
     if job is None:
@@ -353,7 +436,7 @@ def get_parse_job(job_id: str) -> ParseJobItem:
     return _parse_job_payload(job)
 
 
-@router.get("/documents/{document_id}/parsers")
+@router.get("/documents/{document_id}/parsers", dependencies=[Depends(require_admin)])
 def document_parsers(document_id: str, session: Session = Depends(get_session)) -> dict:
     row = get_document_with_chunk_count(session, document_id)
     if row is None:
@@ -361,7 +444,7 @@ def document_parsers(document_id: str, session: Session = Depends(get_session)) 
     return {"parsers": registry.list_parsers(Path(row[0].source_path))}
 
 
-@router.post("/documents/{document_id}/parse", response_model=ParseJobItem, status_code=202)
+@router.post("/documents/{document_id}/parse", response_model=ParseJobItem, status_code=202, dependencies=[Depends(require_admin)])
 def parse_single_document(document_id: str, session: Session = Depends(get_session), parser_name: str | None = Query(default=None, min_length=1)) -> ParseJobItem:
     row = get_document_with_chunk_count(session, document_id)
     if row is None:
@@ -384,7 +467,7 @@ def parse_single_document(document_id: str, session: Session = Depends(get_sessi
     return _parse_job_payload(job)
 
 
-@router.post("/documents/{document_id}/chunk", response_model=DocumentItem)
+@router.post("/documents/{document_id}/chunk", response_model=DocumentItem, dependencies=[Depends(require_admin)])
 def chunk_single_document(document_id: str) -> DocumentItem:
     try:
         result = ingestion_pipeline.chunk_document(document_id)
@@ -395,7 +478,7 @@ def chunk_single_document(document_id: str) -> DocumentItem:
     return DocumentItem(**result)
 
 
-@router.get("/documents/{document_id}/markdown", response_model=DocumentMarkdown)
+@router.get("/documents/{document_id}/markdown", response_model=DocumentMarkdown, dependencies=[Depends(require_admin)])
 def get_document_markdown(document_id: str, session: Session = Depends(get_session)) -> DocumentMarkdown:
     row = get_document_with_chunk_count(session, document_id)
     if row is None:
@@ -408,7 +491,7 @@ def get_document_markdown(document_id: str, session: Session = Depends(get_sessi
     return DocumentMarkdown(**serialize_markdown(document))
 
 
-@router.put("/documents/{document_id}/markdown", response_model=DocumentMarkdown)
+@router.put("/documents/{document_id}/markdown", response_model=DocumentMarkdown, dependencies=[Depends(require_admin)])
 def update_document_markdown(document_id: str, request: UpdateMarkdownRequest) -> DocumentMarkdown:
     """Save a manual Markdown fix; the document then waits in "parsed" to be chunked."""
     try:
@@ -420,7 +503,7 @@ def update_document_markdown(document_id: str, request: UpdateMarkdownRequest) -
     return DocumentMarkdown(**result)
 
 
-@router.delete("/documents/{document_id}", response_model=DocumentDeleteResponse)
+@router.delete("/documents/{document_id}", response_model=DocumentDeleteResponse, dependencies=[Depends(require_admin)])
 def remove_document(document_id: str) -> DocumentDeleteResponse:
     result = ingestion_pipeline.delete_ingested_document(document_id)
     if result is None:
@@ -453,16 +536,26 @@ def _document_payload(document, chunk_count: int) -> dict:
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat(request: ChatRequest, session: Session = Depends(get_session)) -> ChatResponse:
+def chat(
+    request: ChatRequest,
+    response: Response = None,
+    http_request: Request = None,
+    session: Session = Depends(get_session),
+) -> ChatResponse:
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message must not be empty.")
 
+    # Phiên ẩn danh quyết định owner; user_id client gửi bị bỏ qua.
+    client = auth.get_client_session(http_request)
     conversation = ensure_conversation(
         session,
         request.conversation_id,
-        user_id=request.user_id,
+        user_id=client.owner_key,
         title=request.message.strip()[:80],
     )
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
+    client.apply(response)
     history = (
         get_recent_conversation_history(
             session,
@@ -500,7 +593,11 @@ def chat(request: ChatRequest, session: Session = Depends(get_session)) -> ChatR
 
 
 @router.post("/chat/stream")
-def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -> StreamingResponse:
+def chat_stream(
+    request: ChatRequest,
+    http_request: Request = None,
+    session: Session = Depends(get_session),
+) -> StreamingResponse:
     """Stream newline-delimited JSON events while preserving the normal chat contract.
 
     Event types: ``start``, ``step`` (tiến độ từng bước retrieval/generation),
@@ -510,12 +607,16 @@ def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message must not be empty.")
 
+    # Phiên ẩn danh quyết định owner; user_id client gửi bị bỏ qua.
+    client = auth.get_client_session(http_request)
     conversation = ensure_conversation(
         session,
         request.conversation_id,
-        user_id=request.user_id,
+        user_id=client.owner_key,
         title=request.message.strip()[:80],
     )
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
     history = (
         get_recent_conversation_history(
             session,
@@ -641,10 +742,16 @@ def chat_stream(request: ChatRequest, session: Session = Depends(get_session)) -
             "steps": steps_log,
         })
 
+    # Route tự trả StreamingResponse nên FastAPI không gộp cookie của response
+    # inject: gắn Set-Cookie trực tiếp lên headers của stream cho phiên mới.
+    stream_headers = {"X-Accel-Buffering": "no", "Cache-Control": "no-cache"}
+    if client.cookie_header is not None:
+        stream_headers["Set-Cookie"] = client.cookie_header
+
     return StreamingResponse(
         event_stream(),
         media_type="application/x-ndjson",
-        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+        headers=stream_headers,
     )
 
 
@@ -655,26 +762,34 @@ def _ndjson(payload: dict) -> str:
 # ==========================================
 # Lịch sử hội thoại
 # ==========================================
-def _serialize_conversation(conversation, message_count: int) -> ConversationItem:
+def _serialize_conversation(conversation, message_count: int, owner: str | None = None) -> ConversationItem:
     return ConversationItem(
         id=conversation.id,
         title=conversation.title,
         message_count=message_count,
         created_at=conversation.created_at,
         updated_at=conversation.updated_at,
+        owner=owner,
     )
 
 
 @router.get("/conversations", response_model=ConversationListResponse)
 def list_conversation_history(
+    response: Response = None,
+    http_request: Request = None,
     limit: int = 50,
     offset: int = 0,
-    user_id: str | None = None,
     session: Session = Depends(get_session),
 ) -> ConversationListResponse:
+    """Danh sách hội thoại của phiên ẩn danh hiện tại (cookie ptit_sid).
+
+    Luôn lọc theo owner của phiên — kể cả khi trình duyệt đang có cookie admin.
+    """
     limit = max(1, min(limit, 200))
     offset = max(0, offset)
-    rows, total = list_conversations(session, limit=limit, offset=offset, user_id=user_id)
+    client = auth.get_client_session(http_request)
+    client.apply(response)
+    rows, total = list_conversations(session, limit=limit, offset=offset, user_id=client.owner_key)
     return ConversationListResponse(
         total=total,
         conversations=[_serialize_conversation(c, count) for c, count in rows],
@@ -684,9 +799,13 @@ def list_conversation_history(
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
 def get_conversation_detail(
     conversation_id: str,
+    response: Response = None,
+    http_request: Request = None,
     session: Session = Depends(get_session),
 ) -> ConversationDetail:
-    conversation = get_conversation(session, conversation_id)
+    client = auth.get_client_session(http_request)
+    client.apply(response)
+    conversation = get_owned_conversation(session, conversation_id, client.owner_key)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
 
@@ -718,8 +837,15 @@ def get_conversation_detail(
 def rename_conversation_title(
     conversation_id: str,
     request: RenameConversationRequest,
+    response: Response = None,
+    http_request: Request = None,
     session: Session = Depends(get_session),
 ) -> ConversationItem:
+    client = auth.get_client_session(http_request)
+    client.apply(response)
+    conversation = get_owned_conversation(session, conversation_id, client.owner_key)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
     conversation = rename_conversation(session, conversation_id, request.title.strip())
     if conversation is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
@@ -731,9 +857,74 @@ def rename_conversation_title(
 @router.delete("/conversations/{conversation_id}")
 def remove_conversation(
     conversation_id: str,
+    response: Response = None,
+    http_request: Request = None,
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
+    client = auth.get_client_session(http_request)
+    client.apply(response)
+    conversation = get_owned_conversation(session, conversation_id, client.owner_key)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
     if not delete_conversation(session, conversation_id):
         raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
     session.commit()
     return {"id": conversation_id, "deleted": True}
+
+
+# ==========================================
+# Hội thoại toàn hệ thống (admin, phục vụ FE-13)
+# ==========================================
+@router.get(
+    "/admin/conversations",
+    response_model=ConversationListResponse,
+    dependencies=[Depends(require_admin)],
+)
+def admin_list_conversations(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    owner: str | None = Query(default=None),
+    session: Session = Depends(get_session),
+) -> ConversationListResponse:
+    """Mọi hội thoại (kể cả của phiên khác và hội thoại cũ chưa có owner)."""
+    rows, total = list_conversations(session, limit=limit, offset=offset, user_id=owner)
+    return ConversationListResponse(
+        total=total,
+        conversations=[_serialize_conversation(c, count, owner=c.user_id) for c, count in rows],
+    )
+
+
+@router.get(
+    "/admin/conversations/{conversation_id}",
+    response_model=ConversationDetail,
+    dependencies=[Depends(require_admin)],
+)
+def admin_get_conversation(
+    conversation_id: str,
+    session: Session = Depends(get_session),
+) -> ConversationDetail:
+    conversation = get_conversation(session, conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
+
+    messages = get_conversation_messages(session, conversation_id)
+    return ConversationDetail(
+        id=conversation.id,
+        title=conversation.title,
+        message_count=len(messages),
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+        owner=conversation.user_id,
+        messages=[
+            ConversationMessage(
+                id=message.id,
+                role=message.role,
+                content=message.content,
+                sources=(message.message_metadata or {}).get("sources", []) or [],
+                reasoning=(message.message_metadata or {}).get("reasoning"),
+                steps=(message.message_metadata or {}).get("steps", []) or [],
+                created_at=message.created_at,
+            )
+            for message in messages
+        ],
+    )

@@ -30,6 +30,11 @@ export function isTimeoutError(error) {
   return error instanceof ApiError && error.code === "timeout";
 }
 
+/** Request bị từ chối vì thiếu/hết hạn phiên đăng nhập (401). */
+export function isUnauthorized(error) {
+  return error instanceof ApiError && error.status === 401;
+}
+
 function abortError() {
   if (typeof DOMException !== "undefined") {
     return new DOMException("Yêu cầu đã bị huỷ.", "AbortError");
@@ -55,6 +60,7 @@ export function describeError(error, options = {}) {
     serverDetail = "Backend trả về lỗi khi xử lý yêu cầu. Kiểm tra log server rồi thử lại.",
     rateLimitTitle = "Vượt quá giới hạn gọi mô hình",
     rateLimitDetail = "Nhà cung cấp LLM đang chặn tạm thời. Thử lại sau ít phút.",
+    unauthorizedTitle = "Cần đăng nhập quản trị",
   } = options;
 
   if (isAbortError(error)) {
@@ -80,6 +86,20 @@ export function describeError(error, options = {}) {
         detail: error.detail || NETWORK_DETAIL,
       };
     }
+    if (error.status === 401) {
+      return {
+        kind: "unauthorized",
+        title: unauthorizedTitle,
+        detail: error.detail || "Phiên đăng nhập không hợp lệ hoặc đã hết hạn.",
+      };
+    }
+    if (error.status === 403) {
+      return {
+        kind: "forbidden",
+        title: "Không có quyền thực hiện",
+        detail: error.detail || "Bạn không có quyền thực hiện thao tác này.",
+      };
+    }
     if (error.status === 404) {
       return {
         kind: "not_found",
@@ -91,7 +111,7 @@ export function describeError(error, options = {}) {
       return {
         kind: "rate_limit",
         title: rateLimitTitle,
-        detail: rateLimitDetail,
+        detail: error.detail || rateLimitDetail,
       };
     }
     if (error.status >= 500) {

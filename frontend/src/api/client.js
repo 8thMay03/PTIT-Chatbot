@@ -1,10 +1,36 @@
 import { ApiError, abortError, isAbortError } from "./errors";
 
+// Mặc định cùng origin qua proxy (Vite dev/nginx) để cookie phiên (ptit_sid,
+// ptit_admin) luôn được gửi. Ai chạy frontend không qua proxy tự đặt biến này
+// cho đúng địa chỉ backend.
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
+  import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 /** Thời gian chờ mặc định cho API thường. Tải/parse tài liệu truyền timeout riêng. */
 export const DEFAULT_TIMEOUT_MS = 30_000;
+
+const unauthorizedListeners = new Set();
+
+/**
+ * Đăng ký nghe mọi response 401 đi qua `request()`; trả về hàm huỷ đăng ký.
+ *
+ * App admin dùng để hiện lại form đăng nhập khi phiên hết hạn giữa chừng, kể cả
+ * với request không đi qua TanStack Query. Listener nhận `{ path, error }`.
+ */
+export function onUnauthorized(listener) {
+  unauthorizedListeners.add(listener);
+  return () => unauthorizedListeners.delete(listener);
+}
+
+function notifyUnauthorized(path, error) {
+  unauthorizedListeners.forEach((listener) => {
+    try {
+      listener({ path: String(path || "").replace(/^\/+/, ""), error });
+    } catch {
+      // Lỗi trong listener không được làm hỏng luồng lỗi của request.
+    }
+  });
+}
 
 function buildUrl(path, query) {
   const root = API_BASE_URL.replace(/\/+$/, "");
@@ -201,6 +227,8 @@ export async function request(path, options = {}) {
       ...fetchOptions,
       headers: requestHeaders,
       body: payload,
+      // Gửi cookie phiên ẩn danh/admin theo mọi request (cùng origin qua proxy).
+      credentials: "include",
       signal: controller.signal,
     };
     if (method && method !== "GET") init.method = method;
@@ -208,7 +236,9 @@ export async function request(path, options = {}) {
     const response = await fetch(buildUrl(path, query), init);
 
     if (!response.ok) {
-      throw await responseToApiError(response);
+      const apiError = await responseToApiError(response);
+      if (apiError.status === 401) notifyUnauthorized(path, apiError);
+      throw apiError;
     }
 
     // Stream/response được caller đọc tiếp; giữ listener để nút "Dừng" còn tác dụng

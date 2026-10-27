@@ -1,0 +1,124 @@
+/* ==========================================================================
+   Trang quản trị (/admin) — màn đăng nhập và lớp phủ khi hết phiên.
+   Chỉ được import từ src/admin/AdminApp.jsx để nằm trong chunk admin.
+   ========================================================================== */
+
+.admin-login-page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 24px 16px;
+  background: var(--bg);
+}
+
+.admin-login-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: min(400px, 100%);
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-login-heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.admin-login-heading h1 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.admin-login-heading p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.admin-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.admin-login-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.admin-login-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.admin-login-input:disabled {
+  background: var(--surface-sunken);
+  cursor: not-allowed;
+}
+
+.admin-login-input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.admin-login-submit {
+  margin-top: 6px;
+  padding: 10px 14px;
+}
+
+.admin-login-alert {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.admin-login-alert svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.admin-login-alert.is-danger {
+  border-color: var(--danger-border);
+  background: var(--danger-subtle);
+  color: var(--danger-text);
+}
+
+.admin-login-alert.is-warning {
+  border-color: var(--warning-border);
+  background: var(--warning-subtle);
+  color: var(--warning-text);
+}
+
+.admin-login-back {
+  align-self: flex-start;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.admin-login-back:hover {
+  color: var(--brand-text);
+}
+
+/* Lớp phủ đăng nhập lại dùng .modal (căn giữa) nhưng form vẫn căn trái. */
+.modal .admin-login-form {
+  margin-top: 16px;
+}

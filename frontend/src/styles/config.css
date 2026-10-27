@@ -440,6 +440,9 @@
 .theme-options { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 .theme-option { display: flex; flex-direction: column; gap: 16px; align-items: flex-start; min-width: 148px; padding: 22px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text-secondary); font-size: 13px; cursor: pointer; }
 .theme-option.active { border-color: var(--brand); background: var(--brand-subtle); color: var(--brand-text); }
+/* Bộ chọn giao diện trong hộp thoại của app sinh viên: ba lựa chọn chia đều chiều ngang. */
+.theme-options.is-compact { justify-content: center; margin-top: 18px; }
+.theme-options.is-compact .theme-option { flex: 1 1 110px; min-width: 0; align-items: center; padding: 16px 12px; gap: 10px; }
 .settings-language { display: flex; justify-content: space-between; gap: 20px; max-width: 500px; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-muted); }
 .settings-language strong { color: var(--text); font-weight: 500; }
 @media (max-width: 900px) {

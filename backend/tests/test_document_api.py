@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.api import routes
@@ -10,6 +11,17 @@ from app.main import app
 from app.parsers import DocumentParseError
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _admin_session(login_admin):
+    """Mọi test trong file gọi API quản trị (documents/ingest/parse-jobs): đăng nhập admin.
+
+    require_admin vẫn hoạt động thật — fixture chỉ đi qua luồng login chuẩn.
+    """
+    login_admin(client)
+    yield
+    client.cookies.clear()
 
 
 def _parse_job(**overrides) -> ParseJob:

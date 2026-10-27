@@ -268,10 +268,19 @@ def ensure_conversation(
     conversation_id: str | None,
     user_id: str | None = None,
     title: str | None = None,
-) -> Conversation:
+) -> Conversation | None:
+    """Trả hội thoại theo id nếu thuộc owner (user_id), hoặc tạo mới.
+
+    Nếu hội thoại tồn tại mà ``user_id`` khác ``conversations.user_id`` trả về
+    None: caller (route chat) phải trả 404, tránh nối tiếp hội thoại của phiên
+    khác. ``user_id`` lúc này là owner key của phiên ẩn danh, không phải giá trị
+    client tự khai.
+    """
     if conversation_id:
         conversation = session.get(Conversation, conversation_id)
-        if conversation:
+        if conversation is not None:
+            if user_id is not None and conversation.user_id != user_id:
+                return None
             return conversation
 
     conversation = Conversation(id=conversation_id or str(uuid4()), user_id=user_id, title=title)
@@ -410,6 +419,18 @@ def list_conversations(
 
 def get_conversation(session: Session, conversation_id: str) -> Conversation | None:
     return session.get(Conversation, conversation_id)
+
+
+def get_owned_conversation(
+    session: Session,
+    conversation_id: str,
+    owner_key: str,
+) -> Conversation | None:
+    """Hội thoại chỉ khi thuộc owner key cho trước; ngược lại None (route trả 404)."""
+    conversation = session.get(Conversation, conversation_id)
+    if conversation is None or conversation.user_id != owner_key:
+        return None
+    return conversation
 
 
 def get_conversation_messages(session: Session, conversation_id: str) -> list[Message]:

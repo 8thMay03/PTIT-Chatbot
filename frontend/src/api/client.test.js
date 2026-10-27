@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { request } from "./client";
+import { onUnauthorized, request } from "./client";
 import { ApiError } from "./errors";
 
 function jsonResponse(body, status = 200) {
@@ -28,6 +28,34 @@ afterEach(() => {
 });
 
 describe("request", () => {
+  it("gửi cookie phiên (credentials include) và base URL mặc định /api", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await request("documents");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url).endsWith("/api/documents")).toBe(true);
+    expect(init.credentials).toBe("include");
+  });
+
+  it("báo listener onUnauthorized khi response 401, kèm path đã chuẩn hoá", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse({ detail: "Cần đăng nhập quản trị." }, 401))
+    );
+    const listener = vi.fn();
+    const unsubscribe = onUnauthorized(listener);
+
+    await expect(request("/config")).rejects.toMatchObject({ status: 401 });
+    unsubscribe();
+    await expect(request("config")).rejects.toMatchObject({ status: 401 });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener.mock.calls[0][0].path).toBe("config");
+    expect(listener.mock.calls[0][0].error).toBeInstanceOf(ApiError);
+  });
+
   it("chuẩn hoá lỗi mạng thành ApiError mã network", async () => {
     vi.stubGlobal(
       "fetch",

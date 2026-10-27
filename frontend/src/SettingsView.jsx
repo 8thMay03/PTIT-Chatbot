@@ -1,18 +1,13 @@
 import React from "react";
-import { Cpu, Monitor, Moon, Sliders, Sun } from "lucide-react";
+import { Cpu, Monitor, Sliders } from "lucide-react";
 import ConfigView from "./ConfigView";
 import ModelsView from "./ModelsView";
+import ThemePicker from "./components/ThemePicker";
 
 const TABS = [
   { key: "config", label: "Cấu hình RAG", icon: Sliders },
   { key: "models", label: "Mô hình", icon: Cpu },
   { key: "appearance", label: "Giao diện", icon: Monitor },
-];
-
-const THEMES = [
-  { key: "light", label: "Sáng", icon: Sun },
-  { key: "dark", label: "Tối", icon: Moon },
-  { key: "system", label: "Theo hệ thống", icon: Monitor },
 ];
 
 export default function SettingsView({
@@ -68,24 +63,7 @@ export default function SettingsView({
       >
         <h2>Giao diện</h2>
         <p>Chọn chế độ hiển thị phù hợp với bạn.</p>
-        <div
-          className="theme-options"
-          role="group"
-          aria-label="Chế độ giao diện"
-        >
-          {THEMES.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              type="button"
-              className={`theme-option ${theme === key ? "active" : ""}`}
-              aria-pressed={theme === key}
-              onClick={() => onThemeChange(key)}
-            >
-              <Icon size={22} />
-              <span>{label}</span>
-            </button>
-          ))}
-        </div>
+        <ThemePicker theme={theme} onThemeChange={onThemeChange} />
         <div className="settings-language">
           <span>Ngôn ngữ giao diện</span>
           <strong>Tiếng Việt</strong>

@@ -1,10 +1,18 @@
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+
+class ConfigValidationError(ValueError):
+    """Giá trị cấu hình không được phép (ví dụ URL LLM ngoài allowlist).
+
+    Route bắt lỗi này và trả về 422 mà không ghi setting nào.
+    """
 
 
 class Settings(BaseSettings):
@@ -154,6 +162,20 @@ class Settings(BaseSettings):
         alias="CORS_ORIGINS",
     )
 
+    # ==========================================
+    # Admin authentication (FE-06)
+    # ==========================================
+    # Bật trang quản trị: bỏ trống thì login trả 503 và mọi route admin 401 (fail closed).
+    admin_password: str | None = Field(default=None, alias="ADMIN_PASSWORD")
+    # Khóa ký cookie phiên admin; bỏ trống thì sinh ngẫu nhiên lúc khởi động (phiên mất khi restart).
+    admin_session_secret: str | None = Field(default=None, alias="ADMIN_SESSION_SECRET")
+    admin_session_ttl_hours: float = Field(default=12.0, gt=0, alias="ADMIN_SESSION_TTL_HOURS")
+    # Đặt true khi chạy sau HTTPS; áp dụng cho cả cookie ptit_admin và ptit_sid.
+    cookie_secure: bool = Field(default=False, alias="COOKIE_SECURE")
+    # Allowlist origin (scheme://host[:port]) cho base_url/endpoint LLM, phân tách bằng dấu phẩy.
+    # Hỗ trợ host wildcard dạng https://*.openai.azure.com. Bỏ trống thì suy ra từ env lúc khởi động.
+    llm_base_url_allowlist: str = Field(default="", alias="LLM_BASE_URL_ALLOWLIST")
+
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins_raw.split(",") if origin.strip()]
@@ -198,6 +220,142 @@ settings = get_settings()
 
 # Snapshot initial defaults for reset capability
 _INITIAL_SETTINGS = settings.model_dump()
+
+# Reset cấu hình RAG qua POST /config/reset không được đụng tới cấu hình xác thực:
+# đổi các trường này có thể khoá admin khỏi hệ thống (ví dụ env không đặt ADMIN_PASSWORD).
+_RESET_EXCLUDED_FIELDS = frozenset(
+    {
+        "admin_password",
+        "admin_session_secret",
+        "admin_session_ttl_hours",
+        "cookie_secure",
+        "llm_base_url_allowlist",
+    }
+)
+
+
+# ==========================================
+# Allowlist URL LLM (FE-06, AC-02)
+# ==========================================
+def _parse_origin(value: str) -> tuple[str, str, int | None] | None:
+    """Phân tích `scheme://host[:port]`; trả về None nếu không tách được host hợp lệ."""
+    try:
+        parts = urlsplit(value.strip())
+        port = parts.port
+    except ValueError:
+        return None
+    scheme = parts.scheme.lower()
+    if scheme not in ("http", "https"):
+        return None
+    host = (parts.hostname or "").lower()
+    if not host:
+        return None
+    return scheme, host, port
+
+
+def _normalized_port(port: int | None, scheme: str) -> int | None:
+    if port is None:
+        return None
+    if scheme == "http" and port == 80:
+        return None
+    if scheme == "https" and port == 443:
+        return None
+    return port
+
+
+def _origin_string(scheme: str, host: str, port: int | None) -> str:
+    port = _normalized_port(port, scheme)
+    return f"{scheme}://{host}" + (f":{port}" if port is not None else "")
+
+
+def _host_matches(pattern: str, host: str) -> bool:
+    if pattern.startswith("*."):
+        suffix = pattern[1:]  # ".openai.azure.com"
+        return host.endswith(suffix) and len(host) > len(suffix)
+    return pattern == host
+
+
+def _default_llm_url_allowlist() -> list[str]:
+    """Allowlist mặc định: origin các URL LLM đọc từ env lúc khởi động + api.openai.com.
+
+    Dùng `_INITIAL_SETTINGS` (snapshot lúc import) chứ không phải settings runtime,
+    vì PUT /config có thể đã đổi giá trị các trường này sau khi khởi động.
+    """
+    entries = ["https://api.openai.com"]
+    for field in ("openai_base_url", "openai_compatible_base_url", "azure_openai_endpoint"):
+        parsed = _parse_origin(str(_INITIAL_SETTINGS.get(field) or ""))
+        if parsed is not None:
+            entries.append(_origin_string(*parsed))
+    # Giữ thứ tự ổn định và bỏ trùng lặp.
+    return list(dict.fromkeys(entries))
+
+
+def llm_url_allowlist() -> list[str]:
+    """Danh sách origin được phép dùng cho base_url/endpoint LLM."""
+    raw = (settings.llm_base_url_allowlist or "").strip()
+    if not raw:
+        return _default_llm_url_allowlist()
+    entries = [entry.strip() for entry in raw.split(",") if entry.strip()]
+    return list(dict.fromkeys(entries))
+
+
+def validate_llm_url(value: str | None) -> None:
+    """Kiểm tra một URL LLM trước khi ghi vào cấu hình hoặc tạo provider.
+
+    Giá trị rỗng/None được phép (provider dùng mặc định của SDK). Vi phạm raise
+    `ConfigValidationError`; caller phải từ chối trước khi đổi setting nào khác.
+    """
+    if value is None or not str(value).strip():
+        return
+    raw = str(value).strip()
+    try:
+        parts = urlsplit(raw)
+        port = parts.port
+    except ValueError as exc:
+        raise ConfigValidationError(f"URL LLM không hợp lệ: {raw}") from exc
+
+    scheme = parts.scheme.lower()
+    if scheme not in ("http", "https"):
+        raise ConfigValidationError("URL LLM phải dùng http hoặc https.")
+    if parts.username is not None or parts.password is not None:
+        raise ConfigValidationError("URL LLM không được chứa thông tin đăng nhập (user:pass).")
+    host = (parts.hostname or "").lower()
+    if not host:
+        raise ConfigValidationError("URL LLM thiếu tên host.")
+
+    port = _normalized_port(port, scheme)
+    for entry in llm_url_allowlist():
+        parsed = _parse_origin(entry)
+        if parsed is None:
+            continue
+        entry_scheme, entry_host, entry_port = parsed
+        if entry_scheme != scheme:
+            continue
+        if not _host_matches(entry_host, host):
+            continue
+        # So khớp origin chặt: entry không có cổng chỉ khớp cổng mặc định/bỏ trống.
+        if _normalized_port(entry_port, entry_scheme) == port:
+            return
+
+    origin = _origin_string(scheme, host, port)
+    raise ConfigValidationError(f"Host '{origin}' không nằm trong LLM_BASE_URL_ALLOWLIST.")
+
+
+# Trường URL LLM trong payload PUT /config cần kiểm tra trước khi ghi setting nào.
+_LLM_URL_PAYLOAD_FIELDS = (
+    "openai_base_url",
+    "openai_compatible_base_url",
+    "azure_openai_endpoint",
+    "base_url",
+)
+
+
+def _validate_llm_urls_in_payload(payload: dict) -> None:
+    """Kiểm toàn bộ trường URL LLM trong payload trước khi đổi bất kỳ setting nào."""
+    llm = payload.get("llm") or {}
+    for field in _LLM_URL_PAYLOAD_FIELDS:
+        if field in llm:
+            validate_llm_url(llm[field])
 
 
 def _mask_api_key(key: str | None) -> str | None:
@@ -294,6 +452,8 @@ def get_runtime_config_dict() -> dict:
 
 def update_runtime_config(payload: dict) -> dict:
     """Update runtime settings in-memory and return refreshed config dict."""
+    # Kiểm URL trước khi chạm vào setting nào: request vi phạm bị từ chối toàn bộ.
+    _validate_llm_urls_in_payload(payload)
     llm = payload.get("llm") or {}
     if "provider" in llm and llm["provider"]:
         settings.llm_provider = str(llm["provider"]).strip().lower()
@@ -415,6 +575,8 @@ def reset_runtime_config() -> dict:
     """Reset runtime configuration back to fresh default settings."""
     fresh = Settings()
     for field_name in Settings.model_fields.keys():
+        if field_name in _RESET_EXCLUDED_FIELDS:
+            continue
         if hasattr(settings, field_name) and hasattr(fresh, field_name):
             setattr(settings, field_name, getattr(fresh, field_name))
     return get_runtime_config_dict()

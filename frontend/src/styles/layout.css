@@ -379,3 +379,20 @@
     opacity: 1;
   }
 }
+
+/* Thương hiệu không bấm được (app sinh viên chỉ còn trang chat, admin không có trang chủ). */
+.sidebar-brand.is-static {
+  cursor: default;
+}
+
+/* Màn chờ khi tải chunk admin hoặc kiểm tra phiên; phải nằm ở CSS chung vì hiện
+   trước khi chunk admin (và admin.css) tải xong. */
+.app-loading {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: var(--text-muted);
+  font-size: 14px;
+  background: var(--bg);
+}

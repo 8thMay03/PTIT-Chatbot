@@ -306,6 +306,21 @@ class TestLLMResponse(BaseModel):
 
 
 # ==========================================
+# Admin session schemas (FE-06)
+# ==========================================
+class AdminLoginRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=1024)
+
+
+class AdminSessionResponse(BaseModel):
+    """Trạng thái phiên admin; route session luôn trả 200, không bao giờ 401."""
+
+    authenticated: bool = False
+    expires_at: str | None = None
+    configured: bool = False
+
+
+# ==========================================
 # Conversation history schemas
 # ==========================================
 class ConversationItem(BaseModel):
@@ -314,6 +329,8 @@ class ConversationItem(BaseModel):
     message_count: int = 0
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    # Owner key (conversations.user_id); chỉ điền ở route admin xem hội thoại.
+    owner: str | None = None
 
 
 class ConversationListResponse(BaseModel):
