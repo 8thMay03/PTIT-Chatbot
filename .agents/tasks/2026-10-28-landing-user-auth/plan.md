@@ -14,7 +14,7 @@ song; coordinator ghi agent-id mới vào từng nhiệm vụ trước khi giao.
 ### S-01 — Model người dùng, băm mật khẩu, phiên người dùng
 
 - Agent: `claude-agent`
-- Trạng thái: `todo`
+- Trạng thái: `done`
 - Mục tiêu:
   - Model `User` (bảng `users`): `id` (uuid str), `email` (unique, đã chuẩn hoá), `full_name`,
     `password_hash`, `created_at`, `last_login_at`. Bảng mới nên `create_all` trong `init_db` tự tạo,
@@ -36,7 +36,7 @@ song; coordinator ghi agent-id mới vào từng nhiệm vụ trước khi giao.
 ### S-02 — Route `/api/auth/*` và chặn dò
 
 - Agent: `claude-agent`
-- Trạng thái: `todo`
+- Trạng thái: `done`
 - Mục tiêu: bốn route theo hợp đồng; validate email/mật khẩu/tên trong schema; giới hạn tên miền email
   (`USER_EMAIL_DOMAINS`); chặn dò cho login và register dùng lại cơ chế FE-06 sau khi sửa R-01 (khoá theo
   IP thật + email, không khoá toàn cục); thêm các route mới vào `PUBLIC_API_ROUTES` có chủ đích.
@@ -50,7 +50,7 @@ song; coordinator ghi agent-id mới vào từng nhiệm vụ trước khi giao.
 ### S-03 — Owner key theo tài khoản và chuyển hội thoại ẩn danh
 
 - Agent: `claude-agent`
-- Trạng thái: `todo`
+- Trạng thái: `done`
 - Mục tiêu:
   - `get_client_session` (FE-06) trả owner key `user:<id>` khi có cookie người dùng hợp lệ, ngược lại
     `anon:<hash>` như cũ; mọi route chat/hội thoại dùng owner key này (không đổi chữ ký route công khai).
@@ -68,7 +68,7 @@ song; coordinator ghi agent-id mới vào từng nhiệm vụ trước khi giao.
 ### S-04 — Test backend
 
 - Agent: `claude-agent`
-- Trạng thái: `todo`
+- Trạng thái: `done`
 - Mục tiêu:
   - `backend/tests/test_user_auth.py`: đăng ký hợp lệ/trùng/sai định dạng/mật khẩu ngắn/ngoài tên miền;
     hash trong DB không chứa mật khẩu gốc; đăng nhập đúng/sai/email không tồn tại (cùng mã + thông điệp);
@@ -87,7 +87,7 @@ song; coordinator ghi agent-id mới vào từng nhiệm vụ trước khi giao.
 ### S-05 — Lớp API frontend cho tài khoản
 
 - Agent: `claude-agent`
-- Trạng thái: `todo`
+- Trạng thái: `done`
 - Mục tiêu: `frontend/src/api/auth.js` (`authApi.me()`, `register(payload)`, `login(payload)`, `logout()`);
   query key `["auth", "me"]`; `describeError` thêm thông điệp cho `409` (email đã đăng ký) và lỗi `422`
   theo trường (trả `fieldErrors` để form gắn vào ô tương ứng). Phục vụ `AC-05`.
@@ -100,7 +100,7 @@ song; coordinator ghi agent-id mới vào từng nhiệm vụ trước khi giao.
 ### S-06 — Phân tuyến và trang landing
 
 - Agent: `claude-agent`
-- Trạng thái: `todo`
+- Trạng thái: `done`
 - Mục tiêu:
   - `appRoute.js`: `resolveAppRoute(pathname)` → `landing | chat | login | register | admin`;
     `safeNextPath(value)` (chỉ nhận đường dẫn nội bộ); giữ `legacyHashToAdmin`. Hash cũ tại `/`
@@ -122,7 +122,7 @@ song; coordinator ghi agent-id mới vào từng nhiệm vụ trước khi giao.
 ### S-07 — Trang đăng ký và đăng nhập
 
 - Agent: `claude-agent`
-- Trạng thái: `todo`
+- Trạng thái: `done`
 - Mục tiêu: `frontend/src/auth/LoginPage.jsx`, `RegisterPage.jsx`, `AuthLayout.jsx` (mới) +
   `frontend/src/styles/auth.css`:
   - Đăng ký: họ tên, email, mật khẩu, nhập lại mật khẩu; đăng nhập: email, mật khẩu. Kiểm tra phía client
@@ -142,7 +142,7 @@ song; coordinator ghi agent-id mới vào từng nhiệm vụ trước khi giao.
 ### S-08 — Tích hợp tài khoản vào app chat
 
 - Agent: `claude-agent`
-- Trạng thái: `todo`
+- Trạng thái: `done`
 - Mục tiêu: app chat chạy ở `/chat`; header/sidebar hiện tên người dùng + menu Đăng xuất, hoặc nút "Đăng
   nhập" (`/login?next=/chat`) khi ẩn danh; dòng nhắc nhẹ "Đăng nhập để lưu lịch sử trên mọi thiết bị" cho
   khách (đóng được, nhớ bằng `localStorage` có try/catch); đăng xuất xoá cache `["conversations"]`,
@@ -158,7 +158,7 @@ song; coordinator ghi agent-id mới vào từng nhiệm vụ trước khi giao.
 ### S-09 — Test frontend và kiểm tra bundle
 
 - Agent: `claude-agent`
-- Trạng thái: `todo`
+- Trạng thái: `done`
 - Mục tiêu:
   - Test: `appRoute.test.js` (route, `safeNextPath` với `//evil.com`, `https://…`, `javascript:`, `/chat`);
     `LandingPage.test.jsx` (landmark, `h1`, CTA theo trạng thái đăng nhập); `LoginPage.test.jsx`,
@@ -176,7 +176,7 @@ song; coordinator ghi agent-id mới vào từng nhiệm vụ trước khi giao.
 ### S-10 — Tài liệu và cấu hình triển khai
 
 - Agent: `claude-agent`
-- Trạng thái: `todo`
+- Trạng thái: `done`
 - Mục tiêu: `README.md` thêm mục "Tài khoản người dùng" (biến môi trường, route trang, chuyển hội thoại ẩn
   danh, khác biệt với admin, giới hạn: chưa xác thực email/quên mật khẩu); `.env.example` thêm biến mới
   với giá trị giữ chỗ; `docker-compose.yml` truyền biến nếu không dùng `env_file`. Phục vụ `AC-07`.
@@ -250,9 +250,9 @@ song; coordinator ghi agent-id mới vào từng nhiệm vụ trước khi giao.
   `npm run check:bundle`; kiểm tra thủ công trên trình duyệt: landing ở 360/768/1280 px sáng/tối (chụp
   ảnh), đăng ký → chat → đăng xuất → đăng nhập lại, hai trình duyệt cùng tài khoản, hội thoại ẩn danh được
   chuyển khi đăng nhập.
-- Reviewer: chưa chỉ định — đề nghị review độc lập vì có thay đổi bảo mật (mật khẩu, phiên); nếu không có
-  agent khác thì `claude-agent` với hình thức `self_review`.
-- Hình thức review: `independent` (đề nghị) / `self_review` — coordinator chốt trước khi bàn giao review.
+- Reviewer: `claude-agent` — không có agent khác trong phiên nên chốt hình thức `self_review` (vẫn đề nghị một lượt
+  review độc lập trước khi merge vì có thay đổi bảo mật).
+- Hình thức review: `self_review` (chốt `2026-10-28T01:10:00+07:00`).
 - Trọng tâm review: băm mật khẩu và so sánh hằng thời gian, liệt kê email qua thông điệp/thời gian phản hồi,
   open redirect qua `next`, cookie flags, cookie người dùng không leo thang thành admin, claim hội thoại
   đúng owner, rò rỉ module chat/admin vào chunk landing, a11y form.
@@ -312,3 +312,19 @@ Người dùng đồng ý toàn bộ các mặc định dưới đây lúc `2026
   worker; ghi trong README.
 - Rủi ro: landing import tĩnh `ThemePicker` hoặc api kéo theo module chat. Giảm thiểu: `check:bundle` mở
   rộng ở S-09.
+
+### Điều chỉnh khi triển khai (`2026-10-28T01:10:00+07:00`, `claude-agent`)
+
+- Phạm vi file thêm ngoài bảng phân công, đều cần cho AC:
+  - `backend/alembic/versions/0005_users.py` (S-01): Docker chạy `alembic upgrade head` lúc khởi động nên
+    `create_all` không đủ cho Postgres đã có schema.
+  - `frontend/src/api/client.js` (S-05): giữ body JSON lỗi (`ApiError.payload`) để đọc lỗi `422` theo trường.
+  - `frontend/src/components/ThemeToggle.jsx`, `LazyMarkdownView.jsx` (S-06/S-08), `frontend/src/ChatView.jsx`
+    (prop `headerActions` cho header chat + dùng `LazyMarkdownView`), `frontend/src/styles/chat.css` (một lớp
+    `.markdown-pending`), `frontend/vite.config.js` (`xfwd: true` cho proxy), `docker-compose.yml`
+    (`TRUSTED_PROXY_IPS`), `frontend/src/admin/AdminLogin.jsx` (link "Về trang chat" → `/chat`).
+- `landing.css`/`auth.css` import trong `index.css` (theo plan), không import trong chunk trang.
+- Hợp đồng thêm biến `TRUSTED_PROXY_IPS`, `USER_AUTH_MAX_FAILURES`, `USER_AUTH_WINDOW_SECONDS` (ngưỡng chặn dò của
+  AC-07). Chặn dò: đăng nhập theo cặp IP + email; đăng ký đếm số lần gặp email đã tồn tại theo IP.
+- Đăng xuất cấp `ptit_sid` mới (giải quyết rủi ro "đăng xuất cấp lại ptit_sid" ở mục rủi ro).
+- AC-06: trang chat tải lười renderer Markdown (quyết định người dùng, `MSG-user-002`).

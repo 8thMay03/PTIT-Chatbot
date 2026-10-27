@@ -1,11 +1,11 @@
 # Task: Trang landing, đăng ký và đăng nhập tài khoản người dùng
 
 - ID: `2026-10-28-landing-user-auth`
-- Trạng thái: `in_progress`
+- Trạng thái: `done`
 - Coordinator: `claude-agent`
 - Người yêu cầu: người dùng (yêu cầu trực tiếp trong phiên chat)
 - Tạo lúc: `2026-10-28T00:18:31+07:00`
-- Cập nhật lúc: `2026-10-28T00:30:45+07:00`
+- Cập nhật lúc: `2026-10-28T01:20:00+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -61,44 +61,44 @@ Kết quả cần có:
 
 ## Tiêu chí nghiệm thu
 
-- [ ] AC-01: Truy cập `/` hiện trang landing gồm tối thiểu: hero (tên sản phẩm, mô tả ngắn, CTA "Bắt đầu
+- [x] AC-01: Truy cập `/` hiện trang landing gồm tối thiểu: hero (tên sản phẩm, mô tả ngắn, CTA "Bắt đầu
   trò chuyện" → `/chat`, "Đăng nhập" → `/login`, "Đăng ký" → `/register`), khối tính năng, khối cách hoạt
   động/nguồn dữ liệu, lưu ý giới hạn (chatbot có thể sai, cần đối chiếu văn bản gốc), footer. Đã đăng nhập
   thì CTA đổi thành "Vào trò chuyện" và hiện tên người dùng. Hiển thị đúng ở khổ 360/768/1280 px, không
   cuộn ngang, cả chủ đề sáng và tối; điều hướng được bằng bàn phím, có landmark `header/main/footer` và một
   `h1` (test render + kiểm tra thủ công có ảnh chụp).
-- [ ] AC-02: Đăng ký `POST /api/auth/register` với dữ liệu hợp lệ trả `201`, đặt cookie phiên người dùng và
+- [x] AC-02: Đăng ký `POST /api/auth/register` với dữ liệu hợp lệ trả `201`, đặt cookie phiên người dùng và
   trả thông tin người dùng (không có mật khẩu/hash); email chuẩn hoá (trim + chữ thường) và trùng email
   trả `409`; email sai định dạng, mật khẩu < 8 ký tự hoặc tên trống trả `422`; nếu cấu hình giới hạn tên
   miền email thì email ngoài danh sách trả `422`. Test đọc DB xác nhận cột mật khẩu là hash scrypt có salt,
   không chứa mật khẩu gốc.
-- [ ] AC-03: Đăng nhập `POST /api/auth/login` đúng trả `200` + cookie; sai mật khẩu và email không tồn tại
+- [x] AC-03: Đăng nhập `POST /api/auth/login` đúng trả `200` + cookie; sai mật khẩu và email không tồn tại
   trả **cùng** `401` với cùng thông điệp; dò quá ngưỡng trả `429` mà không khoá người dùng khác (rút kinh
   nghiệm R-01 FE-06); `POST /api/auth/logout` xoá cookie; `GET /api/auth/me` trả người dùng hiện tại hoặc
   `{"authenticated": false}` — cookie sai chữ ký, hết hạn hoặc trỏ tới user không tồn tại được coi là chưa
   đăng nhập (không `500`). Cookie người dùng **không** mở được bất kỳ route admin nào (test tham số hoá
   trên các route admin của FE-06 vẫn `401`).
-- [ ] AC-04: Hội thoại theo tài khoản (test backend): hai client cùng đăng nhập một tài khoản thấy cùng
+- [x] AC-04: Hội thoại theo tài khoản (test backend): hai client cùng đăng nhập một tài khoản thấy cùng
   danh sách hội thoại; tài khoản khác hoặc client ẩn danh nhận `404` khi truy cập
   `GET|PATCH|DELETE /conversations/{id}` và không nối tin nhắn được qua `/chat`, `/chat/stream`; hội
   thoại ẩn danh tạo trước khi đăng nhập/đăng ký trên cùng trình duyệt xuất hiện trong danh sách của tài
   khoản ngay sau đăng nhập; sau đăng xuất, client quay về phiên ẩn danh và không thấy hội thoại của tài
   khoản. Admin vẫn xem mọi hội thoại qua `/api/admin/conversations`, kèm owner dạng `user:<id>`.
-- [ ] AC-05: Luồng frontend (test component + kiểm tra thủ công): đăng ký/đăng nhập thành công chuyển tới
+- [x] AC-05: Luồng frontend (test component + kiểm tra thủ công): đăng ký/đăng nhập thành công chuyển tới
   `next` (mặc định `/chat`); `next` chỉ nhận đường dẫn nội bộ bắt đầu bằng một `/` (chặn `//host`,
   `https://…`, `javascript:`); người đã đăng nhập mở `/login` hoặc `/register` được chuyển sang `/chat`;
   lỗi `401/409/422/429/503` hiện thông báo tiếng Việt cạnh form, gắn `aria-describedby`/`aria-live`; nút
   gửi bị khoá khi đang gửi; có nút hiện/ẩn mật khẩu; header chat hiện tên + Đăng xuất hoặc nút Đăng nhập;
   đăng xuất xoá cache hội thoại và quay về phiên ẩn danh. Link cũ `/#…` của FE-06 (hash admin, hash
   `#settings/appearance`) vẫn hoạt động.
-- [ ] AC-06: Bundle (kiểm bằng `npm run check:bundle` mở rộng): JS ban đầu của `/`, `/login`, `/register`
+- [x] AC-06: Bundle (kiểm bằng `npm run check:bundle` mở rộng): JS ban đầu của `/`, `/login`, `/register`
   không chứa `ChatView`, `markdown-it`, `dompurify` hay module admin; JS ban đầu của `/chat` vẫn không chứa
   module admin và tổng gzip không vượt mức đo của FE-06 sau khi merge (ghi số thực tế cả hai trang trong
   `verification.md`).
-- [ ] AC-07: `README.md` và `.env.example` mô tả biến mới (khoá ký và thời hạn phiên người dùng, giới hạn
+- [x] AC-07: `README.md` và `.env.example` mô tả biến mới (khoá ký và thời hạn phiên người dùng, giới hạn
   tên miền email, ngưỡng chặn dò), các route `/`, `/chat`, `/login`, `/register`, và việc admin vẫn dùng
   `ADMIN_PASSWORD` riêng.
-- [ ] AC-08: `pytest` (backend), `npm test`, `npm run build`, `npm run check:bundle` (frontend) thành công.
+- [x] AC-08: `pytest` (backend), `npm test`, `npm run build`, `npm run check:bundle` (frontend) thành công.
 
 ## Tài liệu và phụ thuộc
 
@@ -119,9 +119,12 @@ Kết quả cần có:
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: task `in_progress` — đã tạo nhánh `feat/landing-user-auth` từ `dev` tại commit `070cfb9`. Đang triển khai S-01 … S-04 (backend).
+- Tóm tắt: task `done` — S-01 … S-10 hoàn tất trên nhánh `feat/landing-user-auth` (commit `b187a2d`, `d0ec869`,
+  `e189035` và commit tài liệu task), V-01 … V-08 `passed`, review `self_review` `approved` (xem `review.md`).
 - Blocker: không.
-- Bước tiếp theo: triển khai S-01 (Model User, user_auth.py, config.py).
+- Bước tiếp theo: người dùng review/merge nhánh `feat/landing-user-auth` vào `dev`. Theo dõi nhận xét không bắt
+  buộc R-01, R-02 trong `review.md`; nếu cần review độc lập (plan đề nghị vì có thay đổi bảo mật) thì giao reviewer
+  khác đọc diff `dev...feat/landing-user-auth`.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
@@ -129,3 +132,11 @@ Kết quả cần có:
   đăng ký đăng nhập cho hệ thống", trạng thái `draft` vì còn quyết định chờ xác nhận và phụ thuộc FE-06.
 - `2026-10-28T00:22:31+07:00` — `claude-agent`: người dùng đồng ý toàn bộ mặc định D-01 … D-10 và yêu cầu chuyển
   `ready`; chuyển `ready`. Phụ thuộc FE-06 vẫn là điều kiện bắt đầu S-01.
+- `2026-10-28T00:31:00+07:00` — `claude-agent`: FE-06 đã có trên `dev` (`930d5ab`, `070cfb9`) nhưng R-01 của FE-06
+  (khoá dò toàn cục sau proxy) còn mở. S-02 tự sửa cơ chế dùng chung (IP thật qua `TRUSTED_PROXY_IPS`, khoá đăng
+  nhập người dùng theo IP + email) thay vì chờ — xem `implementation.md` mục S-02 và `MSG-claude-agent-002`.
+- `2026-10-28T01:05:00+07:00` — `claude-agent`: AC-06 thất bại ở bản đầu (JS ban đầu `/chat` 134.37 kB gzip > mốc
+  128.41 kB do tách landing/auth khỏi entry). Người dùng chọn tải lười renderer Markdown ở trang chat
+  (`MSG-user-002`); sau sửa còn 79.69 kB. Người dùng cũng chọn đẩy nhánh `feat/landing-user-auth` (không đẩy lên
+  `dev`) theo `AGENTS.md`.
+- `2026-10-28T01:20:00+07:00` — `claude-agent`: mọi AC có bằng chứng, review `self_review` `approved`; chuyển `done`.
