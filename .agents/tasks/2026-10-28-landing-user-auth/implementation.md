@@ -143,3 +143,13 @@ từ `dev` mới nhất (đã gồm FE-06 và commit tạo task).
 - Kiểm tra: xem `verification.md` (V-01 … V-08 `passed`).
 - Chưa làm/giới hạn: xem `review.md` R-01, R-02 (không bắt buộc); chưa có review độc lập.
 - Bước tiếp theo: review/merge vào `dev`; chạy `alembic upgrade head` (Docker tự chạy) để tạo bảng `users`.
+
+### Sửa lỗi: migration `0005_users` làm backend Docker crash-loop
+
+- Lúc: `2026-10-28`; từ `claude-agent`.
+- Triệu chứng: container `backend` restart liên tục, `alembic upgrade head` lỗi `DuplicateTable: relation "users" already exists`.
+- Nguyên nhân: `./backend/app` được mount và chạy `--reload`, nên `init_db()` (`create_all`) đã tạo bảng `users` theo
+  bản nháp model cũ (không giới hạn độ dài, thêm `idx_users_email`) trong khi `alembic_version` vẫn ở `0004`.
+- Sửa: `0005_users` kiểm tra bảng đã có thì chỉnh `email` → `VARCHAR(254)`, `full_name` → `VARCHAR(100)`, bỏ
+  `idx_users_email` thừa rồi dừng; nếu chưa có thì tạo như cũ.
+- Kiểm chứng: migration chạy tới `0005_users`, schema `users` khớp model, `GET /api/health` trả `ok`, container `healthy`.
