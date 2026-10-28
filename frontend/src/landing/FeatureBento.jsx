@@ -75,11 +75,11 @@ function ScopeIllustration() {
   return (
     <div className="lp-tags-art" aria-hidden="true">
       <span className="lp-tags-shadow" />
-      {SCOPE_TAGS.map(({ label, tone, style }) => (
+      {SCOPE_TAGS.map(({ label, tone, style }, index) => (
         <span
           key={label}
           className={`lp-tag is-${tone}`}
-          style={{ left: style.left, bottom: style.bottom, "--tag-rotate": style.rotate }}
+          style={{ left: style.left, bottom: style.bottom, "--tag-rotate": style.rotate, "--i": index }}
         >
           {label}
         </span>
@@ -150,43 +150,57 @@ function HistoryIllustration() {
   );
 }
 
+/**
+ * Mỗi thẻ: lật 3D theo tiến độ cuộn khi vào khung nhìn (`data-scrub="enter"`),
+ * nghiêng theo chuột kèm vệt sáng (`data-tilt`), minh hoạ bên trong chạy khi thẻ
+ * được reveal.
+ */
+function Card({ className, children }) {
+  return (
+    <li className={`lp-card ${className}`} data-scrub="enter" data-tilt data-reveal="card">
+      <span className="lp-glare" aria-hidden="true" />
+      {children}
+    </li>
+  );
+}
+
 export default function FeatureBento() {
   return (
     <ul className="lp-bento">
-      <li className="lp-card lp-card-wide">
+      <Card className="lp-card-wide">
         <CardCopy title="Hỏi gì về học vụ cũng được">
           Gõ câu hỏi như khi hỏi phòng đào tạo — chatbot tìm trong quy chế, sổ tay sinh viên và trả lời
           rõ từng ý.
         </CardCopy>
         <AnswerIllustration />
-      </li>
-      <li className="lp-card lp-card-scope">
+      </Card>
+      <Card className="lp-card-scope">
         <CardCopy title="Đúng phạm vi học vụ">
           Tập trung vào quy chế, học phí, học bổng, thi cử, rèn luyện và thủ tục sinh viên. Câu hỏi ngoài
           phạm vi được từ chối thay vì trả lời bừa.
         </CardCopy>
         <ScopeIllustration />
-      </li>
-      <li className="lp-card lp-card-cite">
+      </Card>
+      <Card className="lp-card-cite">
         <CardCopy title="Trích dẫn tới điều, khoản">
           Mỗi ý trong câu trả lời gắn số trích dẫn; bấm vào để xem đoạn văn bản gốc.
         </CardCopy>
         <CitationIllustration />
-      </li>
-      <li className="lp-card lp-card-context">
+      </Card>
+      <Card className="lp-card-context">
         <CardCopy title="Hiểu ngữ cảnh câu hỏi">
           Hỏi tiếp dựa trên câu trước mà không cần nhắc lại toàn bộ; chatbot dùng các lượt gần nhất trong
           cùng hội thoại.
         </CardCopy>
         <ContextIllustration />
-      </li>
-      <li className="lp-card lp-card-history">
+      </Card>
+      <Card className="lp-card-history">
         <CardCopy title="Lịch sử theo tài khoản">
           Không cần tài khoản vẫn hỏi được ngay. Đăng nhập để lịch sử hội thoại theo bạn trên mọi thiết
           bị.
         </CardCopy>
         <HistoryIllustration />
-      </li>
+      </Card>
     </ul>
   );
 }

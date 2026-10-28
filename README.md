@@ -291,6 +291,8 @@ Giao diện chạy tại `http://localhost:5173`:
 | `/login`, `/register` | Đăng nhập, đăng ký tài khoản người dùng (nhận `?next=/duong-dan-noi-bo`, mặc định `/chat`) — xem mục 5 |
 | `/admin` | Trang quản trị — xem mục 4 |
 
+Trang landing có chuyển động (tiêu đề hiện theo từng từ, thẻ tính năng lật 3D khi cuộn và nghiêng theo chuột, vòng chủ đề xoay theo cuộn, thanh điều hướng thu gọn/ẩn khi cuộn, pixel transition khi chuyển sang chat/đăng nhập/đăng ký), tự viết trong `frontend/src/landing/motion/` và `frontend/src/styles/landing-motion.css`, không thêm thư viện. Trình duyệt bật "giảm chuyển động" (`prefers-reduced-motion`) thì trang hiển thị tĩnh và chuyển trang ngay.
+
 Đường dẫn lạ mở trang landing. Link cũ của app chat ở `/` (`/#chat`, `/#settings/appearance`) tự chuyển sang `/chat`; link cũ `#documents`, `#config`, `#models`, `#settings/...` chuyển sang `/admin`. Mỗi trang là một chunk tải riêng: landing và trang tài khoản không tải mã chat (render Markdown) hay mã quản trị. Khi tự triển khai sau web server khác, cấu hình fallback SPA cho mọi đường dẫn trên về `index.html` (như `try_files` trong `frontend/nginx.conf`).
 
 Frontend gọi API qua đường dẫn tương đối `/api`; proxy của Vite chuyển tiếp tới `http://localhost:8000` (đổi đích bằng biến `VITE_PROXY_TARGET`). Nhờ cùng origin, trình duyệt luôn gửi cookie phiên chat và phiên admin. Chỉ đặt `VITE_API_BASE_URL` trong `frontend/.env.local` khi buộc phải gọi thẳng backend ở địa chỉ khác; khi đó frontend và backend phải cùng site (ví dụ cùng `localhost`, không trộn `localhost` với `127.0.0.1`) và origin của frontend phải có trong `CORS_ORIGINS`, nếu không đăng nhập admin và lịch sử chat sẽ không hoạt động.

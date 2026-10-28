@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { ArrowUpRight, Github, GraduationCap, Sparkles, Wallet } from "lucide-react";
 import ThemeToggle from "../components/ThemeToggle";
 import { useAuthSession, userInitial } from "../auth/session";
@@ -6,8 +6,11 @@ import FaqList from "./FaqList";
 import FeatureBento from "./FeatureBento";
 import HeroComposer from "./HeroComposer";
 import StepsCarousel from "./StepsCarousel";
+import TopicRing from "./TopicRing";
 import { BACKGROUND_TEXT, REPO_URL, TOPIC_STRIP } from "./content";
 import "./fonts";
+import SplitWords, { wordCount } from "./motion/SplitWords";
+import useLandingMotion from "./motion/useLandingMotion";
 
 function BrandMark({ inverted = false }) {
   return (
@@ -20,19 +23,75 @@ function BrandMark({ inverted = false }) {
   );
 }
 
-function PrimaryLink({ href, children, size = "lg", className = "" }) {
+/** Nút chính: hút theo chuột, sóng khi click và pixel transition khi rời trang. */
+function PrimaryLink({ href, children, size = "lg", className = "", style }) {
   return (
-    <a className={`lp-btn is-${size} ${className}`.trim()} href={href}>
+    <a
+      className={`lp-btn is-${size} ${className}`.trim()}
+      href={href}
+      style={style}
+      data-magnetic
+      data-pulse
+      data-transition
+    >
       {children}
-      <ArrowUpRight size={size === "sm" ? 20 : 22} aria-hidden="true" />
+      <ArrowUpRight className="lp-btn-arrow" size={size === "sm" ? 20 : 22} aria-hidden="true" />
     </a>
   );
 }
 
-/** Nền chữ mờ phía sau khung soạn/dải kêu gọi (trang trí). */
-function BackgroundText({ className = "" }) {
+/**
+ * Các dòng của tiêu đề lớn, mỗi từ trượt lên từ mặt nạ (thẻ cha cần `data-reveal`).
+ * `lines` là mảng `[chữ, mờ?]`; thứ tự từ nối tiếp giữa các dòng để độ trễ liền mạch.
+ */
+function DisplayLines({ lines }) {
+  let start = 0;
+  return lines.map(([text, muted]) => {
+    const line = (
+      <span key={text} className={`lp-display-line has-words ${muted ? "is-muted" : ""}`.trim()}>
+        <SplitWords text={text} start={start} />
+      </span>
+    );
+    start += wordCount(text);
+    return line;
+  });
+}
+
+/** Link điều hướng: chữ cuộn lên khi hover (bóng chữ đóng vai bản sao, không nhân đôi DOM). */
+function RollLink({ href, children }) {
   return (
-    <p className={`lp-bgtext ${className}`.trim()} aria-hidden="true">
+    <a className="lp-roll" href={href}>
+      <span className="lp-roll-text">{children}</span>
+    </a>
+  );
+}
+
+function TopicMarquee() {
+  const items = TOPIC_STRIP.map(({ label, icon: Icon }) => (
+    <li key={label}>
+      <Icon size={26} strokeWidth={1.75} aria-hidden="true" />
+      {label}
+    </li>
+  ));
+  return (
+    <div className="lp-marquee" data-reveal="fade">
+      <div className="lp-marquee-track">
+        <ul className="lp-topic-strip" aria-label="Chủ đề chatbot hỗ trợ">
+          {items}
+        </ul>
+        {/* Bản sao để vòng chạy liền mạch; chỉ hiện khi bật chuyển động. */}
+        <ul className="lp-topic-strip is-clone" aria-hidden="true">
+          {items}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+/** Nền chữ mờ phía sau khung soạn (trang trí); sáng dần theo từng dòng khi cuộn. */
+function BackgroundText() {
+  return (
+    <p className="lp-bgtext" aria-hidden="true" data-scrub>
       {/* Lặp hai lần để phủ kín vùng nền như thiết kế. */}
       {[...BACKGROUND_TEXT, [" ", null], ...BACKGROUND_TEXT].map(([text, tone], index) =>
         tone ? (
@@ -50,7 +109,7 @@ function BackgroundText({ className = "" }) {
 /** Hai thẻ nghiêng hai bên hero (Figma node 2002:535), chỉ để trang trí. */
 function HeroFloatCards() {
   return (
-    <div className="lp-float-cards" aria-hidden="true">
+    <div className="lp-float-cards" aria-hidden="true" data-reveal="float">
       <div className="lp-float-card is-left">
         <p className="lp-float-title">Câu hỏi gợi ý</p>
         <p className="lp-float-row">
@@ -88,9 +147,11 @@ export default function LandingPage() {
   const session = useAuthSession();
   const { user } = session;
   const chatLabel = session.isAuthenticated ? "Vào trò chuyện" : "Bắt đầu trò chuyện";
+  const rootRef = useRef(null);
+  useLandingMotion(rootRef);
 
   return (
-    <div className="landing-page">
+    <div className="landing-page" ref={rootRef}>
       <a className="skip-link" href="#landing-main">
         Tới nội dung chính
       </a>
@@ -103,9 +164,9 @@ export default function LandingPage() {
             <span className="lp-nav-tagline">Trợ lý học vụ</span>
           </a>
           <nav className="lp-nav-links" aria-label="Các mục trên trang">
-            <a href="#tinh-nang">Tính năng</a>
-            <a href="#cach-hoat-dong">Cách hoạt động</a>
-            <a href="#cau-hoi">Câu hỏi thường gặp</a>
+            <RollLink href="#tinh-nang">Tính năng</RollLink>
+            <RollLink href="#cach-hoat-dong">Cách hoạt động</RollLink>
+            <RollLink href="#cau-hoi">Câu hỏi thường gặp</RollLink>
           </nav>
           <div className="lp-nav-actions">
             <ThemeToggle className="lp-theme-toggle" />
@@ -123,7 +184,7 @@ export default function LandingPage() {
               </>
             ) : (
               <>
-                <a className="lp-nav-login" href="/login">
+                <a className="lp-nav-login" href="/login" data-transition>
                   Đăng nhập
                 </a>
                 <PrimaryLink href="/register" size="sm">
@@ -139,11 +200,15 @@ export default function LandingPage() {
         <section className="lp-hero" aria-labelledby="landing-title">
           <span className="lp-haze" aria-hidden="true" />
           <div className="lp-container lp-hero-copy">
-            <h1 id="landing-title" className="lp-display">
-              <span className="lp-display-line">Hỏi đáp quy chế PTIT</span>
-              <span className="lp-display-line is-muted">nhanh, có trích dẫn nguồn</span>
+            <h1 id="landing-title" className="lp-display" data-reveal="words">
+              <DisplayLines
+                lines={[
+                  ["Hỏi đáp quy chế PTIT", false],
+                  ["nhanh, có trích dẫn nguồn", true],
+                ]}
+              />
             </h1>
-            <p className="lp-lead">
+            <p className="lp-lead" data-reveal="up" style={{ "--d": "420ms" }}>
               Trả lời câu hỏi về quy chế đào tạo, học phí và thủ tục sinh viên dựa trên tài liệu chính
               thức, kèm trích dẫn để bạn tự kiểm tra.
             </p>
@@ -152,41 +217,43 @@ export default function LandingPage() {
                 Xin chào, <strong>{user.full_name}</strong> — lịch sử hội thoại của bạn đã sẵn sàng.
               </p>
             )}
-            <PrimaryLink href="/chat">{chatLabel}</PrimaryLink>
+            <div className="lp-hero-cta" data-reveal="up" style={{ "--d": "560ms" }}>
+              <PrimaryLink href="/chat">{chatLabel}</PrimaryLink>
+            </div>
           </div>
           <HeroFloatCards />
           <div className="lp-hero-stage">
             <BackgroundText />
-            <div className="lp-container lp-hero-composer">
+            <div className="lp-container lp-hero-composer" data-reveal="up" style={{ "--d": "700ms" }}>
               <HeroComposer />
               {!session.isAuthenticated && (
                 <p className="lp-hero-note">
-                  Không cần tài khoản để hỏi. <a href="/login">Đăng nhập</a> để lưu lịch sử trên mọi thiết
-                  bị.
+                  Không cần tài khoản để hỏi.{" "}
+                  <a href="/login" data-transition>
+                    Đăng nhập
+                  </a>{" "}
+                  để lưu lịch sử trên mọi thiết bị.
                 </p>
               )}
             </div>
           </div>
           <div className="lp-container">
-            <ul className="lp-topic-strip" aria-label="Chủ đề chatbot hỗ trợ">
-              {TOPIC_STRIP.map(({ label, icon: Icon }) => (
-                <li key={label}>
-                  <Icon size={26} strokeWidth={1.75} aria-hidden="true" />
-                  {label}
-                </li>
-              ))}
-            </ul>
+            <TopicMarquee />
           </div>
         </section>
 
         <section className="lp-section" id="tinh-nang" aria-labelledby="features-title">
           <div className="lp-container">
             <div className="lp-section-head">
-              <h2 id="features-title" className="lp-display is-h2">
-                <span className="lp-display-line">Hiểu câu hỏi tiếng Việt</span>
-                <span className="lp-display-line is-muted">Chatbot giúp được gì</span>
+              <h2 id="features-title" className="lp-display is-h2" data-reveal="words">
+                <DisplayLines
+                  lines={[
+                    ["Hiểu câu hỏi tiếng Việt", false],
+                    ["Chatbot giúp được gì", true],
+                  ]}
+                />
               </h2>
-              <p>
+              <p data-reveal="up" style={{ "--d": "240ms" }}>
                 Tra cứu nhanh thay vì lật từng trang quy chế, và vẫn biết câu trả lời lấy từ đâu.
               </p>
             </div>
@@ -206,11 +273,15 @@ export default function LandingPage() {
         <section className="lp-section" id="cau-hoi" aria-labelledby="faq-title">
           <div className="lp-container">
             <div className="lp-section-head">
-              <h2 id="faq-title" className="lp-display is-h2">
-                <span className="lp-display-line">Câu hỏi</span>
-                <span className="lp-display-line is-muted">thường gặp</span>
+              <h2 id="faq-title" className="lp-display is-h2" data-reveal="words">
+                <DisplayLines
+                  lines={[
+                    ["Câu hỏi", false],
+                    ["thường gặp", true],
+                  ]}
+                />
               </h2>
-              <p className="lp-faq-note" id="luu-y">
+              <p className="lp-faq-note" id="luu-y" data-reveal="up" style={{ "--d": "200ms" }}>
                 Lưu ý khi sử dụng: chatbot có thể trả lời sai — luôn đối chiếu văn bản gốc qua trích dẫn
                 trước khi làm thủ tục quan trọng.
               </p>
@@ -220,15 +291,19 @@ export default function LandingPage() {
         </section>
 
         <section className="lp-cta" aria-labelledby="cta-title">
-          <BackgroundText className="is-cta" />
+          <TopicRing />
           <div className="lp-cta-inner">
-            <h2 id="cta-title" className="lp-display">
-              <span className="lp-display-line">
-                {session.isAuthenticated ? "Tiếp tục cuộc trò chuyện" : "Sẵn sàng đặt câu hỏi?"}
-              </span>
-              <span className="lp-display-line is-muted">Hỏi PTIT Chatbot</span>
+            <h2 id="cta-title" className="lp-display" data-reveal="words">
+              <DisplayLines
+                lines={[
+                  [session.isAuthenticated ? "Tiếp tục cuộc trò chuyện" : "Sẵn sàng đặt câu hỏi?", false],
+                  ["Hỏi PTIT Chatbot", true],
+                ]}
+              />
             </h2>
-            <PrimaryLink href="/chat">{chatLabel}</PrimaryLink>
+            <div data-reveal="up" style={{ "--d": "320ms" }}>
+              <PrimaryLink href="/chat">{chatLabel}</PrimaryLink>
+            </div>
           </div>
         </section>
       </main>
@@ -243,9 +318,19 @@ export default function LandingPage() {
             <nav className="lp-footer-cols" aria-label="Liên kết cuối trang">
               <div className="lp-footer-col">
                 <p className="lp-footer-heading">Sản phẩm</p>
-                <a href="/chat">Trò chuyện</a>
-                {!session.isAuthenticated && <a href="/login">Đăng nhập</a>}
-                {!session.isAuthenticated && <a href="/register">Đăng ký</a>}
+                <a href="/chat" data-transition>
+                  Trò chuyện
+                </a>
+                {!session.isAuthenticated && (
+                  <a href="/login" data-transition>
+                    Đăng nhập
+                  </a>
+                )}
+                {!session.isAuthenticated && (
+                  <a href="/register" data-transition>
+                    Đăng ký
+                  </a>
+                )}
               </div>
               <div className="lp-footer-col">
                 <p className="lp-footer-heading">Tìm hiểu</p>
