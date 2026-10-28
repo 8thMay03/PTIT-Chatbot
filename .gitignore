@@ -14,3 +14,5 @@ data/
 .AGENTS
 !.agents/
 !.agents/**
+.agents/
+.claude/
