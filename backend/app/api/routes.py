@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from collections.abc import Iterator
 from datetime import datetime, timezone
@@ -7,7 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.schemas import (
@@ -19,6 +20,7 @@ from app.api.schemas import (
     ChatResponse,
     ChunkAllResponse,
     ChunkItem,
+    ConfigPersistenceInfo,
     ConversationDetail,
     ConversationItem,
     ConversationListResponse,
@@ -48,11 +50,11 @@ from app.core.config import (
     PROJECT_ROOT,
     ConfigValidationError,
     get_runtime_config_dict,
-    reset_runtime_config,
     settings,
-    update_runtime_config,
     validate_llm_url,
 )
+from app.core.config_crypto import SecretEncryptionUnavailable, is_secret_encryption_configured
+from app.core.config_store import apply_config_update, get_config_store_session, reset_config as reset_stored_config
 from app.db import check_db_health, get_session
 from app.db.repositories import (
     add_message,
@@ -101,6 +103,7 @@ from app.parsers import (
     resolve_parser_name,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Route API công khai (prefix /api) theo plan FE-06. Route mới mặc định KHÔNG
@@ -302,23 +305,47 @@ def get_current_user(
 
 @router.get("/config", response_model=FullConfigResponse, dependencies=[Depends(require_admin)])
 def get_config() -> FullConfigResponse:
-    return FullConfigResponse(**get_runtime_config_dict())
+    return _config_response(get_runtime_config_dict())
+
+
+def _config_response(data: dict) -> FullConfigResponse:
+    return FullConfigResponse(
+        **data,
+        persistence=ConfigPersistenceInfo(secret_encryption_enabled=is_secret_encryption_configured()),
+    )
 
 
 @router.put("/config", response_model=FullConfigResponse, dependencies=[Depends(require_admin)])
-def update_config(request: UpdateConfigRequest) -> FullConfigResponse:
+def update_config(
+    request: UpdateConfigRequest,
+    session: Session = Depends(get_config_store_session),
+) -> FullConfigResponse:
+    """Áp và lưu cấu hình vào DB; mọi lỗi đều để cấu hình đang chạy như trước request."""
     payload = request.model_dump(exclude_unset=True)
     try:
-        updated = update_runtime_config(payload)
-    except ConfigValidationError as exc:
+        updated = apply_config_update(session, payload)
+    except (ConfigValidationError, SecretEncryptionUnavailable) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return FullConfigResponse(**updated)
+    except SQLAlchemyError as exc:
+        logger.exception("Không lưu được cấu hình vào DB")
+        raise HTTPException(
+            status_code=503,
+            detail="Không lưu được cấu hình vào cơ sở dữ liệu; cấu hình chưa thay đổi.",
+        ) from exc
+    return _config_response(updated)
 
 
 @router.post("/config/reset", response_model=FullConfigResponse, dependencies=[Depends(require_admin)])
-def reset_config() -> FullConfigResponse:
-    reset_data = reset_runtime_config()
-    return FullConfigResponse(**reset_data)
+def reset_config(session: Session = Depends(get_config_store_session)) -> FullConfigResponse:
+    try:
+        reset_data = reset_stored_config(session)
+    except SQLAlchemyError as exc:
+        logger.exception("Không xoá được cấu hình đã lưu trong DB")
+        raise HTTPException(
+            status_code=503,
+            detail="Không xoá được cấu hình đã lưu trong cơ sở dữ liệu; cấu hình chưa thay đổi.",
+        ) from exc
+    return _config_response(reset_data)
 
 
 @router.post("/config/test-llm", response_model=TestLLMResponse, dependencies=[Depends(require_admin)])

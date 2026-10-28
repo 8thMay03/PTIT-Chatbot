@@ -480,7 +480,7 @@ function ApiKeyField({ id, value, onChange, hasKey, required, label = "API key" 
         </button>
       </div>
       <span className="mdl-field-hint" id={hintId}>
-        Khoá được gửi thẳng tới máy chủ, không lưu trong trình duyệt và không bao giờ hiển thị lại.
+        Khoá được mã hoá trước khi lưu trên máy chủ, không lưu trong trình duyệt và không bao giờ hiển thị lại.
       </span>
     </div>
   );
@@ -1007,10 +1007,19 @@ export default function ModelsView() {
         <div className="inline-alert is-info">
           <HardDrive size={16} />
           <span>
-            Thay đổi ở đây áp dụng ngay cho máy chủ đang chạy nhưng không ghi vào tệp <code>.env</code>. Khi
-            khởi động lại backend, cấu hình quay về giá trị trong <code>.env</code>.
+            Thay đổi được lưu vào cơ sở dữ liệu và giữ nguyên khi khởi động lại backend; API key được mã hoá
+            trước khi lưu. Mục chưa đổi vẫn lấy giá trị trong <code>.env</code>.
           </span>
         </div>
+        {!config.persistence?.secret_encryption_enabled && (
+          <div className="inline-alert is-warning" role="alert">
+            <AlertTriangle size={16} />
+            <span>
+              Máy chủ chưa có <code>CONFIG_ENCRYPTION_KEY</code> hợp lệ nên sẽ từ chối lưu API key mới. Các thay
+              đổi khác vẫn lưu bình thường.
+            </span>
+          </div>
+        )}
         <LlmSection llm={llm} />
         <RerankerSection reranker={reranker} />
         <EmbeddingSection embedding={config.embedding ?? {}} openaiHasKey={Boolean(llm.openai_has_key)} />

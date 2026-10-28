@@ -224,6 +224,11 @@ class AvailableProviders(BaseModel):
     reranker: list[str] = ["heuristic", "cross-encoder", "cohere"]
 
 
+class ConfigPersistenceInfo(BaseModel):
+    # false: thiếu/sai CONFIG_ENCRYPTION_KEY, PUT /config từ chối mọi thay đổi API key.
+    secret_encryption_enabled: bool = False
+
+
 class FullConfigResponse(BaseModel):
     llm: LLMConfigPayload
     retrieval: RetrievalConfigPayload
@@ -231,6 +236,7 @@ class FullConfigResponse(BaseModel):
     guardrails: GuardrailsConfigPayload
     embedding: EmbeddingConfigPayload = Field(default_factory=EmbeddingConfigPayload)
     available_providers: AvailableProviders
+    persistence: ConfigPersistenceInfo = Field(default_factory=ConfigPersistenceInfo)
 
 
 class UpdateLLMConfig(BaseModel):

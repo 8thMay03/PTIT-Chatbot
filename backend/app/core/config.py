@@ -179,6 +179,9 @@ class Settings(BaseSettings):
     # Chỉ khi request đi tới từ các địa chỉ này mới đọc X-Forwarded-For để lấy IP thật
     # cho chặn dò mật khẩu; bỏ trống thì dùng IP kết nối trực tiếp.
     trusted_proxy_ips: str = Field(default="", alias="TRUSTED_PROXY_IPS")
+    # Khoá Fernet mã hoá API key khi lưu cấu hình runtime vào Postgres (app.core.config_crypto).
+    # Nhiều khoá phân tách bằng dấu phẩy để xoay khoá. Bỏ trống thì không lưu được API key qua UI.
+    config_encryption_key: str | None = Field(default=None, alias="CONFIG_ENCRYPTION_KEY")
 
     # ==========================================
     # Tài khoản người dùng (landing-user-auth)
@@ -257,6 +260,7 @@ _RESET_EXCLUDED_FIELDS = frozenset(
         "admin_session_secret",
         "admin_session_ttl_hours",
         "cookie_secure",
+        "config_encryption_key",
         "llm_base_url_allowlist",
         "trusted_proxy_ips",
         "user_session_secret",

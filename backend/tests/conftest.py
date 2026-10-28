@@ -10,19 +10,22 @@
   để test hội thoại không ghi vào DB dev.
 - ``register_user`` / ``login_user``: đăng ký/đăng nhập tài khoản người dùng cho một
   TestClient (landing-user-auth); cần ``api_db``.
+- ``config_store_db`` (autouse): bảng cấu hình đã lưu (PUT /config, lifespan) trỏ
+  sang SQLite tạm, dọn sau mỗi test; không test nào đọc/ghi cấu hình trong DB dev.
 """
 
 from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, delete
 from sqlalchemy.orm import sessionmaker
 
 from app.core import auth
+from app.core import config_store
 from app.core.config import settings
 from app.db import get_session
-from app.db.models import Base
+from app.db.models import AppConfigOverride, Base
 from app.main import app
 
 ADMIN_TEST_PASSWORD = "unit-test-admin-password"
@@ -36,6 +39,27 @@ def _isolated_admin_login_state():
     auth.reset_login_attempts()
     yield
     auth.reset_login_attempts()
+
+
+@pytest.fixture(scope="session")
+def _config_store_session_factory(tmp_path_factory):
+    engine = create_engine(
+        f"sqlite:///{(tmp_path_factory.mktemp('config-store') / 'config.db').as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    AppConfigOverride.__table__.create(engine)
+    yield sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+    engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def config_store_db(_config_store_session_factory, monkeypatch):
+    """Session factory của bảng cấu hình đã lưu, trỏ sang SQLite tạm dùng chung, rỗng mỗi test."""
+    monkeypatch.setattr(config_store, "SessionLocal", _config_store_session_factory)
+    yield _config_store_session_factory
+    with _config_store_session_factory() as session:
+        session.execute(delete(AppConfigOverride))
+        session.commit()
 
 
 @pytest.fixture

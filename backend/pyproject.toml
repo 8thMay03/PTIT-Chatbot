@@ -13,6 +13,8 @@ dependencies = [
   "psycopg[binary]>=3.1.18",
   "pgvector>=0.3.0",
   "alembic>=1.13.0",
+  # Fernet encrypts API keys saved with the runtime config (app.core.config_crypto).
+  "cryptography>=42.0.0",
   "python-dotenv>=1.0.1",
   "python-multipart>=0.0.9",
   "uvicorn[standard]>=0.30.0",

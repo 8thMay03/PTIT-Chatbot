@@ -31,6 +31,26 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class AppConfigOverride(Base):
+    """Cấu hình runtime admin đã đổi so với `.env` (app.core.config_store).
+
+    Mỗi dòng là một trường Settings. Trường thường nằm ở `value`; secret (API key)
+    chỉ nằm ở `encrypted_value` dưới dạng bản mã Fernet, `value` để trống.
+    """
+
+    __tablename__ = "app_config_overrides"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[object | None] = mapped_column(JSON, nullable=True)
+    encrypted_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
 class Document(Base):
     __tablename__ = "documents"
 
