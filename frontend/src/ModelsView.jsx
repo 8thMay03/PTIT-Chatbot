@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -8,19 +8,21 @@ import {
   Binary,
   Check,
   CheckCircle2,
+  ChevronRight,
   Cloud,
   Copy,
   Cpu,
   Eye,
   EyeOff,
-  HardDrive,
-  Info,
   ListOrdered,
   Loader2,
+  Lock,
   MessageSquareText,
   RefreshCw,
   Save,
   Server,
+  ShieldAlert,
+  ShieldCheck,
   Undo2,
   Zap,
 } from "lucide-react";
@@ -36,6 +38,10 @@ import { useToast } from "./components/Toast";
  *
  * Bản trước là một "kho nhà cung cấp" viết cứng có cả VLM/ASR/TTS/OCR mà backend
  * không hỗ trợ, và báo "đã lưu" cho những lựa chọn không hề được gửi đi.
+ *
+ * Bố cục: thanh "luồng xử lý" xếp ba khâu theo đúng thứ tự một câu hỏi đi qua
+ * (nhúng → xếp hạng lại → sinh câu trả lời), chọn khâu nào thì mở bảng chỉnh
+ * của khâu đó. Ba bảng luôn mounted để không mất bản nháp khi đổi khâu.
  */
 
 function OpenAILogo({ size = 20 }) {
@@ -297,13 +303,15 @@ const RERANKER_PROVIDERS = [
   {
     key: "heuristic",
     name: "Heuristic",
-    description: "Kết hợp điểm vector, BM25 và độ phủ từ khoá. Nhanh, không cần tải mô hình.",
+    description: "Kết hợp điểm vector, BM25 và độ phủ từ khoá.",
+    traits: ["Nhanh", "Không cần tải mô hình"],
     Icon: ListOrdered,
   },
   {
     key: "cross-encoder",
     name: "Cross-Encoder",
-    description: "Mô hình chấm điểm từng cặp câu hỏi–đoạn, chạy cục bộ trên máy chủ. Chính xác hơn, chậm hơn.",
+    description: "Mô hình chấm điểm từng cặp câu hỏi–đoạn, chạy cục bộ trên máy chủ.",
+    traits: ["Chính xác hơn", "Chậm hơn", "Tải mô hình lần đầu"],
     Icon: Cpu,
   },
 ];
@@ -343,22 +351,26 @@ function useWarnBeforeUnload(active) {
   }, [active]);
 }
 
+/** Báo trạng thái "có thay đổi chưa lưu" lên thanh luồng xử lý. */
+function useReportDirty(dirty, onDirtyChange) {
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+}
+
 function StatusPill({ tone = "muted", children }) {
   return <span className={`mdl-pill is-${tone}`}>{children}</span>;
 }
 
-function Section({ id, icon, title, description, current, children, footer }) {
+function Section({ id, title, description, badge, children, footer }) {
   return (
     <section className="mdl-card" aria-labelledby={`${id}-title`} id={id}>
       <header className="mdl-card-head">
-        <span className="mdl-card-icon" aria-hidden="true">
-          {icon}
-        </span>
         <div className="mdl-card-heading">
           <h3 id={`${id}-title`}>{title}</h3>
           <p>{description}</p>
-          {current && <div className="mdl-current">{current}</div>}
         </div>
+        {badge && <span className="mdl-card-badge">{badge}</span>}
       </header>
       <div className="mdl-card-body">{children}</div>
       {footer && <footer className="mdl-card-foot">{footer}</footer>}
@@ -366,41 +378,57 @@ function Section({ id, icon, title, description, current, children, footer }) {
   );
 }
 
-function ChoiceGroup({ name, legend, options, value, onChange }) {
+/** Radio dạng thẻ; `layout="list"` xếp dọc (nhà cung cấp LLM), `"grid"` chia cột. */
+function OptionGroup({ name, legend, options, value, onChange, layout = "grid" }) {
   return (
-    <fieldset className="mdl-choice-group">
-      <legend>{legend}</legend>
-      <div className="mdl-choices">
-        {options.map(({ key, name: label, description, Icon }) => (
-          <label key={key} className={`mdl-choice ${value === key ? "is-selected" : ""}`}>
-            <input
-              type="radio"
-              name={name}
-              value={key}
-              checked={value === key}
-              onChange={() => onChange(key)}
-            />
-            <span className="mdl-choice-icon" aria-hidden="true">
-              <Icon size={18} />
-            </span>
-            <span className="mdl-choice-text">
-              <strong>{label}</strong>
-              <span>{description}</span>
-            </span>
-          </label>
-        ))}
+    <fieldset className={`mdl-options is-${layout}`}>
+      <legend className="mdl-label">{legend}</legend>
+      <div className="mdl-options-items">
+        {options.map(({ key, name: label, description, traits, Icon }) => {
+          const selected = value === key;
+          return (
+            <label key={key} className={`mdl-option ${selected ? "is-selected" : ""}`}>
+              <input
+                type="radio"
+                className="sr-only"
+                name={name}
+                value={key}
+                checked={selected}
+                onChange={() => onChange(key)}
+              />
+              <span className="mdl-option-icon" aria-hidden="true">
+                <Icon size={18} />
+              </span>
+              <span className="mdl-option-text">
+                <strong>{label}</strong>
+                <span>{description}</span>
+                {traits && (
+                  <span className="mdl-traits">
+                    {traits.map((trait) => (
+                      <span key={trait} className="mdl-trait">
+                        {trait}
+                      </span>
+                    ))}
+                  </span>
+                )}
+              </span>
+              <span className="mdl-option-check" aria-hidden="true">
+                {selected && <Check size={12} strokeWidth={3} />}
+              </span>
+            </label>
+          );
+        })}
       </div>
     </fieldset>
   );
 }
 
 function TextField({ id, field, value, onChange, error }) {
-  const listId = field.suggestions ? `${id}-suggestions` : undefined;
   const hintId = `${id}-hint`;
   const describedBy = [error ? `${id}-error` : null, field.hint ? hintId : null].filter(Boolean).join(" ");
   return (
     <div className="mdl-field">
-      <label htmlFor={id}>
+      <label htmlFor={id} className="mdl-label">
         {field.label}
         {!field.required && <span className="mdl-optional">Tuỳ chọn</span>}
       </label>
@@ -410,19 +438,26 @@ function TextField({ id, field, value, onChange, error }) {
         className={`mdl-input ${error ? "is-invalid" : ""}`}
         value={value}
         placeholder={field.placeholder}
-        list={listId}
         spellCheck={false}
         autoComplete="off"
         aria-invalid={Boolean(error)}
         aria-describedby={describedBy || undefined}
         onChange={(event) => onChange(event.target.value)}
       />
-      {listId && (
-        <datalist id={listId}>
+      {field.suggestions && (
+        <div className="mdl-suggestions" role="group" aria-label={`Gợi ý ${field.label.toLowerCase()}`}>
           {field.suggestions.map((item) => (
-            <option key={item} value={item} />
+            <button
+              key={item}
+              type="button"
+              className="mdl-chip"
+              aria-pressed={value.trim() === item}
+              onClick={() => onChange(item)}
+            >
+              {item}
+            </button>
           ))}
-        </datalist>
+        </div>
       )}
       {error && (
         <span className="mdl-field-error" id={`${id}-error`}>
@@ -444,7 +479,9 @@ function ApiKeyField({ id, value, onChange, hasKey, required, label = "API key" 
   return (
     <div className="mdl-field">
       <div className="mdl-field-label-row">
-        <label htmlFor={id}>{label}</label>
+        <label htmlFor={id} className="mdl-label">
+          {label}
+        </label>
         {hasKey ? (
           <StatusPill tone="ok">
             <Check size={12} /> Máy chủ đã có khoá
@@ -486,14 +523,13 @@ function ApiKeyField({ id, value, onChange, hasKey, required, label = "API key" 
   );
 }
 
-function SectionActions({ dirty, saving, onReset, onSave, children }) {
+function SectionActions({ dirty, saving, onReset, onSave }) {
   return (
     <>
-      <span className="mdl-dirty" role="status">
+      <span className={`mdl-dirty ${dirty ? "is-dirty" : ""}`} role="status">
         {dirty ? "Có thay đổi chưa lưu" : ""}
       </span>
       <div className="mdl-actions">
-        {children}
         {dirty && (
           <button type="button" className="ghost-btn" onClick={onReset} disabled={saving}>
             <Undo2 size={15} />
@@ -521,7 +557,7 @@ async function saveConfig(queryClient, payload) {
 // Mục LLM
 // ---------------------------------------------------------------------------
 
-function LlmSection({ llm }) {
+function LlmSection({ llm, onDirtyChange }) {
   const toast = useToast();
   const queryClient = useQueryClient();
   // Chỉ tạo lại bản nháp khi trường liên quan đến LLM đổi; lưu temperature ở tab
@@ -543,7 +579,7 @@ function LlmSection({ llm }) {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
-  const bodyRef = useRef(null);
+  const formRef = useRef(null);
 
   useEffect(() => {
     setDraft(initial);
@@ -558,6 +594,7 @@ function LlmSection({ llm }) {
   const errors = useMemo(() => validateLlm(draft), [draft]);
   const dirty = isLlmDirty(draft, initial);
   useWarnBeforeUnload(dirty);
+  useReportDirty(dirty, onDirtyChange);
 
   function update(name, value) {
     setDraft((current) => ({ ...current, [provider]: { ...current[provider], [name]: value } }));
@@ -593,7 +630,7 @@ function LlmSection({ llm }) {
     if (Object.keys(errors).length === 0) return true;
     setShowErrors(true);
     const first = LLM_FIELDS[provider].find((field) => errors[field.name]);
-    bodyRef.current?.querySelector(`#llm-${provider}-${first?.name}`)?.focus();
+    formRef.current?.querySelector(`#llm-${provider}-${first?.name}`)?.focus();
     return false;
   }
 
@@ -635,103 +672,124 @@ function LlmSection({ llm }) {
   }
 
   const currentProvider = normalizeLlmProvider(llm.provider);
-  const currentHasKey = Boolean(llm[KEY_FIELD[currentProvider].hasKey]);
+  const currentMissingKey =
+    KEY_FIELD[currentProvider].required && !llm[KEY_FIELD[currentProvider].hasKey];
 
   return (
     <Section
       id="mdl-llm"
-      icon={<MessageSquareText size={18} />}
       title="Sinh câu trả lời (LLM)"
-      description="Mô hình đọc các đoạn tài liệu tìm được và viết câu trả lời cho sinh viên. Thay đổi có hiệu lực từ câu hỏi tiếp theo."
-      current={
+      description="Mô hình đọc các đoạn tài liệu tìm được và viết câu trả lời cho sinh viên."
+      badge={
         <>
-          <span>
-            Đang dùng <strong>{llm.model || "—"}</strong> · {llmProviderName(currentProvider)}
-          </span>
-          {KEY_FIELD[currentProvider].required && !currentHasKey && (
-            <StatusPill tone="warn">
-              <AlertTriangle size={12} /> Chưa có API key — chatbot sẽ không trả lời được
-            </StatusPill>
-          )}
+          <Zap size={13} /> Áp dụng từ câu hỏi tiếp theo
         </>
       }
-      footer={
-        <SectionActions dirty={dirty} saving={saving} onReset={resetDraft} onSave={handleSave}>
-          <button type="button" className="ghost-btn" onClick={handleTest} disabled={testing || saving}>
-            {testing ? <Loader2 size={15} className="spin" /> : <Zap size={15} />}
-            {testing ? "Đang kiểm tra..." : "Kiểm tra kết nối"}
-          </button>
-        </SectionActions>
-      }
+      footer={<SectionActions dirty={dirty} saving={saving} onReset={resetDraft} onSave={handleSave} />}
     >
-      <div ref={bodyRef} className="mdl-stack">
-        <ChoiceGroup
+      {currentMissingKey && (
+        <div className="inline-alert is-warning mdl-alert">
+          <AlertTriangle size={16} />
+          <span>
+            {llmProviderName(currentProvider)} đang được dùng nhưng máy chủ chưa có API key — chatbot sẽ không
+            trả lời được cho tới khi lưu khoá.
+          </span>
+        </div>
+      )}
+
+      <div className="mdl-llm-layout">
+        <OptionGroup
           name="llm-provider"
           legend="Nhà cung cấp"
+          layout="list"
           options={LLM_PROVIDERS}
           value={provider}
           onChange={selectProvider}
         />
 
-        {provider === "openai_compatible" && (
-          <div className="mdl-presets" role="group" aria-label="Điền nhanh địa chỉ máy chủ">
-            <span>Điền nhanh:</span>
-            {COMPATIBLE_PRESETS.map((preset) => (
-              <button
-                key={preset.key}
-                type="button"
-                className="mdl-preset"
-                aria-pressed={values.baseUrl === preset.baseUrl}
-                onClick={() => applyPreset(preset)}
-              >
-                {preset.label}
-              </button>
+        <div ref={formRef} className="mdl-llm-form">
+          <div className="mdl-form-head">
+            <h4>Kết nối {llmProviderName(provider)}</h4>
+            {provider === currentProvider ? (
+              <StatusPill tone="brand">Đang dùng</StatusPill>
+            ) : (
+              <StatusPill tone="warn">Chưa áp dụng — bấm Lưu để chuyển</StatusPill>
+            )}
+          </div>
+
+          {provider === "openai_compatible" && (
+            <div className="mdl-presets" role="group" aria-label="Điền nhanh địa chỉ máy chủ">
+              <span>Điền nhanh</span>
+              {COMPATIBLE_PRESETS.map((preset) => (
+                <button
+                  key={preset.key}
+                  type="button"
+                  className="mdl-chip"
+                  aria-pressed={values.baseUrl === preset.baseUrl}
+                  onClick={() => applyPreset(preset)}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="mdl-grid">
+            {LLM_FIELDS[provider].map((field) => (
+              <TextField
+                key={`${provider}-${field.name}`}
+                id={`llm-${provider}-${field.name}`}
+                field={field}
+                value={values[field.name]}
+                onChange={(value) => update(field.name, value)}
+                error={
+                  showErrors || (field.url && values[field.name].trim()) ? errors[field.name] : undefined
+                }
+              />
             ))}
           </div>
-        )}
 
-        <div className="mdl-grid">
-          {LLM_FIELDS[provider].map((field) => (
-            <TextField
-              key={`${provider}-${field.name}`}
-              id={`llm-${provider}-${field.name}`}
-              field={field}
-              value={values[field.name]}
-              onChange={(value) => update(field.name, value)}
-              error={
-                showErrors || (field.url && values[field.name].trim()) ? errors[field.name] : undefined
-              }
-            />
-          ))}
-        </div>
+          <ApiKeyField
+            key={provider}
+            id={`llm-${provider}-key`}
+            value={values.apiKey}
+            onChange={(value) => update("apiKey", value)}
+            hasKey={hasKey}
+            required={keyField.required}
+          />
 
-        <ApiKeyField
-          key={provider}
-          id={`llm-${provider}-key`}
-          value={values.apiKey}
-          onChange={(value) => update("apiKey", value)}
-          hasKey={hasKey}
-          required={keyField.required}
-        />
-
-        {testResult && (
-          <div
-            className={`mdl-test-result ${testResult.success ? "is-ok" : "is-error"}`}
-            role={testResult.success ? "status" : "alert"}
-          >
-            {testResult.success ? <CheckCircle2 size={17} /> : <AlertCircle size={17} />}
-            <div>
-              <strong>{testResult.success ? "Kết nối thành công" : "Kết nối thất bại"}</strong>
-              <p>{testResult.message}</p>
-              {(testResult.latency_ms != null || testResult.sample_output) && (
-                <p className="mdl-test-meta">
-                  {testResult.latency_ms != null && <>Thời gian phản hồi: {Math.round(testResult.latency_ms)} ms</>}
-                  {testResult.sample_output && <> · Mô hình trả lời: “{testResult.sample_output}”</>}
-                </p>
-              )}
+          <div className="mdl-test">
+            <div className="mdl-test-row">
+              <div className="mdl-test-intro">
+                <strong>Kiểm tra kết nối</strong>
+                <span>Gửi một yêu cầu ngắn bằng thông tin đang nhập, chưa cần lưu. Để trống API key thì dùng khoá trên máy chủ.</span>
+              </div>
+              <button type="button" className="ghost-btn" onClick={handleTest} disabled={testing || saving}>
+                {testing ? <Loader2 size={15} className="spin" /> : <Zap size={15} />}
+                {testing ? "Đang kiểm tra..." : "Kiểm tra"}
+              </button>
             </div>
+
+            {testResult && (
+              <div
+                className={`mdl-test-result ${testResult.success ? "is-ok" : "is-error"}`}
+                role={testResult.success ? "status" : "alert"}
+              >
+                {testResult.success ? <CheckCircle2 size={17} /> : <AlertCircle size={17} />}
+                <div>
+                  <strong>{testResult.success ? "Kết nối thành công" : "Kết nối thất bại"}</strong>
+                  <p>{testResult.message}</p>
+                  {(testResult.latency_ms != null || testResult.sample_output) && (
+                    <p className="mdl-test-meta">
+                      {testResult.latency_ms != null && <>Thời gian phản hồi: {Math.round(testResult.latency_ms)} ms</>}
+                      {testResult.sample_output && <> · Mô hình trả lời: “{testResult.sample_output}”</>}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </Section>
   );
@@ -759,60 +817,78 @@ function EmbeddingSection({ embedding, openaiHasKey }) {
   return (
     <Section
       id="mdl-embedding"
-      icon={<Binary size={18} />}
       title="Nhúng văn bản (Embedding)"
       description="Mô hình biến câu hỏi và các đoạn tài liệu thành vector để tìm kiếm theo ngữ nghĩa."
-      current={
+      badge={
         <>
-          <span>
-            Đang dùng <strong>{embedding.model || "—"}</strong> ·{" "}
-            {EMBEDDING_PROVIDER_NAMES[provider] ?? (provider || "—")}
-          </span>
-          {provider === "openai" && !openaiHasKey && (
-            <StatusPill tone="warn">
-              <AlertTriangle size={12} /> Chưa có API key OpenAI
-            </StatusPill>
-          )}
+          <Lock size={13} /> Chỉ đọc · đổi qua <code>.env</code>
         </>
       }
     >
-      <div className="mdl-stack">
-        <div className="inline-alert is-info">
-          <Info size={16} />
-          <span>
-            Mô hình nhúng được nạp một lần khi backend khởi động và quyết định số chiều của mọi vector đã lưu
-            trong kho, nên không đổi được tại đây.
-            {provider === "openai" && " Mô hình này dùng chung API key OpenAI ở mục LLM."}
-          </span>
+      <dl className="mdl-spec">
+        <div>
+          <dt>Nhà cung cấp</dt>
+          <dd>{EMBEDDING_PROVIDER_NAMES[provider] ?? (provider || "—")}</dd>
         </div>
+        <div>
+          <dt>Mô hình</dt>
+          <dd className="is-mono">{embedding.model || "—"}</dd>
+        </div>
+        <div>
+          <dt>API key</dt>
+          <dd>
+            {provider !== "openai" ? (
+              "Không cần"
+            ) : openaiHasKey ? (
+              "Dùng chung khoá OpenAI ở khâu LLM"
+            ) : (
+              <StatusPill tone="warn">
+                <AlertTriangle size={12} /> Chưa có API key OpenAI
+              </StatusPill>
+            )}
+          </dd>
+        </div>
+      </dl>
 
-        <div className="mdl-howto">
-          <h4>Muốn đổi mô hình nhúng</h4>
-          <ol>
-            <li>
+      <p className="mdl-note">
+        Mô hình nhúng được nạp một lần khi backend khởi động và quyết định số chiều của mọi vector đã lưu trong
+        kho, nên không đổi được tại đây.
+      </p>
+
+      <div className="mdl-howto">
+        <h4>Muốn đổi mô hình nhúng</h4>
+        <ol className="mdl-steps">
+          <li>
+            <span>
               Sửa tệp <code>.env</code> của backend:
-              <div className="mdl-code">
-                <pre>{snippet}</pre>
-                <button
-                  type="button"
-                  className="mdl-code-copy"
-                  onClick={copySnippet}
-                  aria-label="Chép cấu hình hiện tại"
-                >
-                  {copied ? <Check size={14} /> : <Copy size={14} />}
-                  {copied ? "Đã chép" : "Chép"}
-                </button>
-              </div>
-            </li>
-            <li>
+            </span>
+            <div className="mdl-code">
+              <pre>{snippet}</pre>
+              <button
+                type="button"
+                className="mdl-code-copy"
+                onClick={copySnippet}
+                aria-label="Chép cấu hình hiện tại"
+              >
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+                {copied ? "Đã chép" : "Chép"}
+              </button>
+            </div>
+          </li>
+          <li>
+            <span>
               Đặt <code>VECTOR_DIM</code> bằng số chiều của mô hình mới.
-            </li>
-            <li>Khởi động lại backend.</li>
-            <li>
+            </span>
+          </li>
+          <li>
+            <span>Khởi động lại backend.</span>
+          </li>
+          <li>
+            <span>
               Vào <strong>Dataset</strong> → <strong>Nạp lại toàn bộ</strong> để tạo lại vector cho mọi tài liệu.
-            </li>
-          </ol>
-        </div>
+            </span>
+          </li>
+        </ol>
       </div>
     </Section>
   );
@@ -822,7 +898,7 @@ function EmbeddingSection({ embedding, openaiHasKey }) {
 // Mục Reranker
 // ---------------------------------------------------------------------------
 
-function RerankerSection({ reranker }) {
+function RerankerSection({ reranker, onDirtyChange }) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const initialKey = `${reranker.provider ?? ""}\u0000${reranker.model ?? ""}`;
@@ -842,6 +918,7 @@ function RerankerSection({ reranker }) {
   const dirty =
     draft.provider !== initial.provider || (usesModel && draft.model.trim() !== initial.model.trim());
   useWarnBeforeUnload(dirty);
+  useReportDirty(dirty, onDirtyChange);
 
   async function handleSave() {
     if (modelError) {
@@ -868,25 +945,14 @@ function RerankerSection({ reranker }) {
     }
   }
 
-  const currentIsModel = reranker.provider === "cross-encoder";
-
   return (
     <Section
       id="mdl-reranker"
-      icon={<ArrowDownUp size={18} />}
       title="Xếp hạng lại (Reranker)"
       description="Sắp xếp lại các đoạn ứng viên theo mức liên quan trước khi đưa vào LLM."
-      current={
+      badge={
         <>
-          <span>
-            Đang dùng <strong>{currentIsModel ? reranker.model : "Heuristic"}</strong>
-            {currentIsModel && " · Cross-Encoder"}
-          </span>
-          {reranker.enabled === false ? (
-            <StatusPill tone="warn">Đang tắt</StatusPill>
-          ) : (
-            <StatusPill tone="ok">Đang bật</StatusPill>
-          )}
+          <Zap size={13} /> Áp dụng từ lần tìm kiếm tiếp theo
         </>
       }
       footer={
@@ -901,20 +967,20 @@ function RerankerSection({ reranker }) {
         />
       }
     >
-      <div className="mdl-stack">
-        {reranker.enabled === false && (
-          <div className="inline-alert is-warning">
-            <AlertTriangle size={16} />
-            <span>
-              Reranker đang tắt nên lựa chọn bên dưới chưa được dùng.{" "}
-              <a className="mdl-inline-link" href="#settings/config">
-                Bật trong Cấu hình RAG <ArrowRight size={13} />
-              </a>
-            </span>
-          </div>
-        )}
+      {reranker.enabled === false && (
+        <div className="inline-alert is-warning mdl-alert">
+          <AlertTriangle size={16} />
+          <span>
+            Reranker đang tắt nên lựa chọn bên dưới chưa được dùng.{" "}
+            <a className="mdl-inline-link" href="#settings/config">
+              Bật trong Cấu hình RAG <ArrowRight size={13} />
+            </a>
+          </span>
+        </div>
+      )}
 
-        <ChoiceGroup
+      <div className="mdl-stack">
+        <OptionGroup
           name="reranker-provider"
           legend="Cách xếp hạng"
           options={RERANKER_PROVIDERS}
@@ -923,7 +989,7 @@ function RerankerSection({ reranker }) {
         />
 
         {usesModel && (
-          <div ref={modelRef} className="mdl-grid">
+          <div ref={modelRef} className="mdl-reranker-model">
             <TextField
               id="reranker-model"
               field={{
@@ -945,6 +1011,132 @@ function RerankerSection({ reranker }) {
 }
 
 // ---------------------------------------------------------------------------
+// Thanh luồng xử lý
+// ---------------------------------------------------------------------------
+
+const STAGES = [
+  { key: "embedding", label: "Nhúng văn bản", Icon: Binary },
+  { key: "reranker", label: "Xếp hạng lại", Icon: ArrowDownUp },
+  { key: "llm", label: "Sinh câu trả lời", Icon: MessageSquareText },
+];
+
+/** Tóm tắt khâu đang chạy trên máy chủ để hiện trên thẻ của thanh luồng xử lý. */
+function stageSummaries(config) {
+  const llm = config.llm ?? {};
+  const reranker = config.reranker ?? {};
+  const embedding = config.embedding ?? {};
+  const llmProvider = normalizeLlmProvider(llm.provider);
+  const embeddingProvider = (embedding.provider || "").toLowerCase();
+  const rerankerIsModel = reranker.provider === "cross-encoder";
+
+  return {
+    embedding: {
+      model: embedding.model || "—",
+      meta: EMBEDDING_PROVIDER_NAMES[embeddingProvider] ?? (embeddingProvider || "—"),
+      status:
+        embeddingProvider === "openai" && !llm.openai_has_key
+          ? { tone: "warn", Icon: AlertTriangle, text: "Thiếu API key" }
+          : { tone: "muted", Icon: Lock, text: "Cố định khi chạy" },
+    },
+    reranker: {
+      model: rerankerIsModel ? reranker.model || "—" : "Heuristic",
+      meta: rerankerIsModel ? "Cross-Encoder" : "Vector + BM25 + từ khoá",
+      status:
+        reranker.enabled === false
+          ? { tone: "warn", text: "Đang tắt" }
+          : { tone: "ok", text: "Đang bật" },
+    },
+    llm: {
+      model: llm.model || "—",
+      meta: llmProviderName(llmProvider),
+      status:
+        KEY_FIELD[llmProvider].required && !llm[KEY_FIELD[llmProvider].hasKey]
+          ? { tone: "warn", Icon: AlertTriangle, text: "Thiếu API key" }
+          : { tone: "ok", Icon: Check, text: "Đã cấu hình" },
+    },
+  };
+}
+
+function Pipeline({ summaries, active, dirtyStages, onSelect }) {
+  const tabRefs = useRef({});
+
+  function handleKeyDown(event, index) {
+    const last = STAGES.length - 1;
+    let next = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") next = index === last ? 0 : index + 1;
+    else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = index === 0 ? last : index - 1;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = last;
+    if (next == null) return;
+    event.preventDefault();
+    const key = STAGES[next].key;
+    onSelect(key);
+    tabRefs.current[key]?.focus();
+  }
+
+  return (
+    <div className="mdl-flow">
+      <p className="mdl-flow-caption" id="mdl-flow-caption">
+        Luồng xử lý một câu hỏi — chọn một khâu để cấu hình
+      </p>
+      <div className="mdl-pipeline" role="tablist" aria-labelledby="mdl-flow-caption">
+        {STAGES.map(({ key, label, Icon }, index) => {
+          const summary = summaries[key];
+          const selected = active === key;
+          const StatusIcon = summary.status.Icon;
+          return (
+            <React.Fragment key={key}>
+              {index > 0 && (
+                <span className="mdl-flow-arrow" aria-hidden="true">
+                  <ChevronRight size={16} />
+                </span>
+              )}
+              <button
+                ref={(node) => {
+                  tabRefs.current[key] = node;
+                }}
+                type="button"
+                role="tab"
+                id={`mdl-tab-${key}`}
+                aria-selected={selected}
+                aria-controls={`mdl-panel-${key}`}
+                tabIndex={selected ? 0 : -1}
+                className={`mdl-stage ${selected ? "is-active" : ""}`}
+                onClick={() => onSelect(key)}
+                onKeyDown={(event) => handleKeyDown(event, index)}
+              >
+                <span className="mdl-stage-top">
+                  <span className="mdl-stage-icon" aria-hidden="true">
+                    <Icon size={16} />
+                  </span>
+                  <span className="mdl-stage-step">Bước {index + 1}</span>
+                  {dirtyStages[key] && (
+                    <span className="mdl-stage-dirty">
+                      <span aria-hidden="true" /> Chưa lưu
+                    </span>
+                  )}
+                </span>
+                <span className="mdl-stage-label">{label}</span>
+                <span className="mdl-stage-model" title={summary.model}>
+                  {summary.model}
+                </span>
+                <span className="mdl-stage-meta">{summary.meta}</span>
+                <span className="mdl-stage-status">
+                  <StatusPill tone={summary.status.tone}>
+                    {StatusIcon && <StatusIcon size={12} />}
+                    {summary.status.text}
+                  </StatusPill>
+                </span>
+              </button>
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Màn chính
 // ---------------------------------------------------------------------------
 
@@ -961,6 +1153,17 @@ export default function ModelsView() {
         fallbackDetail: "Máy chủ trả về lỗi khi đọc cấu hình.",
       })
     : null;
+  const [activeStage, setActiveStage] = useState("llm");
+  const [dirtyStages, setDirtyStages] = useState({});
+  const onLlmDirty = useCallback(
+    (dirty) => setDirtyStages((current) => (current.llm === dirty ? current : { ...current, llm: dirty })),
+    []
+  );
+  const onRerankerDirty = useCallback(
+    (dirty) =>
+      setDirtyStages((current) => (current.reranker === dirty ? current : { ...current, reranker: dirty })),
+    []
+  );
 
   useEffect(() => {
     // Dọn dữ liệu của màn cũ: danh sách "nhà cung cấp đã thêm" chỉ từng tồn tại trên giao diện.
@@ -973,6 +1176,7 @@ export default function ModelsView() {
 
   const llm = config?.llm ?? {};
   const reranker = config?.reranker ?? {};
+  const encryptionEnabled = Boolean(config?.persistence?.secret_encryption_enabled);
 
   let body;
   if (loading && !config) {
@@ -1002,34 +1206,48 @@ export default function ModelsView() {
       </div>
     );
   } else {
+    const panels = {
+      embedding: <EmbeddingSection embedding={config.embedding ?? {}} openaiHasKey={Boolean(llm.openai_has_key)} />,
+      reranker: <RerankerSection reranker={reranker} onDirtyChange={onRerankerDirty} />,
+      llm: <LlmSection llm={llm} onDirtyChange={onLlmDirty} />,
+    };
     body = (
       <>
-        <div className="inline-alert is-info">
-          <HardDrive size={16} />
-          <span>
-            Thay đổi được lưu vào cơ sở dữ liệu và giữ nguyên khi khởi động lại backend; API key được mã hoá
-            trước khi lưu. Mục chưa đổi vẫn lấy giá trị trong <code>.env</code>.
-          </span>
-        </div>
-        {!config.persistence?.secret_encryption_enabled && (
-          <div className="inline-alert is-warning" role="alert">
-            <AlertTriangle size={16} />
+        {!encryptionEnabled && (
+          <div className="inline-alert is-warning mdl-alert" role="alert">
+            <ShieldAlert size={16} />
             <span>
               Máy chủ chưa có <code>CONFIG_ENCRYPTION_KEY</code> hợp lệ nên sẽ từ chối lưu API key mới. Các thay
               đổi khác vẫn lưu bình thường.
             </span>
           </div>
         )}
-        <LlmSection llm={llm} />
-        <RerankerSection reranker={reranker} />
-        <EmbeddingSection embedding={config.embedding ?? {}} openaiHasKey={Boolean(llm.openai_has_key)} />
+        <Pipeline
+          summaries={stageSummaries(config)}
+          active={activeStage}
+          dirtyStages={dirtyStages}
+          onSelect={setActiveStage}
+        />
+        {/* Giữ cả ba bảng mounted để không mất bản nháp khi đổi khâu. */}
+        {STAGES.map(({ key }) => (
+          <div
+            key={key}
+            role="tabpanel"
+            id={`mdl-panel-${key}`}
+            aria-labelledby={`mdl-tab-${key}`}
+            className="mdl-panel"
+            hidden={activeStage !== key}
+          >
+            {panels[key]}
+          </div>
+        ))}
       </>
     );
   }
 
   return (
     <div className="models-page-wrapper">
-      <div className="settings-subtabs-header">
+      <div className="settings-subtabs-header mdl-header">
         <div className="config-header-title-box">
           <div className="config-header-icon-box red-gradient">
             <Cpu size={18} />
@@ -1037,10 +1255,17 @@ export default function ModelsView() {
           <div>
             <h2 className="config-main-title">Mô hình AI</h2>
             <p className="config-main-desc">
-              Chọn mô hình cho từng khâu của hệ thống hỏi đáp: sinh câu trả lời, xếp hạng lại và nhúng văn bản.
+              Mỗi khâu lưu riêng vào cơ sở dữ liệu và giữ nguyên khi backend khởi động lại; khâu chưa đổi dùng giá
+              trị trong <code>.env</code>.
             </p>
           </div>
         </div>
+        {config && (
+          <span className={`mdl-persist ${encryptionEnabled ? "is-ok" : "is-warn"}`}>
+            {encryptionEnabled ? <ShieldCheck size={14} /> : <ShieldAlert size={14} />}
+            {encryptionEnabled ? "API key được mã hoá khi lưu" : "Chưa bật mã hoá API key"}
+          </span>
+        )}
       </div>
       <div className="mdl-page">
         <div className="mdl-content">{body}</div>
