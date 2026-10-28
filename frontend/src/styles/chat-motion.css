@@ -1,0 +1,488 @@
+/* ==========================================================================
+   Chuyển động trang chat (task 2026-10-28-chat-motion).
+   Cùng ngôn ngữ với landing nhưng ở mức hợp với màn làm việc: chỉ phần tử vừa
+   mount mới chạy (tin nhắn, nguồn, bước suy luận…), không animate lại khi stream.
+   Toàn bộ nằm trong `prefers-reduced-motion: no-preference`; giảm chuyển động thì
+   giữ nguyên hành vi cũ (msgIn rút về tức thì theo quy tắc trong base.css).
+   Hiệu ứng cần JS (tilt, vệt sáng) thêm điều kiện `.motion-ready` — useChatMotion.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: no-preference) {
+  .app-shell {
+    --cm-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --cm-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* ------------------------------------------------------------------------
+     Vào trang: header trượt xuống, khung nhập trồi lên; sidebar (màn rộng)
+     trượt từ trái, các khối bên trong so le.
+     ------------------------------------------------------------------------ */
+  .view-chat .chat-header {
+    animation: cm-drop 0.7s var(--cm-ease-out) 0.1s both;
+  }
+
+  .view-chat .composer-shell {
+    animation: cm-rise 0.8s var(--cm-ease-out) 0.25s both;
+  }
+
+  @media (min-width: 901px) {
+    .view-chat .sidebar > * {
+      animation: cm-slide-right 0.7s var(--cm-ease-out) both;
+    }
+
+    .view-chat .sidebar > :nth-child(2) { animation-delay: 80ms; }
+    .view-chat .sidebar > :nth-child(3) { animation-delay: 160ms; }
+    .view-chat .sidebar > :nth-child(4) { animation-delay: 240ms; }
+  }
+
+  /* Hội thoại trong sidebar hiện so le; hội thoại mới lưu trượt vào đầu danh sách. */
+  .conv-item {
+    animation: cm-slide-right 0.5s var(--cm-ease-out) both;
+  }
+
+  .conv-item:nth-child(2) { animation-delay: 40ms; }
+  .conv-item:nth-child(3) { animation-delay: 80ms; }
+  .conv-item:nth-child(4) { animation-delay: 120ms; }
+  .conv-item:nth-child(5) { animation-delay: 160ms; }
+  .conv-item:nth-child(6) { animation-delay: 200ms; }
+  .conv-item:nth-child(n + 7) { animation-delay: 240ms; }
+
+  .conv-item.active {
+    animation-name: cm-slide-right, cm-flash;
+    animation-duration: 0.5s, 0.9s;
+  }
+
+  /* ------------------------------------------------------------------------
+     Màn chào
+     ------------------------------------------------------------------------ */
+  .welcome-icon {
+    position: relative;
+    animation:
+      cm-pop 0.9s var(--cm-ease-spring) 0.15s both,
+      cm-float 5s ease-in-out 1.1s infinite;
+  }
+
+  /* Sóng toả quanh icon, lặp chậm. */
+  .welcome-icon::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--brand-400);
+    border-radius: inherit;
+    opacity: 0;
+    animation: cm-sonar 3.2s var(--cm-ease-out) 1.2s infinite;
+  }
+
+  .welcome-title .split-word-inner {
+    animation: cm-word-up 0.9s var(--cm-ease-out) both;
+    animation-delay: calc(var(--i, 0) * 60ms + 250ms);
+  }
+
+  .welcome > p {
+    animation: cm-rise 0.8s var(--cm-ease-out) 0.55s both;
+  }
+
+  .suggestion {
+    overflow: hidden;
+    animation: cm-rise 0.7s var(--cm-ease-out) both;
+    animation-delay: calc(var(--i, 0) * 80ms + 0.65s);
+  }
+
+  .suggestion .s-title svg {
+    transition: rotate 0.5s var(--cm-ease-spring), scale 0.5s var(--cm-ease-spring);
+  }
+
+  .suggestion:hover .s-title svg {
+    rotate: -12deg;
+    scale: 1.2;
+  }
+
+  /* Thẻ gợi ý nghiêng theo chuột kèm vệt sáng (cần JS). */
+  .motion-ready .suggestion {
+    --lift: 0px;
+    transform: perspective(800px) translateY(var(--lift)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+    transition:
+      transform 0.5s var(--cm-ease-out),
+      border-color 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+
+  .motion-ready .suggestion:hover {
+    --lift: -3px;
+  }
+
+  .motion-ready .suggestion.is-tilting {
+    transition-duration: 0.2s, 0.18s, 0.18s;
+  }
+
+  .motion-ready .suggestion-glare {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      circle at var(--gx, 50%) var(--gy, 50%),
+      var(--motion-glare),
+      transparent 55%
+    );
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s var(--cm-ease-out);
+  }
+
+  .motion-ready .suggestion.is-tilting .suggestion-glare {
+    opacity: 1;
+  }
+
+  /* ------------------------------------------------------------------------
+     Tin nhắn: câu hỏi vào từ phải, câu trả lời từ trái; mở lại hội thoại thì
+     so le theo --enter-delay (ChatView).
+     ------------------------------------------------------------------------ */
+  .message-row.user {
+    transform-origin: 100% 100%;
+    animation: cm-msg-user 0.55s var(--cm-ease-spring) var(--enter-delay, 0ms) both;
+  }
+
+  .message-row.assistant {
+    transform-origin: 0 100%;
+    animation: cm-msg-assistant 0.6s var(--cm-ease-out) var(--enter-delay, 0ms) both;
+  }
+
+  /* Bong bóng câu trả lời xuất hiện (thay chỗ "đang tìm") — chạy một lần khi mount. */
+  .message-row.assistant .bubble {
+    animation: cm-bubble-in 0.45s var(--cm-ease-out) both;
+  }
+
+  .message-row .bubble.is-error {
+    animation: cm-shake 0.5s var(--cm-ease-out) both;
+  }
+
+  /* Avatar trợ lý có vòng sáng xoay trong lúc đang trả lời. */
+  .message-row.is-streaming .avatar.assistant {
+    position: relative;
+  }
+
+  .message-row.is-streaming .avatar.assistant::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    padding: 2px;
+    border-radius: 14px;
+    background: conic-gradient(from var(--cm-angle), transparent 0 50%, var(--brand-400) 75%, var(--brand-600) 100%);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+    animation: cm-spin 1.4s linear infinite;
+  }
+
+  /* Bước suy luận mới trượt vào khi xuất hiện. */
+  .reasoning-step {
+    animation: cm-slide-right 0.45s var(--cm-ease-out) both;
+  }
+
+  /* Nguồn trích dẫn trượt vào lần lượt sau khi câu trả lời xong. */
+  .source-card {
+    position: relative;
+    animation: cm-rise-sm 0.5s var(--cm-ease-out) both;
+    animation-delay: calc(var(--i, 0) * 70ms + var(--enter-delay, 0ms) + 120ms);
+  }
+
+  /* Bấm số trích dẫn: vòng sáng toả từ thẻ nguồn (trên pseudo-element để không
+     chạy lại animation vào của thẻ khi bỏ class highlight). */
+  .source-card.highlight::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border: 2px solid var(--brand);
+    border-radius: inherit;
+    pointer-events: none;
+    animation: cm-cite-ring 0.9s var(--cm-ease-out) forwards;
+  }
+
+  .copy-btn svg {
+    animation: cm-pop 0.45s var(--cm-ease-spring) both;
+  }
+
+  /* ------------------------------------------------------------------------
+     Header, khung nhập, nút
+     ------------------------------------------------------------------------ */
+  .chat-header .status-dot {
+    position: relative;
+  }
+
+  .chat-header .status-dot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: var(--success);
+    opacity: 0;
+  }
+
+  .chat-header .status-dot.is-busy {
+    background: var(--brand);
+  }
+
+  .chat-header .status-dot.is-busy::after {
+    background: var(--brand);
+    animation: cm-sonar-dot 1.2s var(--cm-ease-out) infinite;
+  }
+
+  .chat-header .title > span:last-child {
+    animation: cm-fade 0.4s ease both;
+  }
+
+  .composer {
+    position: relative;
+    isolation: isolate;
+  }
+
+  /* Viền gradient chạy quanh khung nhập khi focus; nhanh hơn khi đang trả lời. */
+  .composer-glow {
+    position: absolute;
+    inset: -2px;
+    z-index: -1;
+    padding: 2px;
+    border-radius: calc(var(--radius-xl) + 2px);
+    background: conic-gradient(
+      from var(--cm-angle),
+      transparent 0 55%,
+      var(--brand-400) 72%,
+      var(--brand-600) 86%,
+      transparent 100%
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s var(--cm-ease-out);
+    animation: cm-spin 4s linear infinite;
+  }
+
+  .composer:focus-within .composer-glow {
+    opacity: 1;
+  }
+
+  .composer.is-busy .composer-glow {
+    opacity: 1;
+    animation-duration: 1.6s;
+  }
+
+  /* Đổi Gửi ↔ Dừng: icon mới bay vào / bật ra. */
+  .send-btn .lucide-send {
+    animation: cm-send-in 0.5s var(--cm-ease-spring) both;
+  }
+
+  .send-btn .lucide-square {
+    animation: cm-pop 0.4s var(--cm-ease-spring) both;
+  }
+
+  .send-btn:hover:not(:disabled) .lucide-send {
+    translate: 2px -2px;
+    transition: translate 0.3s var(--cm-ease-spring);
+  }
+
+  .scroll-bottom-btn {
+    animation: cm-pop 0.45s var(--cm-ease-spring) both;
+  }
+
+  .scroll-bottom-btn svg {
+    animation: cm-nudge 1.6s ease-in-out 0.6s infinite;
+  }
+
+  .guest-hint {
+    animation: cm-rise-sm 0.6s var(--cm-ease-out) 0.5s both;
+  }
+
+  /* ------------------------------------------------------------------------
+     Keyframes
+     ------------------------------------------------------------------------ */
+  @keyframes cm-drop {
+    from {
+      opacity: 0;
+      translate: 0 -16px;
+    }
+  }
+
+  @keyframes cm-rise {
+    from {
+      opacity: 0;
+      translate: 0 24px;
+    }
+  }
+
+  @keyframes cm-rise-sm {
+    from {
+      opacity: 0;
+      translate: 0 10px;
+    }
+  }
+
+  @keyframes cm-fade {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes cm-slide-right {
+    from {
+      opacity: 0;
+      translate: -18px 0;
+    }
+  }
+
+  @keyframes cm-flash {
+    0% {
+      box-shadow: 0 0 0 0 var(--brand-400);
+    }
+    100% {
+      box-shadow: 0 0 0 8px transparent;
+    }
+  }
+
+  @keyframes cm-pop {
+    from {
+      opacity: 0;
+      scale: 0.3;
+      rotate: -25deg;
+    }
+  }
+
+  @keyframes cm-float {
+    0%,
+    100% {
+      translate: 0 0;
+    }
+    50% {
+      translate: 0 -8px;
+    }
+  }
+
+  @keyframes cm-sonar {
+    0% {
+      opacity: 0.7;
+      scale: 1;
+    }
+    70%,
+    100% {
+      opacity: 0;
+      scale: 1.6;
+    }
+  }
+
+  @keyframes cm-sonar-dot {
+    0% {
+      opacity: 0.6;
+      scale: 1;
+    }
+    100% {
+      opacity: 0;
+      scale: 3.2;
+    }
+  }
+
+  @keyframes cm-word-up {
+    from {
+      translate: 0 110%;
+      rotate: 6deg;
+    }
+  }
+
+  @keyframes cm-msg-user {
+    from {
+      opacity: 0;
+      translate: 28px 6px;
+      scale: 0.94;
+    }
+  }
+
+  @keyframes cm-msg-assistant {
+    from {
+      opacity: 0;
+      translate: -20px 8px;
+    }
+  }
+
+  @keyframes cm-bubble-in {
+    from {
+      opacity: 0;
+      scale: 0.97;
+    }
+  }
+
+  @keyframes cm-shake {
+    0%,
+    100% {
+      translate: 0 0;
+    }
+    20%,
+    60% {
+      translate: -6px 0;
+    }
+    40%,
+    80% {
+      translate: 6px 0;
+    }
+  }
+
+  @keyframes cm-cite-ring {
+    from {
+      opacity: 1;
+      scale: 1;
+    }
+    to {
+      opacity: 0;
+      scale: 1.06;
+    }
+  }
+
+  @keyframes cm-send-in {
+    from {
+      opacity: 0;
+      translate: -10px 10px;
+    }
+  }
+
+  @keyframes cm-nudge {
+    0%,
+    100% {
+      translate: 0 0;
+    }
+    50% {
+      translate: 0 3px;
+    }
+  }
+
+  @keyframes cm-spin {
+    to {
+      --cm-angle: 360deg;
+    }
+  }
+}
+
+@property --cm-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* Vệt sáng và viền chạy chỉ là trang trí: không có chuyển động thì ẩn hẳn. */
+.suggestion-glare,
+.composer-glow {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .composer-glow,
+  .motion-ready .suggestion-glare {
+    display: block;
+  }
+}

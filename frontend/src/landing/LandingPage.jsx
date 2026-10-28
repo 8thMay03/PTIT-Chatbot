@@ -9,7 +9,7 @@ import StepsCarousel from "./StepsCarousel";
 import TopicRing from "./TopicRing";
 import { BACKGROUND_TEXT, REPO_URL, TOPIC_STRIP } from "./content";
 import "./fonts";
-import SplitWords, { wordCount } from "./motion/SplitWords";
+import SplitWords, { wordCount } from "../lib/motion/SplitWords";
 import useLandingMotion from "./motion/useLandingMotion";
 
 function BrandMark({ inverted = false }) {

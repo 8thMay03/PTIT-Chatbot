@@ -259,7 +259,8 @@
   --lp-tag-shadow: inset 0 0 4px 0 rgba(0, 0, 0, 0.1);
   --lp-glow: rgba(255, 140, 110, 0.28);
   --lp-glare: rgba(255, 255, 255, 0.55);
-  --lp-pixel: var(--brand-700);
+  --motion-pixel: var(--brand-700);
+  --motion-glare: var(--lp-glare);
   --lp-nav-glass: rgba(255, 255, 255, 0.72);
   --lp-footer-bg: #191d24;
   --lp-footer-heading: #ffffff;

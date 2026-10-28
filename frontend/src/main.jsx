@@ -8,6 +8,7 @@ import {
   navigateTo,
   resolveAppRoute,
 } from "./lib/appRoute";
+import { playPixelEnter } from "./lib/motion/pixelTransition";
 import "./styles/index.css";
 
 // Mỗi trang là một chunk riêng: landing và trang tài khoản không tải mã chat
@@ -38,6 +39,9 @@ function renderApp() {
     navigateTo(redirect);
     return;
   }
+
+  // Trang trước vừa chạy pixel transition: phủ lưới ngay trước khi vẽ rồi cho tan.
+  playPixelEnter();
 
   const { Component, loading } = PAGES[route];
   createRoot(document.getElementById("root")).render(

@@ -1,10 +1,11 @@
 /* ==========================================================================
    Chuyển động của trang landing (task 2026-10-28-landing-motion).
    Biến CSS do src/landing/motion/useLandingMotion.js ghi; mọi trạng thái ẩn chờ
-   reveal và hiệu ứng chạy đều nằm dưới `.motion-ready` — hook chỉ gắn class này
+   reveal và hiệu ứng chạy đều nằm dưới `.landing-page.motion-ready` — hook chỉ gắn class này
    khi có matchMedia và người dùng không bật "giảm chuyển động", nên thiếu JS hay
    tắt chuyển động thì trang vẫn hiện đầy đủ, tĩnh như trước.
    Chỉ animate transform/translate/scale/rotate/opacity (chạy trên compositor).
+   Sóng click và lớp phủ pixel transition dùng chung với trang chat: motion.css.
    ========================================================================== */
 
 @property --lp-angle {
@@ -27,42 +28,29 @@
    từ trượt trong mặt nạ vẫn giữ màu (background-clip của dòng không theo
    transform của con).
    -------------------------------------------------------------------------- */
-.lp-word {
-  display: inline-block;
-  overflow: hidden;
-  /* Chừa chỗ cho dấu tiếng Việt chồng trên/dưới khỏi bị mặt nạ cắt. */
-  padding: 0.16em 0.04em;
-  margin: -0.16em -0.04em;
-  vertical-align: top;
-}
-
-.lp-word-inner {
-  display: inline-block;
-}
-
 .lp-display-line.has-words {
   background: none;
 }
 
-.lp-display-line.has-words .lp-word-inner {
+.lp-display-line.has-words .split-word-inner {
   background: var(--lp-heading-gradient);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-.lp-display-line.has-words.is-muted .lp-word-inner {
+.lp-display-line.has-words.is-muted .split-word-inner {
   background-image: var(--lp-heading-muted-gradient);
 }
 
-.motion-ready [data-reveal="words"] .lp-word-inner {
+.landing-page.motion-ready [data-reveal="words"] .split-word-inner {
   transform-origin: 0 100%;
   transition:
     translate 1s var(--lp-ease-out) calc(var(--i, 0) * 55ms + var(--d, 0ms)),
     rotate 1s var(--lp-ease-out) calc(var(--i, 0) * 55ms + var(--d, 0ms));
 }
 
-.motion-ready [data-reveal="words"]:not(.is-revealed) .lp-word-inner {
+.landing-page.motion-ready [data-reveal="words"]:not(.is-revealed) .split-word-inner {
   translate: 0 115%;
   rotate: 7deg;
 }
@@ -70,24 +58,24 @@
 /* --------------------------------------------------------------------------
    Reveal chung
    -------------------------------------------------------------------------- */
-.motion-ready [data-reveal="up"],
-.motion-ready [data-reveal="fade"] {
+.landing-page.motion-ready [data-reveal="up"],
+.landing-page.motion-ready [data-reveal="fade"] {
   transition:
     opacity 0.9s var(--lp-ease-out) var(--d, 0ms),
     translate 1.1s var(--lp-ease-out) var(--d, 0ms);
 }
 
-.motion-ready [data-reveal="up"]:not(.is-revealed) {
+.landing-page.motion-ready [data-reveal="up"]:not(.is-revealed) {
   opacity: 0;
   translate: 0 48px;
 }
 
-.motion-ready [data-reveal="fade"]:not(.is-revealed) {
+.landing-page.motion-ready [data-reveal="fade"]:not(.is-revealed) {
   opacity: 0;
 }
 
 /* Tab tới phần tử chưa kịp reveal thì hiện ngay, không để tiêu điểm rơi vào chỗ trống. */
-.motion-ready [data-reveal]:focus-within {
+.landing-page.motion-ready [data-reveal]:focus-within {
   opacity: 1;
   translate: none;
 }
@@ -96,18 +84,18 @@
    Thanh điều hướng: cố định, thu thành viên thuốc kính mờ khi cuộn, ẩn khi cuộn
    xuống và hiện lại khi cuộn lên (data-nav-state).
    -------------------------------------------------------------------------- */
-.motion-ready {
+.landing-page.motion-ready {
   padding-top: 100px;
 }
 
-.motion-ready .lp-nav {
+.landing-page.motion-ready .lp-nav {
   position: fixed;
   inset: 0 0 auto;
   z-index: 40;
   transition: translate 0.6s var(--lp-ease-out);
 }
 
-.motion-ready .lp-nav-inner {
+.landing-page.motion-ready .lp-nav-inner {
   border: 1px solid transparent;
   border-radius: 20px;
   transition:
@@ -119,8 +107,8 @@
     box-shadow 0.4s var(--lp-ease-out);
 }
 
-.motion-ready .lp-nav[data-nav-state="scrolled"] .lp-nav-inner,
-.motion-ready .lp-nav[data-nav-state="hidden"] .lp-nav-inner {
+.landing-page.motion-ready .lp-nav[data-nav-state="scrolled"] .lp-nav-inner,
+.landing-page.motion-ready .lp-nav[data-nav-state="hidden"] .lp-nav-inner {
   min-height: 64px;
   margin-top: 10px;
   padding-inline: 12px;
@@ -132,23 +120,23 @@
 }
 
 /* Đủ xa để cả bóng của viên thuốc cũng ra khỏi màn hình. */
-.motion-ready .lp-nav[data-nav-state="hidden"] {
+.landing-page.motion-ready .lp-nav[data-nav-state="hidden"] {
   translate: 0 -170%;
 }
 
-.motion-ready .lp-nav .lp-brand-tile {
+.landing-page.motion-ready .lp-nav .lp-brand-tile {
   transition: scale 0.5s var(--lp-ease-out), rotate 0.6s var(--lp-ease-spring);
 }
 
-.motion-ready .lp-nav[data-nav-state="scrolled"] .lp-brand-tile {
+.landing-page.motion-ready .lp-nav[data-nav-state="scrolled"] .lp-brand-tile {
   scale: 0.82;
 }
 
-.motion-ready .lp-nav-brand:hover .lp-brand-tile {
+.landing-page.motion-ready .lp-nav-brand:hover .lp-brand-tile {
   rotate: -12deg;
 }
 
-.motion-ready [id] {
+.landing-page.motion-ready [id] {
   scroll-margin-top: 96px;
 }
 
@@ -164,24 +152,20 @@
   display: inline-block;
 }
 
-.motion-ready .lp-roll-text {
+.landing-page.motion-ready .lp-roll-text {
   text-shadow: 0 1.5em 0 var(--lp-heading);
   transition: translate 0.55s var(--lp-ease-out);
 }
 
-.motion-ready .lp-roll:hover .lp-roll-text,
-.motion-ready .lp-roll:focus-visible .lp-roll-text {
+.landing-page.motion-ready .lp-roll:hover .lp-roll-text,
+.landing-page.motion-ready .lp-roll:focus-visible .lp-roll-text {
   translate: 0 -1.5em;
 }
 
 /* --------------------------------------------------------------------------
    Nút: hút theo chuột, mũi tên xoay, nhún khi nhấn, sóng khi click
    -------------------------------------------------------------------------- */
-[data-pulse] {
-  position: relative;
-}
-
-.motion-ready .lp-btn {
+.landing-page.motion-ready .lp-btn {
   transform: translate(var(--mx, 0px), var(--my, 0px));
   transition:
     transform 0.6s var(--lp-ease-out),
@@ -189,21 +173,21 @@
     box-shadow var(--duration-fast) var(--ease);
 }
 
-.motion-ready .lp-btn:hover {
+.landing-page.motion-ready .lp-btn:hover {
   transform: translate(var(--mx, 0px), calc(var(--my, 0px) - 2px));
 }
 
-.motion-ready .lp-btn-arrow {
+.landing-page.motion-ready .lp-btn-arrow {
   transition: rotate 0.5s var(--lp-ease-spring);
 }
 
-.motion-ready .lp-btn:hover .lp-btn-arrow,
-.motion-ready .lp-btn:focus-visible .lp-btn-arrow {
+.landing-page.motion-ready .lp-btn:hover .lp-btn-arrow,
+.landing-page.motion-ready .lp-btn:focus-visible .lp-btn-arrow {
   rotate: 45deg;
 }
 
-.motion-ready .lp-composer-send,
-.motion-ready .lp-carousel-arrow {
+.landing-page.motion-ready .lp-composer-send,
+.landing-page.motion-ready .lp-carousel-arrow {
   transform: translate(var(--mx, 0px), var(--my, 0px));
   transition:
     transform 0.6s var(--lp-ease-out),
@@ -211,43 +195,21 @@
     background var(--duration-fast) var(--ease);
 }
 
-.motion-ready .lp-chip {
+.landing-page.motion-ready .lp-chip {
   transition:
     scale 0.25s var(--lp-ease-out),
     color var(--duration-fast) var(--ease),
     border-color var(--duration-fast) var(--ease);
 }
 
-.motion-ready [data-pulse]:active {
+.landing-page.motion-ready [data-pulse]:active {
   scale: 0.95;
-}
-
-.lp-pulse {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  margin: -8px 0 0 -8px;
-  border: 2px solid var(--lp-accent);
-  border-radius: 50%;
-  pointer-events: none;
-  animation: lp-pulse 0.75s var(--lp-ease-out) forwards;
-}
-
-@keyframes lp-pulse {
-  from {
-    opacity: 0.9;
-    scale: 1;
-  }
-  to {
-    opacity: 0;
-    scale: 9;
-  }
 }
 
 /* --------------------------------------------------------------------------
    Hero: haze và chữ nền trôi theo cuộn/chuột, thẻ nghiêng bay vào rồi lơ lửng
    -------------------------------------------------------------------------- */
-.motion-ready .lp-haze {
+.landing-page.motion-ready .lp-haze {
   translate:
     calc(var(--hero-px, 0) * 48px)
     calc(var(--scroll-y, 0) * 0.35px + var(--hero-py, 0) * 32px);
@@ -256,7 +218,7 @@
 
 /* Chữ nền sáng dần từng dòng khi cuộn: ghép mặt nạ toả tròn của thiết kế với một
    mặt nạ dọc chạy theo --progress. #000 chỉ là kênh alpha của mặt nạ. */
-.motion-ready .lp-bgtext[data-scrub] {
+.landing-page.motion-ready .lp-bgtext[data-scrub] {
   --fill: calc(var(--progress, 0) * 140% - 10%);
   translate: 0 calc(var(--scroll-y, 0) * -0.12px);
   -webkit-mask-image:
@@ -269,35 +231,35 @@
   mask-composite: intersect;
 }
 
-.motion-ready .lp-float-cards {
+.landing-page.motion-ready .lp-float-cards {
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
 }
 
-.motion-ready .lp-float-card {
+.landing-page.motion-ready .lp-float-card {
   transition:
     opacity 1s var(--lp-ease-out) 0.5s,
     scale 1.3s var(--lp-ease-spring) 0.5s,
     translate 0.9s var(--lp-ease-out);
 }
 
-.motion-ready .lp-float-card.is-left {
+.landing-page.motion-ready .lp-float-card.is-left {
   translate:
     calc(var(--hero-px, 0) * -40px)
     calc(var(--hero-py, 0) * -28px + var(--scroll-y, 0) * -0.22px);
   animation: lp-bob-left 7s ease-in-out infinite;
 }
 
-.motion-ready .lp-float-card.is-right {
+.landing-page.motion-ready .lp-float-card.is-right {
   translate:
     calc(var(--hero-px, 0) * -56px)
     calc(var(--hero-py, 0) * -36px + var(--scroll-y, 0) * -0.32px);
   animation: lp-bob-right 8s ease-in-out infinite;
 }
 
-.motion-ready [data-reveal="float"]:not(.is-revealed) .lp-float-card {
+.landing-page.motion-ready [data-reveal="float"]:not(.is-revealed) .lp-float-card {
   opacity: 0;
   scale: 0.5;
 }
@@ -331,7 +293,7 @@
   display: none;
 }
 
-.motion-ready .lp-composer-glow {
+.landing-page.motion-ready .lp-composer-glow {
   position: absolute;
   inset: -2px;
   z-index: -1;
@@ -359,8 +321,8 @@
   animation: lp-spin 5s linear infinite;
 }
 
-.motion-ready .lp-composer:hover .lp-composer-glow,
-.motion-ready .lp-composer:focus-within .lp-composer-glow {
+.landing-page.motion-ready .lp-composer:hover .lp-composer-glow,
+.landing-page.motion-ready .lp-composer:focus-within .lp-composer-glow {
   opacity: 1;
 }
 
@@ -375,7 +337,7 @@
   display: none;
 }
 
-.motion-ready .lp-marquee {
+.landing-page.motion-ready .lp-marquee {
   position: relative;
   z-index: 2;
   overflow: hidden;
@@ -384,17 +346,17 @@
   mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
 }
 
-.motion-ready .lp-marquee-track {
+.landing-page.motion-ready .lp-marquee-track {
   display: flex;
   width: max-content;
   animation: lp-marquee 38s linear infinite;
 }
 
-.motion-ready .lp-marquee:hover .lp-marquee-track {
+.landing-page.motion-ready .lp-marquee:hover .lp-marquee-track {
   animation-play-state: paused;
 }
 
-.motion-ready .lp-marquee .lp-topic-strip {
+.landing-page.motion-ready .lp-marquee .lp-topic-strip {
   display: flex;
   flex-shrink: 0;
   flex-wrap: nowrap;
@@ -417,7 +379,7 @@
   display: none;
 }
 
-.motion-ready .lp-card[data-scrub] {
+.landing-page.motion-ready .lp-card[data-scrub] {
   --flip: calc(1 - var(--progress, 0));
   transform-origin: 50% 100%;
   opacity: calc(0.2 + var(--progress, 0) * 0.8);
@@ -430,20 +392,20 @@
     opacity 0.7s var(--lp-ease-out);
 }
 
-.motion-ready .lp-card.is-tilting {
+.landing-page.motion-ready .lp-card.is-tilting {
   transition-duration: 0.3s;
 }
 
-.motion-ready .lp-card-scope {
+.landing-page.motion-ready .lp-card-scope {
   --flip-y: -14deg;
 }
 
-.motion-ready .lp-card-cite,
-.motion-ready .lp-card-history {
+.landing-page.motion-ready .lp-card-cite,
+.landing-page.motion-ready .lp-card-history {
   --flip-y: 14deg;
 }
 
-.motion-ready .lp-glare {
+.landing-page.motion-ready .lp-glare {
   position: absolute;
   inset: 0;
   z-index: 3;
@@ -459,71 +421,71 @@
   transition: opacity 0.5s var(--lp-ease-out);
 }
 
-.motion-ready .is-tilting > .lp-glare {
+.landing-page.motion-ready .is-tilting > .lp-glare {
   opacity: 1;
 }
 
 /* Minh hoạ trong thẻ chạy khi thẻ được reveal. */
-.motion-ready .lp-card .lp-panel,
-.motion-ready .lp-card .lp-prompt-bubble,
-.motion-ready .lp-card .lp-cite-chip,
-.motion-ready .lp-card .lp-mini-bubble,
-.motion-ready .lp-card .lp-history-item,
-.motion-ready .lp-card .lp-history-group {
+.landing-page.motion-ready .lp-card .lp-panel,
+.landing-page.motion-ready .lp-card .lp-prompt-bubble,
+.landing-page.motion-ready .lp-card .lp-cite-chip,
+.landing-page.motion-ready .lp-card .lp-mini-bubble,
+.landing-page.motion-ready .lp-card .lp-history-item,
+.landing-page.motion-ready .lp-card .lp-history-group {
   transition:
     opacity 0.8s var(--lp-ease-out) var(--stagger, 0ms),
     translate 0.9s var(--lp-ease-out) var(--stagger, 0ms),
     scale 0.9s var(--lp-ease-spring) var(--stagger, 0ms);
 }
 
-.motion-ready .lp-card:not(.is-revealed) .lp-panel,
-.motion-ready .lp-card:not(.is-revealed) .lp-prompt-bubble,
-.motion-ready .lp-card:not(.is-revealed) .lp-history-item,
-.motion-ready .lp-card:not(.is-revealed) .lp-history-group {
+.landing-page.motion-ready .lp-card:not(.is-revealed) .lp-panel,
+.landing-page.motion-ready .lp-card:not(.is-revealed) .lp-prompt-bubble,
+.landing-page.motion-ready .lp-card:not(.is-revealed) .lp-history-item,
+.landing-page.motion-ready .lp-card:not(.is-revealed) .lp-history-group {
   opacity: 0;
   translate: 0 36px;
 }
 
-.motion-ready .lp-card:not(.is-revealed) .lp-cite-chip {
+.landing-page.motion-ready .lp-card:not(.is-revealed) .lp-cite-chip {
   opacity: 0;
   translate: 60px 0;
 }
 
-.motion-ready .lp-card:not(.is-revealed) .lp-mini-bubble {
+.landing-page.motion-ready .lp-card:not(.is-revealed) .lp-mini-bubble {
   opacity: 0;
   scale: 0.6;
 }
 
-.motion-ready .lp-mini-bubble.is-user {
+.landing-page.motion-ready .lp-mini-bubble.is-user {
   transform-origin: 100% 100%;
 }
 
-.motion-ready .lp-mini-bubble.is-bot {
+.landing-page.motion-ready .lp-mini-bubble.is-bot {
   transform-origin: 0 100%;
 }
 
-.motion-ready .lp-panel-sources { --stagger: 180ms; }
-.motion-ready .lp-prompt-bubble { --stagger: 360ms; }
-.motion-ready .lp-cite-chip:nth-child(1) { --stagger: 150ms; }
-.motion-ready .lp-cite-chip:nth-child(2) { --stagger: 300ms; }
-.motion-ready .lp-cite-chip:nth-child(3) { --stagger: 450ms; }
-.motion-ready .lp-mini-bubble:nth-child(1) { --stagger: 200ms; }
-.motion-ready .lp-mini-bubble:nth-child(2) { --stagger: 800ms; }
-.motion-ready .lp-mini-bubble:nth-child(3) { --stagger: 1400ms; }
-.motion-ready .lp-history-panel > :nth-child(2) { --stagger: 100ms; }
-.motion-ready .lp-history-panel > :nth-child(3) { --stagger: 200ms; }
-.motion-ready .lp-history-panel > :nth-child(4) { --stagger: 300ms; }
-.motion-ready .lp-history-panel > :nth-child(5) { --stagger: 400ms; }
-.motion-ready .lp-history-panel > :nth-child(6) { --stagger: 500ms; }
+.landing-page.motion-ready .lp-panel-sources { --stagger: 180ms; }
+.landing-page.motion-ready .lp-prompt-bubble { --stagger: 360ms; }
+.landing-page.motion-ready .lp-cite-chip:nth-child(1) { --stagger: 150ms; }
+.landing-page.motion-ready .lp-cite-chip:nth-child(2) { --stagger: 300ms; }
+.landing-page.motion-ready .lp-cite-chip:nth-child(3) { --stagger: 450ms; }
+.landing-page.motion-ready .lp-mini-bubble:nth-child(1) { --stagger: 200ms; }
+.landing-page.motion-ready .lp-mini-bubble:nth-child(2) { --stagger: 800ms; }
+.landing-page.motion-ready .lp-mini-bubble:nth-child(3) { --stagger: 1400ms; }
+.landing-page.motion-ready .lp-history-panel > :nth-child(2) { --stagger: 100ms; }
+.landing-page.motion-ready .lp-history-panel > :nth-child(3) { --stagger: 200ms; }
+.landing-page.motion-ready .lp-history-panel > :nth-child(4) { --stagger: 300ms; }
+.landing-page.motion-ready .lp-history-panel > :nth-child(5) { --stagger: 400ms; }
+.landing-page.motion-ready .lp-history-panel > :nth-child(6) { --stagger: 500ms; }
 
 /* Nhãn phạm vi rơi xuống và nảy vào chỗ. */
-.motion-ready .lp-card .lp-tag {
+.landing-page.motion-ready .lp-card .lp-tag {
   transition:
     translate 1.1s var(--lp-ease-spring) calc(var(--i, 0) * 70ms + 200ms),
     opacity 0.4s ease calc(var(--i, 0) * 70ms + 200ms);
 }
 
-.motion-ready .lp-card:not(.is-revealed) .lp-tag {
+.landing-page.motion-ready .lp-card:not(.is-revealed) .lp-tag {
   opacity: 0;
   translate: 0 -280px;
 }
@@ -531,7 +493,7 @@
 /* --------------------------------------------------------------------------
    Carousel: nghiêng nhẹ theo chuột, chữ trích dẫn trượt vào khi đổi bước
    -------------------------------------------------------------------------- */
-.motion-ready .lp-carousel {
+.landing-page.motion-ready .lp-carousel {
   transform: perspective(1600px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
   transition:
     opacity 0.9s var(--lp-ease-out),
@@ -539,30 +501,30 @@
     transform 0.6s var(--lp-ease-out);
 }
 
-.motion-ready .lp-carousel.is-revealed .lp-carousel-quote .lp-word-inner {
-  animation: lp-word-in 0.8s var(--lp-ease-out) both;
+.landing-page.motion-ready .lp-carousel.is-revealed .lp-carousel-quote .split-word-inner {
+  animation: split-word-in 0.8s var(--lp-ease-out) both;
   animation-delay: calc(var(--i, 0) * 22ms);
 }
 
-.motion-ready .lp-carousel.is-revealed .lp-carousel-person {
+.landing-page.motion-ready .lp-carousel.is-revealed .lp-carousel-person {
   animation: lp-rise 0.7s var(--lp-ease-out) 0.25s both;
 }
 
-.motion-ready .lp-carousel.is-revealed .lp-carousel-avatar svg {
+.landing-page.motion-ready .lp-carousel.is-revealed .lp-carousel-avatar svg {
   animation: lp-pop 0.8s var(--lp-ease-spring) 0.35s both;
 }
 
-.motion-ready .lp-carousel-thumb-tile {
+.landing-page.motion-ready .lp-carousel-thumb-tile {
   transition:
     opacity var(--duration) var(--ease),
     scale 0.4s var(--lp-ease-spring);
 }
 
-.motion-ready .lp-carousel-thumb:hover .lp-carousel-thumb-tile {
+.landing-page.motion-ready .lp-carousel-thumb:hover .lp-carousel-thumb-tile {
   scale: 1.12;
 }
 
-@keyframes lp-word-in {
+@keyframes split-word-in {
   from {
     opacity: 0;
     translate: 0 100%;
@@ -586,19 +548,19 @@
 /* --------------------------------------------------------------------------
    FAQ: câu hỏi trượt nhẹ khi hover, câu trả lời mở ra mượt
    -------------------------------------------------------------------------- */
-.motion-ready .lp-faq-question button > span {
+.landing-page.motion-ready .lp-faq-question button > span {
   transition: translate 0.45s var(--lp-ease-out);
 }
 
-.motion-ready .lp-faq-question button:hover > span {
+.landing-page.motion-ready .lp-faq-question button:hover > span {
   translate: 8px 0;
 }
 
-.motion-ready .lp-faq-icon {
+.landing-page.motion-ready .lp-faq-icon {
   transition: transform 0.5s var(--lp-ease-spring);
 }
 
-.motion-ready .lp-faq-answer:not([hidden]) p {
+.landing-page.motion-ready .lp-faq-answer:not([hidden]) p {
   animation: lp-faq-in 0.55s var(--lp-ease-out) both;
 }
 
@@ -648,8 +610,8 @@
   opacity: calc(0.62 + 0.38 * cos(var(--angle) + var(--ring-turn)));
 }
 
-.motion-ready .lp-ring-track,
-.motion-ready .lp-ring-item {
+.landing-page.motion-ready .lp-ring-track,
+.landing-page.motion-ready .lp-ring-item {
   transition:
     transform 0.9s var(--lp-ease-out),
     opacity 0.9s var(--lp-ease-out);
@@ -669,31 +631,6 @@
     height: 34px;
     padding: 0 12px;
     font-size: 13px;
-  }
-}
-
-/* --------------------------------------------------------------------------
-   Pixel transition (lớp phủ gắn vào body, xem motion/pixelTransition.js)
-   -------------------------------------------------------------------------- */
-.lp-pixels {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: grid;
-  grid-template-columns: repeat(var(--cols), 1fr);
-  grid-template-rows: repeat(var(--rows), 1fr);
-  cursor: progress;
-}
-
-.lp-pixels span {
-  background: var(--lp-pixel);
-  opacity: 0;
-  animation: lp-pixel 0.01s steps(1, end) forwards;
-}
-
-@keyframes lp-pixel {
-  to {
-    opacity: 1;
   }
 }
 

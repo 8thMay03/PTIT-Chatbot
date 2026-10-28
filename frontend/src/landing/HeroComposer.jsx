@@ -1,7 +1,7 @@
 import React, { useId, useState } from "react";
 import { CornerUpRight, Quote, SendHorizontal } from "lucide-react";
 import { CHAT_PATH, chatPathWithQuestion } from "../lib/appRoute";
-import { transitionTo } from "./motion/pixelTransition";
+import { transitionTo } from "../lib/motion/pixelTransition";
 import { COMPOSER_SUGGESTION, COMPOSER_TOPICS } from "./content";
 
 /**

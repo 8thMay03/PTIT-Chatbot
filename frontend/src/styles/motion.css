@@ -1,0 +1,93 @@
+/* ==========================================================================
+   Chuyển động dùng chung giữa landing và trang chat (src/lib/motion/).
+   - .split-word: chữ tách từ trượt lên trong mặt nạ (SplitWords.jsx).
+   - .motion-pulse: sóng tại điểm click trên phần tử `data-pulse` (interactions.js).
+   - .pixel-overlay: lưới ô vuông của pixel transition, gắn vào <body>
+     (pixelTransition.js): `is-cover` phủ dần trước khi rời trang, `is-reveal`
+     tan dần khi trang đích vừa tải. Cả hai chỉ được tạo khi chuyển động bật.
+   ========================================================================== */
+
+/* Chữ tách từ (lib/motion/SplitWords): mỗi từ trượt trong mặt nạ của nó. */
+.split-word {
+  display: inline-block;
+  overflow: hidden;
+  /* Chừa chỗ cho dấu tiếng Việt chồng trên/dưới khỏi bị mặt nạ cắt. */
+  padding: 0.16em 0.04em;
+  margin: -0.16em -0.04em;
+  vertical-align: top;
+}
+
+.split-word-inner {
+  display: inline-block;
+}
+
+[data-pulse] {
+  position: relative;
+}
+
+.motion-pulse {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid var(--brand);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: motion-pulse 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes motion-pulse {
+  from {
+    opacity: 0.9;
+    scale: 1;
+  }
+  to {
+    opacity: 0;
+    scale: 9;
+  }
+}
+
+.pixel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  grid-template-rows: repeat(var(--rows), 1fr);
+}
+
+.pixel-overlay.is-cover {
+  cursor: progress;
+}
+
+/* Trang đích dùng được ngay trong lúc lưới tan. */
+.pixel-overlay.is-reveal {
+  pointer-events: none;
+}
+
+.pixel-overlay span {
+  background: var(--motion-pixel);
+  animation: 0.01s steps(1, end) forwards;
+}
+
+.pixel-overlay.is-cover span {
+  opacity: 0;
+  animation-name: pixel-on;
+}
+
+.pixel-overlay.is-reveal span {
+  opacity: 1;
+  animation-name: pixel-off;
+}
+
+@keyframes pixel-on {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pixel-off {
+  to {
+    opacity: 0;
+  }
+}

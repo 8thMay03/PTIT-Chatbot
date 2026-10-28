@@ -29,7 +29,7 @@ export default function UserMenu({ onLoggedOut }) {
 
   if (!session.isAuthenticated) {
     return (
-      <a className="user-login-btn" href={authPageHref("login", CHAT_PATH)}>
+      <a className="user-login-btn" href={authPageHref("login", CHAT_PATH)} data-transition>
         <LogIn size={16} aria-hidden="true" />
         <span>Đăng nhập</span>
       </a>
@@ -91,7 +91,10 @@ export function GuestHint() {
   return (
     <div className="guest-hint">
       <p>
-        <a href={authPageHref("login", CHAT_PATH)}>Đăng nhập</a> để lưu lịch sử trên mọi thiết bị.
+        <a href={authPageHref("login", CHAT_PATH)} data-transition>
+          Đăng nhập
+        </a>{" "}
+        để lưu lịch sử trên mọi thiết bị.
       </p>
       <button type="button" className="guest-hint-close" onClick={dismiss} aria-label="Ẩn lời nhắc đăng nhập">
         <X size={14} aria-hidden="true" />

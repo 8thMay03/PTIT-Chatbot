@@ -16,6 +16,7 @@ import {
 import { chatApi, conversationsApi, describeError, isAbortError } from "./api";
 import MarkdownView, { preloadMarkdownView } from "./components/LazyMarkdownView";
 import ReasoningPanel from "./components/ReasoningPanel";
+import SplitWords from "./lib/motion/SplitWords";
 
 const SUGGESTIONS = [
   {
@@ -39,6 +40,10 @@ const SUGGESTIONS = [
     text: "Sinh viên được khen thưởng trong những trường hợp nào?",
   },
 ];
+
+// Mở lại hội thoại: các tin hiện so le, tối đa 8 bậc để hội thoại dài không phải chờ.
+const RESTORE_STAGGER_MS = 60;
+const RESTORE_STAGGER_MAX = 8;
 
 const GREETING =
   "Xin chào 👋 Mình là trợ lý ảo dựa trên **sổ tay sinh viên PTIT**. " +
@@ -172,8 +177,9 @@ const ChatView = forwardRef(function ChatView(
       setMessages([{ role: "assistant", content: "", sources: [], streaming: true }]);
       try {
         const payload = await conversationsApi.get(id, { signal: controller.signal });
-        const restored = (payload.messages ?? []).map((message) => ({
+        const restored = (payload.messages ?? []).map((message, index) => ({
           role: message.role,
+          enterDelay: Math.min(index, RESTORE_STAGGER_MAX) * RESTORE_STAGGER_MS,
           content: message.content,
           sources: message.sources ?? [],
           // Reasoning/steps lưu trong metadata: mở lại hội thoại vẫn xem được.
@@ -401,7 +407,7 @@ const ChatView = forwardRef(function ChatView(
     <section className="chat" hidden={hidden} aria-hidden={hidden}>
       <header className="chat-header">
         <div className="title">
-          <span className="status-dot" />
+          <span className={`status-dot ${loading ? "is-busy" : ""}`.trim()} />
           <span>{loading ? "Đang trả lời..." : "Sẵn sàng hỗ trợ"}</span>
         </div>
         <div className="header-actions">
@@ -436,7 +442,9 @@ const ChatView = forwardRef(function ChatView(
             <div className="welcome-icon">
               <GraduationCap size={32} />
             </div>
-            <h2>Hỏi đáp về quy chế PTIT</h2>
+            <h2 className="welcome-title">
+              <SplitWords text="Hỏi đáp về quy chế PTIT" />
+            </h2>
             <p>
               Trợ lý tìm kiếm trong sổ tay sinh viên và trả lời bằng tiếng Việt kèm nguồn trích dẫn. Thử một câu hỏi
               gợi ý hoặc tự nhập câu của bạn.
@@ -448,9 +456,13 @@ const ChatView = forwardRef(function ChatView(
                   <button
                     key={index}
                     className="suggestion"
+                    style={{ "--i": index }}
+                    data-tilt="0.8"
+                    data-pulse
                     onClick={(event) => sendMessage(event, suggestion.text)}
                     disabled={loading}
                   >
+                    <span className="suggestion-glare" aria-hidden="true" />
                     <span className="s-title">
                       <Icon size={16} />
                       {suggestion.title}
@@ -470,7 +482,13 @@ const ChatView = forwardRef(function ChatView(
               message.role === "assistant" && message.streaming && !message.content && !hasReasoning;
 
             return (
-              <div className={`message-row ${message.role}`} key={index}>
+              <div
+                className={`message-row ${message.role} ${
+                  message.role === "assistant" && message.streaming ? "is-streaming" : ""
+                }`.trim()}
+                style={message.enterDelay ? { "--enter-delay": `${message.enterDelay}ms` } : undefined}
+                key={index}
+              >
                 <div className={`avatar ${message.role}`} aria-hidden="true">
                   {message.role === "assistant" ? <Sparkles size={18} /> : "B"}
                 </div>
@@ -556,6 +574,7 @@ const ChatView = forwardRef(function ChatView(
                             }`}
                             key={`${source.source_name}-${source.section_path}-${sourceIndex}`}
                             data-citation={source.citation_id}
+                            style={{ "--i": sourceIndex }}
                           >
                             <span className="source-badge">{source.citation_id}</span>
                             <div className="source-meta">
@@ -596,7 +615,8 @@ const ChatView = forwardRef(function ChatView(
       )}
 
       <div className="composer-shell">
-        <form className="composer" onSubmit={sendMessage}>
+        <form className={`composer ${loading ? "is-busy" : ""}`.trim()} onSubmit={sendMessage}>
+          <span className="composer-glow" aria-hidden="true" />
           <label className="sr-only" htmlFor="chat-input">
             Nhập câu hỏi của bạn
           </label>
@@ -623,6 +643,7 @@ const ChatView = forwardRef(function ChatView(
             <button
               type="submit"
               className="send-btn"
+              data-pulse
               disabled={!input.trim()}
               aria-label="Gửi câu hỏi"
               title="Gửi"

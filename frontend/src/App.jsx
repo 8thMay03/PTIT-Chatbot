@@ -21,6 +21,7 @@ import {
   navigateTo,
   readQuestionParam,
 } from "./lib/appRoute";
+import useChatMotion from "./lib/motion/useChatMotion";
 import { useSidebar } from "./lib/useSidebar";
 import { useTheme } from "./lib/theme";
 import { queryKeys } from "./api";
@@ -46,7 +47,9 @@ export default function App() {
   const sidebar = useSidebar();
   const { isMobile, isOpen: isSidebarOpen, mobileOpen, setMobileOpen } = sidebar;
   const chatRef = useRef(null);
+  const shellRef = useRef(null);
   const queryClient = useQueryClient();
+  useChatMotion(shellRef);
 
   // Bỏ `q` khỏi URL sau khi đọc để tải lại trang không điền lại câu hỏi cũ.
   useEffect(() => {
@@ -124,6 +127,7 @@ export default function App() {
       </a>
 
       <main
+        ref={shellRef}
         className={`app-shell view-chat ${mobileOpen ? "sidebar-open" : ""} ${
           sidebar.desktopCollapsed ? "sidebar-collapsed" : ""
         }`}
@@ -144,7 +148,12 @@ export default function App() {
           inert={isMobile && !mobileOpen ? "" : undefined}
         >
           <div className="sidebar-brand-row">
-            <a className="brand sidebar-brand" href="/" aria-label="PTIT Chatbot — Trang chủ">
+            <a
+              className="brand sidebar-brand"
+              href="/"
+              aria-label="PTIT Chatbot — Trang chủ"
+              data-transition
+            >
               <span className="brand-mark">
                 <Sparkles size={19} />
               </span>
@@ -181,6 +190,7 @@ export default function App() {
             <button
               type="button"
               className={`sidebar-nav-item ${!activeConversationId ? "active" : ""}`}
+              data-pulse
               onClick={startNewChat}
               disabled={chatLoading}
               title="Cuộc trò chuyện mới"

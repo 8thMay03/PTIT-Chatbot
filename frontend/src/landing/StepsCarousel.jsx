@@ -1,7 +1,7 @@
 import React, { useId, useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { STEPS } from "./content";
-import SplitWords from "./motion/SplitWords";
+import SplitWords from "../lib/motion/SplitWords";
 
 /**
  * Carousel "Cách hoạt động" theo bố cục khối lời chứng thực của thiết kế
