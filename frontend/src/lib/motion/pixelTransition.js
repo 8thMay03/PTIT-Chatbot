@@ -1,15 +1,21 @@
-import { goTo } from "../../lib/appRoute";
+import { goTo } from "../appRoute";
 import { motionEnabled } from "./env";
 
 /**
- * Pixel transition khi rời landing: lưới ô vuông màu thương hiệu phủ dần màn hình
- * (lan chéo từ góc trên trái, có nhiễu ngẫu nhiên) rồi mới chuyển trang. Lớp phủ
- * gắn thẳng vào `document.body` để HeroComposer và link đều dùng chung.
+ * Pixel transition giữa các trang: khi rời trang, lưới ô vuông màu thương hiệu phủ
+ * dần màn hình (lan chéo từ góc trên trái, có nhiễu ngẫu nhiên) rồi mới chuyển
+ * trang; trang đích gọi `playPixelEnter()` lúc khởi động để lưới đó "tan ra".
+ * Lớp phủ gắn thẳng vào `document.body`, dùng chung cho landing, chat và link.
  */
 
 const CELL_PX = 72;
 const COVER_MS = 620;
 const FAILSAFE_MS = 4000;
+const ENTER_MS = 900;
+// Cờ cho trang đích: thời điểm rời trang. Quá hạn (điều hướng hỏng, mở lại tab
+// sau) thì bỏ qua để không phát hiệu ứng vào trang lạc lõng.
+const ENTER_FLAG = "ptit:pixel-enter";
+const ENTER_FLAG_TTL_MS = 5000;
 
 let overlay = null;
 let failsafe = null;
@@ -25,11 +31,11 @@ function handlePageShow(event) {
   if (event.persisted) removeOverlay();
 }
 
-function buildOverlay() {
+function buildOverlay(mode) {
   const cols = Math.max(1, Math.ceil(window.innerWidth / CELL_PX));
   const rows = Math.max(1, Math.ceil(window.innerHeight / CELL_PX));
   const node = document.createElement("div");
-  node.className = "lp-pixels";
+  node.className = `pixel-overlay is-${mode}`;
   node.setAttribute("aria-hidden", "true");
   node.style.setProperty("--cols", cols);
   node.style.setProperty("--rows", rows);
@@ -46,18 +52,53 @@ function buildOverlay() {
   return node;
 }
 
+function writeEnterFlag() {
+  try {
+    window.sessionStorage.setItem(ENTER_FLAG, String(Date.now()));
+  } catch {
+    /* sessionStorage bị chặn: trang đích chỉ không có hiệu ứng vào trang */
+  }
+}
+
+/** Đọc và xoá cờ; true khi trang trước vừa chạy pixel transition. */
+function consumeEnterFlag() {
+  try {
+    const value = Number(window.sessionStorage.getItem(ENTER_FLAG));
+    window.sessionStorage.removeItem(ENTER_FLAG);
+    return value > 0 && Date.now() - value < ENTER_FLAG_TTL_MS;
+  } catch {
+    return false;
+  }
+}
+
 export function transitionTo(url) {
   if (!motionEnabled()) {
     goTo(url);
     return;
   }
   if (overlay) return;
-  overlay = buildOverlay();
+  overlay = buildOverlay("cover");
   document.body.append(overlay);
   window.addEventListener("pageshow", handlePageShow);
-  window.setTimeout(() => goTo(url), COVER_MS);
+  window.setTimeout(() => {
+    writeEnterFlag();
+    goTo(url);
+  }, COVER_MS);
   // Điều hướng bị huỷ (beforeunload, lỗi mạng…) thì không để lớp phủ che trang mãi.
   failsafe = window.setTimeout(removeOverlay, FAILSAFE_MS);
+}
+
+/**
+ * Gọi một lần khi trang khởi động (trước khi React vẽ). Trang trước vừa chạy
+ * pixel transition thì phủ lưới kín rồi cho từng ô biến mất; lớp phủ không chặn
+ * thao tác (`pointer-events: none`) và tự gỡ sau khi tan.
+ */
+export function playPixelEnter() {
+  if (typeof window === "undefined" || !consumeEnterFlag() || !motionEnabled()) return false;
+  const node = buildOverlay("reveal");
+  document.body.append(node);
+  window.setTimeout(() => node.remove(), ENTER_MS);
+  return true;
 }
 
 /** Chỉ chặn click chuột trái thường; Ctrl/⌘/Shift/Alt hay chuột giữa mở tab mới như cũ. */

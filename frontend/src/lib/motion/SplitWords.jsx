@@ -10,8 +10,8 @@ export default function SplitWords({ text, start = 0 }) {
   return words.map((word, index) => (
     <React.Fragment key={`${index}-${word}`}>
       {index > 0 && " "}
-      <span className="lp-word" style={{ "--i": start + index }}>
-        <span className="lp-word-inner">{word}</span>
+      <span className="split-word" style={{ "--i": start + index }}>
+        <span className="split-word-inner">{word}</span>
       </span>
     </React.Fragment>
   ));

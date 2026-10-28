@@ -61,20 +61,26 @@
 - Liên quan: AC-01 (mục 8).
 - Mức độ: `low`.
 - Bắt buộc sửa: không.
-- Trạng thái: `deferred`.
+- Trạng thái: `resolved`.
 - Vấn đề và tác động: lớp phủ chỉ chạy khi rời landing; trang đích hiện ngay sau khi tải. Trang chat/tài khoản ngoài
   phạm vi task.
 - Nếu deferred: task sau có thể đọc cờ `sessionStorage` ở trang đích để chạy pixel "tan ra".
+- Phản hồi/cách sửa: task `2026-10-28-chat-motion` thêm `playPixelEnter()` (cờ `sessionStorage`) gọi từ
+  `main.jsx`; lõi chuyển động chuyển sang `frontend/src/lib/motion/`.
+- Xác nhận của reviewer: `2026-10-28-chat-motion` V-01, V-02.
 
 ## Lịch sử các vòng review
 
 - `2026-10-28T21:07:39+07:00` — `claude-agent` — working tree `feat/landing-motion` — R-01, R-02 resolved; R-03,
   R-04 deferred; `approved`.
 
+- `2026-10-28T21:41:30+07:00` — `claude-agent` — R-04 chuyển `resolved` bởi task `2026-10-28-chat-motion`; kết
+  luận giữ `approved`.
+
 ## Kết luận
 
 - Kết luận: `approved`.
 - Nhận xét bắt buộc còn mở: không có.
-- Nhận xét hoãn lại: R-03, R-04 (lý do và hướng theo dõi ở trên).
+- Nhận xét hoãn lại: R-03 (R-04 đã xử lý ở task `2026-10-28-chat-motion`).
 - Phần chưa review / giới hạn: đây là self-review; chưa kiểm Safari/Firefox.
 - Bước tiếp theo: coordinator đóng task.

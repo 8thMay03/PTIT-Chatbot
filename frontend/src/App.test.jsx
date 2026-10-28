@@ -105,6 +105,23 @@ describe("App sinh viên", () => {
     expect(urls.every((url) => /\/api\/(conversations|auth\/me)/.test(url))).toBe(true);
   });
 
+  it("chuyển động: link sang trang khác qua pixel transition, màn chào giữ nguyên chữ", async () => {
+    await renderApp();
+    await waitFor(() => container.querySelector(".user-login-btn"));
+
+    // jsdom không có matchMedia → chuyển động tắt, không gắn listener.
+    expect(container.querySelector(".app-shell").classList.contains("motion-ready")).toBe(false);
+    expect(container.querySelector(".sidebar-brand").hasAttribute("data-transition")).toBe(true);
+    expect(container.querySelector(".user-login-btn").hasAttribute("data-transition")).toBe(true);
+    // Mọi link nội bộ sang trang khác đều có data-transition (link ngoài/mở tab mới thì không).
+    const internal = [...container.querySelectorAll('a[href^="/"]')];
+    expect(internal.length).toBeGreaterThan(0);
+    expect(internal.every((a) => a.hasAttribute("data-transition"))).toBe(true);
+    expect(container.querySelector(".welcome h2").textContent).toBe("Hỏi đáp về quy chế PTIT");
+    expect(container.querySelectorAll(".suggestion[data-tilt][data-pulse]")).toHaveLength(4);
+    expect(container.querySelector(".composer-glow").getAttribute("aria-hidden")).toBe("true");
+  });
+
   it("nút Giao diện mở bộ chọn chủ đề và đổi được chủ đề", async () => {
     await renderApp();
 

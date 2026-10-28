@@ -8,8 +8,8 @@ vi.mock("../../lib/appRoute", async (importOriginal) => ({
   goTo: (url) => goTo(url),
 }));
 
-const { default: SplitWords } = await import("./SplitWords");
-const { shouldIntercept, transitionTo } = await import("./pixelTransition");
+const { default: SplitWords } = await import("../../lib/motion/SplitWords");
+const { playPixelEnter, shouldIntercept, transitionTo } = await import("../../lib/motion/pixelTransition");
 const { default: useLandingMotion } = await import("./useLandingMotion");
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -81,7 +81,7 @@ describe("SplitWords", () => {
     );
     const heading = view.container.querySelector("h1");
     expect(heading.textContent).toBe("Hỏi đáp quy chế PTIT");
-    const words = [...heading.querySelectorAll(".lp-word")];
+    const words = [...heading.querySelectorAll(".split-word")];
     expect(words).toHaveLength(5);
     expect(words.map((word) => word.style.getPropertyValue("--i"))).toEqual(["2", "3", "4", "5", "6"]);
   });
@@ -163,13 +163,13 @@ describe("useLandingMotion", () => {
 
     link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true }));
     expect(prevented).toEqual([false]);
-    expect(document.querySelector(".lp-pixels")).toBeNull();
+    expect(document.querySelector(".pixel-overlay")).toBeNull();
 
     link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
     document.removeEventListener("click", record);
     expect(prevented).toEqual([false, true]);
-    expect(document.querySelector(".lp-pixels")).not.toBeNull();
-    expect(link.querySelector(".lp-pulse")).not.toBeNull();
+    expect(document.querySelector(".pixel-overlay")).not.toBeNull();
+    expect(link.querySelector(".motion-pulse")).not.toBeNull();
     expect(goTo).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(700);
@@ -181,22 +181,56 @@ describe("pixelTransition", () => {
   it("tắt chuyển động thì chuyển trang ngay, không tạo lớp phủ", () => {
     transitionTo("/login");
     expect(goTo).toHaveBeenCalledWith("/login");
-    expect(document.querySelector(".lp-pixels")).toBeNull();
+    expect(document.querySelector(".pixel-overlay")).toBeNull();
   });
 
   it("gỡ lớp phủ khi trang được khôi phục từ bfcache", () => {
     stubMatchMedia();
     vi.useFakeTimers();
     transitionTo("/chat");
-    expect(document.querySelector(".lp-pixels")).not.toBeNull();
+    expect(document.querySelector(".pixel-overlay")).not.toBeNull();
     // Gọi lại trong lúc đang chuyển thì không tạo thêm lớp phủ.
     transitionTo("/chat");
-    expect(document.querySelectorAll(".lp-pixels")).toHaveLength(1);
+    expect(document.querySelectorAll(".pixel-overlay")).toHaveLength(1);
 
     const pageshow = new Event("pageshow");
     pageshow.persisted = true;
     window.dispatchEvent(pageshow);
-    expect(document.querySelector(".lp-pixels")).toBeNull();
+    expect(document.querySelector(".pixel-overlay")).toBeNull();
+  });
+
+  it("rời trang ghi cờ; trang đích phát lưới tan đúng một lần rồi tự gỡ", () => {
+    stubMatchMedia();
+    vi.useFakeTimers();
+    sessionStorage.clear();
+    transitionTo("/chat");
+    expect(sessionStorage.getItem("ptit:pixel-enter")).toBeNull();
+    vi.advanceTimersByTime(700);
+    expect(goTo).toHaveBeenCalledWith("/chat");
+    expect(Number(sessionStorage.getItem("ptit:pixel-enter"))).toBeGreaterThan(0);
+
+    // Mô phỏng trang đích vừa tải.
+    document.querySelectorAll(".pixel-overlay").forEach((node) => node.remove());
+    expect(playPixelEnter()).toBe(true);
+    const reveal = document.querySelector(".pixel-overlay.is-reveal");
+    expect(reveal).not.toBeNull();
+    expect(reveal.getAttribute("aria-hidden")).toBe("true");
+    expect(sessionStorage.getItem("ptit:pixel-enter")).toBeNull();
+    expect(playPixelEnter()).toBe(false);
+    vi.advanceTimersByTime(1000);
+    expect(document.querySelector(".pixel-overlay.is-reveal")).toBeNull();
+  });
+
+  it("không phát lưới tan khi cờ quá hạn hoặc người dùng giảm chuyển động", () => {
+    stubMatchMedia();
+    sessionStorage.setItem("ptit:pixel-enter", String(Date.now() - 60_000));
+    expect(playPixelEnter()).toBe(false);
+    expect(sessionStorage.getItem("ptit:pixel-enter")).toBeNull();
+
+    stubMatchMedia({ reduce: true });
+    sessionStorage.setItem("ptit:pixel-enter", String(Date.now()));
+    expect(playPixelEnter()).toBe(false);
+    expect(document.querySelector(".pixel-overlay")).toBeNull();
   });
 
   it("chỉ chặn click chuột trái thường trên link cùng origin", () => {

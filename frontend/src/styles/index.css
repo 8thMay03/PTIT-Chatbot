@@ -12,10 +12,12 @@
 @import "./layout.css";
 @import "./components.css";
 @import "./chat.css";
+@import "./chat-motion.css";
 @import "./dataset.css";
 @import "./document.css";
 @import "./config.css";
 @import "./models.css";
+@import "./motion.css";
 @import "./landing.css";
 @import "./landing-motion.css";
 @import "./auth.css";
