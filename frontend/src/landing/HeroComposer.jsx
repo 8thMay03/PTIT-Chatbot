@@ -1,11 +1,13 @@
 import React, { useId, useState } from "react";
 import { CornerUpRight, Quote, SendHorizontal } from "lucide-react";
-import { CHAT_PATH, chatPathWithQuestion, goTo } from "../lib/appRoute";
+import { CHAT_PATH, chatPathWithQuestion } from "../lib/appRoute";
+import { transitionTo } from "./motion/pixelTransition";
 import { COMPOSER_SUGGESTION, COMPOSER_TOPICS } from "./content";
 
 /**
  * Khung soạn câu hỏi ở hero (Figma node 2002:475). Gửi mở trang chat với câu hỏi
- * điền sẵn (`/chat?q=`); trang chat không tự gửi để người dùng xem lại trước.
+ * điền sẵn (`/chat?q=`) qua pixel transition; trang chat không tự gửi để người dùng
+ * xem lại trước.
  */
 export default function HeroComposer() {
   const [question, setQuestion] = useState("");
@@ -15,7 +17,7 @@ export default function HeroComposer() {
   function submit(event) {
     event?.preventDefault();
     const text = question.trim();
-    goTo(text ? chatPathWithQuestion(text) : CHAT_PATH);
+    transitionTo(text ? chatPathWithQuestion(text) : CHAT_PATH);
   }
 
   function handleKeyDown(event) {
@@ -24,12 +26,14 @@ export default function HeroComposer() {
 
   return (
     <form className="lp-composer" onSubmit={submit} aria-label="Đặt câu hỏi cho PTIT Chatbot">
+      <span className="lp-composer-glow" aria-hidden="true" />
       <div className="lp-composer-chips" role="group" aria-label="Chủ đề gợi ý">
         {COMPOSER_TOPICS.map(({ label, icon: Icon, question: suggestion }) => (
           <button
             key={label}
             type="button"
             className="lp-chip"
+            data-pulse
             onClick={() => setQuestion(suggestion)}
             aria-label={`Điền câu hỏi về ${label.toLowerCase()}`}
           >
@@ -66,7 +70,13 @@ export default function HeroComposer() {
             <Quote size={15} aria-hidden="true" />
             Trả lời kèm trích dẫn nguồn
           </span>
-          <button type="submit" className="lp-composer-send" aria-label="Gửi câu hỏi và mở trang trò chuyện">
+          <button
+            type="submit"
+            className="lp-composer-send"
+            aria-label="Gửi câu hỏi và mở trang trò chuyện"
+            data-magnetic
+            data-pulse
+          >
             <SendHorizontal size={20} aria-hidden="true" />
           </button>
         </div>

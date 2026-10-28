@@ -258,6 +258,9 @@
   --lp-tag-text: #ffffff;
   --lp-tag-shadow: inset 0 0 4px 0 rgba(0, 0, 0, 0.1);
   --lp-glow: rgba(255, 140, 110, 0.28);
+  --lp-glare: rgba(255, 255, 255, 0.55);
+  --lp-pixel: var(--brand-700);
+  --lp-nav-glass: rgba(255, 255, 255, 0.72);
   --lp-footer-bg: #191d24;
   --lp-footer-heading: #ffffff;
   --lp-footer-text: #cacbcd;
@@ -374,6 +377,8 @@
     --lp-accent-ring: var(--brand-400);
     --lp-dot: #353a43;
     --lp-glow: rgba(255, 120, 90, 0.18);
+    --lp-glare: rgba(255, 255, 255, 0.08);
+    --lp-nav-glass: rgba(13, 15, 19, 0.72);
     --lp-footer-bg: #08090c;
     --lp-footer-line: rgba(255, 255, 255, 0.1);
   }
@@ -483,6 +488,8 @@
   --lp-accent-ring: var(--brand-400);
   --lp-dot: #353a43;
   --lp-glow: rgba(255, 120, 90, 0.18);
+  --lp-glare: rgba(255, 255, 255, 0.08);
+  --lp-nav-glass: rgba(13, 15, 19, 0.72);
   --lp-footer-bg: #08090c;
   --lp-footer-line: rgba(255, 255, 255, 0.1);
 }

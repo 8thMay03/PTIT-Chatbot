@@ -323,7 +323,7 @@
   font-weight: 600;
 }
 
-.lp-hero-copy > .lp-btn {
+.lp-hero-cta {
   margin-top: 40px;
 }
 
@@ -1350,11 +1350,6 @@
   overflow: hidden;
 }
 
-.lp-cta .lp-bgtext.is-cta {
-  inset: 60px 0;
-  opacity: 0.55;
-}
-
 .lp-cta-inner {
   position: relative;
   z-index: 1;
@@ -1365,7 +1360,7 @@
   gap: 40px;
 }
 
-/* Quầng nền sau tiêu đề để chữ nền mờ không làm khó đọc tiêu đề. */
+/* Quầng nền sau tiêu đề để vòng thẻ chủ đề phía sau không làm khó đọc tiêu đề. */
 .lp-cta-inner::before {
   content: "";
   position: absolute;

@@ -81,6 +81,26 @@ describe("LandingPage", () => {
     expect(container.querySelector(".lp-float-cards").getAttribute("aria-hidden")).toBe("true");
   });
 
+  it("gắn điểm neo chuyển động; phần trang trí động ẩn với trình đọc màn hình", async () => {
+    createBackend({ "GET auth/me": GUEST });
+    page = await renderPage(<LandingPage />);
+    const { container } = page;
+
+    // jsdom không có matchMedia → chuyển động tắt, không phần tử nào bị ẩn chờ reveal.
+    expect(container.querySelector(".landing-page").classList.contains("motion-ready")).toBe(false);
+    expect(container.querySelector("h1").getAttribute("data-reveal")).toBe("words");
+    expect(container.querySelectorAll(".lp-bento > li[data-scrub='enter'][data-tilt]")).toHaveLength(5);
+    // Mọi link sang trang khác trong landing đi qua pixel transition; link neo thì không.
+    const pageLinks = [...container.querySelectorAll('a[href^="/"]')].filter((a) => a.getAttribute("href") !== "/");
+    expect(pageLinks.length).toBeGreaterThan(0);
+    expect(pageLinks.every((a) => a.hasAttribute("data-transition"))).toBe(true);
+    expect(container.querySelector('a[href="#tinh-nang"]').hasAttribute("data-transition")).toBe(false);
+    // Bản sao marquee và vòng chủ đề chỉ để trang trí.
+    expect(container.querySelector(".lp-topic-strip.is-clone").getAttribute("aria-hidden")).toBe("true");
+    expect(container.querySelector(".lp-ring").getAttribute("aria-hidden")).toBe("true");
+    expect(container.querySelectorAll('ul.lp-topic-strip[aria-label="Chủ đề chatbot hỗ trợ"]')).toHaveLength(1);
+  });
+
   it("khách thấy CTA Bắt đầu trò chuyện, Đăng nhập, Đăng ký đúng đường dẫn", async () => {
     createBackend({ "GET auth/me": GUEST });
     page = await renderPage(<LandingPage />);

@@ -6,9 +6,11 @@ import {
   FileText,
   GraduationCap,
   HeartHandshake,
+  Layers,
   PenLine,
   Quote,
   SearchX,
+  TriangleAlert,
   Wallet,
 } from "lucide-react";
 
@@ -39,6 +41,20 @@ export const TOPIC_STRIP = [
   { label: "Rèn luyện", icon: HeartHandshake },
   { label: "Tốt nghiệp", icon: GraduationCap },
   { label: "Thủ tục", icon: FileText },
+];
+
+/** Vòng thẻ chủ đề 3D xoay theo cuộn ở dải kêu gọi (trang trí, cùng chủ đề với dải trên). */
+export const RING_TOPICS = [
+  { label: "Quy chế đào tạo", icon: BookOpen, tone: "dark" },
+  { label: "Học phí", icon: Wallet, tone: "orange" },
+  { label: "Học bổng", icon: Award, tone: "pink" },
+  { label: "Thi cử", icon: ClipboardCheck, tone: "blue" },
+  { label: "Rèn luyện", icon: HeartHandshake, tone: "cyan" },
+  { label: "Tốt nghiệp", icon: GraduationCap, tone: "yellow" },
+  { label: "Thủ tục", icon: FileText, tone: "grey" },
+  { label: "Cảnh báo học tập", icon: TriangleAlert, tone: "dark" },
+  { label: "Học phần", icon: Layers, tone: "blue" },
+  { label: "Đăng ký học", icon: PenLine, tone: "orange" },
 ];
 
 /** Nhãn nghiêng trong thẻ "Đúng phạm vi học vụ" (màu và góc theo thiết kế). */

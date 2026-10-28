@@ -14,7 +14,12 @@ export default function FaqList() {
         const buttonId = `${baseId}-q${index}`;
         const panelId = `${baseId}-a${index}`;
         return (
-          <li key={question} className={`lp-faq-item ${open ? "is-open" : ""}`}>
+          <li
+            key={question}
+            className={`lp-faq-item ${open ? "is-open" : ""}`}
+            data-reveal="up"
+            style={{ "--d": `${index * 70}ms` }}
+          >
             <h3 className="lp-faq-question">
               <button
                 type="button"
