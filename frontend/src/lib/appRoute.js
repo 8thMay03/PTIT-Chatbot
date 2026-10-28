@@ -60,6 +60,21 @@ export function authPageHref(page, next = CHAT_PATH) {
   return target === CHAT_PATH ? base : `${base}?next=${encodeURIComponent(target)}`;
 }
 
+// Giới hạn độ dài câu hỏi điền sẵn qua `?q=` (cùng giới hạn ô soạn ở landing).
+export const QUESTION_PARAM_MAX_LENGTH = 1000;
+
+/** `/chat?q=<câu hỏi>` để trang chat điền sẵn câu hỏi (không tự gửi). */
+export function chatPathWithQuestion(question) {
+  const text = String(question || "").trim().slice(0, QUESTION_PARAM_MAX_LENGTH);
+  return text ? `${CHAT_PATH}?q=${encodeURIComponent(text)}` : CHAT_PATH;
+}
+
+/** Câu hỏi điền sẵn từ query string (`?q=`), đã cắt khoảng trắng và độ dài; rỗng → "". */
+export function readQuestionParam(search) {
+  const value = new URLSearchParams(String(search || "")).get("q") || "";
+  return value.trim().slice(0, QUESTION_PARAM_MAX_LENGTH);
+}
+
 /**
  * Hash cũ của app sinh viên tại `/` → đường dẫn mới ở `/chat`.
  *

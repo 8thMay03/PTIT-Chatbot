@@ -1,5 +1,6 @@
 /* ==========================================================================
-   Trang tài khoản (/login, /register). Dùng .site-brand/.theme-toggle trong
+   Trang tài khoản (/login, /register). Cùng phong cách trang landing: font
+   Readex Pro/Playfair Display, .lp-brand, .theme-toggle và nút tối trong
    landing.css. Chỉ dùng token semantic.
    ========================================================================== */
 
@@ -8,8 +9,13 @@
   flex-direction: column;
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--bg-gradient), var(--bg);
-  color: var(--text);
+  background: var(--lp-bg);
+  color: var(--lp-heading);
+  font-family: var(--lp-font-sans);
+}
+
+.auth-brand {
+  text-decoration: none;
 }
 
 .auth-header {
@@ -42,21 +48,24 @@
   gap: 22px;
   width: min(440px, 100%);
   padding: 28px 22px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-md);
+  border: 1px solid var(--lp-border);
+  border-radius: 24px;
+  background: var(--lp-card-bg);
+  box-shadow: var(--lp-shadow-card), var(--lp-card-inset);
 }
 
 .auth-card-heading h1 {
   margin: 0;
-  font-size: 24px;
-  letter-spacing: -0.025em;
+  font-family: var(--lp-font-serif);
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 40px;
+  letter-spacing: -0.32px;
 }
 
 .auth-card-heading p {
   margin: 6px 0 0;
-  color: var(--text-muted);
+  color: var(--lp-text);
   font-size: 14px;
   line-height: 1.55;
 }
@@ -124,7 +133,7 @@
   border: 0;
   border-radius: var(--radius-xs);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--lp-text);
   cursor: pointer;
 }
 
@@ -141,7 +150,7 @@
 }
 
 .auth-hint {
-  color: var(--text-muted);
+  color: var(--lp-text);
 }
 
 .auth-field-error {
@@ -151,7 +160,7 @@
 
 .auth-note {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--lp-text);
   font-size: 12.5px;
   line-height: 1.5;
 }
@@ -189,7 +198,7 @@
 }
 
 .auth-alert a {
-  color: var(--brand-text);
+  color: var(--lp-heading);
   font-weight: 600;
 }
 
@@ -198,24 +207,25 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 46px;
+  min-height: 52px;
   margin-top: 4px;
   border: 0;
-  border-radius: var(--radius-sm);
-  background: var(--brand);
-  color: var(--on-solid);
-  font-size: 15px;
+  border-radius: 12px;
+  background: var(--lp-btn-bg);
+  color: var(--lp-btn-text);
+  font-family: inherit;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: background var(--duration-fast) var(--ease);
 }
 
 .auth-submit:hover:not(:disabled) {
-  background: var(--brand-hover);
+  background: var(--lp-btn-bg-hover);
 }
 
 .auth-submit:focus-visible {
-  outline-color: var(--brand-400);
+  outline: 2px solid var(--lp-accent);
+  outline-offset: 3px;
 }
 
 .auth-submit:disabled {
@@ -230,7 +240,7 @@
 }
 
 .auth-switch a {
-  color: var(--brand-text);
+  color: var(--lp-heading);
   font-weight: 600;
 }
 
@@ -243,13 +253,13 @@
 }
 
 .auth-footer a {
-  color: var(--text-muted);
+  color: var(--lp-text);
   font-size: 13px;
   text-decoration: none;
 }
 
 .auth-footer a:hover {
-  color: var(--brand-text);
+  color: var(--lp-heading);
 }
 
 @media (min-width: 640px) {
@@ -265,4 +275,10 @@
   .auth-card {
     padding: 34px 32px;
   }
+}
+
+/* Vòng focus theo màu nhấn của trang landing (thay maroon của app chat). */
+.auth-input:focus-visible {
+  border-color: var(--lp-accent);
+  box-shadow: 0 0 0 4px var(--lp-haze);
 }

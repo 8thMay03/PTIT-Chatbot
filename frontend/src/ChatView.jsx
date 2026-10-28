@@ -75,13 +75,14 @@ function describeChatError(error, overrides = {}) {
 preloadMarkdownView().catch(() => {});
 
 const ChatView = forwardRef(function ChatView(
-  { hidden, onLoadingChange, onConversationSaved, headerActions },
+  { hidden, onLoadingChange, onConversationSaved, headerActions, initialInput = "" },
   ref
 ) {
   const [messages, setMessages] = useState([
     { role: "assistant", content: GREETING, sources: [] },
   ]);
-  const [input, setInput] = useState("");
+  // initialInput: câu hỏi điền sẵn từ `/chat?q=` (landing); không tự gửi.
+  const [input, setInput] = useState(initialInput);
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState(null);
   const [highlightedSource, setHighlightedSource] = useState(null);
@@ -132,6 +133,16 @@ const ChatView = forwardRef(function ChatView(
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
     }
   }, [input]);
+
+  // Câu hỏi điền sẵn: đưa con trỏ vào cuối ô nhập để người dùng sửa hoặc gửi ngay.
+  useEffect(() => {
+    const node = textareaRef.current;
+    if (!initialInput || !node) return;
+    node.focus();
+    node.setSelectionRange(node.value.length, node.value.length);
+    // Chỉ chạy lần mount đầu tiên.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const resetConversation = useCallback(() => {
     if (loading) return;

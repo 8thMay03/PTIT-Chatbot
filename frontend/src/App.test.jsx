@@ -219,4 +219,15 @@ describe("App sinh viên", () => {
     await waitFor(() => !container.textContent.includes("Hội thoại của tài khoản"));
     expect(fetch.mock.calls.some(([url, options]) => String(url).includes("/auth/logout") && options?.method === "POST")).toBe(true);
   });
+
+  it("/chat?q= điền sẵn câu hỏi vào ô nhập, không tự gửi và xoá q khỏi URL", async () => {
+    window.history.replaceState(null, "", `/chat?q=${encodeURIComponent("Điều kiện tốt nghiệp?")}`);
+    await renderApp();
+
+    const textarea = container.querySelector("textarea");
+    expect(textarea.value).toBe("Điều kiện tốt nghiệp?");
+    expect(document.activeElement).toBe(textarea);
+    expect(window.location.search).toBe("");
+    expect(fetch.mock.calls.some(([url]) => String(url).includes("/chat/stream"))).toBe(false);
+  });
 });
