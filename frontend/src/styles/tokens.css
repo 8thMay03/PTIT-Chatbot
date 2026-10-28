@@ -212,7 +212,8 @@
   --ring-brand: 0 0 0 4px rgba(151, 38, 53, 0.16);
   --ring-danger: 0 0 0 4px rgba(220, 38, 38, 0.16);
 
-  /* Landing (/) — bảng màu theo thiết kế Figma "AI Chat landing page UI kit" */
+  /* Landing (/) — bảng màu theo thiết kế Figma "AI Chat landing page UI kit"; nút chính và
+     màu nhấn dùng maroon PTIT (--brand-*) như app chat. */
   --lp-bg: var(--gray-0);
   --lp-heading: #191d24;
   --lp-heading-gradient: linear-gradient(180deg, #191d24 0%, #4b5059 100%);
@@ -229,9 +230,9 @@
   --lp-glass: rgba(255, 255, 255, 0.6);
   --lp-card-bg: radial-gradient(120% 140% at 50% 50%, #f6f6f6 0%, #fff4f0 100%);
   --lp-card-inset: inset 0 0 50px 0 #ffffff;
-  --lp-btn-bg: linear-gradient(-7deg, #212730 19%, #3d3d3d 87%);
-  --lp-btn-bg-hover: linear-gradient(-7deg, #11151b 19%, #2d2d2d 87%);
-  --lp-btn-text: #ffffff;
+  --lp-btn-bg: linear-gradient(-7deg, var(--brand-700) 19%, #b8394b 87%);
+  --lp-btn-bg-hover: linear-gradient(-7deg, var(--brand-800) 19%, var(--brand-600) 87%);
+  --lp-btn-text: var(--on-solid);
   --lp-btn-soft-bg: linear-gradient(-23deg, rgba(29, 29, 29, 0.07) 19%, rgba(61, 61, 61, 0.07) 87%);
   --lp-logo-tile: linear-gradient(180deg, rgba(238, 238, 238, 0.96) 0%, rgba(195, 195, 195, 0.96) 100%);
   --lp-logo-mark: #191d24;
@@ -244,8 +245,8 @@
   --lp-kw-yellow: #e4b84a;
   --lp-kw-red: #f2846c;
   --lp-kw-blue: #4fa8dd;
-  --lp-accent: #5392ea;
-  --lp-accent-ring: #72acfe;
+  --lp-accent: var(--brand-600);
+  --lp-accent-ring: var(--brand-400);
   --lp-dot: #e3e3e5;
   --lp-tag-pink: #ffa3a4;
   --lp-tag-orange: #ff845b;
@@ -353,9 +354,9 @@
     --lp-glass: rgba(23, 26, 31, 0.7);
     --lp-card-bg: radial-gradient(120% 140% at 50% 50%, #15181d 0%, #1f1a1b 100%);
     --lp-card-inset: inset 0 0 50px 0 rgba(13, 15, 19, 0.9);
-    --lp-btn-bg: linear-gradient(-7deg, #e6e8eb 19%, #ffffff 87%);
-    --lp-btn-bg-hover: linear-gradient(-7deg, #d4d7dc 19%, #f1f2f4 87%);
-    --lp-btn-text: #191d24;
+    --lp-btn-bg: linear-gradient(-7deg, var(--brand-600) 19%, var(--brand-500) 87%);
+    --lp-btn-bg-hover: linear-gradient(-7deg, var(--brand-700) 19%, #b8394b 87%);
+    --lp-btn-text: var(--on-solid);
     --lp-btn-soft-bg: linear-gradient(-23deg, rgba(255, 255, 255, 0.08) 19%, rgba(255, 255, 255, 0.12) 87%);
     --lp-logo-tile: linear-gradient(180deg, rgba(70, 74, 82, 0.96) 0%, rgba(38, 41, 47, 0.96) 100%);
     --lp-logo-mark: #f3f4f6;
@@ -369,8 +370,8 @@
     --lp-kw-red: rgba(217, 112, 90, 0.6);
     --lp-kw-blue: rgba(71, 144, 189, 0.65);
     --lp-tag-dark: #3a3f48;
-    --lp-accent: #6aa4f0;
-    --lp-accent-ring: #6aa4f0;
+    --lp-accent: var(--brand-400);
+    --lp-accent-ring: var(--brand-400);
     --lp-dot: #353a43;
     --lp-glow: rgba(255, 120, 90, 0.18);
     --lp-footer-bg: #08090c;
@@ -462,9 +463,9 @@
   --lp-glass: rgba(23, 26, 31, 0.7);
   --lp-card-bg: radial-gradient(120% 140% at 50% 50%, #15181d 0%, #1f1a1b 100%);
   --lp-card-inset: inset 0 0 50px 0 rgba(13, 15, 19, 0.9);
-  --lp-btn-bg: linear-gradient(-7deg, #e6e8eb 19%, #ffffff 87%);
-  --lp-btn-bg-hover: linear-gradient(-7deg, #d4d7dc 19%, #f1f2f4 87%);
-  --lp-btn-text: #191d24;
+  --lp-btn-bg: linear-gradient(-7deg, var(--brand-600) 19%, var(--brand-500) 87%);
+  --lp-btn-bg-hover: linear-gradient(-7deg, var(--brand-700) 19%, #b8394b 87%);
+  --lp-btn-text: var(--on-solid);
   --lp-btn-soft-bg: linear-gradient(-23deg, rgba(255, 255, 255, 0.08) 19%, rgba(255, 255, 255, 0.12) 87%);
   --lp-logo-tile: linear-gradient(180deg, rgba(70, 74, 82, 0.96) 0%, rgba(38, 41, 47, 0.96) 100%);
   --lp-logo-mark: #f3f4f6;
@@ -478,8 +479,8 @@
   --lp-kw-red: rgba(217, 112, 90, 0.6);
   --lp-kw-blue: rgba(71, 144, 189, 0.65);
   --lp-tag-dark: #3a3f48;
-  --lp-accent: #6aa4f0;
-  --lp-accent-ring: #6aa4f0;
+  --lp-accent: var(--brand-400);
+  --lp-accent-ring: var(--brand-400);
   --lp-dot: #353a43;
   --lp-glow: rgba(255, 120, 90, 0.18);
   --lp-footer-bg: #08090c;

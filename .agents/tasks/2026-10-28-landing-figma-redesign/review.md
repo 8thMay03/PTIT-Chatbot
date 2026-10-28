@@ -4,7 +4,7 @@
 - Hình thức: `self_review`.
 - Trạng thái: `approved`.
 - Bản được review: diff `053b561..feat/landing-figma-redesign` (commit sau bàn giao).
-- Cập nhật lúc: `2026-10-28T09:25:00+07:00`.
+- Cập nhật lúc: `2026-10-28T09:56:40+07:00`.
 
 ## Phạm vi và cơ sở đánh giá
 
@@ -28,9 +28,15 @@
 
 ### R-03 — Landing không còn dùng màu maroon nhận diện
 
-- Mức độ: `low`; bắt buộc: không; trạng thái: `deferred` (chờ người dùng).
-- Theo thiết kế Figma (trung tính, nút tối). Quyết định D-09 của task trước giữ maroon làm màu nhận diện; app chat
-  vẫn dùng maroon. Nếu muốn, đổi `--lp-btn-bg`/`--lp-accent` sang token maroon trong `tokens.css`.
+- Mức độ: `low`; bắt buộc: không; trạng thái: `resolved`.
+- Theo thiết kế Figma (trung tính, nút tối), khác D-09 của task trước (giữ maroon làm màu nhận diện).
+- Phản hồi/cách sửa (`2026-10-28T09:56:40+07:00`): người dùng yêu cầu nút màu đỏ hợp màu chủ đạo PTIT
+  (`MSG-user-001`). `--lp-btn-bg`/`--lp-btn-bg-hover`/`--lp-btn-text`/`--lp-accent`/`--lp-accent-ring` trong
+  `tokens.css` chuyển sang `--brand-*` (sáng: `#7D1F2C → #B8394B`, tối: `#972635 → #C53D52`, chữ trắng; tương phản
+  chữ trắng ≥ 5.04:1). Áp cho nút chính (nav, hero, dải kêu gọi), nút "Bước tiếp theo", nút gửi, chấm carousel đang
+  chọn, vòng focus, nút trang đăng nhập/đăng ký.
+- Xác nhận của reviewer: đã xem ảnh chụp 1440 sáng/tối, 360, `/login` 1280 sáng/360 tối; test và
+  `check:bundle` chạy lại đạt.
 
 ### Điểm đã kiểm và không có nhận xét
 
@@ -43,9 +49,10 @@
 ## Lịch sử các vòng review
 
 - `2026-10-28T09:25:00+07:00` — `claude-agent` (`self_review`) — `approved`; R-01 … R-03 `low`, `deferred`.
+- `2026-10-28T09:56:40+07:00` — `claude-agent` (`self_review`) — `approved`; R-03 `resolved` (nút maroon).
 
 ## Kết luận
 
 - Kết luận: `approved` (`self_review`).
 - Nhận xét bắt buộc còn mở: không.
-- Nhận xét hoãn lại: R-01, R-02, R-03.
+- Nhận xét hoãn lại: R-01, R-02. R-03 đã xử lý.

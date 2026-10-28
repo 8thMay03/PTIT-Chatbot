@@ -46,9 +46,20 @@
 - `src/landing/LandingPage.test.jsx` (8 test), `src/App.test.jsx` (+1), `src/lib/appRoute.test.js` (+2).
 - Kết quả: xem `verification.md`.
 
+### Điều chỉnh sau bàn giao — claude-agent
+
+- Lúc: `2026-10-28T09:56:40+07:00`.
+- Theo `MSG-user-001`: nút chính và màu nhấn của landing/trang tài khoản chuyển sang maroon PTIT (chỉ đổi token
+  `--lp-btn-*`, `--lp-accent*` trong `tokens.css`; không đổi component). Xem `review.md` R-03.
+
 ## Trao đổi giữa agents
 
-- Không có (một agent).
+### MSG-user-001
+
+- Lúc: `2026-10-28T09:50:00+07:00`.
+- Từ: người dùng; đến: `claude-agent`.
+- Nội dung: "các button cần có màu đỏ để hợp với màu chủ đạo của PTIT".
+- Hành động: đã làm (nút maroon, xem R-03).
 
 ## Bàn giao
 

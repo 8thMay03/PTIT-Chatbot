@@ -5,7 +5,7 @@
 - Coordinator: `claude-agent`
 - Người yêu cầu: người dùng (yêu cầu trực tiếp trong phiên chat)
 - Tạo lúc: `2026-10-28T09:09:12+07:00`
-- Cập nhật lúc: `2026-10-28T09:25:00+07:00`
+- Cập nhật lúc: `2026-10-28T09:56:40+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -58,10 +58,12 @@ accordion; dải kêu gọi hành động; footer nền tối.
 
 - Tóm tắt: `done` — S-01 … S-04 xong, V-01 … V-05 `passed`, review `self_review` `approved`.
 - Blocker: không.
-- Bước tiếp theo: người dùng xem landing; quyết định R-03 (giữ nền trung tính theo Figma hay đổi sang maroon).
+- Bước tiếp theo: người dùng xem landing và merge (sau `feat/landing-user-auth`).
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
 - `2026-10-28T09:09:12+07:00` — `claude-agent`: tạo task từ yêu cầu người dùng; đọc thiết kế qua connector Figma
   (asset URL của Figma bị chặn mạng trong phiên nên icon dùng `lucide-react`, nền mờ/chữ gradient dựng bằng CSS).
 - `2026-10-28T09:25:00+07:00` — `claude-agent`: hoàn tất, chuyển `done`.
+- `2026-10-28T09:56:40+07:00` — `claude-agent`: người dùng yêu cầu nút màu đỏ PTIT; đổi token nút/màu nhấn sang
+  maroon, kiểm chứng lại (V-06), task vẫn `done`.

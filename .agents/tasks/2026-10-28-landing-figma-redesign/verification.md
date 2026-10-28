@@ -51,6 +51,16 @@
   chat 80.04 kB (mốc 128.41); không trang nào chứa module bị cấm.
 - Trạng thái: `passed`.
 
+### V-06 — Nút maroon (theo `MSG-user-001`)
+
+- Người thực hiện / thời gian: `claude-agent` / `2026-10-28T09:56:40+07:00`.
+- Thao tác: chụp `/` 1440 sáng/tối, 360 sáng; `/login` 1280 sáng, 360 tối; chạy lại `npx vitest run`,
+  `npm run check:bundle`; tính tương phản chữ trắng trên nền nút.
+- Kết quả: nút chính, nút "Bước tiếp theo", nút gửi, chấm carousel và nút đăng nhập/đăng ký có màu maroon ở cả hai
+  chủ đề; tương phản chữ trắng ≥ 5.64:1 (sáng, `#B8394B`) và ≥ 5.04:1 (tối, `#C53D52`); `19 files, 146 tests
+  passed`; `check:bundle đạt`; không cuộn ngang.
+- Trạng thái: `passed`. Bằng chứng: các ảnh trong `evidence/` (đã chụp lại).
+
 ## Lỗi, kiểm tra lại và phần chưa xác minh
 
 - Chưa thử Firefox/Safari, chưa đo hiệu năng tải font trên mạng chậm (font `font-display: swap`).
