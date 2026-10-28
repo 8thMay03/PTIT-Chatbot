@@ -86,7 +86,6 @@
   }
 
   /* ---- Mọi layout 2 cột xếp chồng ---- */
-  .config-two-col-grid,
   .model-mgmt-layout,
   .doc-view-split-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -103,10 +102,6 @@
     flex-direction: column;
     align-items: stretch;
     gap: var(--space-3);
-  }
-
-  .settings-header-actions {
-    justify-content: flex-end;
   }
 }
 
@@ -265,26 +260,6 @@
     right: 10px;
     left: 10px;
     width: auto;
-  }
-
-  /* ---- Cấu hình: nhãn và ô số xuống dòng ---- */
-  .config-label-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-
-  .config-toggle-header {
-    flex-direction: row;
-    gap: var(--space-3);
-  }
-
-  .settings-header-actions {
-    flex-wrap: wrap;
-  }
-
-  .settings-header-actions button {
-    flex: 1;
   }
 
   /* ---- Document: thanh công cụ chunk xuống dòng ---- */
