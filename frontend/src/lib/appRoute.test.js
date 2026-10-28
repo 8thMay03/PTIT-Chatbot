@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   adminRouteHash,
   authPageHref,
+  chatPathWithQuestion,
   isAdminPath,
   isAppearanceHash,
   legacyHashToAdmin,
   legacyRootHashToChat,
   readAdminRoute,
   readNextParam,
+  readQuestionParam,
   resolveAppRoute,
   safeNextPath,
 } from "./appRoute";
@@ -146,5 +148,19 @@ describe("legacyRootHashToChat", () => {
     expect(legacyRootHashToChat("/", "#tinh-nang")).toBeNull();
     expect(legacyRootHashToChat("/chat", "#chat")).toBeNull();
     expect(legacyRootHashToChat("/login", "#settings/appearance")).toBeNull();
+  });
+});
+
+describe("chatPathWithQuestion / readQuestionParam", () => {
+  it("mã hoá câu hỏi vào ?q= và đọc lại đúng", () => {
+    const path = chatPathWithQuestion("  Học phí & học bổng?  ");
+    expect(path).toBe(`/chat?q=${encodeURIComponent("Học phí & học bổng?")}`);
+    expect(readQuestionParam(path.slice("/chat".length))).toBe("Học phí & học bổng?");
+  });
+
+  it("câu hỏi rỗng về /chat; cắt độ dài tối đa", () => {
+    expect(chatPathWithQuestion("   ")).toBe("/chat");
+    expect(readQuestionParam("")).toBe("");
+    expect(readQuestionParam(`?q=${"a".repeat(1200)}`)).toHaveLength(1000);
   });
 });

@@ -15,7 +15,12 @@ import Modal from "./components/Modal";
 import ThemePicker from "./components/ThemePicker";
 import { ToastProvider } from "./components/Toast";
 import UserMenu, { GuestHint } from "./components/UserMenu";
-import { isAppearanceHash, legacyHashToAdmin, navigateTo } from "./lib/appRoute";
+import {
+  isAppearanceHash,
+  legacyHashToAdmin,
+  navigateTo,
+  readQuestionParam,
+} from "./lib/appRoute";
 import { useSidebar } from "./lib/useSidebar";
 import { useTheme } from "./lib/theme";
 import { queryKeys } from "./api";
@@ -35,11 +40,26 @@ export default function App() {
   const [appearanceOpen, setAppearanceOpen] = useState(() =>
     isAppearanceHash(window.location.hash)
   );
+  // Câu hỏi gửi từ khung soạn ở landing (`/chat?q=`): chỉ điền sẵn vào ô nhập.
+  const [prefillQuestion] = useState(() => readQuestionParam(window.location.search));
   const { theme, setTheme } = useTheme();
   const sidebar = useSidebar();
   const { isMobile, isOpen: isSidebarOpen, mobileOpen, setMobileOpen } = sidebar;
   const chatRef = useRef(null);
   const queryClient = useQueryClient();
+
+  // Bỏ `q` khỏi URL sau khi đọc để tải lại trang không điền lại câu hỏi cũ.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("q")) return;
+    params.delete("q");
+    const search = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      window.location.pathname + (search ? `?${search}` : "") + window.location.hash
+    );
+  }, []);
 
   // Link cũ (#documents, #settings/config…) bấm ngay trong trang cũng phải sang /admin.
   useEffect(() => {
@@ -225,6 +245,7 @@ export default function App() {
             onLoadingChange={setChatLoading}
             onConversationSaved={handleConversationSaved}
             headerActions={<UserMenu onLoggedOut={handleLoggedOut} />}
+            initialInput={prefillQuestion}
           />
         </div>
       </main>

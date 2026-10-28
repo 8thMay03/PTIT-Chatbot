@@ -1,183 +1,134 @@
 import React from "react";
-import {
-  ArrowRight,
-  BookOpenCheck,
-  FileSearch,
-  Github,
-  History,
-  LogIn,
-  MessageSquareText,
-  PenLine,
-  Quote,
-  SearchX,
-  Sparkles,
-  TriangleAlert,
-  UserPlus,
-} from "lucide-react";
+import { ArrowUpRight, Github, GraduationCap, Sparkles, Wallet } from "lucide-react";
 import ThemeToggle from "../components/ThemeToggle";
 import { useAuthSession, userInitial } from "../auth/session";
+import FaqList from "./FaqList";
+import FeatureBento from "./FeatureBento";
+import HeroComposer from "./HeroComposer";
+import StepsCarousel from "./StepsCarousel";
+import { BACKGROUND_TEXT, REPO_URL, TOPIC_STRIP } from "./content";
+import "./fonts";
 
-const REPO_URL = "https://github.com/8thMay03/PTIT-Chatbot";
-
-// Nội dung mô tả đúng khả năng hiện có của hệ thống (D-10): không số liệu/thống kê.
-const FEATURES = [
-  {
-    icon: MessageSquareText,
-    title: "Hỏi đáp quy chế, học vụ",
-    text: "Đặt câu hỏi bằng tiếng Việt tự nhiên về quy chế đào tạo, học phí, thủ tục sinh viên — trong phạm vi các tài liệu đã được nạp vào hệ thống.",
-  },
-  {
-    icon: Quote,
-    title: "Trích dẫn nguồn rõ ràng",
-    text: "Câu trả lời đánh số trích dẫn tới tài liệu và điều, khoản liên quan để bạn tự đối chiếu với văn bản gốc.",
-  },
-  {
-    icon: BookOpenCheck,
-    title: "Hiểu ngữ cảnh câu hỏi",
-    text: "Hỏi tiếp dựa trên câu trước mà không cần nhắc lại toàn bộ; chatbot dùng các lượt gần nhất trong cùng hội thoại.",
-  },
-  {
-    icon: History,
-    title: "Lưu lịch sử hội thoại",
-    text: "Không cần tài khoản vẫn hỏi được ngay. Đăng nhập để lịch sử theo bạn trên mọi thiết bị.",
-  },
-];
-
-const STEPS = [
-  {
-    icon: PenLine,
-    title: "Bạn đặt câu hỏi",
-    text: "Gõ câu hỏi như khi hỏi phòng đào tạo hay cố vấn học tập.",
-  },
-  {
-    icon: FileSearch,
-    title: "Tìm trong tài liệu chính thức",
-    text: "Hệ thống tìm các đoạn liên quan trong kho văn bản do quản trị viên nạp: quy chế, quy định, sổ tay sinh viên.",
-  },
-  {
-    icon: Quote,
-    title: "Trả lời kèm trích dẫn",
-    text: "Mô hình ngôn ngữ soạn câu trả lời chỉ dựa trên các đoạn tìm được và gắn số trích dẫn tới nguồn.",
-  },
-  {
-    icon: SearchX,
-    title: "Nói rõ khi không biết",
-    text: "Không tìm thấy thông tin phù hợp thì chatbot báo chưa có trong tài liệu thay vì tự đoán.",
-  },
-];
-
-const LIMITS = [
-  "Chatbot có thể trả lời sai, thiếu hoặc hiểu nhầm câu hỏi. Luôn mở trích dẫn để đối chiếu văn bản gốc trước khi làm thủ tục quan trọng.",
-  "Chatbot chỉ biết nội dung các tài liệu đã được nạp; văn bản mới ban hành có thể chưa được cập nhật.",
-  "Thông tin chính thức luôn là văn bản và thông báo do Học viện ban hành.",
-  "Không nhập mật khẩu, số giấy tờ tuỳ thân hay thông tin nhạy cảm vào khung chat.",
-];
-
-function HeroActions({ session, size = "lg" }) {
-  if (session.isAuthenticated) {
-    return (
-      <div className="landing-actions">
-        <a className={`landing-btn is-primary is-${size}`} href="/chat">
-          Vào trò chuyện
-          <ArrowRight size={18} aria-hidden="true" />
-        </a>
-      </div>
-    );
-  }
+function BrandMark({ inverted = false }) {
   return (
-    <div className="landing-actions">
-      <a className={`landing-btn is-primary is-${size}`} href="/chat">
-        Bắt đầu trò chuyện
-        <ArrowRight size={18} aria-hidden="true" />
-      </a>
-      <a className={`landing-btn is-secondary is-${size}`} href="/register">
-        <UserPlus size={18} aria-hidden="true" />
-        Đăng ký
-      </a>
-      <a className={`landing-btn is-ghost is-${size}`} href="/login">
-        <LogIn size={18} aria-hidden="true" />
-        Đăng nhập
-      </a>
+    <span className={`lp-brand ${inverted ? "is-inverted" : ""}`.trim()}>
+      <span className="lp-brand-tile" aria-hidden="true">
+        <Sparkles size={24} />
+      </span>
+      <span className="lp-brand-name">PTIT Chatbot</span>
+    </span>
+  );
+}
+
+function PrimaryLink({ href, children, size = "lg", className = "" }) {
+  return (
+    <a className={`lp-btn is-${size} ${className}`.trim()} href={href}>
+      {children}
+      <ArrowUpRight size={size === "sm" ? 20 : 22} aria-hidden="true" />
+    </a>
+  );
+}
+
+/** Nền chữ mờ phía sau khung soạn/dải kêu gọi (trang trí). */
+function BackgroundText({ className = "" }) {
+  return (
+    <p className={`lp-bgtext ${className}`.trim()} aria-hidden="true">
+      {/* Lặp hai lần để phủ kín vùng nền như thiết kế. */}
+      {[...BACKGROUND_TEXT, [" ", null], ...BACKGROUND_TEXT].map(([text, tone], index) =>
+        tone ? (
+          <span key={index} className={`lp-kw is-${tone}`}>
+            {text}
+          </span>
+        ) : (
+          <React.Fragment key={index}>{text}</React.Fragment>
+        )
+      )}
+    </p>
+  );
+}
+
+/** Hai thẻ nghiêng hai bên hero (Figma node 2002:535), chỉ để trang trí. */
+function HeroFloatCards() {
+  return (
+    <div className="lp-float-cards" aria-hidden="true">
+      <div className="lp-float-card is-left">
+        <p className="lp-float-title">Câu hỏi gợi ý</p>
+        <p className="lp-float-row">
+          <span className="lp-float-icon">
+            <Wallet size={13} />
+          </span>
+          Học phí kỳ này?
+        </p>
+        <p className="lp-float-title">Hỏi tiếp</p>
+        <p className="lp-float-row">
+          <span className="lp-float-icon">
+            <GraduationCap size={13} />
+          </span>
+          Điều kiện tốt nghiệp
+        </p>
+      </div>
+      <div className="lp-float-card is-right">
+        <p className="lp-float-menu is-active">
+          <span className="lp-cite">1</span>Quy chế đào tạo
+        </p>
+        <p className="lp-float-menu">Sổ tay sinh viên</p>
+        <p className="lp-float-menu">Quy định học bổng</p>
+        <span className="lp-float-divider" />
+        <p className="lp-float-menu">Mở văn bản gốc…</p>
+      </div>
     </div>
   );
 }
 
-/** Minh hoạ một lượt hỏi đáp có trích dẫn (trang trí, không phải dữ liệu thật). */
-function ChatPreview() {
-  return (
-    <figure className="landing-preview">
-      <div className="landing-preview-window" aria-hidden="true">
-        <div className="landing-preview-bar">
-          <span />
-          <span />
-          <span />
-        </div>
-        <div className="landing-preview-body">
-          <p className="landing-bubble is-user">Điều kiện để được xét tốt nghiệp là gì?</p>
-          <div className="landing-bubble is-bot">
-            <p>
-              Theo quy chế đào tạo, sinh viên được xét tốt nghiệp khi đáp ứng các điều kiện về tích
-              luỹ tín chỉ và kết quả học tập <span className="landing-cite">[1]</span>…
-            </p>
-            <div className="landing-sources">
-              <span className="landing-source">
-                <span className="landing-cite">1</span>
-                Quy chế đào tạo · Điều xét tốt nghiệp
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <figcaption>Minh hoạ: câu trả lời luôn kèm trích dẫn tới văn bản nguồn.</figcaption>
-    </figure>
-  );
-}
-
-/** Trang giới thiệu tại `/`: CTA vào chat, đăng nhập, đăng ký; nội dung tiếng Việt. */
+/**
+ * Trang giới thiệu tại `/`, dựng theo Figma "AI Chat landing page UI kit"
+ * (frame 2002:456) với nội dung tiếng Việt trung thực về PTIT Chatbot.
+ */
 export default function LandingPage() {
   const session = useAuthSession();
   const { user } = session;
+  const chatLabel = session.isAuthenticated ? "Vào trò chuyện" : "Bắt đầu trò chuyện";
 
   return (
     <div className="landing-page">
       <a className="skip-link" href="#landing-main">
         Tới nội dung chính
       </a>
-      <header className="landing-header">
-        <div className="landing-container landing-header-inner">
-          <a className="site-brand" href="/" aria-label="PTIT Chatbot — Trang chủ">
-            <span className="site-brand-mark" aria-hidden="true">
-              <Sparkles size={18} />
-            </span>
-            <span className="site-brand-name">PTIT Chatbot</span>
+
+      <header className="lp-nav">
+        <div className="lp-container lp-nav-inner">
+          <a className="lp-nav-brand" href="/" aria-label="PTIT Chatbot — Trang chủ">
+            <BrandMark />
+            <span className="lp-nav-divider" aria-hidden="true" />
+            <span className="lp-nav-tagline">Trợ lý học vụ</span>
           </a>
-          <nav className="landing-nav" aria-label="Các mục trên trang">
+          <nav className="lp-nav-links" aria-label="Các mục trên trang">
             <a href="#tinh-nang">Tính năng</a>
             <a href="#cach-hoat-dong">Cách hoạt động</a>
-            <a href="#luu-y">Lưu ý</a>
+            <a href="#cau-hoi">Câu hỏi thường gặp</a>
           </nav>
-          <div className="landing-header-actions">
-            <ThemeToggle />
+          <div className="lp-nav-actions">
+            <ThemeToggle className="lp-theme-toggle" />
             {session.isAuthenticated ? (
               <>
-                <span className="landing-user" title={user.email}>
-                  <span className="landing-avatar" aria-hidden="true">
+                <span className="lp-nav-user" title={user.email}>
+                  <span className="lp-avatar" aria-hidden="true">
                     {userInitial(user)}
                   </span>
-                  <span className="landing-user-name">{user.full_name}</span>
+                  <span className="lp-nav-user-name">{user.full_name}</span>
                 </span>
-                <a className="landing-btn is-primary is-sm" href="/chat">
+                <PrimaryLink href="/chat" size="sm">
                   Vào trò chuyện
-                </a>
+                </PrimaryLink>
               </>
             ) : (
               <>
-                <a className="landing-btn is-ghost is-sm landing-header-login" href="/login">
+                <a className="lp-nav-login" href="/login">
                   Đăng nhập
                 </a>
-                <a className="landing-btn is-primary is-sm" href="/register">
+                <PrimaryLink href="/register" size="sm">
                   Đăng ký
-                </a>
+                </PrimaryLink>
               </>
             )}
           </div>
@@ -185,130 +136,136 @@ export default function LandingPage() {
       </header>
 
       <main id="landing-main" tabIndex={-1}>
-        <section className="landing-hero" aria-labelledby="landing-title">
-          <div className="landing-container landing-hero-grid">
-            <div className="landing-hero-copy">
-              <p className="landing-eyebrow">Trợ lý học vụ cho sinh viên PTIT</p>
-              <h1 id="landing-title">Hỏi đáp quy chế và thủ tục, có trích dẫn nguồn</h1>
-              <p className="landing-lead">
-                PTIT Chatbot trả lời câu hỏi về quy chế đào tạo, học phí và thủ tục sinh viên dựa trên
-                tài liệu chính thức đã được nạp vào hệ thống, kèm trích dẫn để bạn kiểm tra lại.
+        <section className="lp-hero" aria-labelledby="landing-title">
+          <span className="lp-haze" aria-hidden="true" />
+          <div className="lp-container lp-hero-copy">
+            <h1 id="landing-title" className="lp-display">
+              <span className="lp-display-line">Hỏi đáp quy chế PTIT</span>
+              <span className="lp-display-line is-muted">nhanh, có trích dẫn nguồn</span>
+            </h1>
+            <p className="lp-lead">
+              Trả lời câu hỏi về quy chế đào tạo, học phí và thủ tục sinh viên dựa trên tài liệu chính
+              thức, kèm trích dẫn để bạn tự kiểm tra.
+            </p>
+            {session.isAuthenticated && (
+              <p className="lp-greeting">
+                Xin chào, <strong>{user.full_name}</strong> — lịch sử hội thoại của bạn đã sẵn sàng.
               </p>
-              {session.isAuthenticated && (
-                <p className="landing-greeting">
-                  Xin chào, <strong>{user.full_name}</strong>. Lịch sử hội thoại của bạn đã sẵn sàng.
-                </p>
-              )}
-              <HeroActions session={session} />
-              {!session.isAuthenticated && (
-                <p className="landing-hint">
-                  Không cần tài khoản để hỏi. Đăng nhập để lưu lịch sử trên mọi thiết bị.
-                </p>
-              )}
-            </div>
-            <ChatPreview />
+            )}
+            <PrimaryLink href="/chat">{chatLabel}</PrimaryLink>
           </div>
-        </section>
-
-        <section className="landing-section" id="tinh-nang" aria-labelledby="features-title">
-          <div className="landing-container">
-            <div className="landing-section-head">
-              <h2 id="features-title">Chatbot giúp được gì</h2>
-              <p>Tra cứu nhanh thay vì lật từng trang quy chế — và vẫn biết câu trả lời lấy từ đâu.</p>
+          <HeroFloatCards />
+          <div className="lp-hero-stage">
+            <BackgroundText />
+            <div className="lp-container lp-hero-composer">
+              <HeroComposer />
+              {!session.isAuthenticated && (
+                <p className="lp-hero-note">
+                  Không cần tài khoản để hỏi. <a href="/login">Đăng nhập</a> để lưu lịch sử trên mọi thiết
+                  bị.
+                </p>
+              )}
             </div>
-            <ul className="landing-features">
-              {FEATURES.map(({ icon: Icon, title, text }) => (
-                <li key={title} className="landing-card">
-                  <span className="landing-card-icon" aria-hidden="true">
-                    <Icon size={20} />
-                  </span>
-                  <h3>{title}</h3>
-                  <p>{text}</p>
+          </div>
+          <div className="lp-container">
+            <ul className="lp-topic-strip" aria-label="Chủ đề chatbot hỗ trợ">
+              {TOPIC_STRIP.map(({ label, icon: Icon }) => (
+                <li key={label}>
+                  <Icon size={26} strokeWidth={1.75} aria-hidden="true" />
+                  {label}
                 </li>
               ))}
             </ul>
           </div>
         </section>
 
-        <section
-          className="landing-section is-muted"
-          id="cach-hoat-dong"
-          aria-labelledby="how-title"
-        >
-          <div className="landing-container">
-            <div className="landing-section-head">
-              <h2 id="how-title">Cách hoạt động</h2>
+        <section className="lp-section" id="tinh-nang" aria-labelledby="features-title">
+          <div className="lp-container">
+            <div className="lp-section-head">
+              <h2 id="features-title" className="lp-display is-h2">
+                <span className="lp-display-line">Hiểu câu hỏi tiếng Việt</span>
+                <span className="lp-display-line is-muted">Chatbot giúp được gì</span>
+              </h2>
               <p>
-                Câu trả lời được xây dựng từ tài liệu, không phải từ trí nhớ chung của mô hình ngôn
-                ngữ.
+                Tra cứu nhanh thay vì lật từng trang quy chế, và vẫn biết câu trả lời lấy từ đâu.
               </p>
             </div>
-            <ol className="landing-steps">
-              {STEPS.map(({ icon: Icon, title, text }, index) => (
-                <li key={title} className="landing-step">
-                  <span className="landing-step-index" aria-hidden="true">
-                    {index + 1}
-                  </span>
-                  <div>
-                    <h3>
-                      <Icon size={18} aria-hidden="true" />
-                      {title}
-                    </h3>
-                    <p>{text}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-            <p className="landing-source-note">
-              <strong>Nguồn dữ liệu:</strong> các văn bản do quản trị viên hệ thống nạp vào kho tài
-              liệu. Câu hỏi ngoài phạm vi học vụ có thể bị chatbot từ chối trả lời.
-            </p>
+            <FeatureBento />
           </div>
         </section>
 
-        <section className="landing-section" id="luu-y" aria-labelledby="limits-title">
-          <div className="landing-container">
-            <div className="landing-limits">
-              <div className="landing-limits-head">
-                <span className="landing-card-icon is-warning" aria-hidden="true">
-                  <TriangleAlert size={20} />
-                </span>
-                <h2 id="limits-title">Lưu ý khi sử dụng</h2>
-              </div>
-              <ul>
-                {LIMITS.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        <section className="landing-section landing-final" aria-labelledby="final-title">
-          <div className="landing-container landing-final-inner">
-            <h2 id="final-title">
-              {session.isAuthenticated ? "Tiếp tục cuộc trò chuyện" : "Sẵn sàng đặt câu hỏi?"}
+        <section className="lp-section is-tight" id="cach-hoat-dong" aria-labelledby="how-title">
+          <div className="lp-container">
+            <h2 id="how-title" className="sr-only">
+              Cách hoạt động
             </h2>
-            <HeroActions session={session} size="md" />
+            <StepsCarousel />
+          </div>
+        </section>
+
+        <section className="lp-section" id="cau-hoi" aria-labelledby="faq-title">
+          <div className="lp-container">
+            <div className="lp-section-head">
+              <h2 id="faq-title" className="lp-display is-h2">
+                <span className="lp-display-line">Câu hỏi</span>
+                <span className="lp-display-line is-muted">thường gặp</span>
+              </h2>
+              <p className="lp-faq-note" id="luu-y">
+                Lưu ý khi sử dụng: chatbot có thể trả lời sai — luôn đối chiếu văn bản gốc qua trích dẫn
+                trước khi làm thủ tục quan trọng.
+              </p>
+            </div>
+            <FaqList />
+          </div>
+        </section>
+
+        <section className="lp-cta" aria-labelledby="cta-title">
+          <BackgroundText className="is-cta" />
+          <div className="lp-cta-inner">
+            <h2 id="cta-title" className="lp-display">
+              <span className="lp-display-line">
+                {session.isAuthenticated ? "Tiếp tục cuộc trò chuyện" : "Sẵn sàng đặt câu hỏi?"}
+              </span>
+              <span className="lp-display-line is-muted">Hỏi PTIT Chatbot</span>
+            </h2>
+            <PrimaryLink href="/chat">{chatLabel}</PrimaryLink>
           </div>
         </section>
       </main>
 
-      <footer className="landing-footer">
-        <div className="landing-container landing-footer-inner">
-          <div className="landing-footer-brand">
-            <strong>PTIT Chatbot</strong>
-            <span>Trợ lý tra cứu học vụ dựa trên tài liệu, kèm trích dẫn nguồn.</span>
+      <footer className="lp-footer">
+        <div className="lp-container">
+          <div className="lp-footer-top">
+            <div className="lp-footer-brand">
+              <BrandMark inverted />
+              <p>Trợ lý tra cứu học vụ dựa trên tài liệu, kèm trích dẫn nguồn.</p>
+            </div>
+            <nav className="lp-footer-cols" aria-label="Liên kết cuối trang">
+              <div className="lp-footer-col">
+                <p className="lp-footer-heading">Sản phẩm</p>
+                <a href="/chat">Trò chuyện</a>
+                {!session.isAuthenticated && <a href="/login">Đăng nhập</a>}
+                {!session.isAuthenticated && <a href="/register">Đăng ký</a>}
+              </div>
+              <div className="lp-footer-col">
+                <p className="lp-footer-heading">Tìm hiểu</p>
+                <a href="#tinh-nang">Tính năng</a>
+                <a href="#cach-hoat-dong">Cách hoạt động</a>
+                <a href="#cau-hoi">Câu hỏi thường gặp</a>
+              </div>
+              <div className="lp-footer-col">
+                <p className="lp-footer-heading">Dự án</p>
+                <a href={REPO_URL} target="_blank" rel="noreferrer">
+                  <Github size={15} aria-hidden="true" />
+                  Mã nguồn
+                </a>
+              </div>
+            </nav>
           </div>
-          <nav className="landing-footer-links" aria-label="Liên kết cuối trang">
-            <a href="/chat">Trò chuyện</a>
-            {!session.isAuthenticated && <a href="/login">Đăng nhập</a>}
-            {!session.isAuthenticated && <a href="/register">Đăng ký</a>}
-            <a href={REPO_URL} target="_blank" rel="noreferrer">
-              <Github size={14} aria-hidden="true" />
-              Mã nguồn
-            </a>
-          </nav>
+          <div className="lp-footer-bottom">
+            <p>© {new Date().getFullYear()} PTIT Chatbot</p>
+            <p>Thông tin chính thức luôn là văn bản do Học viện ban hành.</p>
+          </div>
         </div>
       </footer>
     </div>
