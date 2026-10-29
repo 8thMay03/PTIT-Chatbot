@@ -84,7 +84,7 @@ describe("MarkdownEditorView", () => {
     });
   }
 
-  it("hiện Markdown thô cạnh bản render và lưu kèm content_hash mới nhất", async () => {
+  it("sửa Markdown thô và lưu kèm content_hash mới nhất", async () => {
     const fetchMock = routedFetch((url, options) => {
       if (!options.method) return jsonResponse(markdown("# Học phí\n\nBản parser", "hash-1"));
       const body = JSON.parse(options.body);
@@ -94,7 +94,6 @@ describe("MarkdownEditorView", () => {
 
     const textarea = container.querySelector("textarea");
     expect(textarea.value).toBe("# Học phí\n\nBản parser");
-    expect(container.querySelector(".md-editor-preview h1")?.textContent).toBe("Học phí");
     expect(button("Lưu").disabled).toBe(true);
 
     await type(textarea, "# Học phí\n\nBản sửa tay");
@@ -118,27 +117,59 @@ describe("MarkdownEditorView", () => {
     expect(JSON.parse(fetchMock.mock.lastCall[1].body).base_hash).toBe("hash-after-hash-1");
   });
 
-  it("hiện ba cột để đối chiếu và nhớ cột đã bật/tắt", async () => {
+  it("gộp Markdown thô và bản render vào một cột, chuyển qua lại bằng một nút", async () => {
+    await renderEditor(routedFetch(() => jsonResponse(markdown("# Học phí", "hash-1"))));
+
+    const markdownPane = pane("Markdown");
+    expect(pane("Markdown thô")).toBeNull();
+    expect(pane("Bản render")).toBeNull();
+    expect(markdownPane.querySelector(".md-editor-pane-title").textContent).toBe("Markdown thô");
+    expect(markdownPane.querySelector(".md-editor-preview")).toBeNull();
+
+    const textarea = markdownPane.querySelector("textarea");
+    await type(textarea, "# Học phí\n\nBản sửa tay");
+    await click(button("Xem bản render"));
+
+    expect(markdownPane.querySelector(".md-editor-pane-title").textContent).toBe("Bản render");
+    expect(markdownPane.querySelector(".md-editor-preview h1").textContent).toBe("Học phí");
+    expect(markdownPane.querySelector(".md-editor-preview p").textContent).toBe("Bản sửa tay");
+    // Ô sửa chỉ bị ẩn để giữ lịch sử hoàn tác, không bị gỡ.
+    expect(markdownPane.querySelector("textarea")).toBe(textarea);
+    expect(textarea.hidden).toBe(true);
+
+    await click(button("Sửa Markdown"));
+    expect(markdownPane.querySelector(".md-editor-preview")).toBeNull();
+    expect(textarea.hidden).toBe(false);
+    expect(textarea.value).toBe("# Học phí\n\nBản sửa tay");
+  });
+
+  it("hiện bản gốc cạnh cột Markdown và nhớ cột đã bật/tắt", async () => {
     await renderEditor(routedFetch(() => jsonResponse(markdown("# Học phí", "hash-1"))));
 
     expect(pane("Bản gốc").querySelector(".doc-original-text").textContent).toBe("# Bản gốc thô");
-    expect(pane("Markdown thô").querySelector("textarea").value).toBe("# Học phí");
-    expect(pane("Bản render").querySelector("h1").textContent).toBe("Học phí");
+    expect(pane("Markdown").querySelector("textarea").value).toBe("# Học phí");
 
     await click(button("Bản gốc"));
-    await click(button("Markdown thô"));
     expect(pane("Bản gốc")).toBeNull();
-    expect(pane("Markdown thô")).toBeNull();
     // Cột cuối cùng không tắt được.
-    await click(button("Bản render"));
-    expect(pane("Bản render")).not.toBeNull();
-    expect(JSON.parse(localStorage.getItem("ptit_md_editor_panes"))).toEqual(["rendered"]);
+    await click(button("Markdown"));
+    expect(pane("Markdown")).not.toBeNull();
+    expect(JSON.parse(localStorage.getItem("ptit_md_editor_panes"))).toEqual(["markdown"]);
 
     await click(button("Bản gốc"));
     expect([...document.body.querySelectorAll("section[aria-label]")].map((item) => item.getAttribute("aria-label"))).toEqual([
       "Bản gốc",
-      "Bản render",
+      "Markdown",
     ]);
+  });
+
+  it("đổi lựa chọn cột kiểu cũ (raw/rendered) sang cột Markdown", async () => {
+    localStorage.setItem("ptit_md_editor_panes", JSON.stringify(["rendered"]));
+    await renderEditor(routedFetch(() => jsonResponse(markdown("# Học phí", "hash-1"))));
+
+    expect(pane("Bản gốc")).toBeNull();
+    expect(pane("Markdown")).not.toBeNull();
+    expect(JSON.parse(localStorage.getItem("ptit_md_editor_panes"))).toEqual(["markdown"]);
   });
 
   it("hỏi trước khi bỏ thay đổi chưa lưu", async () => {

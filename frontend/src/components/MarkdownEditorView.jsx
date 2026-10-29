@@ -1,5 +1,16 @@
-import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, ExternalLink, Info, Loader2, RefreshCw, RotateCcw, Save } from "lucide-react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ExternalLink,
+  Eye,
+  Info,
+  Loader2,
+  Pencil,
+  RefreshCw,
+  RotateCcw,
+  Save,
+} from "lucide-react";
 import { describeError, documentsApi, errorMessage, isAbortError } from "../api";
 import MarkdownView from "./MarkdownView";
 import Modal from "./Modal";
@@ -9,25 +20,34 @@ import "../styles/markdown-editor.css";
 
 const PANES = [
   { key: "original", label: "Bản gốc", title: "Tệp gốc đã tải lên (cuộn riêng)" },
-  { key: "raw", label: "Markdown thô", title: "Bản Markdown để sửa" },
-  { key: "rendered", label: "Bản render", title: "Markdown sau khi render" },
+  { key: "markdown", label: "Markdown", title: "Markdown thô (nơi sửa) hoặc bản render" },
 ];
 const PANES_STORAGE_KEY = "ptit_md_editor_panes";
 
 function savedPanes() {
   try {
     const saved = JSON.parse(localStorage.getItem(PANES_STORAGE_KEY));
-    const keys = PANES.map((pane) => pane.key).filter((key) => Array.isArray(saved) && saved.includes(key));
+    // Bản cũ lưu hai cột "raw"/"rendered" riêng; nay gộp thành cột "markdown".
+    const migrated = Array.isArray(saved)
+      ? saved.map((key) => (key === "raw" || key === "rendered" ? "markdown" : key))
+      : [];
+    const keys = PANES.map((pane) => pane.key).filter((key) => migrated.includes(key));
     if (keys.length) return keys;
   } catch {
-    // Giá trị hỏng hoặc không đọc được localStorage: hiện đủ ba cột.
+    // Giá trị hỏng hoặc không đọc được localStorage: hiện đủ các cột.
   }
   return PANES.map((pane) => pane.key);
 }
 
+function scrollRatio(element) {
+  if (!element) return 0;
+  const range = element.scrollHeight - element.clientHeight;
+  return range > 0 ? element.scrollTop / range : 0;
+}
+
 /**
- * Sửa tay bản Markdown đã parse khi parser đọc sai, đối chiếu ba cột: bản gốc,
- * Markdown thô (nơi sửa) và bản render. Lưu chỉ cập nhật Markdown; kho tri thức chỉ
+ * Sửa tay bản Markdown đã parse khi parser đọc sai, đối chiếu bản gốc với cột Markdown;
+ * cột Markdown chuyển qua lại giữa Markdown thô (nơi sửa) và bản render bằng một nút. Lưu chỉ cập nhật Markdown; kho tri thức chỉ
  * dùng bản mới sau khi bấm "Chia đoạn", giống như sau khi parse.
  */
 export default function MarkdownEditorView({
@@ -47,13 +67,14 @@ export default function MarkdownEditorView({
   const [saving, setSaving] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
   const [confirmLeave, setConfirmLeave] = useState(false);
-  const [syncScroll, setSyncScroll] = useState(true);
   const [visiblePanes, setVisiblePanes] = useState(savedPanes);
-  // Render tài liệu dài tốn thời gian: bản render đi sau một nhịp để gõ không bị giật.
-  const previewText = useDeferredValue(text);
+  // "raw": sửa Markdown thô; "rendered": xem bản render. Luôn mở ở chế độ sửa.
+  const [markdownMode, setMarkdownMode] = useState("raw");
   const editorRef = useRef(null);
   const previewRef = useRef(null);
-  const echoFrom = useRef(null);
+  // Vị trí cuộn tương đối của chế độ vừa rời, áp cho chế độ mới để giữ đúng đoạn đang xem.
+  const pendingScroll = useRef(null);
+  const rendered = markdownMode === "rendered";
 
   const dirty = stored !== null && text !== stored.text;
   const originalType = (fileType || fileName?.split(".").pop() || "").toLowerCase();
@@ -155,22 +176,18 @@ export default function MarkdownEditorView({
   }
 
   // Cuộn theo tỉ lệ: Markdown thô và bản render dài khác nhau nên chỉ khớp tương đối.
-  function mirrorScroll(from) {
-    if (echoFrom.current === from) {
-      echoFrom.current = null;
-      return;
-    }
-    if (!syncScroll) return;
-    const source = from === "editor" ? editorRef.current : previewRef.current;
-    const target = from === "editor" ? previewRef.current : editorRef.current;
-    if (!source || !target) return;
-    const range = source.scrollHeight - source.clientHeight;
-    const ratio = range > 0 ? source.scrollTop / range : 0;
-    const next = Math.round(ratio * (target.scrollHeight - target.clientHeight));
-    if (Math.abs(target.scrollTop - next) < 2) return;
-    echoFrom.current = from === "editor" ? "preview" : "editor";
-    target.scrollTop = next;
+  function toggleMarkdownMode() {
+    pendingScroll.current = scrollRatio(rendered ? previewRef.current : editorRef.current);
+    setMarkdownMode(rendered ? "raw" : "rendered");
   }
+
+  useLayoutEffect(() => {
+    const ratio = pendingScroll.current;
+    const target = rendered ? previewRef.current : editorRef.current;
+    if (ratio === null || !target) return;
+    pendingScroll.current = null;
+    target.scrollTop = Math.round(ratio * (target.scrollHeight - target.clientHeight));
+  }, [rendered]);
 
   let stateLabel = stored?.markdown_edited ? "Bản đã sửa tay" : "Bản do parser tạo";
   if (saving) stateLabel = "Đang lưu...";
@@ -256,8 +273,8 @@ export default function MarkdownEditorView({
           <div className="inline-alert is-info md-editor-note">
             <Info size={16} />
             <span>
-              Đối chiếu bản gốc với bản render rồi sửa ở cột <strong>Markdown thô</strong> (bản mà bước chia đoạn sẽ
-              đọc). Lưu xong, bấm <strong>Chia đoạn</strong> cho tài liệu này để kho tri thức dùng bản mới. Parse
+              Đối chiếu bản gốc với bản render rồi sửa ở <strong>Markdown thô</strong> (bản mà bước chia đoạn sẽ
+              đọc); nút <strong>Xem bản render</strong>/<strong>Sửa Markdown</strong> chuyển qua lại giữa hai bản. Lưu xong, bấm <strong>Chia đoạn</strong> cho tài liệu này để kho tri thức dùng bản mới. Parse
               lại tài liệu sẽ ghi đè các chỉnh sửa này.
             </span>
           </div>
@@ -289,48 +306,41 @@ export default function MarkdownEditorView({
               </section>
             )}
 
-            {visiblePanes.includes("raw") && (
-              <section className="md-editor-pane" aria-label="Markdown thô">
+            {visiblePanes.includes("markdown") && (
+              <section className="md-editor-pane" aria-label="Markdown">
                 <header className="md-editor-pane-header">
-                  <span className="md-editor-pane-title">Markdown thô</span>
-                  <span>
-                    {stats.lines} dòng · {stats.chars} ký tự
+                  <span className="md-editor-pane-title">{rendered ? "Bản render" : "Markdown thô"}</span>
+                  <span className="md-editor-pane-tools">
+                    <span>
+                      {stats.lines} dòng · {stats.chars} ký tự
+                    </span>
+                    <button
+                      type="button"
+                      className="ghost-btn md-editor-mode-btn"
+                      onClick={toggleMarkdownMode}
+                      title={rendered ? "Quay lại sửa Markdown thô" : "Xem Markdown sau khi render"}
+                    >
+                      {rendered ? <Pencil size={13} /> : <Eye size={13} />}
+                      {rendered ? "Sửa Markdown" : "Xem bản render"}
+                    </button>
                   </span>
                 </header>
+                {/* Ô sửa luôn được giữ (chỉ ẩn) để không mất lịch sử hoàn tác của trình duyệt. */}
                 <textarea
                   ref={editorRef}
                   className="md-editor-textarea"
                   value={text}
                   onChange={(event) => setText(event.target.value)}
-                  onScroll={() => mirrorScroll("editor")}
+                  hidden={rendered}
                   readOnly={saving}
                   spellCheck={false}
                   aria-label="Nội dung Markdown"
                 />
-              </section>
-            )}
-
-            {visiblePanes.includes("rendered") && (
-              <section className="md-editor-pane" aria-label="Bản render">
-                <header className="md-editor-pane-header">
-                  <span className="md-editor-pane-title">Bản render</span>
-                  {visiblePanes.includes("raw") && (
-                    <label className="md-editor-sync">
-                      <input
-                        type="checkbox"
-                        checked={syncScroll}
-                        onChange={(event) => setSyncScroll(event.target.checked)}
-                      />
-                      Cuộn đồng bộ
-                    </label>
-                  )}
-                </header>
-                <div ref={previewRef} className="md-editor-preview" onScroll={() => mirrorScroll("preview")}>
-                  <MarkdownView
-                    className="doc-markdown-rendered-view"
-                    content={previewText || "*Markdown đang trống.*"}
-                  />
-                </div>
+                {rendered && (
+                  <div ref={previewRef} className="md-editor-preview">
+                    <MarkdownView className="doc-markdown-rendered-view" content={text || "*Markdown đang trống.*"} />
+                  </div>
+                )}
               </section>
             )}
           </div>

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   SỬA MARKDOWN: bản gốc, Markdown thô (nơi sửa) và bản render để đối chiếu
+   SỬA MARKDOWN: bản gốc đối chiếu với cột Markdown (thô để sửa / bản render)
    ========================================================================== */
 .md-editor-page {
   display: flex;
@@ -85,7 +85,7 @@
 .md-editor-panes {
   display: grid;
   /* Số cột theo các cột đang bật (--md-editor-pane-count đặt inline). */
-  grid-template-columns: repeat(var(--md-editor-pane-count, 3), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--md-editor-pane-count, 2), minmax(0, 1fr));
   gap: 16px;
   flex: 1;
   min-height: 0;
@@ -152,11 +152,9 @@
   padding: 10px;
 }
 
-.md-editor-sync {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
+.md-editor-pane-header .md-editor-mode-btn {
+  padding: 3px 10px;
+  font-size: 12px;
 }
 
 .md-editor-textarea {
@@ -176,6 +174,10 @@
   tab-size: 2;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.md-editor-textarea[hidden] {
+  display: none;
 }
 
 .md-editor-textarea:read-only {
