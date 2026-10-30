@@ -1,7 +1,7 @@
 # Verification: 2026-10-30-model-registry
 
 - Verifier: `claude-agent`.
-- Trạng thái tổng: `passed` cho kiểm tra tự động; V-06 (giao diện trình duyệt) `not_run`.
+- Trạng thái tổng: `passed`.
 - Bản được kiểm tra: working tree nhánh `feat/model-registry` (từ `dev` `cc33fdd`).
 - Môi trường: Windows 11; backend `.venv` Python 3.11 (SQLite tạm); Docker `pgvector/pgvector:pg16` +
   container backend đang chạy (`--reload`); Node/vitest 3.2.7.
@@ -62,8 +62,14 @@
 
 ### V-06 — AC-01 (giao diện trong trình duyệt)
 
-- Trạng thái: `not_run` — cần đăng nhập admin; người yêu cầu xem tại `/admin#settings/models`.
+- Thời gian: `2026-10-30T22:38:00+07:00`.
+- Thao tác: Chrome (phiên admin của người dùng) mở `/admin#settings/models`, viewport ~2270px CSS; tạo
+  tạm 3 profile LLM tên `[tmp] …` (không khoá, không chọn) qua API, chụp màn hình tab LLM và form Sửa,
+  rồi xoá cả 3 (DELETE 200, kho còn 0 profile, `active` đều null).
+- Kết quả: hai cột phủ hết chiều ngang; 3 card gọn xếp một hàng ở cột phải, tên dài bị cắt có dấu …;
+  form Sửa nằm ở cột trái, card đang sửa có viền nhấn. Chưa thử màn hẹp < 1100px bằng trình duyệt.
+- Trạng thái: `passed` (màn rộng).
 
 ## Kết luận
 
-- Tiêu chí đạt: AC-02..AC-06 có bằng chứng tự động; AC-01 có test DOM (V-04), chưa xem bằng mắt (V-06).
+- Tiêu chí đạt: AC-01..AC-06 (AC-01 qua V-04 và V-06).

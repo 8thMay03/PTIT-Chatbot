@@ -8,6 +8,7 @@ import {
   Binary,
   CheckCircle2,
   Info,
+  KeyRound,
   Loader2,
   MessageSquareText,
   Pencil,
@@ -525,10 +526,15 @@ function ProfileEditor({ kind, profile, registry, onClose }) {
 
 function ProfileMeta({ kind, profile }) {
   const parts = [providerName(kind, profile.provider), profileModelLabel(profile)];
-  if (profile.base_url) parts.push(profile.base_url);
-  if (profile.endpoint) parts.push(profile.endpoint);
   if (kind === "embedding" && profile.dimension) parts.push(`${profile.dimension} chiều`);
-  return <span className="mdl-profile-meta">{parts.join(" · ")}</span>;
+  // Địa chỉ máy chủ dài: chỉ hiện khi rê chuột để card giữ một dòng.
+  const address = profile.base_url || profile.endpoint;
+  return (
+    <span className="mdl-profile-meta" title={address ? `${parts.join(" · ")}
+${address}` : undefined}>
+      {parts.join(" · ")}
+    </span>
+  );
 }
 
 function ProfileList({ kind, registry, profiles, editingId, onAdd, onEdit, onDelete, adding }) {
@@ -543,7 +549,7 @@ function ProfileList({ kind, registry, profiles, editingId, onAdd, onEdit, onDel
           <h3 id={`mdl-${kind}-list-title`}>Mô hình đã cấu hình</h3>
           <p>{profiles.length} mô hình trong kho</p>
         </div>
-        <button type="button" className="ghost-btn" onClick={onAdd} disabled={adding}>
+        <button type="button" className="ghost-btn mdl-add-btn" onClick={onAdd} disabled={adding}>
           <Plus size={15} />
           Thêm mô hình
         </button>
@@ -557,48 +563,54 @@ function ProfileList({ kind, registry, profiles, editingId, onAdd, onEdit, onDel
           {profiles.map((profile) => {
             const isActive = active === profile.id;
             const isRunning = kind === "embedding" && runtime?.profile_id === profile.id;
+            const mismatch = dimensionMismatch(kind, profile, vectorDim);
             return (
               <li
                 key={profile.id}
                 className={`mdl-profile ${isActive ? "is-active" : ""} ${editingId === profile.id ? "is-editing" : ""}`}
               >
-                <span className="mdl-choice-icon" aria-hidden="true">
-                  <ProviderIcon kind={kind} provider={profile.provider} />
+                <span className="mdl-profile-icon" aria-hidden="true">
+                  <ProviderIcon kind={kind} provider={profile.provider} size={15} />
                 </span>
                 <div className="mdl-profile-text">
-                  <div className="mdl-profile-title">
-                    <strong>{profile.name}</strong>
-                    {isActive && (
-                      <StatusPill tone="ok">{kind === "embedding" ? "Đã chọn" : "Đang dùng"}</StatusPill>
-                    )}
-                    {isRunning && <StatusPill tone="ok">Đang chạy</StatusPill>}
-                    {profile.has_api_key && <StatusPill>Đã lưu khoá</StatusPill>}
-                    {dimensionMismatch(kind, profile, vectorDim) && (
-                      <StatusPill tone="warn">Khác VECTOR_DIM</StatusPill>
-                    )}
-                  </div>
+                  <strong className="mdl-profile-name" title={profile.name}>
+                    {profile.name}
+                  </strong>
                   <ProfileMeta kind={kind} profile={profile} />
+                  {(isActive || isRunning || profile.has_api_key || mismatch) && (
+                    <div className="mdl-profile-tags">
+                      {isActive && (
+                        <StatusPill tone="ok">{kind === "embedding" ? "Đã chọn" : "Đang dùng"}</StatusPill>
+                      )}
+                      {isRunning && <StatusPill tone="ok">Đang chạy</StatusPill>}
+                      {profile.has_api_key && (
+                        <StatusPill>
+                          <KeyRound size={11} /> Đã lưu khoá
+                        </StatusPill>
+                      )}
+                      {mismatch && <StatusPill tone="warn">Khác VECTOR_DIM</StatusPill>}
+                    </div>
+                  )}
                 </div>
                 <div className="mdl-profile-actions">
                   <button
                     type="button"
-                    className="ghost-btn"
+                    className="mdl-icon-btn"
                     onClick={() => onEdit(profile)}
                     aria-label={`Sửa ${profile.name}`}
+                    title="Sửa"
                   >
                     <Pencil size={14} />
-                    Sửa
                   </button>
                   <button
                     type="button"
-                    className="ghost-btn"
+                    className="mdl-icon-btn is-danger"
                     onClick={() => onDelete(profile)}
                     disabled={isActive}
-                    title={isActive ? "Đang được dùng — chọn mô hình khác trước khi xoá." : undefined}
                     aria-label={`Xoá ${profile.name}`}
+                    title={isActive ? "Đang được dùng — chọn mô hình khác trước khi xoá." : "Xoá"}
                   >
                     <Trash2 size={14} />
-                    Xoá
                   </button>
                 </div>
               </li>
@@ -646,33 +658,38 @@ export default function ModelKindPanel({ kind, registry, config }) {
   }
 
   return (
-    <div className="mdl-content">
-      <ActiveModelCard
-        kind={kind}
-        registry={registry}
-        config={config}
-        profiles={profiles}
-        profilesById={profilesById}
-      />
-      {editing && (
-        <ProfileEditor
-          key={editing.profile?.id ?? "new"}
+    <div className="mdl-kind-layout">
+      {/* Cột trái: chọn mô hình đang dùng + form; cột phải: kho mô hình. Màn hẹp xếp một cột. */}
+      <div className="mdl-kind-main">
+        <ActiveModelCard
           kind={kind}
-          profile={editing.profile}
           registry={registry}
-          onClose={() => setEditing(null)}
+          config={config}
+          profiles={profiles}
+          profilesById={profilesById}
         />
-      )}
-      <ProfileList
-        kind={kind}
-        registry={registry}
-        profiles={profiles}
-        editingId={editing?.profile?.id}
-        adding={Boolean(editing && !editing.profile)}
-        onAdd={() => setEditing({ profile: null })}
-        onEdit={(profile) => setEditing({ profile })}
-        onDelete={setPendingDelete}
-      />
+        {editing && (
+          <ProfileEditor
+            key={editing.profile?.id ?? "new"}
+            kind={kind}
+            profile={editing.profile}
+            registry={registry}
+            onClose={() => setEditing(null)}
+          />
+        )}
+      </div>
+      <div className="mdl-kind-side">
+        <ProfileList
+          kind={kind}
+          registry={registry}
+          profiles={profiles}
+          editingId={editing?.profile?.id}
+          adding={Boolean(editing && !editing.profile)}
+          onAdd={() => setEditing({ profile: null })}
+          onEdit={(profile) => setEditing({ profile })}
+          onDelete={setPendingDelete}
+        />
+      </div>
       <Modal
         open={Boolean(pendingDelete)}
         onClose={() => !deleting && setPendingDelete(null)}

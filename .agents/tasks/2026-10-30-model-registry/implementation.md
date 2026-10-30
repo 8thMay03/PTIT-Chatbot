@@ -57,6 +57,18 @@ Commit backend `0463d9b`; commit frontend + sửa sau self-review ở commit k�
 - Kiểm tra đã chạy: V-04, V-05.
 - Còn lại/blocker: chưa kiểm tra giao diện bằng trình duyệt (V-06 `not_run`).
 
+### S-03 — claude-agent (phản hồi giao diện)
+
+- Cập nhật lúc: `2026-10-30T22:40:00+07:00`.
+- Yêu cầu: card mô hình đã cấu hình gọn hơn; bớt khoảng trống bên phải.
+- Đã làm: mỗi tab chia hai cột (`.mdl-kind-layout`: trái = chọn mô hình đang dùng + form, phải = kho
+  mô hình, sticky; dưới 1100px xếp một cột); bỏ giới hạn 880px (giới hạn mới 2200px). Mỗi mô hình là
+  card nhỏ: icon 26px, tên + nhà cung cấp · mô hình một dòng (cắt chữ, rê chuột xem đủ cả địa chỉ máy
+  chủ), nhãn chỉ hiện khi có, nút Sửa/Xoá dạng icon (giữ `aria-label`). Card tự xếp nhiều cột khi cột
+  phải đủ rộng. Ô chọn mô hình dùng font thường thay vì mono.
+- File: `frontend/src/models/ModelKindPanel.jsx`, `frontend/src/styles/models.css`.
+- Kiểm tra: V-04 (chạy lại), V-05 (build), V-06.
+
 ## Trao đổi giữa agents
 
 Không có (một agent).
