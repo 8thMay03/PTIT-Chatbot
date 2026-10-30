@@ -1,11 +1,11 @@
 # Task: Kho mô hình LLM / Embedding / Rerank và chọn mô hình đang dùng
 
 - ID: `2026-10-30-model-registry`
-- Trạng thái: `in_review`
+- Trạng thái: `done`
 - Coordinator: `claude-agent`
 - Người yêu cầu: `8thMay03`
 - Tạo lúc: `2026-10-30T09:00:00+07:00`
-- Cập nhật lúc: `2026-10-30T22:25:00+07:00`
+- Cập nhật lúc: `2026-10-30T22:50:00+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -61,12 +61,12 @@ Người yêu cầu đã chốt (2026-10-30):
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: đã triển khai, kiểm chứng tự động và self-review approved. AC-01 có test DOM, chưa xem
-  bằng trình duyệt (V-06 `not_run`).
+- Tóm tắt: hoàn tất; mọi AC có bằng chứng, self-review approved; người yêu cầu cho merge vào `dev`.
 - Blocker: không có.
-- Bước tiếp theo: người yêu cầu xem Settings → Mô hình rồi merge `feat/model-registry` vào `dev`.
+- Bước tiếp theo: không có (R-02, R-03 deferred — xem review.md).
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
 - 2026-10-30T09:00:00+07:00 — claude-agent: người yêu cầu chọn làm luôn phần chọn mô hình, embedding
   áp dụng sau restart, chỉ dùng provider backend có sẵn.
+- 2026-10-30T22:50:00+07:00 — claude-agent: người yêu cầu yêu cầu merge `feat/model-registry` vào `dev`; task `done`.

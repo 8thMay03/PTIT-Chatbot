@@ -83,4 +83,4 @@ Không có (một agent).
 - Kiểm chứng: `verification.md` (V-06 giao diện trình duyệt chưa chạy).
 - Review: `review.md` — `approved` (self_review); R-01 resolved, R-02/R-03 deferred.
 - Bước tiếp theo: người yêu cầu xem giao diện tại Settings → Mô hình, rồi merge vào `dev`.
-- Phản hồi nhận bàn giao: <chờ người yêu cầu>.
+- Phản hồi nhận bàn giao: 2026-10-30T22:50:00+07:00 — `8thMay03` yêu cầu merge vào `dev`.
