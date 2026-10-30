@@ -15,7 +15,8 @@ trường đó lại theo `.env`. Thứ tự ưu tiên khi khởi động: DB > 
 from __future__ import annotations
 
 import logging
-from collections.abc import Generator
+from collections.abc import Generator, Iterator
+from contextlib import contextmanager
 
 from sqlalchemy import delete, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -74,8 +75,30 @@ PERSISTED_FIELDS = SECRET_FIELDS | frozenset(
         "guardrail_scope_enabled",
         "retrieval_min_vector_score",
         "retrieval_min_bm25_score",
+        "llm_profile_id",
+        "reranker_profile_id",
+        "embedding_profile_id",
     }
 )
+
+# Trường do một profile LLM/reranker quyết định (app.core.model_profiles). PUT /config
+# đổi trực tiếp các trường này thì cấu hình không còn khớp profile → bỏ chọn profile.
+LLM_PROFILE_FIELDS = (
+    "llm_provider",
+    "openai_model",
+    "openai_base_url",
+    "openai_api_key",
+    "gemini_model",
+    "gemini_api_key",
+    "azure_openai_api_key",
+    "azure_openai_endpoint",
+    "azure_openai_deployment_name",
+    "azure_openai_api_version",
+    "openai_compatible_base_url",
+    "openai_compatible_api_key",
+    "openai_compatible_model",
+)
+RERANKER_PROFILE_FIELDS = ("reranker_provider", "reranker_model")
 
 # URL LLM đọc từ DB vẫn phải qua allowlist hiện hành: allowlist trong `.env` có thể
 # đã bị thu hẹp sau lần lưu.
@@ -123,17 +146,33 @@ def save_overrides(session: Session) -> None:
     session.commit()
 
 
-def apply_config_update(session: Session, payload: dict) -> dict:
-    """Áp payload PUT /config vào settings rồi lưu DB; lỗi thì settings giữ nguyên như trước."""
+@contextmanager
+def settings_transaction(session: Session) -> Iterator[None]:
+    """Đổi settings trong khối rồi lưu DB; lỗi bất kỳ thì rollback DB và phục hồi settings.
+
+    Khối chỉ đổi settings (và thêm thay đổi khác vào ``session``); ``save_overrides``
+    chạy ở cuối và commit tất cả trong một transaction.
+    """
     previous = settings.model_dump()
     try:
-        update_runtime_config(payload)
+        yield
         save_overrides(session)
     except BaseException:
         session.rollback()
         for field, value in previous.items():
             setattr(settings, field, value)
         raise
+
+
+def apply_config_update(session: Session, payload: dict) -> dict:
+    """Áp payload PUT /config vào settings rồi lưu DB; lỗi thì settings giữ nguyên như trước."""
+    with settings_transaction(session):
+        before = {field: getattr(settings, field) for field in LLM_PROFILE_FIELDS + RERANKER_PROFILE_FIELDS}
+        update_runtime_config(payload)
+        if any(getattr(settings, field) != before[field] for field in LLM_PROFILE_FIELDS):
+            settings.llm_profile_id = None
+        if any(getattr(settings, field) != before[field] for field in RERANKER_PROFILE_FIELDS):
+            settings.reranker_profile_id = None
     return get_runtime_config_dict()
 
 

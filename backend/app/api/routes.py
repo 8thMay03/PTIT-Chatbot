@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.schemas import (
+    ActivateModelProfileRequest,
     AdminLoginRequest,
     AdminSessionResponse,
     AuthSessionResponse,
@@ -25,6 +26,7 @@ from app.api.schemas import (
     ConversationItem,
     ConversationListResponse,
     ConversationMessage,
+    CreateModelProfileRequest,
     DocumentChunksResponse,
     DocumentDeleteResponse,
     DocumentDetail,
@@ -34,6 +36,7 @@ from app.api.schemas import (
     FullConfigResponse,
     IngestResponse,
     LoginRequest,
+    ModelRegistryResponse,
     ParseJobItem,
     ParseJobListResponse,
     RegisterRequest,
@@ -41,10 +44,12 @@ from app.api.schemas import (
     RetrievalTestRequest,
     TestLLMRequest,
     TestLLMResponse,
+    TestModelProfileLLMRequest,
     UpdateConfigRequest,
     UpdateMarkdownRequest,
+    UpdateModelProfileRequest,
 )
-from app.core import auth, user_auth
+from app.core import auth, model_profiles, user_auth
 from app.core.auth import require_admin
 from app.core.config import (
     PROJECT_ROOT,
@@ -350,6 +355,11 @@ def reset_config(session: Session = Depends(get_config_store_session)) -> FullCo
 
 @router.post("/config/test-llm", response_model=TestLLMResponse, dependencies=[Depends(require_admin)])
 def test_llm(request: TestLLMRequest) -> TestLLMResponse:
+    _validate_test_llm_urls(request)
+    return _run_llm_test(request, request.api_key)
+
+
+def _validate_test_llm_urls(request: TestLLMRequest) -> None:
     # Kiểm URL trước khi tạo provider: request ngoài allowlist bị từ chối, key
     # đang lưu không bao giờ được gửi tới host lạ.
     try:
@@ -358,12 +368,14 @@ def test_llm(request: TestLLMRequest) -> TestLLMResponse:
     except ConfigValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+
+def _run_llm_test(request: TestLLMRequest, api_key: str | None) -> TestLLMResponse:
     start_time = time.perf_counter()
     try:
         provider_instance = create_llm_provider_from_config(
             provider=request.provider,
             model=request.model,
-            api_key=request.api_key,
+            api_key=api_key,
             base_url=request.base_url,
             endpoint=request.endpoint,
             deployment_name=request.deployment_name,
@@ -396,6 +408,112 @@ def test_llm(request: TestLLMRequest) -> TestLLMResponse:
             latency_ms=latency_ms,
         )
 
+
+
+# ==========================================
+# Kho mô hình (model-registry)
+# ==========================================
+def _registry_response(session: Session) -> ModelRegistryResponse:
+    return ModelRegistryResponse(**model_profiles.registry_state(session))
+
+
+def _run_registry_write(session: Session, action) -> ModelRegistryResponse:
+    """Chạy thao tác ghi kho mô hình và đổi lỗi sang HTTP; lỗi thì DB/settings như trước."""
+    try:
+        action()
+    except model_profiles.ProfileNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except model_profiles.ProfileConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except (ConfigValidationError, SecretEncryptionUnavailable) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        logger.exception("Không lưu được kho mô hình vào DB")
+        raise HTTPException(
+            status_code=503,
+            detail="Không lưu được cấu hình mô hình vào cơ sở dữ liệu; chưa có gì thay đổi.",
+        ) from exc
+    return _registry_response(session)
+
+
+@router.get("/model-profiles", response_model=ModelRegistryResponse, dependencies=[Depends(require_admin)])
+def list_model_profiles(session: Session = Depends(get_config_store_session)) -> ModelRegistryResponse:
+    return _registry_response(session)
+
+
+@router.post(
+    "/model-profiles",
+    response_model=ModelRegistryResponse,
+    status_code=201,
+    dependencies=[Depends(require_admin)],
+)
+def create_model_profile(
+    request: CreateModelProfileRequest,
+    session: Session = Depends(get_config_store_session),
+) -> ModelRegistryResponse:
+    data = request.model_dump(exclude={"kind"})
+    return _run_registry_write(session, lambda: model_profiles.create_profile(session, request.kind, data))
+
+
+@router.post(
+    "/model-profiles/activate",
+    response_model=ModelRegistryResponse,
+    dependencies=[Depends(require_admin)],
+)
+def activate_model_profile(
+    request: ActivateModelProfileRequest,
+    session: Session = Depends(get_config_store_session),
+) -> ModelRegistryResponse:
+    return _run_registry_write(
+        session, lambda: model_profiles.activate_profile(session, request.kind, request.profile_id)
+    )
+
+
+@router.post(
+    "/model-profiles/test-llm",
+    response_model=TestLLMResponse,
+    dependencies=[Depends(require_admin)],
+)
+def test_model_profile_llm(
+    request: TestModelProfileLLMRequest,
+    session: Session = Depends(get_config_store_session),
+) -> TestLLMResponse:
+    _validate_test_llm_urls(request)
+    try:
+        api_key = model_profiles.resolve_llm_test_key(
+            session, request.provider, request.profile_id, request.api_key
+        )
+    except model_profiles.ProfileNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ConfigValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _run_llm_test(request, api_key)
+
+
+@router.put(
+    "/model-profiles/{profile_id}",
+    response_model=ModelRegistryResponse,
+    dependencies=[Depends(require_admin)],
+)
+def update_model_profile(
+    profile_id: str,
+    request: UpdateModelProfileRequest,
+    session: Session = Depends(get_config_store_session),
+) -> ModelRegistryResponse:
+    data = request.model_dump()
+    return _run_registry_write(session, lambda: model_profiles.update_profile(session, profile_id, data))
+
+
+@router.delete(
+    "/model-profiles/{profile_id}",
+    response_model=ModelRegistryResponse,
+    dependencies=[Depends(require_admin)],
+)
+def delete_model_profile(
+    profile_id: str,
+    session: Session = Depends(get_config_store_session),
+) -> ModelRegistryResponse:
+    return _run_registry_write(session, lambda: model_profiles.delete_profile(session, profile_id))
 
 
 @router.post("/retrieval/test", dependencies=[Depends(require_admin)])

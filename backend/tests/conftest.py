@@ -10,8 +10,9 @@
   để test hội thoại không ghi vào DB dev.
 - ``register_user`` / ``login_user``: đăng ký/đăng nhập tài khoản người dùng cho một
   TestClient (landing-user-auth); cần ``api_db``.
-- ``config_store_db`` (autouse): bảng cấu hình đã lưu (PUT /config, lifespan) trỏ
-  sang SQLite tạm, dọn sau mỗi test; không test nào đọc/ghi cấu hình trong DB dev.
+- ``config_store_db`` (autouse): bảng cấu hình đã lưu (PUT /config, lifespan) và kho
+  mô hình (``model_profiles``) trỏ sang SQLite tạm, dọn sau mỗi test; không test nào
+  đọc/ghi cấu hình trong DB dev.
 """
 
 from __future__ import annotations
@@ -22,10 +23,10 @@ from sqlalchemy import create_engine, delete
 from sqlalchemy.orm import sessionmaker
 
 from app.core import auth
-from app.core import config_store
+from app.core import config_store, model_profiles
 from app.core.config import settings
 from app.db import get_session
-from app.db.models import AppConfigOverride, Base
+from app.db.models import AppConfigOverride, Base, ModelProfile
 from app.main import app
 
 ADMIN_TEST_PASSWORD = "unit-test-admin-password"
@@ -48,6 +49,7 @@ def _config_store_session_factory(tmp_path_factory):
         connect_args={"check_same_thread": False},
     )
     AppConfigOverride.__table__.create(engine)
+    ModelProfile.__table__.create(engine)
     yield sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
     engine.dispose()
 
@@ -59,7 +61,9 @@ def config_store_db(_config_store_session_factory, monkeypatch):
     yield _config_store_session_factory
     with _config_store_session_factory() as session:
         session.execute(delete(AppConfigOverride))
+        session.execute(delete(ModelProfile))
         session.commit()
+    model_profiles._set_running_embedding(None, None)
 
 
 @pytest.fixture

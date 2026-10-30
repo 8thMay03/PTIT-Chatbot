@@ -13,7 +13,7 @@ def create_embedding_model() -> EmbeddingModel:
         return HashEmbeddingModel()
 
     if provider == "openai":
-        return OpenAIEmbeddingModel(settings.embedding_model, settings.openai_api_key)
+        return OpenAIEmbeddingModel(settings.embedding_model, settings.embedding_api_key or settings.openai_api_key)
 
     if provider == "sentence-transformers":
         try:

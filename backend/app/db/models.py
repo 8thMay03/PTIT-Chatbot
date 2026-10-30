@@ -51,6 +51,37 @@ class AppConfigOverride(Base):
     )
 
 
+class ModelProfile(Base):
+    """Một cấu hình mô hình admin đã nhập (app.core.model_profiles).
+
+    `kind` là `llm`, `embedding` hoặc `reranker`; các trường riêng của nhà cung cấp
+    (base_url, endpoint, deployment_name, api_version, dimension) nằm trong `params`.
+    API key chỉ nằm ở `encrypted_api_key` dưới dạng bản mã Fernet.
+    """
+
+    __tablename__ = "model_profiles"
+    __table_args__ = (UniqueConstraint("kind", "name", name="uq_model_profiles_kind_name"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    model: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    params: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    encrypted_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
 class Document(Base):
     __tablename__ = "documents"
 

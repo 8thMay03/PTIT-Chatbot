@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic_core import PydanticCustomError
@@ -311,6 +312,98 @@ class TestLLMResponse(BaseModel):
     message: str
     latency_ms: float | None = None
     sample_output: str | None = None
+
+
+# ==========================================
+# Kho mô hình (model-registry)
+# ==========================================
+ModelKind = Literal["llm", "embedding", "reranker"]
+
+
+class ModelProfileFields(BaseModel):
+    """Trường chung khi tạo/sửa; trường thừa với nhà cung cấp được bỏ qua khi lưu."""
+
+    name: str = Field(max_length=200)
+    provider: str = Field(max_length=50)
+    model: str | None = Field(default=None, max_length=255)
+    base_url: str | None = Field(default=None, max_length=2048)
+    endpoint: str | None = Field(default=None, max_length=2048)
+    deployment_name: str | None = Field(default=None, max_length=255)
+    api_version: str | None = Field(default=None, max_length=50)
+    dimension: int | None = None
+    # Không bao giờ trả về client; trống/không gửi khi sửa = giữ khoá cũ.
+    api_key: str | None = Field(default=None, max_length=4096)
+
+
+class CreateModelProfileRequest(ModelProfileFields):
+    kind: ModelKind
+
+
+class UpdateModelProfileRequest(ModelProfileFields):
+    clear_api_key: bool = False
+
+
+class ActivateModelProfileRequest(BaseModel):
+    kind: ModelKind
+    # None: LLM/embedding về cấu hình `.env`, reranker về heuristic.
+    profile_id: str | None = None
+
+
+class TestModelProfileLLMRequest(TestLLMRequest):
+    # Không nhập api_key thì dùng khoá đã lưu của profile này.
+    profile_id: str | None = None
+
+
+class ModelProfileItem(BaseModel):
+    id: str
+    kind: ModelKind
+    name: str
+    provider: str
+    model: str | None = None
+    base_url: str | None = None
+    endpoint: str | None = None
+    deployment_name: str | None = None
+    api_version: str | None = None
+    dimension: int | None = None
+    has_api_key: bool = False
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class ActiveModelProfiles(BaseModel):
+    llm: str | None = None
+    embedding: str | None = None
+    reranker: str | None = None
+
+
+class EmbeddingRuntimeInfo(BaseModel):
+    provider: str
+    model: str
+    # Profile mà embedder đang chạy được tạo từ đó (None = `.env`).
+    profile_id: str | None = None
+    vector_dim: int
+    # Lựa chọn hiện tại khác embedder đang chạy → cần khởi động lại backend.
+    restart_required: bool = False
+    load_error: str | None = None
+
+
+class EnvModelDefault(BaseModel):
+    provider: str
+    model: str | None = None
+
+
+class EnvModelDefaults(BaseModel):
+    llm: EnvModelDefault
+    embedding: EnvModelDefault
+    reranker: EnvModelDefault
+
+
+class ModelRegistryResponse(BaseModel):
+    profiles: list[ModelProfileItem]
+    active: ActiveModelProfiles
+    embedding_runtime: EmbeddingRuntimeInfo
+    env_defaults: EnvModelDefaults
+    secret_encryption_enabled: bool = False
 
 
 # ==========================================
