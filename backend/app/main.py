@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 from app.core.config import settings
 from app.core.config_store import load_persisted_config
+from app.core.model_profiles import load_selected_embedding_at_startup
 from app.db import init_db
 
 
@@ -15,6 +16,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     # Áp cấu hình admin đã lưu trong DB lên trên .env. Chạy ở lifespan (không phải lúc
     # import) để test dùng TestClient(app) không đọc cấu hình từ DB dev.
     load_persisted_config()
+    # Embedder đã tạo lúc import theo `.env`; profile embedding đã chọn được áp ở đây.
+    load_selected_embedding_at_startup()
     yield
 
 

@@ -17,6 +17,7 @@ export const queryKeys = {
   auth: ["auth"],
   authMe: ["auth", "me"],
   config: ["config"],
+  modelProfiles: ["model-profiles"],
   documents: ["documents"],
   documentList: ["documents", "list"],
   document: (documentId) => ["documents", "detail", documentId],

@@ -51,6 +51,27 @@ function baseConfig() {
   };
 }
 
+function emptyRegistry() {
+  return {
+    profiles: [],
+    active: { llm: null, embedding: null, reranker: null },
+    embedding_runtime: {
+      provider: "openai",
+      model: "text-embedding-3-small",
+      profile_id: null,
+      vector_dim: 1536,
+      restart_required: false,
+      load_error: null,
+    },
+    env_defaults: {
+      llm: { provider: "openai", model: "gpt-4.1-mini" },
+      embedding: { provider: "openai", model: "text-embedding-3-small" },
+      reranker: { provider: "heuristic", model: null },
+    },
+    secret_encryption_enabled: true,
+  };
+}
+
 function applyPatch(config, patch) {
   const next = structuredClone(config);
   Object.entries(patch).forEach(([section, values]) => {
@@ -127,13 +148,16 @@ describe("cache cấu hình giữa ConfigView và ModelsView", () => {
 
   it("lưu trạng thái reranker ở tab Cấu hình thì tab Mô hình cập nhật ngay", async () => {
     let current = baseConfig();
-    const fetchMock = vi.fn((_url, options = {}) => {
+    const fetchMock = vi.fn((url, options = {}) => {
+      if (String(url).includes("/model-profiles")) return jsonResponse(emptyRegistry());
       if (options.method === "PUT") {
         current = applyPatch(current, JSON.parse(options.body));
       }
       return jsonResponse(current);
     });
     vi.stubGlobal("fetch", fetchMock);
+    // Trạng thái reranker nằm ở tab Rerank model.
+    localStorage.setItem("ptit_models_tab", "reranker");
 
     await renderViews(
       <>
@@ -241,45 +265,5 @@ describe("cache cấu hình giữa ConfigView và ModelsView", () => {
       () => rerankerSwitch.getAttribute("aria-checked") === "false"
     );
     expect(temperature.value).toBe("0.7");
-  });
-
-  it("lưu chỉ API key thì xoá khoá khỏi input và tắt trạng thái chưa lưu", async () => {
-    const initial = baseConfig();
-    initial.llm.openai_has_key = false;
-    let current = initial;
-    const fetchMock = vi.fn((_url, options = {}) => {
-      if (options.method === "PUT") {
-        const patch = JSON.parse(options.body);
-        current = applyPatch(current, patch);
-        if (patch.llm?.openai_api_key) {
-          current.llm.openai_has_key = true;
-          delete current.llm.openai_api_key;
-        }
-      }
-      return jsonResponse(current);
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    await renderViews(<ModelsView />);
-
-    const section = await waitFor(() => container.querySelector("#mdl-llm"));
-    const keyInput = section.querySelector("#llm-openai-key");
-    const saveButton = [...section.querySelectorAll("button")].find(
-      (item) => item.textContent.trim() === "Lưu"
-    );
-    expect(saveButton.disabled).toBe(true);
-
-    await changeInput(keyInput, "sk-test");
-    expect(saveButton.disabled).toBe(false);
-    await click(saveButton);
-
-    await waitFor(() => keyInput.value === "");
-    expect(saveButton.disabled).toBe(true);
-    expect(section.querySelector(".mdl-dirty").textContent.trim()).toBe("");
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringMatching(/\/api\/config$/),
-      expect.objectContaining({ method: "PUT" })
-    );
-    expect(current.llm.openai_has_key).toBe(true);
   });
 });

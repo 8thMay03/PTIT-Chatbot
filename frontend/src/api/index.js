@@ -15,3 +15,4 @@ export * as chatApi from "./chat";
 export * as configApi from "./config";
 export * as conversationsApi from "./conversations";
 export * as documentsApi from "./documents";
+export * as modelProfilesApi from "./modelProfiles";

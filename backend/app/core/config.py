@@ -82,6 +82,16 @@ class Settings(BaseSettings):
     # tụt (hybrid hit@4 0.820 so với 0.850) nên mặc định là "text"; BM25 luôn
     # dùng search_text.
     embedding_input_field: str = Field(default="text", alias="EMBEDDING_INPUT_FIELD")
+    # Khoá riêng cho embedding OpenAI (profile embedding có khoá); trống thì dùng OPENAI_API_KEY.
+    embedding_api_key: str | None = Field(default=None, alias="EMBEDDING_API_KEY")
+
+    # Profile trong kho mô hình (app.core.model_profiles) đang được chọn cho từng khâu.
+    # None = dùng cấu hình `.env` (LLM, embedding) hoặc heuristic (reranker). Chỉ admin
+    # đổi qua UI; giá trị lưu ở app_config_overrides.
+    llm_profile_id: str | None = Field(default=None, alias="LLM_PROFILE_ID")
+    reranker_profile_id: str | None = Field(default=None, alias="RERANKER_PROFILE_ID")
+    # Embedding đã chọn chỉ có hiệu lực ở lần khởi động sau (embedder tạo một lần).
+    embedding_profile_id: str | None = Field(default=None, alias="EMBEDDING_PROFILE_ID")
 
     vector_dim: int = Field(default=1536, ge=1, alias="VECTOR_DIM")
     database_url: str = Field(
@@ -269,6 +279,12 @@ _RESET_EXCLUDED_FIELDS = frozenset(
         "user_email_domains",
         "user_auth_max_failures",
         "user_auth_window_seconds",
+        # Embedder đã tạo lúc khởi động (có thể từ profile embedding); reset không đổi được
+        # mô hình đang chạy nên giữ nguyên để GET /config phản ánh đúng. Lựa chọn
+        # embedding_profile_id vẫn bị reset và có hiệu lực ở lần khởi động sau.
+        "embedding_provider",
+        "embedding_model",
+        "embedding_api_key",
     }
 )
 

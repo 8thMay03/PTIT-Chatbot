@@ -80,6 +80,15 @@ function createBackend({ authenticated = false, configured = true } = {}) {
     if (path === "conversations") return response({ total: 0, conversations: [] });
     if (!state.authenticated) return response({ detail: "Cần đăng nhập quản trị." }, 401);
     if (path === "config") return response(baseConfig());
+    if (path === "model-profiles") {
+      return response({
+        profiles: [],
+        active: { llm: null, embedding: null, reranker: null },
+        embedding_runtime: { provider: "openai", model: "text-embedding-3-small", vector_dim: 1536 },
+        env_defaults: {},
+        secret_encryption_enabled: true,
+      });
+    }
     if (path === "documents") return response({ documents: [] });
     if (path === "parse-jobs") return response({ jobs: [] });
     return response({});
