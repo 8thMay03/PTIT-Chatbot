@@ -190,6 +190,16 @@ def test_update_keeps_replaces_and_clears_key(admin_client, config_store_db, enc
     assert response.json()["profiles"][0]["has_api_key"] is False
 
 
+def test_changing_provider_drops_key_of_old_provider(admin_client, config_store_db, encryption_key) -> None:
+    profile = _openai_llm(admin_client, api_key=TEST_API_KEY)
+    response = admin_client.put(
+        f"/api/model-profiles/{profile['id']}",
+        json={"name": "GPT mini", "provider": "gemini", "model": "gemini-x"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["profiles"][0]["has_api_key"] is False
+
+
 def test_update_and_delete_unknown_profile_404(admin_client) -> None:
     body = {"name": "x", "provider": "openai", "model": "m"}
     assert admin_client.put("/api/model-profiles/missing", json=body).status_code == 404

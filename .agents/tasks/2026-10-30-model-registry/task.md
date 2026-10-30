@@ -1,11 +1,11 @@
 # Task: Kho mô hình LLM / Embedding / Rerank và chọn mô hình đang dùng
 
 - ID: `2026-10-30-model-registry`
-- Trạng thái: `in_progress`
+- Trạng thái: `in_review`
 - Coordinator: `claude-agent`
 - Người yêu cầu: `8thMay03`
 - Tạo lúc: `2026-10-30T09:00:00+07:00`
-- Cập nhật lúc: `2026-10-30T09:00:00+07:00`
+- Cập nhật lúc: `2026-10-30T22:25:00+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -34,19 +34,19 @@ Người yêu cầu đã chốt (2026-10-30):
 
 ## Tiêu chí nghiệm thu
 
-- [ ] AC-01: Tab Mô hình có ba tab con LLM model / Embedding model / Rerank model; mỗi tab liệt kê
+- [x] AC-01: Tab Mô hình có ba tab con LLM model / Embedding model / Rerank model; mỗi tab liệt kê
   các mô hình đã cấu hình của loại đó, cho thêm/sửa/xoá.
-- [ ] AC-02: Profile lưu bền trong Postgres; API key chỉ ở dạng bản mã, response chỉ có
+- [x] AC-02: Profile lưu bền trong Postgres; API key chỉ ở dạng bản mã, response chỉ có
   `has_api_key`; thiếu khoá mã hoá thì từ chối lưu key (422) và không ghi gì.
-- [ ] AC-03: Chọn profile LLM / Rerank làm mô hình đang dùng có hiệu lực ngay và còn sau restart;
+- [x] AC-03: Chọn profile LLM / Rerank làm mô hình đang dùng có hiệu lực ngay và còn sau restart;
   sửa profile đang dùng thì áp lại ngay; không xoá được profile đang dùng (409). Có lựa chọn quay
   về cấu hình `.env` (LLM, Embedding) / Heuristic (Rerank).
-- [ ] AC-04: Chọn profile Embedding được lưu và áp khi backend khởi động lại (embedder tạo lại lúc
+- [x] AC-04: Chọn profile Embedding được lưu và áp khi backend khởi động lại (embedder tạo lại lúc
   khởi động); số chiều khác `VECTOR_DIM` bị từ chối (422); UI báo "chờ khởi động lại" và nhắc nạp
   lại toàn bộ.
-- [ ] AC-05: Validate theo nhà cung cấp (trường bắt buộc, URL trong allowlist, tên trùng trong cùng
+- [x] AC-05: Validate theo nhà cung cấp (trường bắt buộc, URL trong allowlist, tên trùng trong cùng
   loại → 409); kiểm tra kết nối LLM dùng được với khoá đã lưu của profile.
-- [ ] AC-06: Không hồi quy test backend/frontend hiện có; build frontend thành công.
+- [x] AC-06: Không hồi quy test backend/frontend hiện có; build frontend thành công.
 
 ## Tài liệu và phụ thuộc
 
@@ -61,9 +61,10 @@ Người yêu cầu đã chốt (2026-10-30):
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: đã chốt phạm vi, đang triển khai S-01.
+- Tóm tắt: đã triển khai, kiểm chứng tự động và self-review approved. AC-01 có test DOM, chưa xem
+  bằng trình duyệt (V-06 `not_run`).
 - Blocker: không có.
-- Bước tiếp theo: claude-agent triển khai S-01 (backend), S-02 (frontend).
+- Bước tiếp theo: người yêu cầu xem Settings → Mô hình rồi merge `feat/model-registry` vào `dev`.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 

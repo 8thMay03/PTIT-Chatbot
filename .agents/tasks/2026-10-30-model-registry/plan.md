@@ -5,7 +5,7 @@
 ### S-01 — Kho mô hình + kích hoạt (backend)
 
 - Agent: `claude-agent`
-- Trạng thái: `in_progress`
+- Trạng thái: `done`
 - Mục tiêu: bảng `model_profiles` + migration 0007, service `app/core/model_profiles.py`, route
   `/api/model-profiles*`, trường settings `*_profile_id` + `embedding_api_key`, áp embedding đã chọn
   lúc khởi động; phục vụ `AC-02`..`AC-05`.
@@ -21,7 +21,7 @@
 ### S-02 — Ba tab con trong màn Mô hình (frontend)
 
 - Agent: `claude-agent`
-- Trạng thái: `todo`
+- Trạng thái: `done`
 - Mục tiêu: tab con LLM model / Embedding model / Rerank model; danh sách + thêm/sửa/xoá + chọn mô
   hình đang dùng; phục vụ `AC-01`, `AC-03`, `AC-04`.
 - Phạm vi file được sửa: `frontend/src/ModelsView.jsx`, `frontend/src/models/*` (mới),

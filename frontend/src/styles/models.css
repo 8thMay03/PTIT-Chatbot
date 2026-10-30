@@ -1,6 +1,7 @@
 /* ==========================================================================
    SETTINGS → MÔ HÌNH
-   Ba mục xếp dọc: LLM, Reranker, Embedding. Mỗi mục tự lưu riêng.
+   Ba tab con: LLM model, Embedding model, Rerank model. Mỗi tab gồm thẻ chọn
+   mô hình đang dùng, form thêm/sửa và danh sách mô hình trong kho.
    ========================================================================== */
 .mdl-page {
   flex: 1;
@@ -9,15 +10,226 @@
   padding: 8px 32px 56px;
 }
 
-.mdl-content {
+.mdl-wrap,
+.mdl-content,
+.mdl-notices {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   max-width: 880px;
 }
 
-.mdl-content code,
-.mdl-howto code {
+.mdl-notices {
+  gap: var(--space-3);
+}
+
+/* --------------------------------------------------------------------------
+   Tab con
+   -------------------------------------------------------------------------- */
+.mdl-subtabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  overflow-x: auto;
+}
+
+.mdl-subtab {
+  display: inline-flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+}
+
+.mdl-subtab:hover {
+  color: var(--text);
+}
+
+.mdl-subtab.is-active {
+  background: var(--surface);
+  color: var(--brand-text);
+  box-shadow: var(--shadow-xs);
+}
+
+.mdl-subtab:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
+.mdl-subtab-count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.mdl-subtab.is-active .mdl-subtab-count {
+  background: var(--brand-subtle);
+  color: var(--brand-text);
+}
+
+/* --------------------------------------------------------------------------
+   Danh sách mô hình trong kho
+   -------------------------------------------------------------------------- */
+.mdl-list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.mdl-list-head h3 {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 650;
+  color: var(--text);
+}
+
+.mdl-list-head p {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.mdl-empty {
+  padding: var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.mdl-empty p {
+  margin: 0;
+}
+
+.mdl-profile-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mdl-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.mdl-profile:last-child {
+  border-bottom: 0;
+}
+
+.mdl-profile.is-active {
+  background: var(--brand-subtle);
+}
+
+.mdl-profile.is-editing {
+  box-shadow: inset 3px 0 0 var(--brand);
+}
+
+.mdl-profile-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mdl-profile-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.mdl-profile-title strong {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.mdl-profile-meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.mdl-profile-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-2);
+}
+
+.mdl-select {
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.mdl-provider-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.mdl-provider-note strong {
+  color: var(--text);
+}
+
+.mdl-link-btn {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 5px;
+  margin-top: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.mdl-link-btn:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.mdl-link-btn[aria-pressed="true"] {
+  color: var(--warning-text);
+}
+
+.mdl-link-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mdl-content code {
   padding: 1px 5px;
   border-radius: 4px;
   background: var(--surface-sunken);
@@ -170,8 +382,7 @@
 }
 
 .mdl-choice-group legend,
-.mdl-field label,
-.mdl-howto h4 {
+.mdl-field label {
   margin: 0 0 var(--space-2);
   padding: 0;
   font-size: var(--text-sm);
@@ -442,60 +653,6 @@
   color: var(--text-secondary);
 }
 
-/* --------------------------------------------------------------------------
-   Hướng dẫn đổi embedding
-   -------------------------------------------------------------------------- */
-.mdl-howto ol {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: 0;
-  padding-left: 20px;
-  font-size: var(--text-base);
-  line-height: 1.55;
-  color: var(--text-secondary);
-}
-
-.mdl-code {
-  position: relative;
-  margin-top: var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  background: var(--surface-soft);
-}
-
-.mdl-code pre {
-  margin: 0;
-  padding: 12px 88px 12px 14px;
-  overflow-x: auto;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  line-height: 1.7;
-  color: var(--text);
-}
-
-.mdl-code-copy {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 9px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.mdl-code-copy:hover {
-  color: var(--text);
-  border-color: var(--border-strong);
-}
-
 .mdl-inline-link {
   display: inline-flex;
   align-items: center;
@@ -521,6 +678,23 @@
 
   .mdl-card-foot {
     padding: var(--space-3) var(--space-4);
+  }
+
+  .mdl-list-head,
+  .mdl-profile {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+}
+
+@media (max-width: 640px) {
+  .mdl-profile {
+    flex-wrap: wrap;
+  }
+
+  .mdl-profile-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }
 

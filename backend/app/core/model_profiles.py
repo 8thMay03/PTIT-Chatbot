@@ -362,7 +362,8 @@ def update_profile(session: Session, profile_id: str, data: dict) -> ModelProfil
     # Mã hoá trước khi đổi gì: thiếu khoá mã hoá thì không chạm vào DB/settings.
     if api_key:
         encrypted = encrypt_secret(api_key)
-    elif data.get("clear_api_key") or not keyed:
+    elif data.get("clear_api_key") or not keyed or provider != row.provider:
+        # Khoá cũ thuộc nhà cung cấp cũ: không gửi nó sang nhà cung cấp mới.
         encrypted = None
     else:
         encrypted = row.encrypted_api_key
