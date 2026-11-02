@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Download,
   Eye,
+  FileDown,
   FilePenLine,
   FileText,
   Loader2,
@@ -465,6 +466,31 @@ export default function DatasetView() {
     }
   }
 
+  function markdownFileName(doc) {
+    const base = doc.file_name || doc.title || "tai-lieu";
+    const dot = base.lastIndexOf(".");
+    const stem = dot > 0 ? base.slice(0, dot) : base;
+    return `${stem || "tai-lieu"}.md`;
+  }
+
+  async function downloadMarkdown(doc) {
+    if (!canEditMarkdown(doc)) {
+      toast.warning(NO_MARKDOWN_HINT);
+      return;
+    }
+    try {
+      const blob = await documentsApi.markdownFile(doc.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = markdownFileName(doc);
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(errorMessage(err, "Không tải được bản Markdown."));
+    }
+  }
+
   function onDrop(event) {
     event.preventDefault();
     setDragOver(false);
@@ -876,8 +902,18 @@ export default function DatasetView() {
                             <button
                               type="button"
                               className="act-btn"
-                              title={`Tải xuống ${fileName}`}
-                              aria-label={`Tải xuống ${fileName}`}
+                              title={`Tải xuống bản Markdown của ${fileName}`}
+                              aria-label={`Tải xuống bản Markdown của ${fileName}`}
+                              onClick={() => downloadMarkdown(doc)}
+                              disabled={rowBusy || !canEditMarkdown(doc)}
+                            >
+                              <FileDown size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              className="act-btn"
+                              title={`Tải xuống file gốc ${fileName}`}
+                              aria-label={`Tải xuống file gốc ${fileName}`}
                               onClick={() => downloadDocument(doc)}
                             >
                               <Download size={14} />

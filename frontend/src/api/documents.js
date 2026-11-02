@@ -115,6 +115,19 @@ export function markdown(documentId, { signal } = {}) {
   return request(`documents/${documentId}/markdown`, { signal });
 }
 
+export function markdownFile(documentId, { signal } = {}) {
+  return request(`documents/${documentId}/markdown/download`, {
+    responseType: "blob",
+    signal,
+    timeout: LONG_RUNNING_TIMEOUT_MS,
+  });
+}
+
+export function markdownFileUrl(documentId) {
+  const root = API_BASE_URL.replace(/\/+$/, "");
+  return `${root}/documents/${documentId}/markdown/download`;
+}
+
 export function saveMarkdown(documentId, { text, baseHash }) {
   return request(`documents/${documentId}/markdown`, {
     method: "PUT",

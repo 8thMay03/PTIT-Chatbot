@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  FileDown,
   FilePenLine,
   FileText,
   Loader2,
@@ -14,7 +15,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { describeError, documentsApi, queryKeys } from "./api";
+import { describeError, documentsApi, errorMessage, queryKeys } from "./api";
 import OriginalDocumentViewer, {
   BROWSER_VIEWABLE_TYPES,
   documentFileUrl,
@@ -24,6 +25,7 @@ import { canEditMarkdown, documentStatus, needsChunking, NO_MARKDOWN_HINT } from
 import MarkdownView from "./components/MarkdownView";
 import MarkdownEditorView from "./components/MarkdownEditorView";
 import ParseProgress from "./components/ParseProgress";
+import { useToast } from "./components/Toast";
 
 const PAGE_SIZES = [20, 50, 100];
 
@@ -128,7 +130,9 @@ function findMatchingElements(chunkText, chunkIndex, totalChunks, elements) {
 /** Màn chi tiết, mở khi bấm vào một tài liệu trong danh sách kho. */
 export default function DocumentView({ documentId, onBack, busy: pipelineBusy, parseJob, chunkingDocId, onParse, onChunk }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [editingMarkdown, setEditingMarkdown] = useState(false);
+  const [downloadingMarkdown, setDownloadingMarkdown] = useState(false);
 
   const [chunkMode, setChunkMode] = useState(() => {
     const saved = localStorage.getItem("ptit_chunk_mode");
@@ -375,6 +379,30 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
     await onChunk?.(docDetail);
   }
 
+  async function handleDownloadMarkdown() {
+    if (!docDetail || downloadingMarkdown) return;
+    if (!canEditMarkdown(docDetail)) {
+      toast.warning(NO_MARKDOWN_HINT);
+      return;
+    }
+    setDownloadingMarkdown(true);
+    try {
+      const blob = await documentsApi.markdownFile(docDetail.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const base = docDetail.file_name || docDetail.title || "tai-lieu";
+      const dot = base.lastIndexOf(".");
+      link.download = `${(dot > 0 ? base.slice(0, dot) : base) || "tai-lieu"}.md`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(errorMessage(err, "Không tải được bản Markdown."));
+    } finally {
+      setDownloadingMarkdown(false);
+    }
+  }
+
   const isParsingThis = Boolean(parseJob);
   const isChunkingThis = chunkingDocId === documentId;
   const actionsBusy = pipelineBusy || isParsingThis || isChunkingThis;
@@ -421,6 +449,20 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
             >
               <FilePenLine size={14} />
               <span>Sửa Markdown</span>
+            </button>
+            <button
+              type="button"
+              className="btn-outline-dataset"
+              onClick={handleDownloadMarkdown}
+              disabled={actionsBusy || downloadingMarkdown || !canEditMarkdown(docDetail)}
+              title={
+                canEditMarkdown(docDetail)
+                  ? "Tải bản Markdown đã lưu (bản mà bước chia đoạn đọc) dưới dạng file .md"
+                  : NO_MARKDOWN_HINT
+              }
+            >
+              {downloadingMarkdown ? <Loader2 size={14} className="spin" /> : <FileDown size={14} />}
+              <span>{downloadingMarkdown ? "Đang tải..." : "Tải Markdown"}</span>
             </button>
             <button
               type="button"
