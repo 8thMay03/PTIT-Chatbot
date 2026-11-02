@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
@@ -762,6 +763,35 @@ def get_document_markdown(document_id: str, session: Session = Depends(get_sessi
             status_code=409, detail="Tài liệu chưa có bản parse đã lưu; hãy parse lại trước khi sửa Markdown."
         )
     return DocumentMarkdown(**serialize_markdown(document))
+
+
+@router.get("/documents/{document_id}/markdown/download", dependencies=[Depends(require_admin)])
+def download_document_markdown(document_id: str, session: Session = Depends(get_session)) -> Response:
+    """Tải bản Markdown đã lưu của một tài liệu dưới dạng file `.md`.
+
+    Dùng cho nút tải Markdown trong dataset: nội dung đúng `parsed_text` mà
+    bước chia đoạn đọc (kể cả bản sửa tay). Chưa có Markdown thì 409 giống
+    `GET /markdown` để client báo parse lại trước.
+    """
+    row = get_document_with_chunk_count(session, document_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
+    document = row[0]
+    if document.parsed_text is None:
+        raise HTTPException(
+            status_code=409, detail="Tài liệu chưa có bản parse đã lưu; hãy parse lại trước khi tải Markdown."
+        )
+    stem = Path(document.source_path or "").stem or document.id
+    safe_stem = "".join(ch for ch in stem if ch not in {'"', "\r", "\n"}).strip() or document.id
+    filename = f"{safe_stem}.md"
+    return Response(
+        content=document.parsed_text.encode("utf-8"),
+        media_type="text/markdown; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"; filename*=UTF-8\'\'{quote(filename)}',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.put("/documents/{document_id}/markdown", response_model=DocumentMarkdown, dependencies=[Depends(require_admin)])
