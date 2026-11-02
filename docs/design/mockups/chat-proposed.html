@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mockup chat đề xuất</title>
+<!--
+  Mockup tĩnh minh hoạ đề xuất trong docs/design/RAG-UI-Market-Research.md.
+  Không phải mã sản phẩm: chỉ dùng để chụp ảnh so sánh, dữ liệu là giả.
+  Màu lấy theo token hiện có (brand maroon #972635, thang xám slate).
+-->
+<style>
+  :root {
+    --brand: #972635; --brand-700: #7d1f2c; --brand-50: #fdf3f4; --brand-100: #fbe3e6;
+    --bg: #ffffff; --soft: #f8fafc; --sunken: #f1f5f9; --border: #e2e8f0; --border-strong: #cbd5e1;
+    --text: #0f172a; --muted: #5b6878; --faint: #94a3b8; --ok: #059669; --warn: #b45309;
+    --font: "Inter", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.6 var(--font); color: var(--text); background: var(--bg); }
+  .app { display: grid; grid-template-columns: 260px minmax(0, 1fr) 360px; height: 100vh; }
+
+  /* Sidebar sáng */
+  .side { background: var(--soft); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 14px 12px; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px; }
+  .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+  .brand b { font-size: 14px; } .brand small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.2; }
+  .new { display: flex; align-items: center; gap: 8px; justify-content: center; background: var(--brand); color: #fff; border: 0; border-radius: 10px; padding: 9px; font: 600 13.5px var(--font); }
+  .search { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); background: #fff; border-radius: 9px; padding: 7px 10px; color: var(--faint); font-size: 13px; }
+  .grp { font-size: 11px; font-weight: 600; color: var(--faint); text-transform: uppercase; letter-spacing: .04em; padding: 8px 8px 2px; }
+  .conv { padding: 7px 10px; border-radius: 8px; font-size: 13.5px; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conv.on { background: #fff; box-shadow: 0 0 0 1px var(--border); font-weight: 600; color: var(--text); }
+  .side-foot { margin-top: auto; border-top: 1px solid var(--border); padding-top: 10px; display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--sunken); display: grid; place-items: center; font-weight: 600; font-size: 12px; color: var(--muted); }
+  .side-foot .who { font-size: 13px; line-height: 1.3; } .side-foot .who small { color: var(--muted); display: block; font-size: 11.5px; }
+  .gear { margin-left: auto; color: var(--muted); font-size: 16px; }
+
+  /* Khu chính */
+  .main { display: flex; flex-direction: column; min-width: 0; }
+  .top { height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 24px; border-bottom: 1px solid var(--border); }
+  .top h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  .scope { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .thread { flex: 1; overflow: hidden; padding: 24px 0 0; }
+  .col { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+  .q { display: flex; justify-content: flex-end; margin-bottom: 18px; }
+  .q span { background: var(--sunken); border-radius: 16px 16px 4px 16px; padding: 9px 14px; font-size: 14.5px; }
+  .srcrow { display: flex; gap: 8px; margin-bottom: 12px; }
+  .srcpill { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; font-size: 12.5px; background: #fff; max-width: 230px; }
+  .srcpill .n { width: 18px; height: 18px; border-radius: 5px; background: var(--brand-50); color: var(--brand); display: grid; place-items: center; font-weight: 700; font-size: 11px; flex: none; }
+  .srcpill .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .srcpill small { color: var(--muted); display: block; font-size: 11px; line-height: 1.2; }
+  .trace { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+  .trace .ok { color: var(--ok); }
+  .ans { font-size: 15px; line-height: 1.7; position: relative; }
+  .ans p { margin: 0 0 10px; } .ans ol { margin: 0 0 10px; padding-left: 22px; }
+  .cite { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 5px; background: var(--brand-50); color: var(--brand); font-size: 11px; font-weight: 700; vertical-align: 2px; margin-left: 2px; }
+  .cite.hot { background: var(--brand); color: #fff; }
+  .hover { position: absolute; left: 150px; top: 64px; width: 340px; background: #fff; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 32px rgba(15,23,42,.14); padding: 12px 14px; font-size: 13px; z-index: 2; }
+  .hover .h { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+  .hover .doc { color: var(--muted); font-size: 12px; margin: 2px 0 8px; }
+  .hover q { display: block; quotes: none; border-left: 3px solid var(--brand-100); padding-left: 10px; color: #334155; }
+  .hover mark { background: #fef3c7; padding: 0 2px; border-radius: 3px; }
+  .hover .open { margin-top: 8px; color: var(--brand); font-weight: 600; font-size: 12.5px; }
+  .actions { display: flex; align-items: center; gap: 4px; margin: 4px 0 18px; color: var(--muted); font-size: 12.5px; }
+  .actions span { border: 1px solid transparent; border-radius: 8px; padding: 4px 8px; }
+  .actions .sep { flex: 1; }
+  .actions .fb { border-color: var(--border); }
+  .related h3 { font-size: 13px; color: var(--muted); margin: 0 0 6px; font-weight: 600; }
+  .related div { border-top: 1px solid var(--border); padding: 9px 2px; font-size: 14px; display: flex; justify-content: space-between; }
+  .related div::after { content: "+"; color: var(--brand); font-weight: 600; }
+  .composer { padding: 12px 24px 14px; }
+  .box { max-width: 720px; margin: 0 auto; border: 1px solid var(--border-strong); border-radius: 16px; padding: 10px 12px 8px 14px; box-shadow: 0 2px 10px rgba(15,23,42,.05); }
+  .box .ph { color: var(--faint); font-size: 14.5px; padding: 2px 0 10px; }
+  .box .bar { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+  .chip { border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; }
+  .send { margin-left: auto; width: 32px; height: 32px; border-radius: 10px; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 700; }
+  .note { max-width: 720px; margin: 6px auto 0; text-align: center; font-size: 11.5px; color: var(--faint); }
+
+  /* Panel bằng chứng */
+  .evid { border-left: 1px solid var(--border); background: var(--soft); display: flex; flex-direction: column; min-width: 0; }
+  .evid header { height: 52px; display: flex; align-items: center; padding: 0 16px; border-bottom: 1px solid var(--border); font-weight: 600; gap: 8px; }
+  .evid header small { color: var(--muted); font-weight: 400; }
+  .evid header .x { margin-left: auto; color: var(--muted); }
+  .cards { padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px; font-size: 13px; }
+  .card.on { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-50); }
+  .card .h { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+  .card .doc { color: var(--muted); font-size: 12px; margin: 2px 0 8px; }
+  .card .ex { color: #334155; line-height: 1.55; }
+  .card mark { background: #fef3c7; padding: 0 2px; border-radius: 3px; }
+  .card .meta { display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .card .meta b { color: var(--brand); font-weight: 600; }
+  .badge { font-size: 11px; border-radius: 6px; padding: 1px 6px; background: #ecfdf5; color: var(--ok); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><span class="logo">PT</span><span><b>PTIT Chatbot</b><small>Trợ lý học vụ</small></span></div>
+    <button class="new">＋ Cuộc trò chuyện mới</button>
+    <div class="search">⌕ Tìm trong lịch sử… <span style="margin-left:auto">Ctrl K</span></div>
+    <div>
+      <div class="grp">Hôm nay</div>
+      <div class="conv on">Cảnh báo kết quả học tập</div>
+      <div class="conv">Học phí học kỳ 2</div>
+      <div class="grp">7 ngày qua</div>
+      <div class="conv">Điều kiện xét tốt nghiệp</div>
+      <div class="conv">Đăng ký học phần bổ sung</div>
+    </div>
+    <div class="side-foot"><span class="avatar">NA</span><span class="who">Nguyễn An<small>n21dccn001@stu.ptit.edu.vn</small></span><span class="gear">⚙</span></div>
+  </aside>
+
+  <section class="main">
+    <div class="top">
+      <h1>Cảnh báo kết quả học tập</h1>
+      <span class="scope"><span class="dot"></span>Dữ liệu: 12 văn bản · cập nhật 25/10/2026</span>
+    </div>
+    <div class="thread">
+      <div class="col">
+        <div class="q"><span>Khi nào sinh viên bị cảnh báo kết quả học tập?</span></div>
+
+        <div class="trace"><span class="ok">✓</span> Đã tra cứu 2 văn bản, chọn 4 đoạn liên quan · 3,6 giây <span>⌄</span></div>
+        <div class="srcrow">
+          <div class="srcpill"><span class="n">1</span><span class="t">Điều 12, Khoản 1<small>Sổ tay sinh viên 2024</small></span></div>
+          <div class="srcpill"><span class="n">2</span><span class="t">Điều 16, Khoản 2<small>Quy chế đào tạo tín chỉ</small></span></div>
+        </div>
+
+        <div class="ans">
+          <p>Sinh viên bị <b>cảnh báo kết quả học tập</b> khi rơi vào một trong các trường hợp sau<span class="cite hot">1</span>:</p>
+          <ol>
+            <li>Điểm trung bình học kỳ dưới <b>0,8</b> đối với học kỳ đầu của khóa học;</li>
+            <li>Điểm trung bình học kỳ dưới <b>1,0</b> đối với các học kỳ tiếp theo;</li>
+            <li>Tổng số tín chỉ không đạt trong học kỳ vượt quá <b>50%</b> khối lượng đăng ký<span class="cite">2</span>.</li>
+          </ol>
+          <p>Việc cảnh báo được thực hiện theo từng học kỳ chính.</p>
+
+          <div class="hover">
+            <div class="h"><span class="cite hot">1</span>Điều 12, Khoản 1</div>
+            <div class="doc">Sổ tay sinh viên 2024 · Chương II</div>
+            <q>“Cảnh báo kết quả học tập được thực hiện theo từng học kỳ chính, nhằm giúp sinh viên… khi <mark>điểm trung bình học kỳ đạt dưới 0,8</mark> đối với học kỳ đầu…”</q>
+            <div class="open">Mở trong văn bản gốc →</div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <span>⧉ Sao chép</span><span>↻ Tạo lại</span><span class="sep"></span>
+          <span class="fb">👍</span><span class="fb">👎</span><span>⚑ Báo thông tin sai</span>
+        </div>
+
+        <div class="related">
+          <h3>Câu hỏi liên quan</h3>
+          <div>Bị cảnh báo mấy lần thì bị buộc thôi học?</div>
+          <div>Làm sao để được xóa cảnh báo học tập?</div>
+          <div>Điểm trung bình học kỳ được tính như thế nào?</div>
+        </div>
+      </div>
+    </div>
+    <div class="composer">
+      <div class="box">
+        <div class="ph">Hỏi tiếp về quy chế, học phí, tốt nghiệp…</div>
+        <div class="bar"><span class="chip">📚 Tất cả văn bản ▾</span><span class="send">↑</span></div>
+      </div>
+      <div class="note">Câu trả lời do AI tạo từ văn bản chính thức của PTIT và có thể sai — hãy đối chiếu nguồn trích dẫn.</div>
+    </div>
+  </section>
+
+  <aside class="evid">
+    <header>Nguồn trích dẫn <small>2 văn bản</small><span class="x">✕</span></header>
+    <div class="cards">
+      <div class="card on">
+        <div class="h"><span class="cite hot">1</span>Điều 12, Khoản 1</div>
+        <div class="doc">Sổ tay sinh viên 2024 · Chương II › Điều 12</div>
+        <div class="ex">“1. Cảnh báo kết quả học tập được thực hiện theo từng học kỳ chính… a) <mark>Điểm trung bình học kỳ đạt dưới 0,8</mark> đối với học kỳ đầu của khóa học; <mark>dưới 1,0</mark> đối với các học kỳ tiếp theo…”</div>
+        <div class="meta"><span class="badge">Hiệu lực</span><b>Xem văn bản gốc →</b></div>
+      </div>
+      <div class="card">
+        <div class="h"><span class="cite">2</span>Điều 16, Khoản 2</div>
+        <div class="doc">Quy chế đào tạo tín chỉ · Chương III › Điều 16</div>
+        <div class="ex">“…<mark>tổng số tín chỉ không đạt</mark> trong học kỳ vượt quá <mark>50% khối lượng đã đăng ký</mark> học trong học kỳ…”</div>
+        <div class="meta"><span class="badge">Hiệu lực</span><b>Xem văn bản gốc →</b></div>
+      </div>
+    </div>
+  </aside>
+</div>
+</body>
+</html>
