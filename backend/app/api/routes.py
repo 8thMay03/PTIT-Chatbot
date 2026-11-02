@@ -1,6 +1,8 @@
 import json
 import logging
+import re
 import time
+import unicodedata
 from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
@@ -783,12 +785,22 @@ def download_document_markdown(document_id: str, session: Session = Depends(get_
         )
     stem = Path(document.source_path or "").stem or document.id
     safe_stem = "".join(ch for ch in stem if ch not in {'"', "\r", "\n"}).strip() or document.id
-    filename = f"{safe_stem}.md"
+    filename_utf8 = f"{safe_stem}.md"
+    # Header latin-1 của Starlette không chứa được tiếng Việt trong `filename`,
+    # nên `filename` dùng bản ASCII còn tên đầy đủ nằm ở `filename*` (RFC 5987).
+    ascii_stem = re.sub(
+        r"[^A-Za-z0-9._-]+",
+        "_",
+        unicodedata.normalize("NFKD", safe_stem.replace("đ", "d").replace("Đ", "D"))
+        .encode("ascii", "ignore")
+        .decode("ascii"),
+    ).strip("._-") or document.id
+    filename_ascii = f"{ascii_stem}.md"
     return Response(
         content=document.parsed_text.encode("utf-8"),
         media_type="text/markdown; charset=utf-8",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"; filename*=UTF-8\'\'{quote(filename)}',
+            "Content-Disposition": f'attachment; filename="{filename_ascii}"; filename*=UTF-8\'\'{quote(filename_utf8)}',
             "X-Content-Type-Options": "nosniff",
         },
     )
