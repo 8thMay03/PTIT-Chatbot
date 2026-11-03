@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowUpDown,
-  Edit3,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -12,6 +12,7 @@ import {
   FilePenLine,
   FileText,
   Loader2,
+  Pencil,
   Play,
   Plus,
   Scissors,
@@ -19,7 +20,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { describeError, documentsApi, errorMessage, queryKeys } from "./api";
+import { describeError, datasetsApi, documentsApi, errorMessage, queryKeys } from "./api";
 import { formatDate, formatSize } from "./lib/format";
 import { canEditMarkdown, documentStatus, needsChunking, NO_MARKDOWN_HINT } from "./lib/documentStatus";
 import { isActiveParseJob, parseJobLabel } from "./lib/parseJobs";
@@ -30,6 +31,8 @@ import MarkdownEditorView from "./components/MarkdownEditorView";
 import Modal from "./components/Modal";
 import ParseProgress from "./components/ParseProgress";
 import { useToast } from "./components/Toast";
+import DatasetFormModal from "./datasets/DatasetFormModal";
+import MoveDocumentsModal from "./datasets/MoveDocumentsModal";
 
 const ACCEPTED_TYPES =
   ".md,.txt,.pdf,.docx,text/markdown,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -51,17 +54,20 @@ async function loadParsersByExtension(files) {
   return Object.fromEntries(entries);
 }
 
-export default function DatasetView() {
+export default function DatasetView({ dataset, onBack }) {
   const toast = useToast();
   const queryClient = useQueryClient();
+  const datasetId = dataset?.id ?? null;
+  const datasetName = dataset?.name ?? "Dataset";
 
   const [selectedDocId, setSelectedDocId] = useState(null);
   // Tài liệu đang mở màn sửa Markdown trực tiếp từ danh sách.
   const [markdownDoc, setMarkdownDoc] = useState(null);
 
   const documentsQuery = useQuery({
-    queryKey: queryKeys.documentList,
-    queryFn: ({ signal }) => documentsApi.list({ signal }),
+    queryKey: queryKeys.documentListByDataset(datasetId),
+    queryFn: ({ signal }) => documentsApi.list({ datasetId, signal }),
+    enabled: Boolean(datasetId),
   });
   const documents = documentsQuery.data?.documents ?? NO_DOCUMENTS;
   const loading = documentsQuery.isPending;
@@ -75,30 +81,26 @@ export default function DatasetView() {
   const [sortField, setSortField] = useState("created_at");
   const [sortAsc, setSortAsc] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
-  // Trạng thái bật/tắt và tiêu đề sửa tại chỗ: backend chưa có trường `enable`
-  // lẫn endpoint đổi tiêu đề, nên cả hai chỉ tồn tại trong phiên làm việc này.
-  const [enabledDocs, setEnabledDocs] = useState({});
-  const [editingDoc, setEditingDoc] = useState(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [localTitles, setLocalTitles] = useState({});
 
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
 
   const [pendingDelete, setPendingDelete] = useState(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [editDatasetOpen, setEditDatasetOpen] = useState(false);
+  const [confirmParseAll, setConfirmParseAll] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadTarget, setUploadTarget] = useState(null);
   const [uploadProgress, setUploadProgress] = useState("");
-  const [reindexing, setReindexing] = useState(false);
-  const [rechunking, setRechunking] = useState(false);
+  const [datasetChunking, setDatasetChunking] = useState(false);
+  const [datasetParsing, setDatasetParsing] = useState(false);
   const [parseTarget, setParseTarget] = useState(null);
   const parseResolve = useRef(null);
   const [parseSubmitting, setParseSubmitting] = useState(false);
   const [chunkingDocId, setChunkingDocId] = useState(null);
-  // Parse chạy nền không còn khóa màn hình; chỉ nạp lại/chia đoạn đồng bộ vẫn
-  // giữ khóa để tránh hai thao tác cùng ghi vào kho.
-  const pipelineBusy = reindexing || rechunking || Boolean(chunkingDocId);
+  // Parse chạy nền không còn khóa màn hình; chỉ chia đoạn dataset vẫn giữ khóa nhẹ.
+  const pipelineBusy = datasetChunking || datasetParsing || Boolean(chunkingDocId);
   const [deleting, setDeleting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
@@ -106,13 +108,20 @@ export default function DatasetView() {
 
   // Danh sách, chi tiết và các đoạn đều nằm dưới tiền tố `["documents"]`, nên một
   // lần invalidate sau thao tác ghi là mọi màn đang mở cùng cập nhật.
-  const refreshDocuments = useCallback(
-    () => queryClient.invalidateQueries({ queryKey: queryKeys.documents }),
-    [queryClient]
-  );
+  const refreshDocuments = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.documents });
+    queryClient.invalidateQueries({ queryKey: queryKeys.datasets });
+  }, [queryClient]);
 
   const handleParseJobFinished = useCallback(
     (job) => {
+      // Banner job chỉ đếm job của dataset đang mở.
+      if (datasetId && job.dataset_id && job.dataset_id !== datasetId) return;
+      if (datasetId && job.document_id && !documents.some((d) => d.id === job.document_id)) {
+        // Job upload chưa có document_id nhưng có dataset_id đã lọc ở trên;
+        // job parse của dataset khác thì bỏ qua.
+        if (job.kind !== "upload") return;
+      }
       const label = parseJobLabel(job);
       if (job.status === "succeeded") {
         if (job.kind === "upload" || needsChunking(job.result)) {
@@ -125,14 +134,22 @@ export default function DatasetView() {
         toast.error(`Parse “${label}” thất bại: ${job.error || "lỗi không xác định"}`);
       }
     },
-    [toast, refreshDocuments]
+    [toast, refreshDocuments, datasetId, documents]
   );
 
   // Job nền nằm ở backend; hook tự nạp lại và poll khi còn job đang chạy.
   const { jobs: parseJobs, track: trackParseJobs } = useParseJobs({
     onFinished: handleParseJobFinished,
   });
-  const activeParseJobs = useMemo(() => parseJobs.filter(isActiveParseJob), [parseJobs]);
+  const activeParseJobs = useMemo(() => {
+    if (!datasetId) return parseJobs.filter(isActiveParseJob);
+    const docIds = new Set(documents.map((d) => d.id));
+    return parseJobs.filter(
+      (job) =>
+        isActiveParseJob(job) &&
+        (job.dataset_id === datasetId || (job.document_id && docIds.has(job.document_id)))
+    );
+  }, [parseJobs, datasetId, documents]);
   const parseJobByDocument = useMemo(() => {
     const map = new Map();
     for (const job of activeParseJobs) {
@@ -150,15 +167,14 @@ export default function DatasetView() {
     [activeParseJobs]
   );
 
+  // Đổi dataset đang mở thì reset chọn lọc và trang.
   useEffect(() => {
-    setEnabledDocs((prev) => {
-      const next = { ...prev };
-      documents.forEach((doc) => {
-        if (next[doc.id] === undefined) next[doc.id] = true;
-      });
-      return next;
-    });
-  }, [documents]);
+    setSelectedIds(new Set());
+    setCurrentPage(1);
+    setQuery("");
+    setSelectedDocId(null);
+    setMarkdownDoc(null);
+  }, [datasetId]);
 
   const filtered = useMemo(() => {
     let list = [...documents];
@@ -221,19 +237,6 @@ export default function DatasetView() {
     });
   }
 
-  function toggleEnable(id) {
-    setEnabledDocs((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
-
-  function saveDocTitle() {
-    if (!editingDoc) return;
-    const title = editTitle.trim();
-    if (!title) return;
-    setLocalTitles((prev) => ({ ...prev, [editingDoc.id]: title }));
-    toast.warning(`Đã đổi tiêu đề thành “${title}”. Máy chủ chưa hỗ trợ lưu, tên sẽ trở lại sau khi tải lại trang.`);
-    setEditingDoc(null);
-  }
-
   function handleSort(field) {
     if (sortField === field) setSortAsc(!sortAsc);
     else {
@@ -293,7 +296,7 @@ export default function DatasetView() {
           ? parserName
           : null;
       try {
-        const job = await documentsApi.upload(file, { parserName: chosenParser });
+        const job = await documentsApi.upload(file, { parserName: chosenParser, datasetId });
         jobs.push(job);
       } catch (err) {
         failures.push(`${file.name}: ${errorMessage(err, "không tải lên được")}`);
@@ -306,7 +309,7 @@ export default function DatasetView() {
     if (jobs.length) {
       trackParseJobs(jobs);
       toast.info(
-        `Đã đưa ${jobs.length} tài liệu${parserName ? ` (${parserTitle(parserName)})` : ""} vào hàng đợi parse nền. ` +
+        `Đã đưa ${jobs.length} tài liệu${parserName ? ` (${parserTitle(parserName)})` : ""} vào “${datasetName}” (hàng đợi parse nền). ` +
           "Bạn có thể tiếp tục làm việc khác; tài liệu sẽ xuất hiện khi parse xong."
       );
     }
@@ -373,39 +376,46 @@ export default function DatasetView() {
     await refreshDocuments();
   }
 
-  async function reindexAll() {
-    if (pipelineBusy || activeParseJobs.length > 0) return;
-    setReindexing(true);
+  async function chunkDataset() {
+    if (pipelineBusy || activeParseJobs.length > 0 || !datasetId) return;
+    setDatasetChunking(true);
     try {
-      const payload = await documentsApi.reindex();
-      const detail = `${payload.documents ?? 0} tài liệu · ${payload.chunks ?? 0} đoạn`;
-      toast.success(`Đã nạp lại ${detail}.`);
-      await refreshDocuments();
-    } catch (err) {
-      toast.error(errorMessage(err, "Không nạp lại được kho tri thức."));
-    } finally {
-      setReindexing(false);
-    }
-  }
-
-  async function rechunkAll() {
-    if (pipelineBusy || activeParseJobs.length > 0) return;
-    setRechunking(true);
-    try {
-      const payload = await documentsApi.rechunk();
+      const payload = await datasetsApi.chunk(datasetId);
       const detail = `${payload.documents ?? 0} tài liệu · ${payload.chunks ?? 0} đoạn`;
       if (payload.skipped) {
         toast.warning(
           `Đã chia đoạn lại ${detail}. Bỏ qua ${payload.skipped} tài liệu chưa có bản parse đã lưu — hãy parse lại chúng.`
         );
       } else {
-        toast.success(`Đã chia đoạn lại ${detail}.`);
+        toast.success(`Đã chia đoạn lại ${detail} trong “${datasetName}”.`);
       }
       await refreshDocuments();
     } catch (err) {
-      toast.error(errorMessage(err, "Không chia đoạn lại được kho tri thức."));
+      toast.error(errorMessage(err, "Không chia đoạn lại được dataset."));
     } finally {
-      setRechunking(false);
+      setDatasetChunking(false);
+    }
+  }
+
+  async function parseDataset() {
+    if (pipelineBusy || activeParseJobs.length > 0 || !datasetId) return;
+    setDatasetParsing(true);
+    try {
+      const payload = await datasetsApi.parse(datasetId);
+      const count = payload.jobs?.length ?? 0;
+      const skipped = [];
+      if (payload.skipped_edited) skipped.push(`${payload.skipped_edited} có Markdown sửa tay được giữ lại`);
+      if (payload.skipped_busy) skipped.push(`${payload.skipped_busy} đang bận/bị thiếu file`);
+      toast.info(
+        `Đã đưa ${count} tài liệu của “${datasetName}” vào hàng đợi parse nền.` +
+          (skipped.length ? ` Bỏ qua: ${skipped.join("; ")}.` : "")
+      );
+      if (payload.jobs?.length) trackParseJobs(payload.jobs);
+    } catch (err) {
+      toast.error(errorMessage(err, "Không parse lại được dataset."));
+    } finally {
+      setDatasetParsing(false);
+      setConfirmParseAll(false);
     }
   }
 
@@ -511,7 +521,7 @@ export default function DatasetView() {
         documentId={markdownDoc.id}
         fileName={markdownDoc.file_name || markdownDoc.title}
         fileType={markdownDoc.file_type}
-        backLabel="Quay lại kho tài liệu"
+        backLabel={`Quay lại ${datasetName}`}
         onClose={(saved) => {
           setMarkdownDoc(null);
           if (saved) refreshDocuments();
@@ -527,6 +537,7 @@ export default function DatasetView() {
       <DocumentView
         documentId={selectedDocId}
         onBack={() => setSelectedDocId(null)}
+        backLabel={`Quay lại ${datasetName}`}
         busy={pipelineBusy}
         parseJob={parseJobByDocument.get(selectedDocId) ?? null}
         chunkingDocId={chunkingDocId}
@@ -538,6 +549,11 @@ export default function DatasetView() {
   }
 
   const selectedCount = selectedIds.size;
+  const datasetStats = dataset
+    ? `${dataset.document_count ?? documents.length} tài liệu · ${dataset.chunk_count ?? 0} đoạn` +
+      ((dataset.pending_count ?? 0) > 0 ? ` · ${dataset.pending_count} chờ chia đoạn` : "") +
+      (dataset.size_bytes != null ? ` · ${formatSize(dataset.size_bytes)}` : "")
+    : "";
 
   return (
     <div className="dataset-wrapper">
@@ -565,41 +581,54 @@ export default function DatasetView() {
         onDrop={onDrop}
       >
         <div className="dataset-files-view">
+          <nav className="dataset-breadcrumb" aria-label="Đường dẫn dataset">
+            <button type="button" onClick={onBack}>Dataset</button>
+            <span aria-hidden="true">/</span>
+            <span>{datasetName}</span>
+          </nav>
           <header className="dataset-view-header">
-            <div className="dataset-view-title">
-              <h2>Tài liệu</h2>
-              <p>Tài liệu được parse khi tải lên; chỉ dùng được khi hỏi đáp sau khi đã chia đoạn.</p>
+            <div className="dataset-view-title dataset-detail-title">
+              <h2>{datasetName}</h2>
+              {dataset?.description && <p className="dataset-detail-desc">{dataset.description}</p>}
+              <p className="dataset-detail-stats">{datasetStats}</p>
             </div>
 
             <div className="dataset-view-toolbar">
+              {dataset && (
+                <span className="dataset-enabled-badge" title={dataset.enabled ? "Chatbot đang dùng dataset này" : "Chatbot đang bỏ qua dataset này"}>
+                  <span className={`dataset-status-dot ${dataset.enabled ? "on" : "off"}`} aria-hidden="true" />
+                  {dataset.enabled ? "Đang dùng khi trả lời" : "Đã tắt"}
+                </span>
+              )}
               <button
                 type="button"
                 className="btn-outline-dataset"
-                title={
-                  activeParseJobs.length > 0
-                    ? "Chờ các job parse nền đang chạy xong trước khi chia đoạn lại toàn bộ"
-                    : "Chia đoạn và nhúng vector lại mọi tài liệu từ bản Markdown đã lưu, không parse lại (dùng sau khi đổi cấu hình chia đoạn)"
-                }
-                onClick={rechunkAll}
+                onClick={() => setEditDatasetOpen(true)}
+                title={`Sửa ${datasetName}`}
+              >
+                <Pencil size={14} />
+                <span>Sửa</span>
+              </button>
+              <button
+                type="button"
+                className="btn-outline-dataset"
+                title="Chia đoạn và nhúng vector lại mọi tài liệu trong dataset này từ bản Markdown đã lưu"
+                onClick={chunkDataset}
                 disabled={pipelineBusy || activeParseJobs.length > 0}
               >
-                {rechunking ? <Loader2 size={14} className="spin" /> : <Scissors size={14} />}
-                <span>{rechunking ? "Đang chia đoạn..." : "Chia đoạn lại toàn bộ"}</span>
+                {datasetChunking ? <Loader2 size={14} className="spin" /> : <Scissors size={14} />}
+                <span>{datasetChunking ? "Đang chia đoạn..." : "Chia đoạn lại dataset"}</span>
               </button>
 
               <button
                 type="button"
                 className="btn-parse-dataset"
-                title={
-                  activeParseJobs.length > 0
-                    ? "Chờ các job parse nền đang chạy xong trước khi nạp lại toàn bộ"
-                    : "Parse lại mọi file gốc rồi chia đoạn và nhúng vector; bản Markdown đã sửa tay được giữ nguyên"
-                }
-                onClick={reindexAll}
+                title="Parse lại mọi file trong dataset này; bản Markdown sửa tay được giữ nguyên"
+                onClick={() => setConfirmParseAll(true)}
                 disabled={pipelineBusy || activeParseJobs.length > 0}
               >
-                {reindexing ? <Loader2 size={14} className="spin" /> : <Play size={13} fill="currentColor" />}
-                <span>{reindexing ? "Đang nạp lại..." : "Nạp lại toàn bộ"}</span>
+                {datasetParsing ? <Loader2 size={14} className="spin" /> : <Play size={13} fill="currentColor" />}
+                <span>{datasetParsing ? "Đang parse..." : "Parse lại dataset"}</span>
               </button>
 
               <div className="dataset-search-field">
@@ -640,6 +669,9 @@ export default function DatasetView() {
               </button>
             </div>
           </header>
+          <button type="button" className="ghost-btn" onClick={onBack} style={{ alignSelf: "flex-start", marginBottom: 4 }}>
+            <ArrowLeft size={14} /> Về danh sách Dataset
+          </button>
 
           {activeParseJobs.length > 0 && (
             <div className="inline-alert is-info parse-jobs-banner" role="status" style={{ marginBottom: 12 }}>
@@ -679,6 +711,14 @@ export default function DatasetView() {
               <div className="bulk-bar-actions">
                 <button type="button" className="bulk-btn" onClick={() => setSelectedIds(new Set())}>
                   Bỏ chọn
+                </button>
+                <button
+                  type="button"
+                  className="bulk-btn"
+                  onClick={() => setMoveOpen(true)}
+                  disabled={deleting}
+                >
+                  Chuyển sang dataset…
                 </button>
                 <button
                   type="button"
@@ -745,9 +785,6 @@ export default function DatasetView() {
                         <ArrowUpDown size={12} className="th-sort-icon" />
                       </button>
                     </th>
-                    <th className="th-enable" title="Chỉ có tác dụng trong phiên làm việc này">
-                      Bật/Tắt
-                    </th>
                     <th className="th-status">Trạng thái</th>
                     <th className="th-chunks">Số đoạn</th>
                     <th className="th-size">Dung lượng</th>
@@ -757,12 +794,11 @@ export default function DatasetView() {
                 <tbody>
                   {paged.map((doc) => {
                     const isSelected = selectedIds.has(doc.id);
-                    const fileName = localTitles[doc.id] || doc.file_name || doc.title || "tài liệu";
+                    const fileName = doc.file_name || doc.title || "tài liệu";
                     const parseJob = parseJobByDocument.get(doc.id);
                     const isParsing = Boolean(parseJob);
                     const isChunking = chunkingDocId === doc.id;
                     const rowBusy = pipelineBusy || isParsing || isChunking;
-                    const isEnabled = enabledDocs[doc.id] !== false;
                     const status = documentStatus(doc);
 
                     return (
@@ -794,20 +830,6 @@ export default function DatasetView() {
 
                         <td className="td-date" data-label="Ngày tải lên">
                           {formatDate(doc.created_at || doc.updated_at)}
-                        </td>
-
-                        <td className="td-enable" data-label="Bật/Tắt">
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={isEnabled}
-                            className={`pill-switch ${isEnabled ? "on" : "off"}`}
-                            onClick={() => toggleEnable(doc.id)}
-                            title={`${isEnabled ? "Đang bật" : "Đang tắt"} — trạng thái này chưa được máy chủ lưu lại`}
-                            aria-label={`Bật/tắt ${fileName}`}
-                          >
-                            <span className="pill-switch-thumb" />
-                          </button>
                         </td>
 
                         <td className="td-status" data-label="Trạng thái">
@@ -886,18 +908,6 @@ export default function DatasetView() {
                               onClick={() => setSelectedDocId(doc.id)}
                             >
                               <Eye size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              className="act-btn"
-                              title={`Đổi tiêu đề ${fileName}`}
-                              aria-label={`Đổi tiêu đề ${fileName}`}
-                              onClick={() => {
-                                setEditingDoc(doc);
-                                setEditTitle(localTitles[doc.id] || doc.title || doc.file_name || "");
-                              }}
-                            >
-                              <Edit3 size={14} />
                             </button>
                             <button
                               type="button"
@@ -1020,51 +1030,6 @@ export default function DatasetView() {
         }
       />
 
-      {/* Đổi tiêu đề tài liệu.
-          Backend chưa có endpoint PATCH /documents/{id}, nên tên mới chỉ áp dụng
-          trong phiên này. Hộp thoại nói thẳng điều đó thay vì im lặng như bản cũ. */}
-      <Modal
-        open={Boolean(editingDoc)}
-        onClose={() => setEditingDoc(null)}
-        title="Đổi tiêu đề tài liệu"
-        icon={<Edit3 size={20} />}
-        actions={
-          <>
-            <button type="button" className="ghost-btn" onClick={() => setEditingDoc(null)}>
-              Hủy
-            </button>
-            <button
-              type="button"
-              className="primary-btn"
-              onClick={saveDocTitle}
-              disabled={!editTitle.trim()}
-            >
-              Áp dụng
-            </button>
-          </>
-        }
-      >
-        <div className="edit-form-group">
-          <label htmlFor="doc-title-input">Tiêu đề</label>
-          <input
-            id="doc-title-input"
-            type="text"
-            value={editTitle}
-            onChange={(e) => setEditTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                saveDocTitle();
-              }
-            }}
-          />
-          <span className="field-hint">
-            Máy chủ chưa hỗ trợ lưu tiêu đề. Tên mới chỉ hiển thị trong phiên làm việc này
-            và sẽ trở lại như cũ sau khi tải lại trang.
-          </span>
-        </div>
-      </Modal>
-
       {/* Xóa nhiều tài liệu */}
       <Modal
         open={bulkDeleteOpen}
@@ -1084,6 +1049,50 @@ export default function DatasetView() {
             </button>
           </>
         }
+      />
+
+      {/* Chuyển tài liệu sang dataset khác */}
+      <MoveDocumentsModal
+        open={moveOpen}
+        documentIds={[...selectedIds]}
+        currentDatasetId={datasetId}
+        onClose={() => setMoveOpen(false)}
+        onMoved={() => {
+          setMoveOpen(false);
+          setSelectedIds(new Set());
+          refreshDocuments();
+        }}
+      />
+
+      {/* Parse lại toàn bộ dataset (xác nhận, giữ Markdown sửa tay) */}
+      <Modal
+        open={confirmParseAll}
+        onClose={() => !datasetParsing && setConfirmParseAll(false)}
+        title={`Parse lại dataset “${datasetName}”?`}
+        description="Mọi tài liệu sẽ được parse lại ở chế độ nền. Tài liệu có Markdown sửa tay sẽ được giữ nguyên và bỏ qua."
+        icon={<AlertTriangle size={20} />}
+        actions={
+          <>
+            <button type="button" className="ghost-btn" onClick={() => setConfirmParseAll(false)} disabled={datasetParsing}>
+              Hủy
+            </button>
+            <button type="button" className="primary-btn" onClick={parseDataset} disabled={datasetParsing}>
+              {datasetParsing ? <Loader2 size={15} className="spin" /> : <Play size={13} />}
+              Parse lại
+            </button>
+          </>
+        }
+      />
+
+      {/* Sửa dataset */}
+      <DatasetFormModal
+        open={editDatasetOpen}
+        dataset={dataset}
+        onClose={() => setEditDatasetOpen(false)}
+        onSaved={() => {
+          setEditDatasetOpen(false);
+          refreshDocuments();
+        }}
       />
     </div>
   );

@@ -13,5 +13,5 @@ class VectorStore(Protocol):
     def delete(self, ids: list[str]) -> None:
         ...
 
-    def search(self, query_embedding: list[float], top_k: int) -> list[dict]:
+    def search(self, query_embedding: list[float], top_k: int, dataset_ids: list[str] | None = None) -> list[dict]:
         ...

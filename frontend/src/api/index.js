@@ -14,5 +14,6 @@ export * as authApi from "./auth";
 export * as chatApi from "./chat";
 export * as configApi from "./config";
 export * as conversationsApi from "./conversations";
+export * as datasetsApi from "./datasets";
 export * as documentsApi from "./documents";
 export * as modelProfilesApi from "./modelProfiles";

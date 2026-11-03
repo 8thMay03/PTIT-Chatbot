@@ -19,7 +19,11 @@ export const queryKeys = {
   config: ["config"],
   modelProfiles: ["model-profiles"],
   documents: ["documents"],
+  datasets: ["datasets"],
+  datasetList: ["datasets", "list"],
+  dataset: (datasetId) => ["datasets", "detail", datasetId],
   documentList: ["documents", "list"],
+  documentListByDataset: (datasetId) => ["documents", "list", datasetId ?? "all"],
   document: (documentId) => ["documents", "detail", documentId],
   documentChunks: (documentId, offset, limit) => [
     "documents",

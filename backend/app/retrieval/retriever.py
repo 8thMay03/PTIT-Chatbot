@@ -17,11 +17,11 @@ class Retriever:
         self.vector_store = vector_store or create_vector_store()
         self.keyword_search = keyword_search or BM25Search()
 
-    def retrieve(self, query: str, top_k: int = 4) -> list[dict]:
+    def retrieve(self, query: str, top_k: int = 4, dataset_ids: list[str] | None = None) -> list[dict]:
         candidate_count = max(top_k, top_k * settings.hybrid_candidate_multiplier)
         query_embedding = self.embedding_model.embed([query])[0]
-        vector_results = self.vector_store.search(query_embedding, top_k=candidate_count)
-        keyword_results = self.keyword_search.search(query, top_k=candidate_count)
+        vector_results = self.vector_store.search(query_embedding, top_k=candidate_count, dataset_ids=dataset_ids)
+        keyword_results = self.keyword_search.search(query, top_k=candidate_count, dataset_ids=dataset_ids)
         fused_children = reciprocal_rank_fusion(
             vector_results,
             keyword_results,

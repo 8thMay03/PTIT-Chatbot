@@ -30,7 +30,7 @@ class BM25Search:
         self._chunks: list[dict] = []
         self._scorer: BM25Okapi | None = None
 
-    def search(self, query: str, top_k: int) -> list[dict]:
+    def search(self, query: str, top_k: int, dataset_ids: list[str] | None = None) -> list[dict]:
         if top_k <= 0:
             return []
 
@@ -43,13 +43,26 @@ class BM25Search:
             if self._scorer is None:
                 return []
 
+            # Lọc dataset trước khi cắt top_k; snapshot đã chỉ chứa dataset đang bật.
+            candidates = self._chunks
+            if dataset_ids is not None:
+                wanted = set(dataset_ids)
+                candidates = [c for c in candidates if c.get("dataset_id") in wanted]
+            if not candidates:
+                return []
+            # Tính điểm trên toàn index rồi lọc theo dataset để giữ IDF ổn định,
+            # sau đó cắt top_k trong tập được phép.
             scores = self._scorer.get_scores(query_terms)
-            ranked = [(index, float(score)) for index, score in enumerate(scores) if score > 0]
-            ranked.sort(key=lambda item: (-item[1], item[0]))
+            scored_all = {self._chunks[i].get("chunk_id"): float(score) for i, score in enumerate(scores) if score > 0}
+            ranked = [
+                (chunk, scored_all.get(chunk.get("chunk_id"), 0.0))
+                for chunk in candidates
+                if scored_all.get(chunk.get("chunk_id"), 0.0) > 0
+            ]
+            ranked.sort(key=lambda item: (-item[1], item[0].get("chunk_index", 0)))
 
             results: list[dict] = []
-            for document_index, score in ranked[:top_k]:
-                chunk = self._chunks[document_index]
+            for chunk, score in ranked[:top_k]:
                 result = chunk.copy()
                 result["score"] = score
                 results.append(result)
@@ -80,16 +93,25 @@ class BM25Search:
     def _load_chunks() -> list[dict]:
         """Load detached chunk snapshots so the cache does not retain a DB session."""
         with SessionLocal() as session:
-            chunks = list(session.scalars(select(Chunk).order_by(Chunk.chunk_index)))
+            from app.db.models import Dataset, Document
+
+            rows = session.execute(
+                select(Chunk, Document.dataset_id)
+                .join(Document, Chunk.document_id == Document.id)
+                .join(Dataset, Document.dataset_id == Dataset.id)
+                .where(Dataset.enabled.is_(True))
+                .order_by(Chunk.chunk_index)
+            ).all()
 
         snapshots: list[dict] = []
-        for chunk in chunks:
+        for chunk, dataset_id in rows:
             metadata = chunk.chunk_metadata or {}
             snapshots.append(
                 {
                     "source": metadata.get("source", ""),
                     "source_name": metadata.get("source_name", ""),
                     "document_id": chunk.document_id,
+                    "dataset_id": dataset_id,
                     "chunk_id": chunk.id,
                     "heading": metadata.get("heading", ""),
                     "heading_level": metadata.get("heading_level"),

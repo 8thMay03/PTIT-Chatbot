@@ -202,15 +202,26 @@ Khi parser đọc sai, nút **Sửa Markdown** (ở từng dòng trong danh sác
 
 | API | Bước |
 | --- | --- |
-| `POST /api/documents` | Tải lên + đưa parse vào hàng đợi; trả `202` kèm job |
+| `POST /api/documents` (form: `file`, `parser_name?`, `dataset_id?`) | Tải lên vào dataset chỉ định (mặc định `default`) + đưa parse vào hàng đợi; trả `202` kèm job (`ParseJobItem.dataset_id`) |
 | `POST /api/documents/{id}/parse?parser_name=` | Đưa parse lại một tài liệu vào hàng đợi; trả `202` kèm job |
-| `GET /api/parse-jobs?document_id=&active_only=&limit=` | Danh sách job, mới nhất trước |
+| `GET /api/parse-jobs?document_id=&dataset_id=&active_only=&limit=` | Danh sách job, mới nhất trước |
 | `GET /api/parse-jobs/{job_id}` | Trạng thái, `progress`/`progress_message`, thời điểm, lỗi/kết quả của một job |
 | `GET` / `PUT /api/documents/{id}/markdown` | Đọc / lưu Markdown sửa tay (`PUT` nhận `base_hash` để tránh ghi đè thay đổi của người khác, lệch thì 409) |
 | `POST /api/documents/{id}/chunk` | Chia đoạn + embed một tài liệu |
-| `GET /api/documents` | Danh sách; `parsed_at` khác `null` khi tài liệu đã lưu Markdown (sửa/chia đoạn riêng được) |
+| `GET /api/documents?dataset_id=` | Danh sách (lọc theo dataset khi có tham số; không tham số trả mọi tài liệu như cũ); `DocumentItem.dataset_id` |
+| `POST /api/documents/move` (`{document_ids[1..500], dataset_id}`) | Chuyển tài liệu sang dataset khác, giữ nguyên id/chunk/embedding; trùng tên ở đích → 409 |
+| `GET /api/datasets` | Danh sách dataset kèm thống kê (`document_count`, `chunk_count`, `pending_count`, `size_bytes`); `default` đầu tiên |
+| `POST /api/datasets` (`{name[1..100], description?}`) | Tạo dataset; trùng tên (không phân biệt hoa/thường) → 409 |
+| `GET /api/datasets/{id}` | Chi tiết dataset kèm thống kê |
+| `PATCH /api/datasets/{id}` (`{name?, description?, enabled?, clear_description?}`) | Sửa tên/mô tả/bật-tắt; trùng tên → 409 |
+| `DELETE /api/datasets/{id}` | Xóa dataset + tài liệu/chunk/file nguồn; không xóa được `default`, còn job parse → 409 |
+| `POST /api/datasets/{id}/chunk` | Chia đoạn lại toàn bộ dataset |
+| `POST /api/datasets/{id}/parse` | Parse lại toàn bộ dataset (job nền, bỏ qua Markdown sửa tay) |
+| `POST /api/retrieval/test` (`{query, top_k, dataset_ids?}`) | Thử retrieval, lọc theo dataset khi có `dataset_ids` |
 | `POST /api/ingest/chunk` | Chia đoạn lại mọi tài liệu từ Markdown đã lưu, ví dụ sau khi đổi `CHUNK_SIZE`; trả thêm `skipped` |
-| `POST /api/ingest` | Nạp lại toàn bộ: parse + chia đoạn mọi file trong `DOCUMENTS_PATH` (đồng bộ) |
+| `POST /api/ingest` | Nạp lại toàn bộ: parse + chia đoạn mọi file trong `DOCUMENTS_PATH` (đồng bộ, giữ `dataset_id` + `id`) |
+
+Màn **Dataset** của admin gồm hai cấp: `#documents` liệt kê các dataset (thẻ có tên, mô tả, thống kê, trạng thái bật/tắt, cảnh báo chờ chia đoạn) và `#documents/<datasetId>` hiển thị tài liệu trong dataset đó. File tải lên mới nằm ở `DOCUMENTS_PATH/datasets/<dataset_id>/<tên>` (cùng tên ở hai dataset khác nhau cùng tồn tại; cùng tên trong cùng dataset thay thế bản cũ). File cũ (gốc `data/`, `data/raw`, `data/processed`) giữ nguyên chỗ và thuộc dataset `default` (“Mặc định”, đổi tên được, không xóa được). Chỉ chunk thuộc dataset đang bật được dùng khi trả lời; tắt hết thì chatbot báo không có nguồn. ID tài liệu mới là uuid (không suy từ đường dẫn) và ID chunk suy từ `document_id`, nên chuyển dataset không phải parse/nhúng lại.
 
 Tài liệu được index trước migration `0004_document_parsed_text` chưa có `parsed_text`: vẫn xem và hỏi đáp bình thường, nhưng phải parse lại (hoặc Nạp lại toàn bộ một lần) trước khi chia đoạn riêng hoặc sửa Markdown; `POST /api/ingest/chunk` bỏ qua và báo số tài liệu này.
 

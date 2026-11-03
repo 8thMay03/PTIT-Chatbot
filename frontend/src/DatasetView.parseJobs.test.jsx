@@ -18,6 +18,7 @@ function jsonResponse(payload) {
 function documentItem(overrides) {
   return {
     id: "doc-1",
+    dataset_id: "ds-1",
     title: "policy",
     file_name: "policy.pdf",
     source_path: "data/policy.pdf",
@@ -71,6 +72,7 @@ describe("DatasetView background parse", () => {
       kind: "parse",
       status: "running",
       document_id: "doc-1",
+      dataset_id: "ds-1",
       file_name: "policy.pdf",
       parser_name: null,
       created_at: "2026-10-27T14:00:01Z",
@@ -88,15 +90,18 @@ describe("DatasetView background parse", () => {
         const target = String(url);
         if (target.includes("/parse-jobs")) return jsonResponse({ jobs: [job] });
         if (target.includes("/documents")) return jsonResponse({ documents });
+        if (target.includes("/datasets")) return jsonResponse({ datasets: [] });
         return jsonResponse({});
       })
     );
+
+    const dataset = { id: "ds-1", name: "Kiểm thử", enabled: true, document_count: 2, chunk_count: 5, pending_count: 0 };
 
     await act(async () => {
       root.render(
         <QueryClientProvider client={queryClient}>
           <ToastProvider>
-            <DatasetView />
+            <DatasetView dataset={dataset} onBack={() => {}} />
           </ToastProvider>
         </QueryClientProvider>
       );

@@ -37,6 +37,7 @@ ADMIN_ROUTE_TABLE = [
     ("POST", "/api/ingest/chunk", {}),
     ("GET", "/api/documents", {}),
     ("POST", "/api/documents", {"files": {"file": ("faq.md", b"# FAQ", "text/markdown")}}),
+    ("POST", "/api/documents/move", {"json": {"document_ids": ["doc-404"], "dataset_id": "default"}}),
     ("GET", "/api/documents/doc-404", {}),
     ("DELETE", "/api/documents/doc-404", {}),
     ("GET", "/api/documents/doc-404/chunks", {}),
@@ -46,6 +47,13 @@ ADMIN_ROUTE_TABLE = [
     ("POST", "/api/documents/doc-404/chunk", {}),
     ("GET", "/api/documents/doc-404/markdown", {}),
     ("PUT", "/api/documents/doc-404/markdown", {"json": {"text": "# Sửa"}}),
+    ("GET", "/api/datasets", {}),
+    ("POST", "/api/datasets", {"json": {"name": "Mới"}}),
+    ("GET", "/api/datasets/default", {}),
+    ("PATCH", "/api/datasets/default", {"json": {"name": "Mặc định"}}),
+    ("DELETE", "/api/datasets/default", {}),
+    ("POST", "/api/datasets/default/chunk", {}),
+    ("POST", "/api/datasets/default/parse", {}),
     ("GET", "/api/parsers", {"params": {"file_name": "faq.md"}}),
     ("GET", "/api/parse-jobs", {}),
     ("GET", "/api/parse-jobs/job-404", {}),
@@ -79,20 +87,43 @@ def admin_route_mocks(monkeypatch):
     monkeypatch.setattr(
         routes.ingestion_pipeline,
         "chunk_documents",
-        lambda: {"documents": 0, "chunks": 0, "collection": "ptit", "skipped": 0},
+        lambda dataset_id=None: {"documents": 0, "chunks": 0, "collection": "ptit", "skipped": 0},
     )
     monkeypatch.setattr(routes.ingestion_pipeline, "chunk_document", lambda document_id: None)
     monkeypatch.setattr(
         routes.ingestion_pipeline, "delete_ingested_document", lambda document_id: None
     )
     monkeypatch.setattr(
+        routes.ingestion_pipeline,
+        "delete_dataset",
+        lambda dataset_id: (_ for _ in ()).throw(
+            __import__("app.db.repositories", fromlist=["DatasetConflict"]).DatasetConflict(
+                "Không thể xóa dataset mặc định."
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        routes.ingestion_pipeline,
+        "move_documents",
+        lambda document_ids, dataset_id: (_ for _ in ()).throw(
+            __import__("app.db.repositories", fromlist=["DatasetNotFound"]).DatasetNotFound(
+                "Không tìm thấy một số tài liệu cần chuyển."
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        routes.ingestion_pipeline,
+        "enqueue_dataset_parse",
+        lambda dataset_id: {"jobs": [], "skipped_edited": 0, "skipped_busy": 0},
+    )
+    monkeypatch.setattr(
         routes, "get_document_with_chunk_count", lambda session, document_id: None
     )
-    monkeypatch.setattr(routes, "list_documents", lambda session: [])
+    monkeypatch.setattr(routes, "list_documents", lambda session, dataset_id=None: [])
     monkeypatch.setattr(
         routes.rag_chain,
         "retrieve_context",
-        lambda query, top_k: {"contexts": [], "retrieval_debug": {}, "strong_context": False},
+        lambda query, top_k=10, dataset_ids=None: {"contexts": [], "retrieval_debug": {}, "strong_context": False},
     )
     monkeypatch.setattr(
         routes.parse_jobs,

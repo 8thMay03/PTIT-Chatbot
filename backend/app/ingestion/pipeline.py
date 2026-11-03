@@ -10,21 +10,30 @@ from dataclasses import dataclass, replace
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import undefer
 
 from app.core.config import PROJECT_ROOT, settings
-from app.db.models import Document
+from app.db.models import DEFAULT_DATASET_ID, Document
 from app.db.repositories import (
     ChunkRecord,
+    DatasetConflict,
+    DatasetNotFound,
     DocumentRecord,
+    apply_document_move,
+    delete_dataset_records,
     delete_document,
+    ensure_default_dataset,
     get_document_id_by_source_path,
+    get_document_identities,
     get_document_parsers,
     get_document_vector_ids,
     get_document_with_chunk_count,
+    get_documents_by_ids,
     get_edited_markdown,
+    list_dataset_filenames,
     replace_document_chunks,
     replace_knowledge_base,
     save_parsed_document,
@@ -41,12 +50,18 @@ from app.ingestion.chunker import (
     split_text,
 )
 from app.ingestion.loaders import SourceDocument, load_documents
-from app.ingestion.uploads import delete_source_file, prepare_upload, publish_upload
+from app.ingestion.uploads import (
+    delete_source_file,
+    prepare_upload,
+    publish_upload,
+    resolve_source_path,
+)
 from app.parsers import (
     DocumentParseError,
     ProgressCallback,
     get_parser_name,
     read_document_text,
+    resolve_parser_name,
 )
 from app.retrieval.bm25 import invalidate_bm25_cache
 from app.vectordb import VectorStore, create_vector_store
@@ -54,6 +69,36 @@ from app.vectordb import VectorStore, create_vector_store
 
 class DocumentStateError(RuntimeError):
     """The document's stored state does not allow the requested step."""
+
+
+def dataset_dir(dataset_id: str) -> Path:
+    """Thư mục chứa file nguồn của một dataset."""
+    return settings.documents_path / "datasets" / dataset_id
+
+
+def dataset_id_from_path(path: Path) -> str | None:
+    """Suy dataset từ đường dẫn datasets/<id>/...; None nếu không phải."""
+    try:
+        rel = path.resolve().relative_to(settings.documents_path.resolve())
+    except (OSError, ValueError):
+        try:
+            rel = Path(_source_path(path)).relative_to("data")
+        except ValueError:
+            return None
+    parts = rel.parts
+    if len(parts) >= 3 and parts[0] == "datasets":
+        candidate = parts[1]
+        if candidate and all(ch.isalnum() or ch in "-_" for ch in candidate):
+            return candidate
+    # Dạng source_path "data/datasets/<id>/..." khi resolve ngoài documents_path.
+    try:
+        posix = _source_path(path)
+        pparts = Path(posix).parts
+        if len(pparts) >= 4 and pparts[0] == "data" and pparts[1] == "datasets":
+            return pparts[2]
+    except Exception:
+        return None
+    return None
 
 
 @dataclass(frozen=True)
@@ -116,8 +161,15 @@ class IngestionPipeline:
         chunk_records: list[ChunkRecord] = []
         chunks_payload: list[dict] = []
 
+        with SessionLocal() as session:
+            identities = get_document_identities(session)
+            from app.db.models import Dataset as _Dataset
+
+            dataset_ids = set(session.scalars(select(_Dataset.id)))
         for document in _load_sources():
-            record, chunks, payload = _records_for_document(document)
+            record, chunks, payload = _records_for_document(
+                document, identities=identities, known_datasets=dataset_ids
+            )
             document_records.append(record)
             chunk_records.extend(chunks)
             chunks_payload.extend(payload)
@@ -131,9 +183,29 @@ class IngestionPipeline:
         init_db()
         documents = _load_sources()
         with SessionLocal() as session:
+            identities = get_document_identities(session)
+            from app.db.models import Dataset as _Dataset
+
+            dataset_ids = set(session.scalars(select(_Dataset.id)))
             for document in documents:
-                document_id = get_document_id_by_source_path(session, _source_path(document.path))
-                save_parsed_document(session, _document_record(document, document_id=document_id))
+                source_path = _source_path(document.path)
+                identity = identities.get(source_path)
+                if identity is not None:
+                    document_id, dataset_id = identity
+                else:
+                    document_id = None
+                    inferred = dataset_id_from_path(document.path)
+                    dataset_id = (
+                        inferred
+                        if inferred in dataset_ids
+                        else DEFAULT_DATASET_ID
+                    )
+                save_parsed_document(
+                    session,
+                    _document_record(
+                        document, document_id=document_id, dataset_id=dataset_id
+                    ),
+                )
             session.commit()
         return {"documents": len(documents)}
 
@@ -142,6 +214,7 @@ class IngestionPipeline:
         filename: str,
         content: bytes,
         *,
+        dataset_id: str | None = None,
         parser_name: str | None = None,
         on_progress: ProgressCallback | None = None,
     ) -> dict:
@@ -150,13 +223,14 @@ class IngestionPipeline:
         with TemporaryDirectory(prefix="ptit-upload-") as folder:
             staged_path = prepare_upload(filename, content, Path(folder))
             return self.parse_staged_upload(
-                staged_path, parser_name=parser_name, on_progress=on_progress
+                staged_path, dataset_id=dataset_id, parser_name=parser_name, on_progress=on_progress
             )
 
     def parse_staged_upload(
         self,
         staged_path: Path,
         *,
+        dataset_id: str | None = None,
         parser_name: str | None = None,
         on_progress: ProgressCallback | None = None,
     ) -> dict:
@@ -167,9 +241,10 @@ class IngestionPipeline:
             raise DocumentParseError(f"{staged_path.name} không có nội dung văn bản.")
         if on_progress is not None:
             on_progress(96, "Đang lưu kết quả parse")
-        path = settings.documents_path / staged_path.name
+        target_dataset = dataset_id or DEFAULT_DATASET_ID
+        path = dataset_dir(target_dataset) / staged_path.name
         document = SourceDocument(path=path, text=text, parser_name=get_parser_name(staged_path, parser_name))
-        return self._save_parsed(document, staged_path=staged_path)
+        return self._save_parsed(document, staged_path=staged_path, dataset_id=target_dataset)
 
     def parse_path(
         self,
@@ -228,19 +303,47 @@ class IngestionPipeline:
         *,
         document_id: str | None = None,
         staged_path: Path | None = None,
+        dataset_id: str | None = None,
     ) -> dict:
         init_db()
         path = document.path
         with SessionLocal() as session:
+            if dataset_id is not None:
+                from app.db.models import Dataset as _Dataset
+
+                if session.get(_Dataset, dataset_id) is None:
+                    raise DatasetNotFound("Không tìm thấy dataset.")
             if document_id is None:
                 # A repaired source path can differ from the path that originally
                 # generated the stored ID. Reuse that identity for uploads as well.
                 document_id = get_document_id_by_source_path(session, _source_path(path))
+                if document_id is None and staged_path is not None and dataset_id is not None:
+                    # Tài liệu cùng tên của dataset có thể nằm ngoài datasets/<id>/
+                    # (kho cũ ở data/raw/...): bản tải lên thay thế nó tại chỗ.
+                    same_name = _same_name_document(session, dataset_id, path.name)
+                    if same_name is not None:
+                        document_id, stored_path = same_name
+                        path = _replacement_path(stored_path, path)
+                        document = replace(document, path=path)
             elif session.get(Document, document_id) is None:
                 # A background parse must not recreate a document deleted while
-                # the parser was running.
+                # the parser was running. Dataset may itself have been deleted.
+                if dataset_id is not None:
+                    raise DatasetNotFound("Dataset đã bị xóa trong lúc parse; hãy tải lại danh sách.")
                 raise DocumentStateError("Tài liệu đã bị xóa trong lúc parse; hãy tải lại danh sách.")
-            record = _document_record(document, document_id=document_id, size_bytes=_file_size(staged_path or path))
+            resolved_dataset = dataset_id
+            if document_id is not None and dataset_id is None:
+                existing_doc = session.get(Document, document_id)
+                if existing_doc is not None:
+                    resolved_dataset = existing_doc.dataset_id
+            if resolved_dataset is None:
+                resolved_dataset = DEFAULT_DATASET_ID
+            record = _document_record(
+                document,
+                document_id=document_id,
+                dataset_id=resolved_dataset,
+                size_bytes=_file_size(staged_path or path),
+            )
             stored = save_parsed_document(session, record)
             # Parsing and the DB flush have succeeded before publication.
             # A failed commit rolls back both the stored text and the source file.
@@ -276,7 +379,7 @@ class IngestionPipeline:
         invalidate_bm25_cache()
         return item
 
-    def chunk_documents(self) -> dict:
+    def chunk_documents(self, dataset_id: str | None = None) -> dict:
         """Re-chunk every parsed document from its stored Markdown, without parsing.
 
         Documents indexed before parse results were stored have no Markdown to read
@@ -284,7 +387,14 @@ class IngestionPipeline:
         """
         init_db()
         with SessionLocal() as session:
-            documents = session.scalars(select(Document).options(undefer(Document.parsed_text))).all()
+            query = select(Document).options(undefer(Document.parsed_text))
+            if dataset_id is not None:
+                from app.db.models import Dataset as _Dataset
+
+                if session.get(_Dataset, dataset_id) is None:
+                    raise DatasetNotFound("Không tìm thấy dataset.")
+                query = query.where(Document.dataset_id == dataset_id)
+            documents = session.scalars(query).all()
             parsed = [_ParsedDocument.from_model(item) for item in documents if item.parsed_text is not None]
             skipped = len(documents) - len(parsed)
 
@@ -336,6 +446,188 @@ class IngestionPipeline:
         invalidate_bm25_cache()
         return {"id": document_id, "deleted": True}
 
+    def delete_dataset(self, dataset_id: str) -> dict:
+        """Xóa dataset cùng tài liệu, chunk và file nguồn (sau commit)."""
+        from app.ingestion.jobs import parse_jobs as _parse_jobs
+
+        init_db()
+        if dataset_id == DEFAULT_DATASET_ID:
+            raise DatasetConflict("Không thể xóa dataset mặc định.")
+        with SessionLocal() as session:
+            from app.db.models import Dataset as _Dataset
+
+            if session.get(_Dataset, dataset_id) is None:
+                raise DatasetNotFound("Không tìm thấy dataset.")
+            doc_ids = list(
+                session.scalars(select(Document.id).where(Document.dataset_id == dataset_id))
+            )
+            for doc_id in doc_ids:
+                if _parse_jobs.active_for_document(doc_id) is not None:
+                    raise DatasetConflict(
+                        "Dataset còn tài liệu đang parse; hãy chờ job hiện tại xong."
+                    )
+            count, source_paths, vector_ids = delete_dataset_records(session, dataset_id)
+            session.commit()
+
+        for source_path in source_paths:
+            delete_source_file(source_path)
+        # Dọn thư mục rỗng của dataset (file cũ ngoài datasets/ không bị ảnh hưởng).
+        try:
+            target = dataset_dir(dataset_id)
+            if target.is_dir() and target.resolve().is_relative_to(
+                settings.documents_path.resolve()
+            ):
+                try:
+                    next(target.iterdir())
+                except StopIteration:
+                    target.rmdir()
+        except OSError:
+            pass
+        if self._uses_external_store() and vector_ids:
+            self.vector_store.delete(vector_ids)
+        invalidate_bm25_cache()
+        return {"id": dataset_id, "deleted": True, "documents": count}
+
+    def move_documents(self, document_ids: list[str], target_id: str) -> dict:
+        """Chuyển tài liệu sang dataset khác, giữ nguyên id/chunk/embedding."""
+        from app.ingestion.jobs import parse_jobs as _parse_jobs
+
+        init_db()
+        if not document_ids or len(document_ids) > 500:
+            raise DatasetConflict("Chọn từ 1 đến 500 tài liệu để chuyển.")
+        with SessionLocal() as session:
+            from app.db.models import Dataset as _Dataset
+
+            if session.get(_Dataset, target_id) is None:
+                raise DatasetNotFound("Không tìm thấy dataset đích.")
+            documents = get_documents_by_ids(session, list(dict.fromkeys(document_ids)))
+            if len(documents) != len(set(document_ids)):
+                raise DatasetNotFound("Không tìm thấy một số tài liệu cần chuyển.")
+            for document in documents:
+                if _parse_jobs.active_for_document(document.id) is not None:
+                    raise DatasetConflict(
+                        f"Tài liệu “{Path(document.source_path).name}” đang parse; hãy chờ job xong."
+                    )
+            # Trùng tên ở đích → 409, không đổi gì (so cả lô với nhau và với tài liệu sẵn có).
+            existing_names = list_dataset_filenames(session, target_id)
+            moving_names: dict[str, str] = {}
+            for document in documents:
+                if document.dataset_id == target_id:
+                    continue
+                lowered = Path(document.source_path).name.casefold()
+                if lowered in moving_names:
+                    raise DatasetConflict(
+                        f"Có nhiều tài liệu cùng tên “{Path(document.source_path).name}” trong lô chuyển."
+                    )
+                owner = existing_names.get(lowered)
+                if owner is not None and owner not in {d.id for d in documents}:
+                    raise DatasetConflict(
+                        f"Dataset đích đã có file “{Path(document.source_path).name}”."
+                    )
+                moving_names[lowered] = document.id
+
+            moves: list[tuple[Document, Path, Path]] = []
+            for document in documents:
+                if document.dataset_id == target_id:
+                    continue
+                file_name = Path(document.source_path).name
+                dest = dataset_dir(target_id) / file_name
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                src_resolved = resolve_source_path(document.source_path)
+                moves.append((document, src_resolved, dest) if src_resolved else (document, None, dest))
+
+            new_paths: dict[str, str] = {}
+            for document, _src, dest in moves:
+                new_paths[document.id] = _source_path(dest)
+
+            renamed: list[tuple[Path, Path, bool]] = []
+            try:
+                for document, src, dest in moves:
+                    if src is not None and src.is_file():
+                        if dest.exists():
+                            raise DatasetConflict(
+                                f"Dataset đích đã có file “{dest.name}”."
+                            )
+                        try:
+                            dest.parent.mkdir(parents=True, exist_ok=True)
+                            src.replace(dest)
+                        except OSError as exc:
+                            raise DatasetConflict(
+                                "File đang được sử dụng, không thể chuyển lúc này."
+                            ) from exc
+                        renamed.append((src, dest, True))
+                    for doc_row in documents:
+                        if doc_row.id == document.id:
+                            apply_document_move(session, doc_row, target_id, new_paths[document.id])
+                            break
+                session.commit()
+            except Exception:
+                session.rollback()
+                for src, dest, _done in reversed(renamed):
+                    try:
+                        if dest.is_file():
+                            dest.replace(src)
+                    except OSError:
+                        pass
+                raise
+        invalidate_bm25_cache()
+        moved = len(moves)
+        return {"moved": moved, "dataset_id": target_id}
+
+    def enqueue_dataset_parse(self, dataset_id: str) -> dict:
+        """Đưa mỗi tài liệu của dataset vào job parse nền với parser đã lưu.
+
+        Bỏ qua Markdown sửa tay; tài liệu đang có job hoặc mất file nguồn tính vào
+        ``skipped_busy``. ``jobs`` là các ``ParseJob`` vừa tạo.
+        """
+        from app.ingestion.jobs import ParseJobConflict
+        from app.ingestion.jobs import parse_jobs as _parse_jobs
+
+        init_db()
+        with SessionLocal() as session:
+            from app.db.models import Dataset as _Dataset
+
+            if session.get(_Dataset, dataset_id) is None:
+                raise DatasetNotFound("Không tìm thấy dataset.")
+            rows = session.execute(
+                select(
+                    Document.id,
+                    Document.source_path,
+                    Document.document_metadata,
+                ).where(Document.dataset_id == dataset_id)
+            ).all()
+        jobs = []
+        skipped_edited = 0
+        skipped_busy = 0
+        for doc_id, source_path, metadata in rows:
+            metadata = metadata if isinstance(metadata, dict) else {}
+            if metadata.get("markdown_edited"):
+                skipped_edited += 1
+                continue
+            if _parse_jobs.active_for_document(doc_id) is not None:
+                skipped_busy += 1
+                continue
+            path = resolve_source_path(source_path)
+            if path is None or not path.is_file():
+                skipped_busy += 1
+                continue
+            stored_parser = metadata.get("parser")
+            try:
+                job = _parse_jobs.enqueue_parse(
+                    doc_id,
+                    path,
+                    file_name=Path(source_path).name,
+                    parser_name=resolve_parser_name(
+                        path, stored_parser if isinstance(stored_parser, str) else None
+                    ),
+                )
+            except ParseJobConflict:
+                # Một parse khác vừa nhận tài liệu này giữa lúc kiểm tra và enqueue.
+                skipped_busy += 1
+                continue
+            jobs.append(job)
+        return {"jobs": jobs, "skipped_edited": skipped_edited, "skipped_busy": skipped_busy}
+
     # ---- Helpers ----
 
     def _embed(
@@ -372,6 +664,31 @@ def _load_sources() -> list[SourceDocument]:
     )
 
 
+def _same_name_document(session, dataset_id: str, file_name: str) -> tuple[str, str] | None:
+    """(id, source_path) của tài liệu trong dataset có cùng tên file, không phân biệt hoa/thường."""
+    wanted = file_name.casefold()
+    rows = session.execute(
+        select(Document.id, Document.source_path)
+        .where(Document.dataset_id == dataset_id)
+        .order_by(Document.source_path)
+    )
+    for doc_id, source_path in rows:
+        if Path(source_path).name.casefold() == wanted:
+            return doc_id, source_path
+    return None
+
+
+def _replacement_path(source_path: str, fallback: Path) -> Path:
+    """Đường dẫn đã lưu của tài liệu bị thay thế, chỉ khi nó nằm trong DOCUMENTS_PATH."""
+    stored = Path(source_path)
+    candidate = stored if stored.is_absolute() else PROJECT_ROOT / stored
+    try:
+        candidate.resolve().relative_to(settings.documents_path.resolve())
+    except (OSError, ValueError):
+        return fallback
+    return candidate
+
+
 def _current_document(session, parsed: _ParsedDocument) -> Document:
     """Return the document if its Markdown is still the one that was chunked."""
     document = session.get(Document, parsed.id)
@@ -389,9 +706,32 @@ def _serialize(session, document: Document, size_bytes: int | None = None) -> di
 
 
 def _records_for_document(
-    document: SourceDocument, *, document_id: str | None = None, size_bytes: int | None = None
+    document: SourceDocument,
+    *,
+    document_id: str | None = None,
+    dataset_id: str | None = None,
+    size_bytes: int | None = None,
+    identities: dict[str, tuple[str, str]] | None = None,
+    known_datasets: set[str] | None = None,
 ) -> tuple[DocumentRecord, list[ChunkRecord], list[dict]]:
-    document_record = _document_record(document, document_id=document_id, size_bytes=size_bytes)
+    source_path = _source_path(document.path)
+    resolved_id = document_id
+    resolved_dataset = dataset_id
+    if identities is not None and resolved_id is None:
+        hit = identities.get(source_path)
+        if hit is not None:
+            resolved_id, resolved_dataset = hit
+    if resolved_id is None:
+        resolved_id = uuid4().hex
+    if resolved_dataset is None:
+        inferred = dataset_id_from_path(document.path)
+        if inferred is not None and (known_datasets is None or inferred in known_datasets):
+            resolved_dataset = inferred
+        else:
+            resolved_dataset = DEFAULT_DATASET_ID
+    document_record = _document_record(
+        document, document_id=resolved_id, dataset_id=resolved_dataset, size_bytes=size_bytes
+    )
     chunk_records, chunks_payload = _chunk_records(
         document_record.id,
         document_record.source_path,
@@ -402,10 +742,15 @@ def _records_for_document(
 
 
 def _document_record(
-    document: SourceDocument, *, document_id: str | None = None, size_bytes: int | None = None
+    document: SourceDocument,
+    *,
+    document_id: str | None = None,
+    dataset_id: str | None = None,
+    size_bytes: int | None = None,
 ) -> DocumentRecord:
     if document_id is None:
-        document_id = _document_id(document.path)
+        # Tài liệu mới dùng uuid để chuyển dataset không đổi identity (D-01, S-02).
+        document_id = uuid4().hex
     source_path = _source_path(document.path)
     if size_bytes is None:
         size_bytes = _file_size(document.path)
@@ -419,6 +764,7 @@ def _document_record(
         metadata["markdown_edited"] = True
     return DocumentRecord(
         id=document_id,
+        dataset_id=dataset_id or DEFAULT_DATASET_ID,
         source_path=source_path,
         title=document.path.stem,
         file_type=document.path.suffix.lower().lstrip("."),
@@ -438,13 +784,13 @@ def _chunk_records(
         if isinstance(chunk, ParentChildChunk):
             parent_index = chunk.parent_index
             child_index = chunk.child_index
-            parent_id = _parent_id(source_path, parent_index)
-            chunk_id = _child_id(source_path, parent_index, child_index)
+            parent_id = _parent_id(document_id, parent_index)
+            chunk_id = _child_id(document_id, parent_index, child_index)
             parent_text = chunk.parent_text
         else:
             parent_index = chunk.index
             child_index = 0
-            chunk_id = _chunk_id(source_path, chunk.index)
+            chunk_id = _chunk_id(document_id, chunk.index)
             parent_id = chunk_id
             parent_text = chunk.text
         search_text = compose_search_text(document_title, chunk.section_path, chunk.text)
@@ -503,7 +849,8 @@ def _file_size(path: Path) -> int | None:
 
 
 def _document_id(path: Path) -> str:
-    return sha256(_source_path(path).encode("utf-8")).hexdigest()
+    # ID mới dùng uuid để chuyển dataset không đổi identity; tài liệu cũ giữ ID.
+    return uuid4().hex
 
 
 def _source_path(path: Path) -> str:
@@ -521,16 +868,16 @@ def _estimate_token_count(text: str) -> int:
     return max(1, len(text.split()))
 
 
-def _chunk_id(source_path: str, chunk_index: int) -> str:
-    return f"{source_path}::chunk-{chunk_index}"
+def _chunk_id(document_id: str, chunk_index: int) -> str:
+    return f"{document_id}::chunk-{chunk_index}"
 
 
-def _parent_id(source_path: str, parent_index: int) -> str:
-    return f"{source_path}::parent-{parent_index}"
+def _parent_id(document_id: str, parent_index: int) -> str:
+    return f"{document_id}::parent-{parent_index}"
 
 
-def _child_id(source_path: str, parent_index: int, child_index: int) -> str:
-    return f"{_parent_id(source_path, parent_index)}::child-{child_index}"
+def _child_id(document_id: str, parent_index: int, child_index: int) -> str:
+    return f"{_parent_id(document_id, parent_index)}::child-{child_index}"
 
 
 def _split_document(text: str) -> list[Chunk | ParentChildChunk]:

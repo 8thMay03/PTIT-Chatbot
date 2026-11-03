@@ -30,6 +30,12 @@ from app.api.schemas import (
     ConversationListResponse,
     ConversationMessage,
     CreateModelProfileRequest,
+    DatasetCreateRequest,
+    DatasetDeleteResponse,
+    DatasetItem,
+    DatasetListResponse,
+    DatasetParseResponse,
+    DatasetUpdateRequest,
     DocumentChunksResponse,
     DocumentDeleteResponse,
     DocumentDetail,
@@ -40,6 +46,8 @@ from app.api.schemas import (
     IngestResponse,
     LoginRequest,
     ModelRegistryResponse,
+    MoveDocumentsRequest,
+    MoveDocumentsResponse,
     ParseJobItem,
     ParseJobListResponse,
     RegisterRequest,
@@ -65,26 +73,35 @@ from app.core.config_crypto import SecretEncryptionUnavailable, is_secret_encryp
 from app.core.config_store import apply_config_update, get_config_store_session, reset_config as reset_stored_config
 from app.db import check_db_health, get_session
 from app.db.repositories import (
+    DatasetConflict,
+    DatasetNotFound,
     add_message,
     add_message_sources,
     claim_anonymous_conversations,
+    create_dataset,
     create_user,
     delete_conversation,
+    delete_dataset_records,
     ensure_conversation,
+    ensure_default_dataset,
     get_conversation,
     get_conversation_messages,
+    get_dataset_with_stats,
     get_document_chunks,
     get_document_full_text,
     get_document_preview_text,
     get_document_with_chunk_count,
+    get_enabled_dataset_ids,
     get_owned_conversation,
     get_recent_conversation_history,
     get_user_by_email,
     list_conversations,
+    list_datasets_with_stats,
     list_documents,
     rename_conversation,
     serialize_document,
     serialize_markdown,
+    update_dataset,
 )
 from app.generation.citations import public_citations
 from app.generation.llm import (
@@ -95,6 +112,8 @@ from app.generation.rag_chain import rag_chain
 from app.guardrails import OUT_OF_SCOPE_ANSWER, filter_safe_history
 from app.ingestion import ingestion_pipeline
 from app.ingestion.jobs import ParseJob, ParseJobConflict, parse_jobs
+from app.ingestion.pipeline import DatasetConflict as PipelineDatasetConflict
+from app.ingestion.pipeline import DatasetNotFound as PipelineDatasetNotFound
 from app.ingestion.pipeline import DocumentStateError
 from app.ingestion.uploads import (
     PREVIEW_CHAR_LIMIT,
@@ -110,6 +129,7 @@ from app.parsers import (
     registry,
     resolve_parser_name,
 )
+from app.retrieval.bm25 import invalidate_bm25_cache
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -523,7 +543,9 @@ def delete_model_profile(
 def test_retrieval(request: RetrievalTestRequest) -> dict:
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="Query must not be empty.")
-    result = rag_chain.retrieve_context(request.query, top_k=request.top_k)
+    result = rag_chain.retrieve_context(
+        request.query, top_k=request.top_k, dataset_ids=request.dataset_ids
+    )
     return {
         "query": request.query,
         "contexts": result.get("contexts", []),
@@ -552,10 +574,18 @@ def chunk_all_documents() -> ChunkAllResponse:
 
 
 @router.get("/documents", response_model=DocumentListResponse, dependencies=[Depends(require_admin)])
-def get_documents(session: Session = Depends(get_session)) -> DocumentListResponse:
+def get_documents(
+    dataset_id: str | None = Query(default=None),
+    session: Session = Depends(get_session),
+) -> DocumentListResponse:
+    if dataset_id is not None:
+        from app.db.models import Dataset as _Dataset
+
+        if session.get(_Dataset, dataset_id) is None:
+            raise HTTPException(status_code=404, detail="Không tìm thấy dataset.")
     documents = [
         DocumentItem(**_document_payload(document, chunk_count))
-        for document, chunk_count in list_documents(session)
+        for document, chunk_count in list_documents(session, dataset_id=dataset_id)
     ]
     return DocumentListResponse(documents=documents)
 
@@ -675,7 +705,10 @@ def parsers_for_file(file_name: str = Query(min_length=1)) -> dict:
 
 @router.post("/documents", response_model=ParseJobItem, status_code=202, dependencies=[Depends(require_admin)])
 def upload_document(
-    file: UploadFile = File(...), parser_name: str | None = Form(default=None, min_length=1)
+    file: UploadFile = File(...),
+    parser_name: str | None = Form(default=None, min_length=1),
+    dataset_id: str | None = Form(default=None, min_length=1),
+    session: Session = Depends(get_session),
 ) -> ParseJobItem:
     """Validate and stage the upload, then parse it in a background job.
 
@@ -683,9 +716,19 @@ def upload_document(
     conversion/parse of large PDFs no longer blocks the client. The source file
     is published into DOCUMENTS_PATH by the job after parsing and committing.
     """
+    from app.db.models import Dataset as _Dataset
+
+    target = dataset_id or "default"
+    # api_db (SQLite test) tạo bảng rỗng chưa có dòng default; bảo đảm tồn tại.
+    ensure_default_dataset(session)
+    session.commit()
+    if session.get(_Dataset, target) is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dataset.")
     try:
         options = {"parser_name": parser_name} if parser_name is not None else {}
-        job = parse_jobs.enqueue_upload(file.filename or "", file.file.read(), **options)
+        job = parse_jobs.enqueue_upload(
+            file.filename or "", file.file.read(), dataset_id=target, **options
+        )
     except DocumentUploadError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     except ParseJobConflict as exc:
@@ -697,10 +740,13 @@ def upload_document(
 @router.get("/parse-jobs", response_model=ParseJobListResponse, dependencies=[Depends(require_admin)])
 def list_parse_jobs(
     document_id: str | None = Query(default=None),
+    dataset_id: str | None = Query(default=None),
     active_only: bool = Query(default=False),
     limit: int = Query(default=50, ge=1, le=200),
 ) -> ParseJobListResponse:
-    jobs = parse_jobs.list(document_id=document_id, active_only=active_only, limit=limit)
+    jobs = parse_jobs.list(
+        document_id=document_id, dataset_id=dataset_id, active_only=active_only, limit=limit
+    )
     return ParseJobListResponse(jobs=[_parse_job_payload(job) for job in jobs])
 
 
@@ -826,12 +872,132 @@ def remove_document(document_id: str) -> DocumentDeleteResponse:
     return DocumentDeleteResponse(**result)
 
 
+@router.post("/documents/move", response_model=MoveDocumentsResponse, dependencies=[Depends(require_admin)])
+def move_documents(request: MoveDocumentsRequest) -> MoveDocumentsResponse:
+    try:
+        result = ingestion_pipeline.move_documents(request.document_ids, request.dataset_id)
+    except (PipelineDatasetNotFound, DatasetNotFound) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (PipelineDatasetConflict, DatasetConflict) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return MoveDocumentsResponse(**result)
+
+
+# ==========================================
+# Dataset (multi-dataset)
+# ==========================================
+def _dataset_error_to_http(exc: Exception) -> HTTPException:
+    if isinstance(exc, DatasetNotFound):
+        return HTTPException(status_code=404, detail=str(exc))
+    return HTTPException(status_code=409, detail=str(exc))
+
+
+@router.get("/datasets", response_model=DatasetListResponse, dependencies=[Depends(require_admin)])
+def list_datasets_api(session: Session = Depends(get_session)) -> DatasetListResponse:
+    ensure_default_dataset(session)
+    session.commit()
+    return DatasetListResponse(
+        datasets=[DatasetItem(**item) for item in list_datasets_with_stats(session)]
+    )
+
+
+@router.post("/datasets", response_model=DatasetItem, status_code=201, dependencies=[Depends(require_admin)])
+def create_dataset_api(
+    request: DatasetCreateRequest, session: Session = Depends(get_session)
+) -> DatasetItem:
+    try:
+        dataset = create_dataset(session, request.name, request.description)
+        session.commit()
+    except (DatasetConflict, DatasetNotFound) as exc:
+        raise _dataset_error_to_http(exc) from exc
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(status_code=409, detail="Dataset đã tồn tại.") from exc
+    payload = get_dataset_with_stats(session, dataset.id)
+    return DatasetItem(**payload)
+
+
+@router.get("/datasets/{dataset_id}", response_model=DatasetItem, dependencies=[Depends(require_admin)])
+def get_dataset_api(dataset_id: str, session: Session = Depends(get_session)) -> DatasetItem:
+    payload = get_dataset_with_stats(session, dataset_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dataset.")
+    return DatasetItem(**payload)
+
+
+@router.patch("/datasets/{dataset_id}", response_model=DatasetItem, dependencies=[Depends(require_admin)])
+def update_dataset_api(
+    dataset_id: str, request: DatasetUpdateRequest, session: Session = Depends(get_session)
+) -> DatasetItem:
+    from app.db.models import Dataset as _Dataset
+
+    current = session.get(_Dataset, dataset_id)
+    was_enabled = current.enabled if current is not None else None
+    try:
+        # clear_description=True cho phép xóa mô tả về null (PATCH {description: null} bị exclude).
+        dataset = update_dataset(
+            session,
+            dataset_id,
+            name=request.name,
+            description=request.description,
+            enabled=request.enabled,
+            _clear_description=request.clear_description,
+        )
+        session.commit()
+    except (DatasetConflict, DatasetNotFound) as exc:
+        raise _dataset_error_to_http(exc) from exc
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(status_code=409, detail="Dataset đã tồn tại.") from exc
+    if was_enabled is not None and was_enabled != dataset.enabled:
+        # BM25 giữ snapshot chunk của các dataset đang bật.
+        invalidate_bm25_cache()
+    payload = get_dataset_with_stats(session, dataset.id)
+    return DatasetItem(**payload)
+
+
+@router.delete("/datasets/{dataset_id}", response_model=DatasetDeleteResponse, dependencies=[Depends(require_admin)])
+def delete_dataset_api(dataset_id: str) -> DatasetDeleteResponse:
+    try:
+        result = ingestion_pipeline.delete_dataset(dataset_id)
+    except (PipelineDatasetNotFound, DatasetNotFound) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (PipelineDatasetConflict, DatasetConflict) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return DatasetDeleteResponse(**result)
+
+
+@router.post("/datasets/{dataset_id}/chunk", response_model=ChunkAllResponse, dependencies=[Depends(require_admin)])
+def chunk_dataset_api(dataset_id: str) -> ChunkAllResponse:
+    try:
+        result = ingestion_pipeline.chunk_documents(dataset_id=dataset_id)
+    except (PipelineDatasetNotFound, DatasetNotFound) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except DocumentStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return ChunkAllResponse(**result)
+
+
+@router.post("/datasets/{dataset_id}/parse", response_model=DatasetParseResponse, dependencies=[Depends(require_admin)])
+def parse_dataset_api(dataset_id: str) -> DatasetParseResponse:
+    try:
+        result = ingestion_pipeline.enqueue_dataset_parse(dataset_id)
+    except (PipelineDatasetNotFound, DatasetNotFound) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return DatasetParseResponse(
+        jobs=[_parse_job_payload(job) for job in result["jobs"]],
+        skipped_edited=result["skipped_edited"],
+        skipped_busy=result["skipped_busy"],
+    )
+
+
 def _parse_job_payload(job: ParseJob) -> ParseJobItem:
     return ParseJobItem(
         id=job.id,
         kind=job.kind,
         status=job.status,
         document_id=job.document_id,
+        dataset_id=job.dataset_id,
         file_name=job.file_name,
         parser_name=job.parser_name,
         created_at=job.created_at,

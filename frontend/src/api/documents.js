@@ -2,8 +2,8 @@ import { API_BASE_URL, request } from "./client";
 
 const LONG_RUNNING_TIMEOUT_MS = 5 * 60_000;
 
-export function list({ signal } = {}) {
-  return request("documents", { signal });
+export function list({ datasetId, signal } = {}) {
+  return request("documents", { query: { dataset_id: datasetId }, signal });
 }
 
 export function get(documentId, { signal } = {}) {
@@ -42,10 +42,11 @@ export async function allChunks(documentId, { signal, batchSize = 500 } = {}) {
   return collected;
 }
 
-export function upload(file, { parserName = null } = {}) {
+export function upload(file, { parserName = null, datasetId = null } = {}) {
   const form = new FormData();
   form.append("file", file);
   if (parserName) form.append("parser_name", parserName);
+  if (datasetId) form.append("dataset_id", datasetId);
 
   // Backend chỉ stage file rồi trả job parse nền, nên timeout dài chỉ còn dùng
   // cho lúc tải bytes lên.
@@ -58,6 +59,14 @@ export function upload(file, { parserName = null } = {}) {
 
 export function remove(documentId) {
   return request(`documents/${documentId}`, { method: "DELETE" });
+}
+
+export function move(documentIds, datasetId, { signal } = {}) {
+  return request("documents/move", {
+    method: "POST",
+    body: { document_ids: documentIds, dataset_id: datasetId },
+    signal,
+  });
 }
 
 export function reindex() {
@@ -81,10 +90,11 @@ export function parse(documentId, parserName) {
   });
 }
 
-export function parseJobs({ documentId, activeOnly = false, limit = 50, signal } = {}) {
+export function parseJobs({ documentId, datasetId, activeOnly = false, limit = 50, signal } = {}) {
   return request("parse-jobs", {
     query: {
       document_id: documentId,
+      dataset_id: datasetId,
       active_only: activeOnly || undefined,
       limit,
     },

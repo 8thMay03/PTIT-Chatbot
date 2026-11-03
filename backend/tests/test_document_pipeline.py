@@ -36,7 +36,7 @@ class RecordingVectorStore:
     def delete(self, ids: list[str]) -> None:
         self.deleted.extend(ids)
 
-    def search(self, query_embedding: list[float], top_k: int) -> list[dict]:
+    def search(self, query_embedding: list[float], top_k: int, dataset_ids: list[str] | None = None) -> list[dict]:
         return []
 
 
@@ -62,12 +62,23 @@ def _memory_engine():
         cursor.close()
 
     Base.metadata.create_all(engine)
+    # Dataset mặc định cho FK documents.dataset_id (multi-dataset, AC-01).
+    from app.db.repositories import ensure_default_dataset
+
+    with sessionmaker(bind=engine)() as session:
+        ensure_default_dataset(session)
+        session.commit()
     return engine
 
 
 def _parse_and_chunk(pipeline: IngestionPipeline, path: Path, **kwargs) -> dict:
     parsed = pipeline.parse_path(path, **kwargs)
     return pipeline.chunk_document(parsed["id"])
+
+
+def _dataset_source(filename: str) -> Path:
+    """Đường dẫn file nguồn mới sau multi-dataset (DOCUMENTS_PATH/datasets/default/)."""
+    return settings.documents_path / "datasets" / "default" / filename
 
 
 def _upload_and_chunk(pipeline: IngestionPipeline, filename: str, content: bytes, **kwargs) -> dict:
@@ -152,7 +163,8 @@ def test_reparse_moved_document_preserves_identity(
     assert result["id"] == first["id"]
     assert result["source_path"] == moved.as_posix()
     assert set(store.deleted) == set(old_vector_ids)
-    assert set(store.added).isdisjoint(old_vector_ids)
+    # Chunk ID mới dựa trên document_id nên ổn định khi chuyển file (multi-dataset).
+    assert set(store.added) == set(old_vector_ids)
     with sessionmaker(bind=engine)() as session:
         documents = session.scalars(select(Document)).all()
         assert len(documents) == 1
@@ -213,7 +225,7 @@ def test_failed_upload_preserves_source_and_index(upload_pipeline, monkeypatch, 
     original = b"%PDF original source"
     if replace_existing:
         _upload_and_chunk(pipeline, "policy.pdf", original)
-    source = settings.documents_path / "policy.pdf"
+    source = _dataset_source("policy.pdf")
     before = _stored_records(engine)
     old_vectors = list(store.added)
 
@@ -249,15 +261,15 @@ def test_failed_upload_preserves_source_and_index(upload_pipeline, monkeypatch, 
     assert store.added == old_vectors
     assert store.deleted == []
     assert store.reset_calls == 0
-    if settings.documents_path.exists():
-        assert list(settings.documents_path.iterdir()) == ([source] if replace_existing else [])
+    # Upload mới nằm trong datasets/default/; thư mục datasets có thể đã tồn tại.
+    assert source.exists() is replace_existing
     assert all(not path.exists() for path in parsed_paths if path != source)
 
 
 @pytest.mark.parametrize(("filename", "signature"), [("policy.pdf", b"%PDF"), ("policy.docx", b"PK\x03\x04")])
 def test_upload_replacement_publishes_final_source_and_metadata(upload_pipeline, filename, signature):
     pipeline, engine, store, parsed_paths = upload_pipeline
-    source = settings.documents_path / filename
+    source = _dataset_source(filename)
     first = _upload_and_chunk(pipeline, filename, signature + b" original")
     replacement = signature + b" updated content with a different size"
 
@@ -273,7 +285,7 @@ def test_upload_replacement_publishes_final_source_and_metadata(upload_pipeline,
     assert second["size_bytes"] == len(replacement)
     assert second["source_path"] == source.as_posix()
     assert second["file_name"] == filename
-    assert list(settings.documents_path.iterdir()) == [source]
+    assert list(source.parent.iterdir()) == [source]
     assert len(parsed_paths) == 2
     assert all(not path.exists() for path in parsed_paths)
     with sessionmaker(bind=engine)() as session:
@@ -293,8 +305,8 @@ def test_rebuild_parse_failure_preserves_entire_index(upload_pipeline, monkeypat
     _upload_and_chunk(pipeline, "ok.md", b"# Original\nOld text")
     before = _stored_records(engine)
     old_vectors = list(store.added)
-    (settings.documents_path / "broken.pdf").write_bytes(b"%PDF now broken")
-    (settings.documents_path / "ok.md").write_text("# Changed\nNew text", encoding="utf-8")
+    _dataset_source("broken.pdf").write_bytes(b"%PDF now broken")
+    _dataset_source("ok.md").write_text("# Changed\nNew text", encoding="utf-8")
 
     def fail(path):
         raise DocumentParseError("conversion unavailable")
@@ -317,7 +329,7 @@ def test_rebuild_valid_documents_replaces_index(upload_pipeline):
     pipeline, engine, store, _parsed_paths = upload_pipeline
     pipeline.parse_upload("policy.pdf", b"%PDF policy")
     pipeline.parse_upload("ok.md", b"# Original\nOld text")
-    (settings.documents_path / "ok.md").write_text("# Changed\nNew text", encoding="utf-8")
+    _dataset_source("ok.md").write_text("# Changed\nNew text", encoding="utf-8")
 
     result = pipeline.ingest_documents()
 
@@ -364,7 +376,7 @@ def test_parser_choice_is_stored_and_kept_by_preview_and_full_reload(upload_pipe
     monkeypatch.setattr(llamaparse, "convert_with_llamaparse", convert)
     chosen = pipeline.parse_upload("chosen.pdf", b"%PDF chosen")
     pipeline.parse_upload("other.pdf", b"%PDF other")
-    chosen_path = settings.documents_path / "chosen.pdf"
+    chosen_path = _dataset_source("chosen.pdf")
 
     pipeline.parse_path(chosen_path, document_id=chosen["id"], parser_name="llamaparse")
 
@@ -423,7 +435,7 @@ def test_upload_only_parses_and_waits_for_chunking(upload_pipeline, monkeypatch)
     document = _document_row(engine, item["id"])
     assert "Nội dung chờ kiểm tra" in document.parsed_text
     assert document.parsed_at is not None
-    assert (settings.documents_path / "policy.md").is_file()
+    assert _dataset_source("policy.md").is_file()
 
 
 def test_parse_staged_upload_publishes_source(upload_pipeline, tmp_path: Path):
@@ -435,7 +447,7 @@ def test_parse_staged_upload_publishes_source(upload_pipeline, tmp_path: Path):
 
     assert item["status"] == "parsed"
     assert item["file_name"] == "staged-policy.md"
-    assert (settings.documents_path / "staged-policy.md").is_file()
+    assert _dataset_source("staged-policy.md").is_file()
     assert "Nội dung đã stage" in _document_row(engine, item["id"]).parsed_text
 
 
@@ -453,7 +465,7 @@ def test_reparse_with_same_text_keeps_document_active(upload_pipeline, monkeypat
     item = _upload_and_chunk(pipeline, "policy.pdf", b"%PDF stable text")
     monkeypatch.setattr(pipeline.embedding_model, "embed", _fail_embedding)
 
-    reparsed = pipeline.parse_path(settings.documents_path / "policy.pdf", document_id=item["id"])
+    reparsed = pipeline.parse_path(_dataset_source("policy.pdf"), document_id=item["id"])
 
     assert reparsed["status"] == "active"
     assert reparsed["chunk_count"] == item["chunk_count"]
@@ -463,7 +475,7 @@ def test_chunk_document_reads_stored_markdown_without_parsing(upload_pipeline, m
     pipeline, engine, store, _parsed_paths = upload_pipeline
     item = pipeline.parse_upload("policy.pdf", b"%PDF stored parser output")
     # Chunking must not need the source, the parser cache or a parser at all.
-    (settings.documents_path / "policy.pdf").unlink()
+    _dataset_source("policy.pdf").unlink()
     shutil.rmtree(settings.converted_documents_path)
 
     def fail(*args, **kwargs):
@@ -574,7 +586,7 @@ def test_bulk_parse_keeps_manual_edits_but_single_reparse_replaces_them(upload_p
     assert document.document_metadata["markdown_edited"] is True
     assert all("Bản sửa tay" in text for text in _chunk_texts(engine, item["id"]))
 
-    reparsed = pipeline.parse_path(settings.documents_path / "policy.pdf", document_id=item["id"])
+    reparsed = pipeline.parse_path(_dataset_source("policy.pdf"), document_id=item["id"])
 
     assert reparsed["markdown_edited"] is False
     assert reparsed["status"] == "parsed"
@@ -590,7 +602,7 @@ def test_chunk_documents_rechunks_from_stored_markdown(upload_pipeline, monkeypa
         session.add(Document(id="legacy", source_path="data/legacy.md", content_hash="h", status="active"))
         session.commit()
     old_vectors = list(store.added)
-    (settings.documents_path / "a.md").unlink()
+    _dataset_source("a.md").unlink()
     monkeypatch.setattr(settings, "parent_child_chunking_enabled", False)
     monkeypatch.setattr(settings, "chunk_size", 120)
     monkeypatch.setattr(settings, "chunk_overlap", 0)
