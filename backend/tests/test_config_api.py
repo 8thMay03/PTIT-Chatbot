@@ -149,7 +149,7 @@ def test_retrieval_test_endpoint_returns_disabled_guardrail(monkeypatch) -> None
             return [query]
 
     class _Retriever:
-        def retrieve(self, query, top_k):
+        def retrieve(self, query, top_k, dataset_ids=None):
             return [{"text": "Nội dung không liên quan", "vector_score": 0.1, "bm25_score": 0.5}]
 
     monkeypatch.setattr(routes.rag_chain, "query_rewriter", _Rewriter())
@@ -198,7 +198,7 @@ def test_chat_endpoint_returns_200_when_scope_guardrail_disabled(monkeypatch) ->
             return [query]
 
     class _WeakRetriever:
-        def retrieve(self, query, top_k):
+        def retrieve(self, query, top_k, dataset_ids=None):
             return [{"text": "Nội dung không liên quan", "vector_score": 0.1, "bm25_score": 0.5}]
 
     monkeypatch.setattr(routes.rag_chain, "query_rewriter", _Rewriter())

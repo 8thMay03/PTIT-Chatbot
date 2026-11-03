@@ -132,15 +132,25 @@ def resolve_source_path(source_path: str) -> Path | None:
         except (OSError, ValueError):
             continue
 
-    # 2. Tìm kiếm theo tên file trong documents_path (bao gồm các thư mục con như processed/, raw/, ...)
+    # 2. Fallback rglob chỉ cho đường dẫn cũ KHÔNG nằm dưới datasets/ (RK-02).
+    # Khi đã có file trùng tên ở nhiều dataset, rglob có thể trả nhầm file của
+    # dataset khác nên chỉ dùng khi có đúng một kết quả.
+    if "/datasets/" in source_path.replace("\\", "/") or source_path.startswith("datasets/"):
+        return None
+    # File trong datasets/ thuộc về tài liệu khác nên không bao giờ là bản thay thế.
     filename = path.name
+    datasets_root = documents_root / "datasets"
     try:
         if documents_root.exists():
-            for found in documents_root.rglob(filename):
-                if found.is_file():
-                    resolved = found.resolve()
-                    resolved.relative_to(project_root)
-                    return resolved
+            matches = [
+                found
+                for found in documents_root.rglob(filename)
+                if found.is_file() and not found.resolve().is_relative_to(datasets_root)
+            ]
+            if len(matches) == 1:
+                resolved = matches[0].resolve()
+                resolved.relative_to(project_root)
+                return resolved
     except (OSError, ValueError):
         pass
 
@@ -170,6 +180,11 @@ def read_preview(
 def delete_source_file(source_path: str) -> None:
     path = resolve_source_path(source_path)
     if path is None or not path.is_file():
+        return
+    try:
+        # Chỉ xóa đúng file trong DOCUMENTS_PATH để tránh xóa nhầm dataset khác.
+        path.resolve().relative_to(settings.documents_path.resolve())
+    except (OSError, ValueError):
         return
     try:
         path.unlink()

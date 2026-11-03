@@ -9,7 +9,213 @@ from pathlib import Path
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
-from app.db.models import Chunk, Conversation, Document, Message, MessageSource, User
+from app.db.models import (
+    DEFAULT_DATASET_ID,
+    DEFAULT_DATASET_NAME,
+    Chunk,
+    Conversation,
+    Dataset,
+    Document,
+    Message,
+    MessageSource,
+    User,
+)
+
+
+class DatasetNotFound(RuntimeError):
+    """Dataset không tồn tại."""
+
+
+class DatasetConflict(RuntimeError):
+    """Tên dataset trùng hoặc thao tác bị cấm (mặc định / còn job)."""
+
+
+def validate_dataset_name(name: str) -> str:
+    """Trim và kiểm tra tên dataset; raise ValueError (422) khi không hợp lệ."""
+    cleaned = str(name or "").strip()
+    if not cleaned or len(cleaned) > 100:
+        raise ValueError("Tên dataset phải từ 1 đến 100 ký tự.")
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in cleaned):
+        raise ValueError("Tên dataset không được chứa ký tự điều khiển.")
+    return cleaned
+
+
+def validate_dataset_description(description: str | None) -> str | None:
+    if description is None:
+        return None
+    text = str(description).strip()
+    if not text:
+        return None
+    if len(text) > 500:
+        raise ValueError("Mô tả dataset tối đa 500 ký tự.")
+    return text
+
+
+def ensure_default_dataset(session: Session) -> Dataset:
+    """Tạo dataset mặc định nếu chưa có (idempotent cho init_db và SQLite test)."""
+    existing = session.get(Dataset, DEFAULT_DATASET_ID)
+    if existing is not None:
+        return existing
+    dataset = Dataset(
+        id=DEFAULT_DATASET_ID,
+        name=DEFAULT_DATASET_NAME,
+        description=None,
+        enabled=True,
+    )
+    session.add(dataset)
+    session.flush()
+    return dataset
+
+
+def get_dataset(session: Session, dataset_id: str) -> Dataset | None:
+    return session.get(Dataset, dataset_id)
+
+
+def get_dataset_by_name_ci(session: Session, name: str) -> Dataset | None:
+    cleaned = str(name or "").strip()
+    if not cleaned:
+        return None
+    lowered = cleaned.casefold()
+    for dataset in session.scalars(select(Dataset)):
+        if (dataset.name or "").strip().casefold() == lowered:
+            return dataset
+    return None
+
+
+def list_datasets(session: Session) -> list[Dataset]:
+    rows = list(session.scalars(select(Dataset)))
+    rows.sort(key=lambda d: (d.id != DEFAULT_DATASET_ID, (d.name or "").casefold()))
+    return rows
+
+
+def create_dataset(session: Session, name: str, description: str | None = None) -> Dataset:
+    cleaned = validate_dataset_name(name)
+    if get_dataset_by_name_ci(session, cleaned) is not None:
+        raise DatasetConflict(f"Dataset “{cleaned}” đã tồn tại.")
+    dataset = Dataset(
+        id=uuid4().hex,
+        name=cleaned,
+        description=validate_dataset_description(description),
+        enabled=True,
+    )
+    session.add(dataset)
+    session.flush()
+    return dataset
+
+
+def update_dataset(
+    session: Session,
+    dataset_id: str,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    enabled: bool | None = None,
+    _clear_description: bool = False,
+) -> Dataset:
+    dataset = session.get(Dataset, dataset_id)
+    if dataset is None:
+        raise DatasetNotFound("Không tìm thấy dataset.")
+    if name is not None:
+        cleaned = validate_dataset_name(name)
+        other = get_dataset_by_name_ci(session, cleaned)
+        if other is not None and other.id != dataset.id:
+            raise DatasetConflict(f"Dataset “{cleaned}” đã tồn tại.")
+        dataset.name = cleaned
+    if _clear_description or description is not None:
+        dataset.description = validate_dataset_description(description) if not _clear_description else None
+    if enabled is not None:
+        dataset.enabled = bool(enabled)
+    dataset.updated_at = datetime.now(timezone.utc)
+    session.flush()
+    return dataset
+
+
+def get_dataset_stats(
+    session: Session, dataset_id: str
+) -> tuple[int, int, int, int | None]:
+    """Trả (số tài liệu, số đoạn, số chờ chia đoạn, dung lượng bytes|None)."""
+    from sqlalchemy import func as sa_func
+
+    doc_count = session.scalar(
+        select(sa_func.count()).select_from(Document).where(Document.dataset_id == dataset_id)
+    ) or 0
+    chunk_count = session.scalar(
+        select(sa_func.count())
+        .select_from(Chunk)
+        .join(Document, Chunk.document_id == Document.id)
+        .where(Document.dataset_id == dataset_id)
+    ) or 0
+    pending_count = session.scalar(
+        select(sa_func.count())
+        .select_from(Document)
+        .where(Document.dataset_id == dataset_id, Document.status != "active")
+    ) or 0
+    size_bytes: int | None = None
+    total = 0
+    has_size = False
+    for (metadata,) in session.execute(
+        select(Document.document_metadata).where(Document.dataset_id == dataset_id)
+    ):
+        raw = (metadata or {}).get("size_bytes") if isinstance(metadata, dict) else None
+        if isinstance(raw, int):
+            total += raw
+            has_size = True
+    if has_size:
+        size_bytes = total
+    return doc_count, chunk_count, pending_count, size_bytes
+
+
+def serialize_dataset(
+    dataset: Dataset,
+    document_count: int,
+    chunk_count: int,
+    pending_count: int,
+    size_bytes: int | None,
+) -> dict:
+    return {
+        "id": dataset.id,
+        "name": dataset.name,
+        "description": dataset.description,
+        "enabled": bool(dataset.enabled),
+        "is_default": dataset.id == DEFAULT_DATASET_ID,
+        "document_count": document_count,
+        "chunk_count": chunk_count,
+        "pending_count": pending_count,
+        "size_bytes": size_bytes,
+        "created_at": dataset.created_at,
+        "updated_at": dataset.updated_at,
+    }
+
+
+def list_datasets_with_stats(session: Session) -> list[dict]:
+    ensure_default_dataset(session)
+    payloads: list[dict] = []
+    for dataset in list_datasets(session):
+        doc_count, chunk_count, pending_count, size_bytes = get_dataset_stats(session, dataset.id)
+        payloads.append(
+            serialize_dataset(dataset, doc_count, chunk_count, pending_count, size_bytes)
+        )
+    return payloads
+
+
+def get_dataset_with_stats(session: Session, dataset_id: str) -> dict | None:
+    dataset = session.get(Dataset, dataset_id)
+    if dataset is None:
+        return None
+    doc_count, chunk_count, pending_count, size_bytes = get_dataset_stats(session, dataset.id)
+    return serialize_dataset(dataset, doc_count, chunk_count, pending_count, size_bytes)
+
+
+def get_enabled_dataset_ids(session: Session) -> list[str]:
+    return list(
+        session.scalars(select(Dataset.id).where(Dataset.enabled.is_(True)))
+    )
+
+
+def dataset_has_enabled(session: Session, dataset_id: str) -> bool:
+    return (
+        session.scalar(select(Dataset.enabled).where(Dataset.id == dataset_id)) is True
+    )
 
 
 @dataclass(frozen=True)
@@ -21,6 +227,7 @@ class DocumentRecord:
     content_hash: str
     metadata: dict | None = None
     parsed_text: str | None = None
+    dataset_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -41,6 +248,7 @@ def replace_knowledge_base(
     documents: list[DocumentRecord],
     chunks: list[ChunkRecord],
 ) -> None:
+    ensure_default_dataset(session)
     session.execute(delete(Document))
     session.flush()
 
@@ -48,6 +256,7 @@ def replace_knowledge_base(
     session.add_all(
         Document(
             id=document.id,
+            dataset_id=document.dataset_id or DEFAULT_DATASET_ID,
             source_path=document.source_path,
             title=document.title,
             file_type=document.file_type,
@@ -65,14 +274,19 @@ def replace_knowledge_base(
 
 
 
-def list_documents(session: Session) -> list[tuple[Document, int]]:
+def list_documents(
+    session: Session, dataset_id: str | None = None
+) -> list[tuple[Document, int]]:
     chunk_count = func.count(Chunk.id).label("chunk_count")
-    rows = session.execute(
+    query = (
         select(Document, chunk_count)
         .outerjoin(Chunk, Chunk.document_id == Document.id)
         .group_by(Document.id)
         .order_by(Document.updated_at.desc(), Document.title.asc())
-    ).all()
+    )
+    if dataset_id is not None:
+        query = query.where(Document.dataset_id == dataset_id)
+    rows = session.execute(query).all()
     return [(document, count) for document, count in rows]
 
 
@@ -107,6 +321,32 @@ def get_document_parsers(session: Session) -> dict[str, str]:
     return parsers
 
 
+def get_document_identities(session: Session) -> dict[str, tuple[str, str]]:
+    """Map source_path to (id, dataset_id) để rebuild giữ identity khi nạp lại toàn bộ."""
+    return {
+        source_path: (doc_id, dataset_id)
+        for source_path, doc_id, dataset_id in session.execute(
+            select(Document.source_path, Document.id, Document.dataset_id)
+        )
+    }
+
+
+def get_documents_by_ids(session: Session, document_ids: list[str]) -> list[Document]:
+    if not document_ids:
+        return []
+    return list(session.scalars(select(Document).where(Document.id.in_(document_ids))))
+
+
+def list_dataset_filenames(session: Session, dataset_id: str) -> dict[str, str]:
+    """Map tên file (casefold) tới document id trong một dataset."""
+    mapping: dict[str, str] = {}
+    for doc_id, source_path in session.execute(
+        select(Document.id, Document.source_path).where(Document.dataset_id == dataset_id)
+    ):
+        mapping[Path(source_path).name.casefold()] = doc_id
+    return mapping
+
+
 def get_edited_markdown(session: Session) -> dict[str, str]:
     """Map source_path to manually edited Markdown, which bulk re-parsing must keep."""
     rows = session.execute(
@@ -130,12 +370,19 @@ def save_parsed_document(session: Session, document: DocumentRecord) -> Document
     now = datetime.now(timezone.utc)
     existing = session.get(Document, document.id)
     if existing is None:
-        existing = Document(id=document.id, status="parsed")
+        ensure_default_dataset(session)
+        existing = Document(
+            id=document.id,
+            dataset_id=document.dataset_id or DEFAULT_DATASET_ID,
+            status="parsed",
+        )
         session.add(existing)
     else:
         if existing.status != "active" or existing.content_hash != document.content_hash:
             existing.status = "parsed"
         existing.updated_at = now
+        if document.dataset_id is not None:
+            existing.dataset_id = document.dataset_id
     existing.source_path = document.source_path
     existing.title = document.title
     existing.file_type = document.file_type
@@ -178,6 +425,58 @@ def delete_document(session: Session, document_id: str) -> Document | None:
     session.delete(document)
     session.flush()
     return document
+
+
+def apply_document_move(
+    session: Session,
+    document: Document,
+    target_id: str,
+    new_source_path: str,
+) -> None:
+    """Cập nhật dataset/source của một tài liệu và chunk metadata đi kèm (không commit)."""
+    document.dataset_id = target_id
+    document.source_path = new_source_path
+    metadata = dict(document.document_metadata or {})
+    metadata["source"] = new_source_path
+    metadata["file_name"] = Path(new_source_path).name
+    document.document_metadata = metadata
+    document.updated_at = datetime.now(timezone.utc)
+    chunks = list(session.scalars(select(Chunk).where(Chunk.document_id == document.id)))
+    for chunk in chunks:
+        chunk_meta = dict(chunk.chunk_metadata or {})
+        chunk_meta["source"] = new_source_path
+        chunk_meta["source_name"] = Path(new_source_path).name
+        chunk.chunk_metadata = chunk_meta
+    session.flush()
+
+
+def delete_dataset_records(session: Session, dataset_id: str) -> tuple[int, list[str], list[str]]:
+    """Xóa tài liệu + dataset trong một transaction; trả (số tài liệu, source_paths, vector_ids).
+
+    Không xóa file/vector ngoài ở đây — pipeline làm sau commit. Cấm xóa dataset mặc định.
+    """
+    if dataset_id == DEFAULT_DATASET_ID:
+        raise DatasetConflict("Không thể xóa dataset mặc định.")
+    dataset = session.get(Dataset, dataset_id)
+    if dataset is None:
+        raise DatasetNotFound("Không tìm thấy dataset.")
+    rows = list(
+        session.execute(
+            select(Document.id, Document.source_path).where(Document.dataset_id == dataset_id)
+        )
+    )
+    document_ids = [row[0] for row in rows]
+    source_paths = [row[1] for row in rows]
+    vector_ids: list[str] = []
+    if document_ids:
+        vector_ids = list(
+            session.scalars(select(Chunk.vector_id).where(Chunk.document_id.in_(document_ids)))
+        )
+        session.execute(delete(Document).where(Document.dataset_id == dataset_id))
+        session.flush()
+    session.delete(dataset)
+    session.flush()
+    return len(document_ids), source_paths, vector_ids
 
 
 def get_document_preview_text(session: Session, document_id: str, limit: int = 2500) -> str | None:
@@ -229,13 +528,16 @@ def get_document_chunks(
 
 
 def serialize_document(document: Document, chunk_count: int, size_bytes: int | None = None) -> dict:
-    metadata = document.document_metadata or {}
+    metadata = document.document_metadata if isinstance(getattr(document, "document_metadata", None), dict) else (getattr(document, "document_metadata", None) or {})
+    # Tương thích test cũ dùng SimpleNamespace chưa có dataset_id.
+    dataset_id = getattr(document, "dataset_id", None) or DEFAULT_DATASET_ID
     file_name = Path(document.source_path).name
     if size_bytes is None:
-        raw_size = metadata.get("size_bytes")
+        raw_size = metadata.get("size_bytes") if isinstance(metadata, dict) else None
         size_bytes = raw_size if isinstance(raw_size, int) else None
     return {
         "id": document.id,
+        "dataset_id": dataset_id,
         "title": document.title or Path(document.source_path).stem,
         "file_name": file_name,
         "source_path": document.source_path,

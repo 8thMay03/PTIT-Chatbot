@@ -55,21 +55,24 @@ describe("isAppearanceHash", () => {
 
 describe("readAdminRoute / adminRouteHash", () => {
   it("đọc hash con trong app admin, tab lạ về config", () => {
-    expect(readAdminRoute("#documents")).toEqual({ view: "documents", tab: "config" });
-    expect(readAdminRoute("#settings/models")).toEqual({ view: "settings", tab: "models" });
+    expect(readAdminRoute("#documents")).toEqual({ view: "documents", tab: "config", datasetId: null });
+    expect(readAdminRoute("#documents/abc_123")).toEqual({ view: "documents", tab: "config", datasetId: "abc_123" });
+    expect(readAdminRoute("#documents/invalid!")).toBeNull();
+    expect(readAdminRoute("#settings/models")).toEqual({ view: "settings", tab: "models", datasetId: null });
     expect(readAdminRoute("#settings/appearance")).toEqual({
       view: "settings",
       tab: "appearance",
+      datasetId: null,
     });
-    expect(readAdminRoute("#settings/khac")).toEqual({ view: "settings", tab: "config" });
-    expect(readAdminRoute("#models")).toEqual({ view: "settings", tab: "models" });
-    expect(readAdminRoute("#chat")).toEqual({ view: "chat", tab: "config" });
+    expect(readAdminRoute("#settings/khac")).toEqual({ view: "settings", tab: "config", datasetId: null });
+    expect(readAdminRoute("#models")).toEqual({ view: "settings", tab: "models", datasetId: null });
+    expect(readAdminRoute("#chat")).toEqual({ view: "chat", tab: "config", datasetId: null });
     expect(readAdminRoute("#main-content")).toBeNull();
     expect(readAdminRoute(null)).toBeNull();
   });
 
   it("route → hash khứ hồi", () => {
-    for (const hash of ["chat", "documents", "settings/config", "settings/models", "settings/appearance"]) {
+    for (const hash of ["chat", "documents", "documents/abc_123", "settings/config", "settings/models", "settings/appearance"]) {
       expect(adminRouteHash(readAdminRoute(`#${hash}`))).toBe(hash);
     }
   });

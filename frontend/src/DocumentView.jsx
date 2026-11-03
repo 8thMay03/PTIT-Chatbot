@@ -128,7 +128,7 @@ function findMatchingElements(chunkText, chunkIndex, totalChunks, elements) {
 }
 
 /** Màn chi tiết, mở khi bấm vào một tài liệu trong danh sách kho. */
-export default function DocumentView({ documentId, onBack, busy: pipelineBusy, parseJob, chunkingDocId, onParse, onChunk }) {
+export default function DocumentView({ documentId, onBack, backLabel, busy: pipelineBusy, parseJob, chunkingDocId, onParse, onChunk }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [editingMarkdown, setEditingMarkdown] = useState(false);
@@ -431,7 +431,7 @@ export default function DocumentView({ documentId, onBack, busy: pipelineBusy, p
       <div className="doc-view-top-bar">
         <button type="button" className="btn-back-dataset" onClick={onBack}>
           <ArrowLeft size={14} />
-          <span>Quay lại kho tài liệu</span>
+          <span>{backLabel || "Quay lại kho tài liệu"}</span>
         </button>
 
         {docDetail && (

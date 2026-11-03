@@ -64,7 +64,7 @@ def test_list_documents_returns_serialized_items(monkeypatch) -> None:
         created_at=None,
         updated_at=None,
     )
-    monkeypatch.setattr(routes, "list_documents", lambda session: [(document, 4)])
+    monkeypatch.setattr(routes, "list_documents", lambda session, dataset_id=None: [(document, 4)])
     monkeypatch.setattr(routes, "resolve_source_path", lambda source_path: None)
 
     response = client.get("/api/documents")
@@ -72,6 +72,7 @@ def test_list_documents_returns_serialized_items(monkeypatch) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["documents"][0]["id"] == "doc-1"
+    assert payload["documents"][0]["dataset_id"] == "default"
     assert payload["documents"][0]["file_name"] == "so-tay.md"
     assert payload["documents"][0]["chunk_count"] == 4
     assert payload["documents"][0]["parsed_at"] is None
@@ -100,7 +101,7 @@ def test_upload_document_enqueues_parse_job(monkeypatch) -> None:
     assert payload["file_name"] == "faq.md"
     assert payload["progress"] == 0
     assert payload["progress_message"] == "Đang chờ trong hàng đợi"
-    assert calls == [("faq.md", b"# FAQ\n", {})]
+    assert calls == [("faq.md", b"# FAQ\n", {"dataset_id": "default"})]
 
 
 def test_upload_document_maps_validation_errors(monkeypatch) -> None:
@@ -235,7 +236,7 @@ def test_upload_document_passes_selected_parser(monkeypatch) -> None:
 
     assert response.status_code == 202
     assert response.json()["id"] == "job-upload"
-    assert calls == [("policy.pdf", {"parser_name": "llamaparse"})]
+    assert calls == [("policy.pdf", {"parser_name": "llamaparse", "dataset_id": "default"})]
 
 
 def test_parse_job_status_and_list(monkeypatch) -> None:
@@ -260,7 +261,7 @@ def test_parse_job_status_and_list(monkeypatch) -> None:
     )
     assert response.status_code == 200
     assert response.json()["jobs"][0]["id"] == "job-1"
-    assert calls == [{"document_id": "doc-1", "active_only": True, "limit": 7}]
+    assert calls == [{"document_id": "doc-1", "dataset_id": None, "active_only": True, "limit": 7}]
 
 
 def test_parser_options_missing_document(monkeypatch) -> None:
@@ -498,7 +499,7 @@ def test_chunk_all_documents(monkeypatch) -> None:
     monkeypatch.setattr(
         routes.ingestion_pipeline,
         "chunk_documents",
-        lambda: {"documents": 3, "chunks": 42, "skipped": 1, "collection": "ptit"},
+        lambda dataset_id=None: {"documents": 3, "chunks": 42, "skipped": 1, "collection": "ptit"},
     )
 
     response = client.post("/api/ingest/chunk")
@@ -506,7 +507,7 @@ def test_chunk_all_documents(monkeypatch) -> None:
     assert response.status_code == 200
     assert response.json() == {"documents": 3, "chunks": 42, "skipped": 1, "collection": "ptit"}
 
-    def conflict():
+    def conflict(dataset_id=None):
         raise routes.DocumentStateError("Tài liệu vừa được parse lại trong lúc chia đoạn.")
 
     monkeypatch.setattr(routes.ingestion_pipeline, "chunk_documents", conflict)

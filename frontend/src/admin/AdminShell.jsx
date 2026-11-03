@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import ChatView from "../ChatView";
-import DatasetView from "../DatasetView";
+import DatasetsPage from "../datasets/DatasetsPage";
 import SettingsView from "../SettingsView";
 import ConversationList from "../components/ConversationList";
 import { queryKeys } from "../api";
@@ -30,9 +30,14 @@ function getInitialRoute() {
   } catch {
     // Storage bị chặn: mở trang chat mặc định.
   }
+  const fromHash = readAdminRoute(window.location.hash);
+  if (fromHash) return fromHash;
+  // Hash #documents/<id> không hợp lệ → về danh sách thay vì màn chat.
+  if (String(window.location.hash || "").replace(/^#\/?/, "").startsWith("documents")) {
+    return { view: "documents", tab: "config", datasetId: null };
+  }
   return (
-    readAdminRoute(window.location.hash) ||
-    readAdminRoute(stored) || { view: "chat", tab: "config" }
+    readAdminRoute(stored) || { view: "chat", tab: "config", datasetId: null }
   );
 }
 
@@ -51,6 +56,7 @@ export default function AdminShell({ onLogout, loggingOut = false, inert = false
   const chatRef = useRef(null);
   const queryClient = useQueryClient();
   const { view, tab } = route;
+  const datasetId = route.datasetId ?? null;
 
   useEffect(() => {
     const hash = adminRouteHash(route);
@@ -67,7 +73,14 @@ export default function AdminShell({ onLogout, loggingOut = false, inert = false
   useEffect(() => {
     function handleHashChange() {
       const next = readAdminRoute(window.location.hash);
-      if (next) setRoute(next);
+      if (next) {
+        setRoute(next);
+        return;
+      }
+      // Hash #documents/<id> sai định dạng → về danh sách.
+      if (String(window.location.hash || "").replace(/^#\/?/, "").startsWith("documents")) {
+        setRoute({ view: "documents", tab: "config", datasetId: null });
+      }
     }
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
@@ -80,11 +93,28 @@ export default function AdminShell({ onLogout, loggingOut = false, inert = false
 
   const goTo = useCallback(
     (nextView) => {
-      setRoute((current) => ({ ...current, view: nextView }));
+      setRoute((current) => ({ ...current, view: nextView, datasetId: null }));
       setMobileOpen(false);
     },
     [setMobileOpen]
   );
+
+  // Vào dataset dùng pushState để nút Back của trình duyệt trở về danh sách.
+  const openDataset = useCallback(
+    (id) => {
+      const next = { view: "documents", tab: "config", datasetId: id };
+      window.history.pushState(null, "", `#${adminRouteHash(next)}`);
+      setRoute(next);
+      setMobileOpen(false);
+    },
+    [setMobileOpen]
+  );
+
+  const backToList = useCallback(() => {
+    const next = { view: "documents", tab: "config", datasetId: null };
+    window.history.pushState(null, "", `#${adminRouteHash(next)}`);
+    setRoute(next);
+  }, []);
 
   const startNewChat = useCallback(() => {
     chatRef.current?.reset();
@@ -257,7 +287,9 @@ export default function AdminShell({ onLogout, loggingOut = false, inert = false
           onLoadingChange={setChatLoading}
           onConversationSaved={handleConversationSaved}
         />
-        {view === "documents" && <DatasetView />}
+        {view === "documents" && (
+          <DatasetsPage datasetId={datasetId} onOpenDataset={openDataset} onBackToList={backToList} />
+        )}
         {view === "settings" && (
           <SettingsView
             activeTab={tab}

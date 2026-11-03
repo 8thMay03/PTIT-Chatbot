@@ -90,6 +90,7 @@ function createBackend({ authenticated = false, configured = true } = {}) {
       });
     }
     if (path === "documents") return response({ documents: [] });
+    if (path === "datasets") return response({ datasets: [] });
     if (path === "parse-jobs") return response({ jobs: [] });
     return response({});
   });

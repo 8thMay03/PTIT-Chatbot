@@ -112,30 +112,41 @@ export function legacyHashToAdmin(hash) {
 
 export const ADMIN_SETTINGS_TABS = ["config", "models", "appearance"];
 
+export const DATASET_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
 /**
- * Hash con trong app admin → `{ view, tab }`; null nếu hash không hợp lệ.
+ * Hash con trong app admin → `{ view, tab, datasetId }`; null nếu hash không hợp lệ.
  *
- * `#chat` → Chat; `#documents` → Dataset; `#settings/<tab>` → Settings (tab lạ về `config`).
+ * `#chat` → Chat; `#documents` → danh sách dataset; `#documents/<id>` → tài liệu
+ * của dataset; `#settings/<tab>` → Settings (tab lạ về `config`).
  * Chấp nhận cả `#config`/`#models` cũ cho link đã lưu trước khi tách app.
  */
 export function readAdminRoute(hash) {
   const route = String(hash || "").replace(/^#\/?/, "");
-  if (route === "chat" || route === "documents") return { view: route, tab: "config" };
-  if (route === "config" || route === "models") return { view: "settings", tab: route };
+  if (route === "chat") return { view: "chat", tab: "config", datasetId: null };
+  if (route === "documents") return { view: "documents", tab: "config", datasetId: null };
+  if (route.startsWith("documents/")) {
+    const datasetId = route.split("/")[1] || "";
+    if (!DATASET_ID_PATTERN.test(datasetId)) return null;
+    return { view: "documents", tab: "config", datasetId };
+  }
+  if (route === "config" || route === "models") return { view: "settings", tab: route, datasetId: null };
   if (route === "settings" || route.startsWith("settings/")) {
     const tab = route.split("/")[1];
     return {
       view: "settings",
       tab: ADMIN_SETTINGS_TABS.includes(tab) ? tab : "config",
+      datasetId: null,
     };
   }
   return null;
 }
 
 /** Route admin → hash tương ứng (không có dấu `#`). */
-export function adminRouteHash({ view, tab }) {
+export function adminRouteHash({ view, tab, datasetId }) {
   if (view === "settings") return `settings/${tab}`;
-  return view === "documents" ? "documents" : "chat";
+  if (view === "documents") return datasetId ? `documents/${datasetId}` : "documents";
+  return "chat";
 }
 
 /** Hash `#settings/appearance` (bộ chọn giao diện) mở tại app sinh viên. */

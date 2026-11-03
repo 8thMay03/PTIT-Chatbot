@@ -77,9 +77,10 @@ class RagChain:
         top_k: int = 4,
         history: list[dict[str, str]] | None = None,
         llm_provider: BaseLLMProvider | None = None,
+        dataset_ids: list[str] | None = None,
     ) -> dict:
         safe_history = filter_safe_history(history)
-        result = self.retrieve_context(question, top_k=top_k, history=safe_history)
+        result = self.retrieve_context(question, top_k=top_k, history=safe_history, dataset_ids=dataset_ids)
         if not result["guardrail_allowed"]:
             return {
                 "answer": OUT_OF_SCOPE_ANSWER,
@@ -109,9 +110,10 @@ class RagChain:
         question: str,
         top_k: int = 4,
         history: list[dict[str, str]] | None = None,
+        dataset_ids: list[str] | None = None,
     ) -> dict:
         """Run retrieval independently so callers can stream generation."""
-        for event in self.iter_retrieve_context(question, top_k=top_k, history=history):
+        for event in self.iter_retrieve_context(question, top_k=top_k, history=history, dataset_ids=dataset_ids):
             if "result" in event:
                 return event["result"]
         # iter_retrieve_context luôn kết thúc bằng event result nên không tới đây.
@@ -122,6 +124,7 @@ class RagChain:
         question: str,
         top_k: int = 4,
         history: list[dict[str, str]] | None = None,
+        dataset_ids: list[str] | None = None,
     ) -> Iterator[dict]:
         """Yield progress events for each retrieval stage, then the result.
 
@@ -177,7 +180,7 @@ class RagChain:
             else top_k
         )
         result_sets = [
-            self.retriever.retrieve(query, top_k=candidate_count)
+            self.retriever.retrieve(query, top_k=candidate_count, dataset_ids=dataset_ids)
             for query in queries
         ]
         contexts = fuse_multi_query_results(result_sets, top_k=candidate_count)
@@ -229,6 +232,7 @@ class RagChain:
             "retrieval_queries": queries,
             "requested_top_k": top_k,
             "candidate_count": candidate_count,
+            "dataset_ids": dataset_ids,
             "retrieved_chunks": retrieved_chunks,
             "selected_chunks": selected_chunks,
             "strong_context": strong_context,

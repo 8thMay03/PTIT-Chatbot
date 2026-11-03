@@ -44,6 +44,7 @@ class ParseJob:
     file_name: str | None
     parser_name: str | None
     created_at: datetime
+    dataset_id: str | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
     error: str | None = None
@@ -86,12 +87,14 @@ class ParseJobManager:
         key = f"document:{document_id}"
         with self._lock:
             job_id = self._reserve_locked(key)
+            dataset_id = _dataset_for_document(document_id)
             job = self._add_locked(
                 job_id=job_id,
                 kind="parse",
                 document_id=document_id,
                 file_name=file_name or path.name,
                 parser_name=parser_name,
+                dataset_id=dataset_id,
             )
         self._executor.submit(self._run_parse, job.id, key, path, document_id, parser_name)
         return job
@@ -101,10 +104,15 @@ class ParseJobManager:
         filename: str,
         content: bytes,
         *,
+        dataset_id: str | None = None,
         parser_name: str | None = None,
     ) -> ParseJob:
+        from app.db.models import DEFAULT_DATASET_ID
+
+        target = dataset_id or DEFAULT_DATASET_ID
         safe_name = sanitize_filename(filename)
-        key = f"upload:{safe_name}"
+        # Cùng tên khác hoa/thường thay thế cùng một tài liệu trong dataset.
+        key = f"upload:{target}:{safe_name.casefold()}"
         with self._lock:
             job_id = self._reserve_locked(key)
             job = self._add_locked(
@@ -113,6 +121,7 @@ class ParseJobManager:
                 document_id=None,
                 file_name=safe_name,
                 parser_name=parser_name,
+                dataset_id=target,
             )
             folder = self._staging_root / job.id
 
@@ -125,7 +134,7 @@ class ParseJobManager:
             shutil.rmtree(folder, ignore_errors=True)
             raise
 
-        self._executor.submit(self._run_upload, job.id, key, staged_path, parser_name)
+        self._executor.submit(self._run_upload, job.id, key, staged_path, dataset_id, parser_name)
         return job
 
     # ---- Read state ----
@@ -138,6 +147,7 @@ class ParseJobManager:
         self,
         *,
         document_id: str | None = None,
+        dataset_id: str | None = None,
         active_only: bool = False,
         limit: int = 50,
     ) -> list[ParseJob]:
@@ -146,6 +156,7 @@ class ParseJobManager:
                 job
                 for job in self._jobs.values()
                 if (document_id is None or job.document_id == document_id)
+                and (dataset_id is None or job.dataset_id == dataset_id)
                 and (not active_only or job.status in ACTIVE_STATUSES)
             ]
         return list(reversed(jobs))[:limit]
@@ -185,6 +196,7 @@ class ParseJobManager:
             status="succeeded",
             result=result,
             document_id=(result.get("id") if isinstance(result, dict) else None) or document_id,
+            dataset_id=(result.get("dataset_id") if isinstance(result, dict) else None),
         )
 
     def _run_upload(
@@ -192,6 +204,7 @@ class ParseJobManager:
         job_id: str,
         key: str,
         staged_path: Path,
+        dataset_id: str | None,
         parser_name: str | None,
     ) -> None:
         self._mark_running(job_id)
@@ -199,6 +212,8 @@ class ParseJobManager:
         error: str | None = None
         try:
             options = {"parser_name": parser_name} if parser_name is not None else {}
+            if dataset_id is not None:
+                options["dataset_id"] = dataset_id
             result = self._pipeline.parse_staged_upload(
                 staged_path,
                 on_progress=self._progress_callback(job_id),
@@ -218,6 +233,7 @@ class ParseJobManager:
                 status="succeeded",
                 result=result,
                 document_id=(result.get("id") if isinstance(result, dict) else None),
+                dataset_id=(result.get("dataset_id") if isinstance(result, dict) else None),
             )
 
     def _progress_callback(self, job_id: str):
@@ -246,6 +262,7 @@ class ParseJobManager:
         document_id: str | None,
         file_name: str | None,
         parser_name: str | None,
+        dataset_id: str | None = None,
     ) -> ParseJob:
         job = ParseJob(
             id=job_id,
@@ -254,6 +271,7 @@ class ParseJobManager:
             document_id=document_id,
             file_name=file_name,
             parser_name=parser_name,
+            dataset_id=dataset_id,
             created_at=_now(),
             progress=0,
             progress_message="Đang chờ trong hàng đợi",
@@ -294,6 +312,7 @@ class ParseJobManager:
         error: str | None = None,
         result: dict[str, Any] | None = None,
         document_id: str | None = None,
+        dataset_id: str | None = None,
     ) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
@@ -306,6 +325,7 @@ class ParseJobManager:
                     error=error,
                     result=result,
                     document_id=document_id or job.document_id,
+                    dataset_id=dataset_id or job.dataset_id,
                     progress=100 if succeeded else job.progress,
                     progress_message="Hoàn tất" if succeeded else "Parse thất bại",
                 )
@@ -325,6 +345,22 @@ class ParseJobManager:
 def _error_text(exc: Exception) -> str:
     message = str(exc).strip()
     return message or exc.__class__.__name__
+
+
+def _dataset_for_document(document_id: str) -> str | None:
+    """Dataset hiện tại của tài liệu để banner job lọc theo dataset; None khi đã xóa."""
+    try:
+        from sqlalchemy import select
+
+        from app.db.models import Document
+        from app.db.session import SessionLocal as _SessionLocal
+
+        with _SessionLocal() as session:
+            return session.scalar(
+                select(Document.dataset_id).where(Document.id == document_id)
+            )
+    except Exception:
+        return None
 
 
 parse_jobs = ParseJobManager()

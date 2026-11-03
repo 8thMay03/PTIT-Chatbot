@@ -3,9 +3,13 @@ from __future__ import annotations
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
+
+
+DEFAULT_DATASET_ID = "default"
+DEFAULT_DATASET_NAME = "Mặc định"
 
 
 class Base(DeclarativeBase):
@@ -82,10 +86,41 @@ class ModelProfile(Base):
     )
 
 
-class Document(Base):
-    __tablename__ = "documents"
+class Dataset(Base):
+    """Nhóm tài liệu do admin tạo; mỗi tài liệu thuộc đúng một dataset (D-01)."""
+
+    __tablename__ = "datasets"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    documents: Mapped[list["Document"]] = relationship(back_populates="dataset")
+
+
+class Document(Base):
+    __tablename__ = "documents"
+    __table_args__ = (Index("idx_documents_dataset_id", "dataset_id"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    dataset_id: Mapped[str] = mapped_column(
+        ForeignKey("datasets.id", ondelete="RESTRICT"),
+        nullable=False,
+        default=DEFAULT_DATASET_ID,
+        index=False,
+    )
     source_path: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     file_type: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -113,6 +148,8 @@ class Document(Base):
         back_populates="document",
         cascade="all, delete-orphan",
     )
+
+    dataset: Mapped["Dataset"] = relationship(back_populates="documents")
 
 
 class Chunk(Base):

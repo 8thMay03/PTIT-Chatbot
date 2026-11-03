@@ -56,6 +56,7 @@ class RetrievalTestRequest(BaseModel):
     use_knowledge_graph: bool = False
     cross_language_search: str | None = None
     meta_data: str | None = None
+    dataset_ids: list[str] | None = None
 
 
 class IngestResponse(BaseModel):
@@ -71,6 +72,7 @@ class ChunkAllResponse(IngestResponse):
 
 class DocumentItem(BaseModel):
     id: str
+    dataset_id: str = "default"
     title: str
     file_name: str
     source_path: str
@@ -96,6 +98,7 @@ class ParseJobItem(BaseModel):
     kind: str
     status: str
     document_id: str | None = None
+    dataset_id: str | None = None
     file_name: str | None = None
     parser_name: str | None = None
     created_at: datetime
@@ -159,6 +162,93 @@ class DocumentListResponse(BaseModel):
 class DocumentDeleteResponse(BaseModel):
     id: str
     deleted: bool = True
+
+
+class DatasetItem(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+    enabled: bool = True
+    is_default: bool = False
+    document_count: int = 0
+    chunk_count: int = 0
+    pending_count: int = 0
+    size_bytes: int | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class DatasetListResponse(BaseModel):
+    datasets: list[DatasetItem]
+
+
+class DatasetCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    description: str | None = Field(default=None, max_length=500)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        from app.db.repositories import validate_dataset_name
+
+        try:
+            return validate_dataset_name(value)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        from app.db.repositories import validate_dataset_description
+
+        try:
+            return validate_dataset_description(value)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+
+
+class DatasetUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    description: str | None = Field(default=None, max_length=500)
+    enabled: bool | None = None
+    # True: xóa mô tả (đặt null). False/None: giữ hoặc cập nhật theo description.
+    clear_description: bool = False
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        from app.db.repositories import validate_dataset_name
+
+        try:
+            return validate_dataset_name(value)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+
+
+class DatasetDeleteResponse(BaseModel):
+    id: str
+    deleted: bool = True
+    documents: int = 0
+
+
+class MoveDocumentsRequest(BaseModel):
+    document_ids: list[str] = Field(min_length=1, max_length=500)
+    dataset_id: str = Field(min_length=1)
+
+
+class MoveDocumentsResponse(BaseModel):
+    moved: int
+    dataset_id: str
+
+
+class DatasetParseResponse(BaseModel):
+    jobs: list[ParseJobItem] = Field(default_factory=list)
+    skipped_edited: int = 0
+    skipped_busy: int = 0
 
 
 # ==========================================
