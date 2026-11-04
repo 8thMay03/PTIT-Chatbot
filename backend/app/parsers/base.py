@@ -13,6 +13,9 @@ class DocumentParseError(RuntimeError):
 
 
 class DocumentParser(Protocol):
+    """Parsers may also expose variants, default_variant and with_variant(variant)
+    to accept "<name>:<variant>" choices (see ParserRegistry.get_parser)."""
+
     name: str
     extensions: frozenset[str]
 

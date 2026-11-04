@@ -26,7 +26,7 @@ import { canEditMarkdown, documentStatus, needsChunking, NO_MARKDOWN_HINT } from
 import { isActiveParseJob, parseJobLabel } from "./lib/parseJobs";
 import useParseJobs from "./lib/useParseJobs";
 import DocumentView from "./DocumentView";
-import ParserSelectionModal, { parserTitle } from "./components/ParserSelectionModal";
+import ParserSelectionModal, { parserBaseName, parserTitle } from "./components/ParserSelectionModal";
 import MarkdownEditorView from "./components/MarkdownEditorView";
 import Modal from "./components/Modal";
 import ParseProgress from "./components/ParseProgress";
@@ -292,7 +292,7 @@ export default function DatasetView({ dataset, onBack }) {
       // Tệp không hỗ trợ parser đã chọn (vd. .md khi chọn LlamaParse) giữ parser mặc định.
       const chosenParser =
         parserName &&
-        (parsersByExt[fileExtension(file.name)] || []).some((item) => item.name === parserName)
+        (parsersByExt[fileExtension(file.name)] || []).some((item) => item.name === parserBaseName(parserName))
           ? parserName
           : null;
       try {

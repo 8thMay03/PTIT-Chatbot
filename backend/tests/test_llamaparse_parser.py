@@ -125,6 +125,32 @@ def test_cache_is_separate_from_docling_and_keyed_by_options(sdk: FakeSDK, pdf: 
     assert read_document_text(pdf, parser_name="llamaparse", convert=False) is None
 
 
+@pytest.mark.parametrize("tier", ["fast", "cost_effective", "agentic", "agentic_plus"])
+def test_selected_tier_overrides_configured_default(sdk: FakeSDK, pdf: Path, tier: str) -> None:
+    parser_name = f"llamaparse:{tier}"
+
+    assert parsers.get_parser_name(pdf, parser_name) == parser_name
+    assert parsers.resolve_parser_name(pdf, parser_name) == parser_name
+    read_document_text(pdf, parser_name=parser_name)
+
+    assert sdk.calls[0]["tier"] == tier
+    assert read_document_text(pdf, parser_name=parser_name, convert=False) is not None
+    # Cache is keyed by the effective tier, so the configured default shares it.
+    assert (read_document_text(pdf, parser_name="llamaparse", convert=False) is not None) == (
+        tier == settings.llamaparse_tier
+    )
+    assert len(sdk.calls) == 1
+
+
+def test_unknown_tier_is_rejected(sdk: FakeSDK, pdf: Path) -> None:
+    with pytest.raises(DocumentParseError, match="không có tùy chọn"):
+        read_document_text(pdf, parser_name="llamaparse:premium")
+    assert parsers.resolve_parser_name(pdf, "llamaparse:premium") is None
+    with pytest.raises(DocumentParseError, match="không có tùy chọn"):
+        read_document_text(Path("ghi-chu.md"), parser_name="text:fast")
+    assert sdk.calls == []
+
+
 def test_changed_file_is_parsed_again(sdk: FakeSDK, pdf: Path) -> None:
     read_document_text(pdf, parser_name="llamaparse")
     pdf.write_bytes(b"%PDF-1.7 changed")

@@ -162,7 +162,19 @@ def test_legacy_converter_public_imports_remain_compatible(tmp_path):
 @pytest.mark.parametrize(
     ("enabled", "api_key", "expected"),
     [
-        (True, "llx-key", [{"name": "docling", "is_default": True}, {"name": "llamaparse", "is_default": False}]),
+        (
+            True,
+            "llx-key",
+            [
+                {"name": "docling", "is_default": True},
+                {
+                    "name": "llamaparse",
+                    "is_default": False,
+                    "variants": ["fast", "cost_effective", "agentic", "agentic_plus"],
+                    "default_variant": "cost_effective",
+                },
+            ],
+        ),
         (False, "llx-key", [{"name": "docling", "is_default": True}]),
         (True, None, [{"name": "docling", "is_default": True}]),
         (True, "   ", [{"name": "docling", "is_default": True}]),
@@ -170,6 +182,7 @@ def test_legacy_converter_public_imports_remain_compatible(tmp_path):
 )
 def test_llamaparse_is_an_opt_in_alternative_to_docling(monkeypatch, enabled, api_key, expected):
     monkeypatch.setattr(settings, "llamaparse_enabled", enabled)
+    monkeypatch.setattr(settings, "llamaparse_tier", "cost_effective")
     monkeypatch.setattr(settings, "llama_cloud_api_key", api_key)
     registry = build_registry()
 
