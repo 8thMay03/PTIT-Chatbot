@@ -4,6 +4,7 @@ import {
   authPageHref,
   chatPathWithQuestion,
   isAdminPath,
+  isAdminTarget,
   isAppearanceHash,
   legacyHashToAdmin,
   legacyRootHashToChat,
@@ -23,6 +24,17 @@ describe("isAdminPath", () => {
     expect(isAdminPath("/administrator")).toBe(false);
     expect(isAdminPath("")).toBe(false);
     expect(isAdminPath(undefined)).toBe(false);
+  });
+});
+
+describe("isAdminTarget", () => {
+  it("bỏ query/hash trước khi so đường dẫn admin", () => {
+    expect(isAdminTarget("/admin#documents/abc")).toBe(true);
+    expect(isAdminTarget("/admin?x=1")).toBe(true);
+    expect(isAdminTarget("/admin/settings#config")).toBe(true);
+    expect(isAdminTarget("/administrator#x")).toBe(false);
+    expect(isAdminTarget("/chat?q=/admin")).toBe(false);
+    expect(isAdminTarget(null)).toBe(false);
   });
 });
 

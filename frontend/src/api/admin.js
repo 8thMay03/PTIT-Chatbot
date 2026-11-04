@@ -12,10 +12,11 @@ export function session({ signal } = {}) {
   return request("admin/session", { signal });
 }
 
-export function login(password) {
+/** Đăng nhập lại ở lớp phủ hết phiên; trang đầy đủ dùng `authApi.login` tại `/login`. */
+export function login({ email, password }) {
   return request("admin/login", {
     method: "POST",
-    body: { password },
+    body: { email, password },
   });
 }
 

@@ -9,8 +9,11 @@ Hai cơ chế cookie HttpOnly dùng chung module này:
   chat/hội thoại. Owner key sinh từ sid (băm SHA-256) và ghi vào cột
   ``conversations.user_id`` để tách hội thoại giữa các trình duyệt.
 
-Fail closed: chưa cấu hình ``ADMIN_PASSWORD`` thì login trả 503 và mọi route
-admin luôn trả 401.
+Admin đăng nhập ở cùng trang ``/login`` với sinh viên: ``POST /auth/login`` với
+email trùng ``ADMIN_EMAIL`` được kiểm bằng ``ADMIN_PASSWORD`` và cấp ``ptit_admin``.
+
+Fail closed: chưa cấu hình ``ADMIN_EMAIL`` hợp lệ và ``ADMIN_PASSWORD`` thì login
+admin trả 503 và mọi route admin luôn trả 401.
 
 Owner key của request (``get_client_session``): cookie ``ptit_user`` hợp lệ
 (``app.core.user_auth``) → ``user:<id>``, ngược lại ``anon:<hash(sid)>``.
@@ -76,8 +79,24 @@ def _random_admin_session_secret() -> None:
 _random_admin_session_secret()
 
 
+def _configured_admin_email() -> str | None:
+    """``ADMIN_EMAIL`` đã chuẩn hoá, hoặc None khi trống/sai định dạng."""
+    email = user_auth.normalize_email(settings.admin_email or "")
+    return email if email and user_auth.is_valid_email(email) else None
+
+
 def is_admin_configured() -> bool:
-    return bool(settings.admin_password)
+    return bool(settings.admin_password) and _configured_admin_email() is not None
+
+
+def is_admin_email(candidate: str | None) -> bool:
+    """Email (đã chuẩn hoá hoặc chưa) có phải tài khoản admin; False khi chưa cấu hình."""
+    admin_email = _configured_admin_email()
+    if not settings.admin_password or admin_email is None or not isinstance(candidate, str):
+        return False
+    return hmac.compare_digest(
+        admin_email.encode("utf-8"), user_auth.normalize_email(candidate).encode("utf-8")
+    )
 
 
 def _signing_key() -> bytes:

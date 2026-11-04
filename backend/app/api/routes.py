@@ -171,25 +171,41 @@ def health() -> dict[str, Any]:
 # ==========================================
 # Phiên quản trị (FE-06)
 # ==========================================
+ADMIN_NOT_CONFIGURED_DETAIL = "Chưa cấu hình ADMIN_EMAIL và ADMIN_PASSWORD."
+# Dùng chung với đăng nhập người dùng để không lộ email nào là tài khoản admin.
+USER_LOGIN_FAILED_DETAIL = "Email hoặc mật khẩu không đúng."
+USER_THROTTLED_DETAIL = "Quá nhiều lần thử. Vui lòng thử lại sau ít phút."
+
+
+def _admin_sign_in(request: Request, response: Response, email: str, password: str) -> float:
+    """Kiểm email + mật khẩu admin, gắn cookie ptit_admin; trả thời điểm hết hạn.
+
+    Chặn dò theo IP (``admin_login_limiter``); email không phải admin cũng tính là sai.
+    """
+    if auth.is_login_throttled(request):
+        raise HTTPException(status_code=429, detail=USER_THROTTLED_DETAIL)
+    # Mật khẩu admin so sánh hằng thời gian (rất nhanh); băm giả để thời gian phản hồi
+    # giống đăng nhập người dùng, không dò được email admin qua thời gian.
+    user_auth.burn_password_check(password)
+    if not (auth.is_admin_email(email) and auth.verify_admin_password(password)):
+        auth.register_failed_login(request)
+        raise HTTPException(status_code=401, detail=USER_LOGIN_FAILED_DETAIL)
+    auth.register_successful_login(request)
+    token, expires_at = auth.issue_admin_session()
+    auth.issue_admin_cookie(response, token)
+    return expires_at
+
+
 @router.post("/admin/login", response_model=AdminSessionResponse)
 def admin_login(
     payload: AdminLoginRequest,
     request: Request,
     response: Response,
 ) -> AdminSessionResponse:
+    """Đăng nhập lại tại lớp phủ hết phiên của /admin (trang đầy đủ dùng /auth/login)."""
     if not auth.is_admin_configured():
-        raise HTTPException(status_code=503, detail="Chưa cấu hình ADMIN_PASSWORD.")
-    if auth.is_login_throttled(request):
-        raise HTTPException(
-            status_code=429,
-            detail="Quá nhiều lần đăng nhập sai. Vui lòng thử lại sau ít phút.",
-        )
-    if not auth.verify_admin_password(payload.password):
-        auth.register_failed_login(request)
-        raise HTTPException(status_code=401, detail="Mật khẩu không đúng.")
-    auth.register_successful_login(request)
-    token, expires_at = auth.issue_admin_session()
-    auth.issue_admin_cookie(response, token)
+        raise HTTPException(status_code=503, detail=ADMIN_NOT_CONFIGURED_DETAIL)
+    expires_at = _admin_sign_in(request, response, payload.email, payload.password)
     return AdminSessionResponse(
         authenticated=True,
         expires_at=auth.iso_expires_at(expires_at),
@@ -218,8 +234,6 @@ def get_admin_session(request: Request) -> AdminSessionResponse:
 # ==========================================
 # Tài khoản người dùng (landing-user-auth)
 # ==========================================
-USER_LOGIN_FAILED_DETAIL = "Email hoặc mật khẩu không đúng."
-USER_THROTTLED_DETAIL = "Quá nhiều lần thử. Vui lòng thử lại sau ít phút."
 EMAIL_TAKEN_DETAIL = "Email đã được đăng ký."
 
 
@@ -264,7 +278,8 @@ def register_user(
     ip_key = auth.client_ip(http_request)
     if auth.user_register_limiter.is_blocked(ip_key):
         raise HTTPException(status_code=429, detail=USER_THROTTLED_DETAIL)
-    if get_user_by_email(session, payload.email) is not None:
+    # Email của admin coi như đã có tài khoản: /auth/login luôn nhận email đó là admin.
+    if auth.is_admin_email(payload.email) or get_user_by_email(session, payload.email) is not None:
         auth.user_register_limiter.record_failure(ip_key)
         raise HTTPException(status_code=409, detail=EMAIL_TAKEN_DETAIL)
 
@@ -291,6 +306,15 @@ def login_user(
     response: Response,
     session: Session = Depends(get_session),
 ) -> AuthSessionResponse:
+    """Trang /login dùng chung: email trùng ADMIN_EMAIL cấp phiên admin, còn lại là người dùng."""
+    if auth.is_admin_email(payload.email):
+        # Chỉ gắn cookie admin: không cấp phiên người dùng, không chuyển hội thoại ẩn danh.
+        expires_at = _admin_sign_in(http_request, response, payload.email, payload.password)
+        session_payload = _auth_session_payload(None)
+        session_payload.admin = True
+        session_payload.admin_expires_at = auth.iso_expires_at(expires_at)
+        return session_payload
+
     throttle_key = auth.user_login_key(http_request, payload.email)
     if auth.user_login_limiter.is_blocked(throttle_key):
         raise HTTPException(status_code=429, detail=USER_THROTTLED_DETAIL)

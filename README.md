@@ -15,7 +15,7 @@ Thay vì để mô hình trả lời hoàn toàn từ kiến thức có sẵn, c
 - Confidence gate từ chối trả lời khi không tìm thấy bằng chứng đủ mạnh.
 - Câu trả lời có citation tới tài liệu, mục, Điều, Khoản hoặc Điểm.
 - Streaming câu trả lời trên giao diện web.
-- Trang giới thiệu (`/`), trang chat cho sinh viên (`/chat`), đăng ký/đăng nhập tài khoản người dùng (`/register`, `/login`) và trang quản trị riêng (`/admin`, đăng nhập bằng mật khẩu) để quản lý tài liệu và cấu hình.
+- Trang giới thiệu (`/`), trang chat cho sinh viên (`/chat`), đăng ký/đăng nhập tài khoản người dùng (`/register`, `/login`) và trang quản trị riêng (`/admin`) để quản lý tài liệu và cấu hình; sinh viên và quản trị đăng nhập chung một trang `/login`.
 - Quản lý tài liệu trên trang quản trị: tải lên, xem trước, tải xuống và xóa.
 - Parse tài liệu chạy nền: tải lên hoặc parse lại trả job ngay, có thanh tiến trình theo trang/pha và người dùng tiếp tục làm việc khác trong lúc chờ.
 - Lưu lịch sử hội thoại theo tài khoản (xem trên mọi thiết bị) hoặc theo trình duyệt khi chưa đăng nhập, kèm thông tin debug retrieval.
@@ -299,7 +299,7 @@ Giao diện chạy tại `http://localhost:5173`:
 |---|---|
 | `/` | Trang giới thiệu (landing): tính năng, cách hoạt động, lưu ý giới hạn, nút vào chat/đăng nhập/đăng ký |
 | `/chat` | Trang chat; khách dùng được ngay, đã đăng nhập thì lịch sử theo tài khoản |
-| `/login`, `/register` | Đăng nhập, đăng ký tài khoản người dùng (nhận `?next=/duong-dan-noi-bo`, mặc định `/chat`) — xem mục 5 |
+| `/login`, `/register` | Đăng nhập (chung cho sinh viên và quản trị), đăng ký tài khoản người dùng (nhận `?next=/duong-dan-noi-bo`, mặc định `/chat`) — xem mục 4, 5 |
 | `/admin` | Trang quản trị — xem mục 4 |
 
 Trang landing và trang chat có chuyển động, tự viết, không thêm thư viện. Landing: tiêu đề hiện theo từng từ, thẻ tính năng lật 3D khi cuộn và nghiêng theo chuột, vòng chủ đề xoay theo cuộn, thanh điều hướng thu gọn/ẩn khi cuộn. Chat: các khối xuất hiện so le khi vào trang, thẻ gợi ý nghiêng theo chuột, câu hỏi/câu trả lời trượt vào, nguồn trích dẫn hiện lần lượt, avatar và viền khung nhập chạy sáng khi đang trả lời. Chuyển giữa các trang qua pixel transition (lưới ô phủ dần rồi tan ở trang đích). Mã nằm ở `frontend/src/lib/motion/` (dùng chung), `frontend/src/landing/motion/`, `frontend/src/styles/{motion,landing-motion,chat-motion}.css`. Trình duyệt bật "giảm chuyển động" (`prefers-reduced-motion`) thì trang hiển thị tĩnh và chuyển trang ngay.
@@ -316,11 +316,12 @@ npm run check:bundle
 
 ### 4. Tài khoản quản trị (`/admin`)
 
-Trang chat (`/chat`) chỉ có chat, lịch sử hội thoại, khối tài khoản người dùng và bộ chọn giao diện. Dataset và Settings nằm ở trang quản trị `/admin`, cần đăng nhập bằng `ADMIN_PASSWORD`; trang chat không có liên kết tới `/admin`. Admin **không** nằm trong bảng tài khoản người dùng: tài khoản sinh viên (mục 5) không mở được bất kỳ API quản trị nào.
+Trang chat (`/chat`) chỉ có chat, lịch sử hội thoại, khối tài khoản người dùng và bộ chọn giao diện. Dataset và Settings nằm ở trang quản trị `/admin`; trang chat không có liên kết tới `/admin`. Admin đăng nhập ở cùng trang `/login` với sinh viên bằng `ADMIN_EMAIL` + `ADMIN_PASSWORD`: backend nhận diện email quản trị, cấp phiên admin và chuyển vào `/admin` (hoặc đúng màn quản trị trong `?next=`). Mở `/admin` khi chưa có phiên sẽ chuyển sang `/login?next=/admin...`. Admin **không** nằm trong bảng tài khoản người dùng: tài khoản sinh viên (mục 5) không mở được bất kỳ API quản trị nào, và không đăng ký được tài khoản sinh viên trùng `ADMIN_EMAIL`.
 
 Đặt trong `.env` rồi khởi động lại backend:
 
 ```env
+ADMIN_EMAIL=<email quản trị, đúng định dạng email>
 ADMIN_PASSWORD=<mật khẩu dài, không dùng lại>
 ADMIN_SESSION_SECRET=<chuỗi ngẫu nhiên>
 ADMIN_SESSION_TTL_HOURS=12
@@ -328,9 +329,10 @@ COOKIE_SECURE=false
 ```
 
 - Sinh `ADMIN_SESSION_SECRET`: `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
-- `ADMIN_PASSWORD` để trống: đăng nhập trả `503`, mọi API quản trị trả `401` (fail closed).
+- `ADMIN_EMAIL` hoặc `ADMIN_PASSWORD` để trống (hoặc `ADMIN_EMAIL` sai định dạng): không đăng nhập quản trị được (`/login` coi email đó như tài khoản thường, `POST /api/admin/login` trả `503`), mọi API quản trị trả `401` (fail closed); `/admin` hiện thông báo cần cấu hình.
+- Đăng nhập sai bằng email quản trị trả cùng thông báo, cùng mã lỗi với tài khoản thường, nên không dò được email nào là quản trị.
 - `ADMIN_SESSION_SECRET` để trống: backend sinh khóa tạm lúc khởi động và ghi cảnh báo; mọi phiên admin mất khi restart. Đổi `ADMIN_PASSWORD` cũng làm mọi phiên cũ mất hiệu lực.
-- Phiên admin nằm trong cookie `ptit_admin` (`HttpOnly`, `SameSite=Strict`, `Path=/api`) ký HMAC-SHA256, hết hạn sau `ADMIN_SESSION_TTL_HOURS` giờ; server không lưu phiên, đăng xuất chỉ xóa cookie. Phiên hết hạn khi đang sửa thì trang hiện lại form đăng nhập mà không mất nội dung đang sửa.
+- Phiên admin nằm trong cookie `ptit_admin` (`HttpOnly`, `SameSite=Strict`, `Path=/api`) ký HMAC-SHA256, hết hạn sau `ADMIN_SESSION_TTL_HOURS` giờ; server không lưu phiên, đăng xuất chỉ xóa cookie. Phiên hết hạn khi đang sửa thì trang hiện lớp phủ đăng nhập (email + mật khẩu, qua `POST /api/admin/login`) mà không mất nội dung đang sửa.
 - `COOKIE_SECURE=true` khi chạy sau HTTPS (áp dụng cho `ptit_admin`, `ptit_user` và `ptit_sid`). Giữ `false` khi chạy dev qua HTTP, vì trình duyệt không lưu cookie `Secure` trên HTTP.
 - Đăng nhập sai quá 5 lần trong 5 phút từ một IP bị chặn tạm (`429`) — chỉ IP đó, client khác vẫn đăng nhập được. Bộ đếm nằm trong bộ nhớ tiến trình nên chỉ chính xác khi chạy một worker uvicorn.
 - IP thật sau reverse proxy: backend chỉ đọc `X-Forwarded-For` khi request tới từ địa chỉ trong `TRUSTED_PROXY_IPS` (IP hoặc CIDR, phân tách bằng dấu phẩy). Để trống thì dùng IP kết nối trực tiếp — sau proxy mà không đặt biến này thì mọi người dùng chung một IP (của proxy). Docker Compose đặt mặc định các dải mạng riêng (`172.16.0.0/12,10.0.0.0/8,192.168.0.0/16`) vì backend chỉ thấy IP container proxy; nginx (`frontend/nginx.conf`) và proxy Vite (`xfwd`) đều gửi `X-Forwarded-For`. Không đưa dải mạng mà client có thể gọi thẳng cổng backend vào danh sách này, nếu không client tự khai được IP.
@@ -381,7 +383,7 @@ API (prefix `/api`, đều công khai):
 - Email được chuẩn hóa (bỏ khoảng trắng, chữ thường); họ tên 1–100 ký tự; mật khẩu 8–128 ký tự, băm bằng `hashlib.scrypt` (salt ngẫu nhiên 16 byte, tham số lưu trong chuỗi hash), không lưu hay ghi log mật khẩu gốc. Email không tồn tại vẫn băm một mật khẩu giả để thời gian phản hồi không lộ email nào đã đăng ký.
 - Khi đăng ký/đăng nhập, hội thoại ẩn danh của **trình duyệt hiện tại** (cookie `ptit_sid`) được chuyển sang tài khoản. Trên máy dùng chung, hội thoại khách của người trước trên cùng trình duyệt cũng sẽ được chuyển — hãy đăng xuất sau khi dùng.
 - Giới hạn hiện tại: chưa xác thực email (có thể đăng ký bằng email của người khác), chưa có quên/đổi mật khẩu, chưa có trang hồ sơ; `409` cho email trùng cho phép biết một email đã có tài khoản (giảm bằng chặn dò theo IP). Bảng `users` tạo bởi migration `0005_users` (Docker chạy `alembic upgrade head` lúc khởi động; chạy tay thì `python -m alembic upgrade head`).
-- Tài khoản người dùng không có quyền quản trị; admin vẫn dùng `ADMIN_PASSWORD` riêng (mục 4).
+- Tài khoản người dùng không có quyền quản trị; admin dùng `ADMIN_EMAIL` + `ADMIN_PASSWORD` riêng, đăng nhập ở cùng trang `/login` (mục 4).
 
 ### Chạy bằng Docker Compose (PostgreSQL Production Ready)
 
@@ -392,7 +394,7 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
-Đặt `ADMIN_PASSWORD` (và `ADMIN_SESSION_SECRET`) trong `.env` trước khi chạy nếu cần trang quản trị, và `USER_SESSION_SECRET` để người dùng không bị đăng xuất khi restart; backend đọc toàn bộ `.env` qua `env_file`. `TRUSTED_PROXY_IPS` mặc định là các dải mạng riêng trong compose (đặt trong `.env` để đổi).
+Đặt `ADMIN_EMAIL`, `ADMIN_PASSWORD` (và `ADMIN_SESSION_SECRET`) trong `.env` trước khi chạy nếu cần trang quản trị, và `USER_SESSION_SECRET` để người dùng không bị đăng xuất khi restart; backend đọc toàn bộ `.env` qua `env_file`. `TRUSTED_PROXY_IPS` mặc định là các dải mạng riêng trong compose (đặt trong `.env` để đổi).
 
 Sau khi các service khởi động thành công (PostgreSQL đạt trạng thái `healthy` trước khi backend khởi chạy):
 

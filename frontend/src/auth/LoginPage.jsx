@@ -1,7 +1,7 @@
 import React, { useEffect, useId } from "react";
 import { Loader2, LogIn } from "lucide-react";
 import { authApi } from "../api";
-import { authPageHref, navigateTo, readNextParam } from "../lib/appRoute";
+import { ADMIN_PATH, authPageHref, isAdminTarget, navigateTo, readNextParam } from "../lib/appRoute";
 import AuthField from "./AuthField";
 import AuthLayout from "./AuthLayout";
 import FormAlert from "./FormAlert";
@@ -9,7 +9,13 @@ import { useApplySignedIn, useAuthSession } from "./session";
 import { useAuthForm } from "./useAuthForm";
 import { normalizeEmail, validateLogin } from "./validation";
 
-/** Trang `/login`: đăng nhập rồi chuyển tới `?next=` (chỉ đường dẫn nội bộ) hoặc `/chat`. */
+/**
+ * Trang `/login` dùng chung cho sinh viên và quản trị.
+ *
+ * Backend nhận diện email quản trị (`ADMIN_EMAIL`): phiên admin chuyển tới `?next=`
+ * nếu đó là trang quản trị, ngược lại `/admin`; phiên sinh viên chuyển tới `?next=`
+ * (chỉ đường dẫn nội bộ) hoặc `/chat`.
+ */
 export default function LoginPage() {
   const next = readNextParam(window.location.search);
   const session = useAuthSession();
@@ -22,20 +28,31 @@ export default function LoginPage() {
     submit: ({ email, password }) => authApi.login({ email: normalizeEmail(email), password }),
     mode: "login",
     onSuccess: (result) => {
+      if (result?.admin) {
+        // Chỉ có cookie phiên quản trị, không phải phiên sinh viên: không ghi cache auth/me.
+        navigateTo(isAdminTarget(next) ? next : ADMIN_PATH);
+        return;
+      }
       applySignedIn(result);
       navigateTo(next);
     },
   });
 
-  // Đã đăng nhập mà mở /login: chuyển thẳng vào trang đích.
+  // Đã đăng nhập mà mở /login: chuyển thẳng vào trang đích. Trừ khi đích là trang quản
+  // trị: phiên sinh viên không mở được /admin, chuyển sang sẽ lặp /admin ↔ /login.
+  const adminTarget = isAdminTarget(next);
   useEffect(() => {
-    if (session.isAuthenticated && !form.submitting) navigateTo(next);
-  }, [session.isAuthenticated, form.submitting, next]);
+    if (session.isAuthenticated && !form.submitting && !adminTarget) navigateTo(next);
+  }, [session.isAuthenticated, form.submitting, adminTarget, next]);
 
   return (
     <AuthLayout
       title="Đăng nhập"
-      subtitle="Đăng nhập để xem lại lịch sử hội thoại trên mọi thiết bị."
+      subtitle={
+        adminTarget
+          ? "Đăng nhập bằng tài khoản quản trị để quản lý Dataset và cấu hình."
+          : "Đăng nhập để xem lại lịch sử hội thoại trên mọi thiết bị."
+      }
       footer={
         <p>
           Chưa có tài khoản? <a href={authPageHref("register", next)}>Đăng ký</a>

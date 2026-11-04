@@ -500,7 +500,15 @@ class ModelRegistryResponse(BaseModel):
 # Admin session schemas (FE-06)
 # ==========================================
 class AdminLoginRequest(BaseModel):
+    """Đăng nhập lại tại lớp phủ hết phiên của /admin; cùng dạng với LoginRequest."""
+
+    email: str = Field(max_length=1024)
     password: str = Field(min_length=1, max_length=1024)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        return _validate_email(value)
 
 
 class AdminSessionResponse(BaseModel):
@@ -596,6 +604,10 @@ class AuthSessionResponse(BaseModel):
     authenticated: bool = False
     user: AuthUser | None = None
     registration_enabled: bool = True
+    # POST /auth/login bằng ADMIN_EMAIL: cấp phiên admin (cookie ptit_admin), không phải
+    # phiên người dùng, nên `authenticated` vẫn False.
+    admin: bool = False
+    admin_expires_at: str | None = None
 
 
 # ==========================================
