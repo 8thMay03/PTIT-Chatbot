@@ -349,7 +349,7 @@ def test_upload_parses_with_selected_parser_and_stores_it(upload_pipeline, monke
     monkeypatch.setattr(settings, "llamaparse_enabled", True)
     monkeypatch.setattr(settings, "llama_cloud_api_key", "llx-test-key")
     monkeypatch.setattr(parsers, "registry", build_registry())
-    monkeypatch.setattr(llamaparse, "convert_with_llamaparse", lambda path: "# LlamaParse\n\nNội dung từ LlamaParse")
+    monkeypatch.setattr(llamaparse, "convert_with_llamaparse", lambda path, **_: "# LlamaParse\n\nNội dung từ LlamaParse")
 
     pipeline.parse_upload("chosen.pdf", b"%PDF chosen", parser_name="llamaparse")
 
@@ -361,6 +361,15 @@ def test_upload_parses_with_selected_parser_and_stores_it(upload_pipeline, monke
     with pytest.raises(DocumentParseError, match="không hỗ trợ"):
         pipeline.parse_upload("notes.md", b"# Notes", parser_name="llamaparse")
 
+    # A pinned tier is stored with the parser so later reads and bulk re-parses reuse it.
+    pipeline.parse_upload("agentic.pdf", b"%PDF agentic", parser_name="llamaparse:agentic")
+    with sessionmaker(bind=engine)() as session:
+        stored = {
+            Path(source).name: metadata["parser"]
+            for source, metadata in session.execute(select(Document.source_path, Document.document_metadata))
+        }
+    assert stored["agentic.pdf"] == "llamaparse:agentic"
+
 
 def test_parser_choice_is_stored_and_kept_by_preview_and_full_reload(upload_pipeline, monkeypatch):
     pipeline, engine, _store, docling_paths = upload_pipeline
@@ -369,7 +378,7 @@ def test_parser_choice_is_stored_and_kept_by_preview_and_full_reload(upload_pipe
     monkeypatch.setattr(parsers, "registry", build_registry())
     remote_calls = []
 
-    def convert(path):
+    def convert(path, **_):
         remote_calls.append(path.name)
         return "# LlamaParse\n\nNội dung từ LlamaParse"
 

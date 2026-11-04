@@ -18,6 +18,17 @@
 .parser-badge { font-size: 10px; font-weight: 600; border: 1px solid var(--border); border-radius: 5px; padding: 2px 6px; color: var(--text-secondary); }
 .parser-card-description { display: block; font-size: 12px; line-height: 1.6; color: var(--text-muted); }
 .parser-options:disabled .parser-card { cursor: wait; opacity: .7; }
+.parser-variants { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: -2px 0 10px 28px; }
+.parser-variant { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); cursor: pointer; transition: border-color var(--duration-fast), background var(--duration-fast); }
+.parser-variant:hover { border-color: var(--brand); }
+.parser-variant.is-selected { border-color: var(--brand); background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--brand); }
+.parser-variant:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+.parser-variant input { position: absolute; opacity: 0; pointer-events: none; }
+.parser-variant-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.parser-variant-heading strong { font-size: 12px; color: var(--text); }
+.parser-variant-credits { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+.parser-variant-description { font-size: 11px; line-height: 1.45; color: var(--text-muted); }
+.parser-options:disabled .parser-variant { cursor: wait; opacity: .7; }
 .parser-notice { display: flex; align-items: flex-start; gap: 9px; margin-top: 16px; color: var(--text-muted); font-size: 12px; line-height: 1.6; }
 .parser-notice svg { flex-shrink: 0; margin-top: 2px; }
 .parser-notice.is-warning { color: var(--warning-text); font-weight: 600; }
@@ -28,7 +39,8 @@
 .parser-cancel:disabled { opacity: .55; cursor: not-allowed; }
 .parser-spinner { animation: parser-spin 1s linear infinite; }
 @keyframes parser-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .parser-spinner { animation: none; } .parser-card { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .parser-spinner { animation: none; } .parser-card, .parser-variant { transition: none; } }
+@media (max-width: 640px) { .parser-variants { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-left: 0; } }
 @media (max-width: 480px) { .parser-card { padding: 12px; } .parser-document { padding: 12px; } }
 .parser-document strong + strong { margin-top: 2px; }
 .parser-document .parser-document-more { margin: 4px 0 0; }

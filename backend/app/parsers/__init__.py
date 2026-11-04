@@ -37,8 +37,13 @@ def get_parser_name(path: Path, parser_name: str | None = None) -> str:
 
 def resolve_parser_name(path: Path, stored: str | None) -> str | None:
     """Return a document's stored parser while it still handles the file, else None (default)."""
-    if not stored or any(item["name"] == stored for item in registry.list_parsers(path)):
-        return stored or None
+    if not stored:
+        return None
+    try:
+        registry.get_parser(path, parser_name=stored)
+        return stored
+    except DocumentParseError:
+        pass
     logger.warning("Parser %r đã lưu cho %s không còn khả dụng; dùng parser mặc định.", stored, path.name)
     return None
 

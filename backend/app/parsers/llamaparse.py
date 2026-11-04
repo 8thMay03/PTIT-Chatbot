@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 LLAMAPARSE_EXTENSIONS = frozenset({".pdf", ".docx"})
 
+# LlamaParse tiers, cheapest first (1 / 3 / 10 / 45 credits per page).
+LLAMAPARSE_TIERS = ("fast", "cost_effective", "agentic", "agentic_plus")
+
 # Bump when request options change so stale cache entries are ignored. Post-processing
 # runs on read and does not need a bump.
 _CONVERTER_VERSION = "llamaparse-v1"
@@ -33,8 +36,27 @@ def llamaparse_available() -> bool:
 
 
 class LlamaParseParser:
-    name = "llamaparse"
+    """tier=None follows LLAMAPARSE_TIER; a pinned tier is stored as "llamaparse:<tier>"."""
+
     extensions = LLAMAPARSE_EXTENSIONS
+    variants = LLAMAPARSE_TIERS
+
+    def __init__(self, tier: str | None = None) -> None:
+        if tier is not None and tier not in LLAMAPARSE_TIERS:
+            raise ValueError(f"Unknown LlamaParse tier: {tier!r}")
+        self._tier = tier
+        self.name = "llamaparse" if tier is None else f"llamaparse:{tier}"
+
+    @property
+    def tier(self) -> str:
+        return self._tier or settings.llamaparse_tier
+
+    @property
+    def default_variant(self) -> str:
+        return settings.llamaparse_tier
+
+    def with_variant(self, variant: str) -> "LlamaParseParser":
+        return LlamaParseParser(variant)
 
     def parse(
         self,
@@ -44,7 +66,7 @@ class LlamaParseParser:
         on_progress: ProgressCallback | None = None,
     ) -> str | None:
         # Raw exports are post-processed on every read, including cached previews.
-        cache_path = _cache_path(path)
+        cache_path = _cache_path(path, self.tier)
         if cache_path.is_file():
             if on_progress is not None:
                 on_progress(80, "Đã có bản parse trong cache")
@@ -53,9 +75,9 @@ class LlamaParseParser:
             return None
 
         exported = (
-            convert_with_llamaparse(path, on_progress=on_progress)
+            convert_with_llamaparse(path, tier=self.tier, on_progress=on_progress)
             if on_progress is not None
-            else convert_with_llamaparse(path)
+            else convert_with_llamaparse(path, tier=self.tier)
         )
         if on_progress is not None:
             on_progress(94, "Đang xử lý Markdown")
@@ -67,13 +89,16 @@ class LlamaParseParser:
         return markdown
 
 
-def convert_with_llamaparse(path: Path, *, on_progress: ProgressCallback | None = None) -> str:
+def convert_with_llamaparse(
+    path: Path, *, tier: str | None = None, on_progress: ProgressCallback | None = None
+) -> str:
     """Return LlamaParse's raw Markdown for a PDF/DOCX file, pages joined in order."""
     if not llamaparse_available():
         raise DocumentParseError(
             "LlamaParse chưa được cấu hình: cần LLAMAPARSE_ENABLED=true và LLAMA_CLOUD_API_KEY."
         )
-    logger.info("Parsing %s with LlamaParse (tier %s)...", path.name, settings.llamaparse_tier)
+    tier = tier or settings.llamaparse_tier
+    logger.info("Parsing %s with LlamaParse (tier %s)...", path.name, tier)
     started = monotonic()
     stop = Event()
     ticker: Thread | None = None
@@ -87,7 +112,7 @@ def convert_with_llamaparse(path: Path, *, on_progress: ProgressCallback | None 
         )
         ticker.start()
     try:
-        result = _parse_remote(path)
+        result = _parse_remote(path, tier)
     finally:
         stop.set()
         if ticker is not None:
@@ -115,7 +140,7 @@ def _waiting_progress(started: float, stop: Event, on_progress: ProgressCallback
         on_progress(percent, f"Đang chờ LlamaCloud xử lý ({int(elapsed)} giây)")
 
 
-def _parse_remote(path: Path) -> Any:
+def _parse_remote(path: Path, tier: str) -> Any:
     """Upload one file, wait for the parse job and return the SDK result."""
     try:
         import llama_cloud
@@ -134,7 +159,7 @@ def _parse_remote(path: Path) -> Any:
             timeout=timeout,
         ) as client, path.open("rb") as handle:
             return client.parsing.parse(
-                tier=settings.llamaparse_tier,
+                tier=tier,
                 version=settings.llamaparse_version,
                 upload_file=(path.name, handle),
                 expand=["markdown"],
@@ -197,11 +222,11 @@ def _postprocess_markdown(markdown: str) -> str:
 _IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 
 
-def _cache_path(path: Path) -> Path:
+def _cache_path(path: Path, tier: str | None = None) -> Path:
     digest = sha256()
     for part in (
         _CONVERTER_VERSION,
-        settings.llamaparse_tier,
+        tier or settings.llamaparse_tier,
         settings.llamaparse_version,
         settings.llamaparse_language,
     ):

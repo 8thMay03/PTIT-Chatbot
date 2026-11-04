@@ -14,14 +14,34 @@ const PARSER_DETAILS = {
   },
 };
 
+// Tier LlamaParse, rẻ nhất trước; credit/trang theo bảng giá LlamaCloud.
+const VARIANT_DETAILS = {
+  fast: { title: "Fast", credits: 1, description: "Chỉ lấy văn bản, nhanh nhất" },
+  cost_effective: { title: "Cost effective", credits: 3, description: "Cân bằng chất lượng và chi phí" },
+  agentic: { title: "Agentic", credits: 10, description: "Bảng, scan và bố cục phức tạp" },
+  agentic_plus: { title: "Agentic Plus", credits: 45, description: "Chính xác nhất cho tài liệu khó" },
+};
+
 const FILE_PREVIEW_LIMIT = 3;
 
+/** Tên parser có thể kèm tùy chọn dạng "llamaparse:agentic". */
+export function parserBaseName(name) {
+  return (name || "").split(":")[0];
+}
+
 export function parserTitle(name) {
-  return PARSER_DETAILS[name]?.title || name;
+  const [base, variant] = (name || "").split(":");
+  const title = PARSER_DETAILS[base]?.title || base;
+  return variant ? `${title} · ${VARIANT_DETAILS[variant]?.title || variant}` : title;
 }
 
 function defaultParser(options) {
   return (options.find((item) => item.is_default) || options[0])?.name || "";
+}
+
+function defaultVariants(options) {
+  return Object.fromEntries(options.filter((item) => item.variants?.length)
+    .map((item) => [item.name, item.default_variant || item.variants[0]]));
 }
 
 /**
@@ -31,6 +51,7 @@ function defaultParser(options) {
 export default function ParserSelectionModal({ document, upload, busy, progress, onClose, onConfirm }) {
   const [parsers, setParsers] = useState(() => upload?.parsers || []);
   const [selected, setSelected] = useState(() => (upload ? defaultParser(upload.parsers) : ""));
+  const [variants, setVariants] = useState(() => (upload ? defaultVariants(upload.parsers) : {}));
   const [loading, setLoading] = useState(!upload);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -49,6 +70,7 @@ export default function ParserSelectionModal({ document, upload, busy, progress,
         const options = payload.parsers || [];
         setParsers(options);
         setSelected(defaultParser(options));
+        setVariants(defaultVariants(options));
       })
       .catch((err) => {
         if (controller.signal.aborted || isAbortError(err)) return;
@@ -60,6 +82,8 @@ export default function ParserSelectionModal({ document, upload, busy, progress,
     return () => controller.abort();
   }, [documentId, attempt]);
 
+  const selectedVariant = variants[selected];
+  const choice = selectedVariant ? `${selected}:${selectedVariant}` : selected;
   const files = upload?.files || [];
   const otherCount = files.length - (upload?.choiceCount ?? files.length);
   const busyText = upload
@@ -82,7 +106,7 @@ export default function ParserSelectionModal({ document, upload, busy, progress,
       actions={<>
         <button className="ghost-btn parser-cancel" type="button" disabled={busy} onClick={onClose}>Hủy</button>
         <button className="primary-btn" type="button" disabled={busy || loading || Boolean(error) || !selected}
-          onClick={() => onConfirm(selected)}>{busy ? <Loader2 size={16} className="parser-spinner" /> : <ArrowRight size={16} />}
+          onClick={() => onConfirm(choice)}>{busy ? <Loader2 size={16} className="parser-spinner" /> : <ArrowRight size={16} />}
           {busy ? "Đang xử lý..." : upload ? "Tải lên và parse" : "Bắt đầu parse"}</button>
       </>}>
       <div className="parser-selection" aria-busy={busy || loading}>
@@ -103,9 +127,10 @@ export default function ParserSelectionModal({ document, upload, busy, progress,
           <legend>Parser khả dụng <span>{parsers.length}</span></legend>
           {parsers.map((parser) => {
             const details = PARSER_DETAILS[parser.name];
-            return <label className={`parser-card ${selected === parser.name ? "is-selected" : ""}`} key={parser.name}>
+            const isSelected = selected === parser.name;
+            const card = <label className={`parser-card ${isSelected ? "is-selected" : ""}`} key={parser.name}>
               <input type="radio" name={`parser-${documentId || "upload"}`} value={parser.name}
-                checked={selected === parser.name} onChange={() => setSelected(parser.name)} />
+                checked={isSelected} onChange={() => setSelected(parser.name)} />
               <span className="parser-card-content">
                 <span className="parser-card-heading"><strong>{details?.title || parser.name}</strong>
                   {parser.is_default && <span className="parser-badge">Mặc định</span>}
@@ -113,6 +138,24 @@ export default function ParserSelectionModal({ document, upload, busy, progress,
                 <span className="parser-card-description">{details?.description || "Xử lý tài liệu bằng parser này."}</span>
               </span>
             </label>;
+            if (!isSelected || !parser.variants?.length) return card;
+            return <React.Fragment key={parser.name}>
+              {card}
+              <div className="parser-variants" role="radiogroup" aria-label={`Chế độ ${details?.title || parser.name}`}>
+                {parser.variants.map((variant) => {
+                  const info = VARIANT_DETAILS[variant];
+                  const checked = variants[parser.name] === variant;
+                  return <label className={`parser-variant ${checked ? "is-selected" : ""}`} key={variant}>
+                    <input type="radio" name={`parser-variant-${documentId || "upload"}`} value={variant} checked={checked}
+                      onChange={() => setVariants((current) => ({ ...current, [parser.name]: variant }))} />
+                    <span className="parser-variant-heading"><strong>{info?.title || variant}</strong>
+                      {variant === parser.default_variant && <span className="parser-badge">Mặc định</span>}</span>
+                    {info && <span className="parser-variant-credits">{info.credits} credit/trang</span>}
+                    {info && <span className="parser-variant-description">{info.description}</span>}
+                  </label>;
+                })}
+              </div>
+            </React.Fragment>;
           })}
         </fieldset> : <div className="parser-state" role="alert"><AlertCircle size={24} /><strong>Chưa có parser tương thích</strong><p>Định dạng tài liệu này chưa được hỗ trợ.</p></div>)}
         {!loading && !error && parsers.length > 0 && <div className={`parser-notice ${overwritesEdit && !busy ? "is-warning" : ""}`} role={busy ? "status" : undefined}>

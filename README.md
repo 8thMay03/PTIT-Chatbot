@@ -260,10 +260,11 @@ pip install -e ".[llamaparse]"
 ```env
 LLAMAPARSE_ENABLED=true
 LLAMA_CLOUD_API_KEY=llx-...
-LLAMAPARSE_TIER=cost_effective   # fast | cost_effective | agentic | agentic_plus
+LLAMAPARSE_TIER=cost_effective   # tier mặc định: fast | cost_effective | agentic | agentic_plus
 ```
 
-- Mở tài liệu trong giao diện, chọn parse lại bằng **LlamaParse**. File được tải lên LlamaCloud và tính credit theo trang (tham khảo bảng giá: fast 1, cost_effective 3, agentic 10, agentic_plus 45 credit/trang).
+- Mở tài liệu trong giao diện, chọn parse lại bằng **LlamaParse** rồi chọn một trong bốn chế độ (tier) `fast`, `cost_effective`, `agentic`, `agentic_plus`; `LLAMAPARSE_TIER` chỉ là lựa chọn mặc định. File được tải lên LlamaCloud và tính credit theo trang (tham khảo bảng giá: fast 1, cost_effective 3, agentic 10, agentic_plus 45 credit/trang).
+- Tier đã chọn được lưu cùng parser của tài liệu dưới dạng `llamaparse:<tier>` (API nhận cùng định dạng ở `parser_name`), nên xem lại, rebuild và parse lại hàng loạt dùng đúng tier đó. Giá trị `llamaparse` không kèm tier đi theo `LLAMAPARSE_TIER`.
 - Markdown được cache tại `backend/storage/converted/llamaparse/` theo hash file + tier + version + ngôn ngữ; xem lại tài liệu hoặc rebuild không gọi API lại trừ khi file hoặc cấu hình đổi.
 - Lỗi key (401), hết credit (402), giới hạn tần suất (429), timeout (`LLAMAPARSE_TIMEOUT_SECONDS`, mặc định 900 giây) được ghi vào job `failed` với thông báo rõ ràng; tài liệu cũ không bị thay đổi. SDK tự retry lỗi tạm thời (`LLAMAPARSE_MAX_RETRIES`).
 - Dùng region EU: đặt `LLAMAPARSE_BASE_URL` theo hướng dẫn của LlamaCloud.
