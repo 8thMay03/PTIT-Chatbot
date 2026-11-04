@@ -8,10 +8,6 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
 
-DEFAULT_DATASET_ID = "default"
-DEFAULT_DATASET_NAME = "Mặc định"
-
-
 class Base(DeclarativeBase):
     pass
 
@@ -118,7 +114,6 @@ class Document(Base):
     dataset_id: Mapped[str] = mapped_column(
         ForeignKey("datasets.id", ondelete="RESTRICT"),
         nullable=False,
-        default=DEFAULT_DATASET_ID,
         index=False,
     )
     source_path: Mapped[str] = mapped_column(String, unique=True, nullable=False)

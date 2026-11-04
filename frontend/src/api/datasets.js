@@ -1,7 +1,5 @@
 import { request } from "./client";
 
-export const DEFAULT_DATASET_ID = "default";
-
 export function list({ signal } = {}) {
   return request("datasets", { signal });
 }

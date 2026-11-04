@@ -203,12 +203,15 @@ def views_from_data(data_dir: Path) -> tuple[list[ChunkView], dict]:
     """Dry-run: chạy đúng lộ trình ingest (parser + chunker) nhưng không ghi DB."""
     from app.core.config import settings
     from app.ingestion.loaders import load_documents
-    from app.ingestion.pipeline import _records_for_document
+    from app.ingestion.pipeline import _chunk_records, _document_record
 
     views: list[ChunkView] = []
     stats = {"documents": 0, "chunks": 0}
     for document in load_documents(data_dir):
-        record, chunk_records, _payload = _records_for_document(document)
+        record = _document_record(document)
+        chunk_records, _payload = _chunk_records(
+            record.id, record.source_path, record.title or document.path.stem, document.text
+        )
         stats["documents"] += 1
         for chunk_record in chunk_records:
             metadata = chunk_record.metadata or {}

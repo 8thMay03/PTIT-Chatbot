@@ -52,16 +52,14 @@ export default function DatasetCard({ dataset, onOpen, onEdit, onDelete, onToggl
             >
               {dataset.enabled ? "Tắt" : "Bật"}
             </button>
-            {!dataset.is_default && (
-              <button
-                type="button"
-                role="menuitem"
-                className="is-danger"
-                onClick={() => { setMenuOpen(false); onDelete?.(); }}
-              >
-                Xóa
-              </button>
-            )}
+            <button
+              type="button"
+              role="menuitem"
+              className="is-danger"
+              onClick={() => { setMenuOpen(false); onDelete?.(); }}
+            >
+              Xóa
+            </button>
           </div>
         )}
       </div>

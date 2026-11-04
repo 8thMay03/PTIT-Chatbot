@@ -14,7 +14,7 @@ from alembic import command
 from alembic.config import Config
 from app.api.routes import router
 from app.core.config import Settings
-from app.db.models import Base, Chunk, Conversation, Document, Message, MessageSource
+from app.db.models import Base, Chunk, Conversation, Dataset, Document, Message, MessageSource
 from app.db.repositories import (
     ChunkRecord,
     DocumentRecord,
@@ -39,6 +39,8 @@ def memory_db():
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
     with Session(engine) as session:
+        session.add(Dataset(id="ds-test", name="Test"))
+        session.flush()
         yield session
 
 
@@ -144,6 +146,7 @@ def test_repository_document_and_chunks_upsert_and_cascade(memory_db: Session) -
     doc_id = "doc-test-1"
     doc = DocumentRecord(
         id=doc_id,
+        dataset_id="ds-test",
         source_path="data/quy-che.md",
         title="Quy chế đào tạo",
         file_type="md",
@@ -211,6 +214,7 @@ def test_repository_replace_knowledge_base(memory_db: Session) -> None:
     docs = [
         DocumentRecord(
             id="doc-a",
+            dataset_id="ds-test",
             source_path="data/a.md",
             title="A",
             file_type="md",
@@ -235,6 +239,7 @@ def test_repository_replace_knowledge_base(memory_db: Session) -> None:
     docs2 = [
         DocumentRecord(
             id="doc-b",
+            dataset_id="ds-test",
             source_path="data/b.md",
             title="B",
             file_type="md",

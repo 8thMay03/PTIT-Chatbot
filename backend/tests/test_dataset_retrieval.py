@@ -2,12 +2,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.models import Base
-from app.db.repositories import ChunkRecord, DocumentRecord, ensure_default_dataset, save_parsed_document, create_dataset, replace_document_chunks
+from app.db.models import Base, Dataset
+from app.db.repositories import ChunkRecord, DocumentRecord, save_parsed_document, create_dataset, replace_document_chunks
 from app.embeddings.models import HashEmbeddingModel
 from app.retrieval.bm25 import BM25Search, invalidate_bm25_cache
 from app.retrieval.retriever import Retriever
 from app.vectordb.pgvector_store import PgVectorStore
+
+
+SHARED_DATASET_ID = "ds-shared"
 
 
 def _session_factory():
@@ -15,7 +18,7 @@ def _session_factory():
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
     with factory() as session:
-        ensure_default_dataset(session)
+        session.add(Dataset(id=SHARED_DATASET_ID, name="Chung"))
         session.commit()
     return factory
 
@@ -150,7 +153,7 @@ def test_retriever_respects_dataset_ids():
         ds = create_dataset(session, "Riêng")
         session.commit()
         ds_id = ds.id
-    store = _seed(factory, [(ds_id, "d1", "học phí PTIT"), ("default", "d2", "thư viện PTIT")])
+    store = _seed(factory, [(ds_id, "d1", "học phí PTIT"), (SHARED_DATASET_ID, "d2", "thư viện PTIT")])
     import app.retrieval.bm25 as bm25_module
 
     bm25_module.SessionLocal = factory

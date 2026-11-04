@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.config import settings
-from app.db.models import Base, Chunk, Document
+from app.db.models import Base, Chunk, Dataset, Document
 from app.embeddings.models import HashEmbeddingModel
 from app.ingestion.pipeline import IngestionPipeline
 from app.retrieval.bm25 import BM25Search
@@ -59,6 +59,9 @@ def _memory_engine():
         cursor.close()
 
     Base.metadata.create_all(engine)
+    with sessionmaker(bind=engine)() as session:
+        session.add(Dataset(id="ds-test", name="Test"))
+        session.commit()
     return engine
 
 
@@ -77,7 +80,7 @@ def test_pipeline_embeds_configured_field(
         encoding="utf-8",
     )
 
-    pipeline.chunk_document(pipeline.parse_path(source)["id"])
+    pipeline.chunk_document(pipeline.parse_path(source, dataset_id="ds-test")["id"])
 
     assert embedding_model.embedded, "pipeline phải gọi embedding model"
     for embedded in embedding_model.embedded:
@@ -105,7 +108,7 @@ def test_pipeline_payload_search_text_matches_record(tmp_path: Path, monkeypatch
         encoding="utf-8",
     )
 
-    pipeline.chunk_document(pipeline.parse_path(source)["id"])
+    pipeline.chunk_document(pipeline.parse_path(source, dataset_id="ds-test")["id"])
 
     with sessionmaker(bind=engine)() as session:
         chunks = session.scalars(select(Chunk)).all()
@@ -176,9 +179,11 @@ def test_pgvector_context_exposes_search_text() -> None:
     store = PgVectorStore(session_factory=factory)
 
     with factory() as session:
+        session.add(Dataset(id="ds-test", name="Test"))
         session.add(
             Document(
                 id="doc-1",
+                dataset_id="ds-test",
                 source_path="data/doc.md",
                 title="Doc",
                 file_type="md",

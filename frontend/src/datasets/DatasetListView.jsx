@@ -196,7 +196,7 @@ export default function DatasetListView({ datasets, loading, loadError, onOpen }
               <p>
                 {query
                   ? "Thử từ khóa khác, hoặc xóa ô tìm kiếm để xem toàn bộ."
-                  : "Dataset “Mặc định” chứa toàn bộ tài liệu hiện có. Hãy tạo dataset mới để nhóm tài liệu theo chủ đề."}
+                  : "Tạo dataset đầu tiên để tải tài liệu lên và nhóm chúng theo chủ đề."}
               </p>
               {!query && (
                 <button type="button" className="btn-add-file" onClick={() => { setEditing(null); setFormOpen(true); }}>

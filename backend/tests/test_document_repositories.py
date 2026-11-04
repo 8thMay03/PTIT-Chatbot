@@ -3,7 +3,7 @@ from dataclasses import replace
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Base, Chunk, Document
+from app.db.models import Base, Chunk, Dataset, Document
 from app.db.repositories import (
     ChunkRecord,
     DocumentRecord,
@@ -19,12 +19,16 @@ from app.db.repositories import (
 def _session() -> Session:
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    return Session(engine)
+    session = Session(engine)
+    session.add(Dataset(id="ds-test", name="Test"))
+    session.flush()
+    return session
 
 
 def _document(doc_id: str = "doc-1", title: str = "Handbook") -> tuple[DocumentRecord, list[ChunkRecord]]:
     record = DocumentRecord(
         id=doc_id,
+        dataset_id="ds-test",
         source_path="data/handbook.md",
         title=title,
         file_type="md",

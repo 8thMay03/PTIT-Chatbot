@@ -98,7 +98,7 @@ def admin_route_mocks(monkeypatch):
         "delete_dataset",
         lambda dataset_id: (_ for _ in ()).throw(
             __import__("app.db.repositories", fromlist=["DatasetConflict"]).DatasetConflict(
-                "Không thể xóa dataset mặc định."
+                "Dataset còn tài liệu đang parse; hãy chờ job hiện tại xong."
             )
         ),
     )

@@ -46,7 +46,7 @@ class FakePipeline:
             )
         return _item(document_id=document_id or "doc-1", file_name=Path(path).name)
 
-    def parse_staged_upload(self, staged_path, *, parser_name=None, on_progress=None):
+    def parse_staged_upload(self, staged_path, *, dataset_id, parser_name=None, on_progress=None):
         self.upload_calls.append((staged_path, parser_name))
         if self._upload is not None:
             return self._upload(
@@ -176,7 +176,7 @@ def test_upload_is_staged_then_cleaned_after_success(tmp_path: Path) -> None:
         staging_root=tmp_path / "staging",
     )
 
-    job = manager.enqueue_upload("policy.md", b"# Policy", parser_name="text")
+    job = manager.enqueue_upload("policy.md", b"# Policy", dataset_id="ds-test", parser_name="text")
 
     assert job.kind == "upload"
     assert job.status == "queued"
@@ -197,11 +197,11 @@ def test_invalid_upload_releases_reservation(tmp_path: Path) -> None:
     )
 
     with pytest.raises(DocumentUploadError):
-        manager.enqueue_upload("notes.exe", b"not supported")
+        manager.enqueue_upload("notes.exe", b"not supported", dataset_id="ds-test")
     # The reservation is gone: a retry reports the same validation error instead
     # of a misleading "already parsing" conflict.
     with pytest.raises(DocumentUploadError):
-        manager.enqueue_upload("notes.exe", b"not supported")
+        manager.enqueue_upload("notes.exe", b"not supported", dataset_id="ds-test")
 
     assert manager.list() == []
 

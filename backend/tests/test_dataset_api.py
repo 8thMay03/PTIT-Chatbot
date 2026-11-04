@@ -8,19 +8,18 @@ client = TestClient(app)
 def test_dataset_crud_and_guards(login_admin, api_db, monkeypatch):
     login_admin(client)
     try:
-        # List có default.
+        # DB mới không tự tạo dataset nào.
         response = client.get("/api/datasets")
         assert response.status_code == 200
-        ids = [d["id"] for d in response.json()["datasets"]]
-        assert "default" in ids
-        default = next(d for d in response.json()["datasets"] if d["id"] == "default")
-        assert default["is_default"] is True
+        assert response.json()["datasets"] == []
 
         # Tạo.
         response = client.post("/api/datasets", json={"name": "Sổ tay", "description": "K2024"})
         assert response.status_code == 201, response.text
         ds_id = response.json()["id"]
         assert response.json()["document_count"] == 0
+        assert "is_default" not in response.json()
+        other_id = client.post("/api/datasets", json={"name": "Mặc định"}).json()["id"]
 
         # Trùng tên (không phân biệt hoa/thường) → 409.
         assert client.post("/api/datasets", json={"name": "sổ TAY"}).status_code == 409
@@ -38,8 +37,7 @@ def test_dataset_crud_and_guards(login_admin, api_db, monkeypatch):
         assert client.patch(f"/api/datasets/{ds_id}", json={"name": "Mặc định"}).status_code == 409
         assert client.patch("/api/datasets/missing", json={"name": "X"}).status_code == 404
 
-        # Không xóa được default → 409; dataset không tồn tại → 404.
-        assert client.delete("/api/datasets/default").status_code == 409
+        # Dataset không tồn tại → 404.
         assert client.delete("/api/datasets/missing").status_code == 404
         # Xóa dataset rỗng: pipeline dùng SessionLocal (DB thật) nên mock để dùng api_db.
         from app.db.repositories import delete_dataset_records
@@ -55,6 +53,9 @@ def test_dataset_crud_and_guards(login_admin, api_db, monkeypatch):
         assert response.status_code == 200
         assert response.json()["documents"] == 0
         assert client.get(f"/api/datasets/{ds_id}").status_code == 404
+        # Mọi dataset đều xóa được, kể cả dataset cuối cùng.
+        assert client.delete(f"/api/datasets/{other_id}").status_code == 200
+        assert client.get("/api/datasets").json()["datasets"] == []
     finally:
         client.cookies.clear()
 
@@ -63,6 +64,7 @@ def test_documents_filter_and_upload_dataset(login_admin, api_db, monkeypatch):
     login_admin(client)
     try:
         ds_id = client.post("/api/datasets", json={"name": "Lọc"}).json()["id"]
+        other_id = client.post("/api/datasets", json={"name": "Khác"}).json()["id"]
         # Seed tài liệu trực tiếp vào test DB (upload chạy job nền bất đồng bộ).
         from app.db.repositories import DocumentRecord, save_parsed_document
 
@@ -78,8 +80,8 @@ def test_documents_filter_and_upload_dataset(login_admin, api_db, monkeypatch):
             save_parsed_document(
                 session,
                 DocumentRecord(
-                    id="doc-def", dataset_id="default", source_path="data/macdinh.md",
-                    title="Mặc định", file_type="md", content_hash="h2",
+                    id="doc-def", dataset_id=other_id, source_path="data/macdinh.md",
+                    title="Khác", file_type="md", content_hash="h2",
                     metadata={"size_bytes": 5}, parsed_text="# M",
                 ),
             )
@@ -109,11 +111,12 @@ def test_documents_filter_and_upload_dataset(login_admin, api_db, monkeypatch):
         )
         assert response.status_code == 202, response.text
         assert response.json()["dataset_id"] == ds_id
+        # Thiếu dataset_id → 422, không tạo job.
         response = client.post(
             "/api/documents", files={"file": ("macdinh.md", "# M\n".encode(), "text/markdown")}
         )
-        assert response.json()["dataset_id"] == "default"
-        assert calls[0] == ("loc.md", ds_id)
+        assert response.status_code == 422
+        assert calls == [("loc.md", ds_id)]
         # Upload vào dataset không tồn tại → 404.
         response = client.post(
             "/api/documents",
@@ -146,7 +149,6 @@ def test_toggle_dataset_refreshes_shared_bm25_index(login_admin, api_db, monkeyp
     from app.db.repositories import (
         ChunkRecord,
         DocumentRecord,
-        ensure_default_dataset,
         replace_document_chunks,
         save_parsed_document,
     )
@@ -154,15 +156,13 @@ def test_toggle_dataset_refreshes_shared_bm25_index(login_admin, api_db, monkeyp
 
     login_admin(client)
     try:
-        with api_db() as session:
-            ensure_default_dataset(session)
-            session.commit()
         ds_id = client.post("/api/datasets", json={"name": "Học bổng"}).json()["id"]
+        other_id = client.post("/api/datasets", json={"name": "Chung"}).json()["id"]
         # BM25 cần ≥3 tài liệu để IDF của từ hiếm > 0.
         docs = [
             (ds_id, "d-hb", "học bổng khuyến khích"),
-            ("default", "d-hp", "học phí tín chỉ"),
-            ("default", "d-tv", "thư viện giáo trình"),
+            (other_id, "d-hp", "học phí tín chỉ"),
+            (other_id, "d-tv", "thư viện giáo trình"),
         ]
         with api_db() as session:
             for dataset_id, doc_id, text in docs:
@@ -237,8 +237,8 @@ def test_dataset_chunk_parse_validation(login_admin, api_db):
     try:
         assert client.post("/api/datasets/missing/chunk").status_code == 404
         assert client.post("/api/datasets/missing/parse").status_code == 404
-        response = client.post("/api/retrieval/test", json={"query": "học phí", "dataset_ids": ["default"]})
+        response = client.post("/api/retrieval/test", json={"query": "học phí", "dataset_ids": ["ds-1"]})
         assert response.status_code == 200
-        assert response.json()["retrieval_debug"].get("dataset_ids") == ["default"]
+        assert response.json()["retrieval_debug"].get("dataset_ids") == ["ds-1"]
     finally:
         client.cookies.clear()

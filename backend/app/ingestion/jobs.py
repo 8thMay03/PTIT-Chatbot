@@ -104,15 +104,12 @@ class ParseJobManager:
         filename: str,
         content: bytes,
         *,
-        dataset_id: str | None = None,
+        dataset_id: str,
         parser_name: str | None = None,
     ) -> ParseJob:
-        from app.db.models import DEFAULT_DATASET_ID
-
-        target = dataset_id or DEFAULT_DATASET_ID
         safe_name = sanitize_filename(filename)
         # Cùng tên khác hoa/thường thay thế cùng một tài liệu trong dataset.
-        key = f"upload:{target}:{safe_name.casefold()}"
+        key = f"upload:{dataset_id}:{safe_name.casefold()}"
         with self._lock:
             job_id = self._reserve_locked(key)
             job = self._add_locked(
@@ -121,7 +118,7 @@ class ParseJobManager:
                 document_id=None,
                 file_name=safe_name,
                 parser_name=parser_name,
-                dataset_id=target,
+                dataset_id=dataset_id,
             )
             folder = self._staging_root / job.id
 
@@ -204,7 +201,7 @@ class ParseJobManager:
         job_id: str,
         key: str,
         staged_path: Path,
-        dataset_id: str | None,
+        dataset_id: str,
         parser_name: str | None,
     ) -> None:
         self._mark_running(job_id)
@@ -212,10 +209,9 @@ class ParseJobManager:
         error: str | None = None
         try:
             options = {"parser_name": parser_name} if parser_name is not None else {}
-            if dataset_id is not None:
-                options["dataset_id"] = dataset_id
             result = self._pipeline.parse_staged_upload(
                 staged_path,
+                dataset_id=dataset_id,
                 on_progress=self._progress_callback(job_id),
                 **options,
             )
