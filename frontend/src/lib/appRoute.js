@@ -1,8 +1,9 @@
 /**
  * Phân tuyến app theo pathname và ánh xạ hash cũ (FE-06, landing-user-auth).
  *
- * `/` trang landing, `/chat` app chat sinh viên, `/login` và `/register` trang tài
- * khoản (nhận `?next=`), `/admin*` app quản trị. Mỗi trang là một chunk lazy-load.
+ * `/` trang landing, `/chat` app chat sinh viên, `/login` (dùng chung cho sinh viên
+ * và quản trị) và `/register` trang tài khoản (nhận `?next=`), `/admin*` app quản
+ * trị. Mỗi trang là một chunk lazy-load.
  * Các hash cũ của thời còn một app duy nhất được chuyển sang `/admin` hoặc `/chat`.
  */
 
@@ -22,6 +23,13 @@ export function isAdminPath(pathname) {
   const value = String(pathname || "");
   return value === "/admin" || value.startsWith("/admin/");
 }
+
+/** Đường dẫn đầy đủ (có thể kèm `?query`/`#hash`, như tham số `next`) trỏ vào app quản trị. */
+export function isAdminTarget(url) {
+  return isAdminPath(String(url || "").split(/[?#]/)[0]);
+}
+
+export const ADMIN_PATH = "/admin";
 
 /** Pathname → `landing | chat | login | register | admin`; đường dẫn lạ về landing. */
 export function resolveAppRoute(pathname) {

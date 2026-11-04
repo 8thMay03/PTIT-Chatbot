@@ -2,11 +2,19 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import AdminApp from "./AdminApp";
 import { request } from "../api";
+
+const navigateTo = vi.fn();
+vi.mock("../lib/appRoute", async (importOriginal) => ({
+  ...(await importOriginal()),
+  navigateTo: (url) => navigateTo(url),
+}));
+
+const { default: AdminApp } = await import("./AdminApp");
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
+const EMAIL = "admin@ptit.edu.vn";
 const PASSWORD = "mat-khau-dung";
 
 function response(payload, status = 200) {
@@ -66,9 +74,14 @@ function createBackend({ authenticated = false, configured = true } = {}) {
       });
     }
     if (path === "admin/login" && method === "POST") {
-      if (!state.configured) return response({ detail: "Chưa cấu hình ADMIN_PASSWORD." }, 503);
-      const { password } = JSON.parse(options.body);
-      if (password !== PASSWORD) return response({ detail: "Mật khẩu không đúng." }, 401);
+      if (!state.configured) {
+        return response({ detail: "Chưa cấu hình ADMIN_EMAIL và ADMIN_PASSWORD." }, 503);
+      }
+      const { email, password } = JSON.parse(options.body);
+      state.lastLogin = { email, password };
+      if (email !== EMAIL || password !== PASSWORD) {
+        return response({ detail: "Email hoặc mật khẩu không đúng." }, 401);
+      }
       state.authenticated = true;
       return response({ authenticated: true, expires_at: "2026-10-28T12:00:00+00:00", configured: true });
     }
@@ -122,8 +135,9 @@ async function changeInput(input, value) {
   });
 }
 
-async function submitLogin(scope, password) {
+async function submitLogin(scope, password, email = EMAIL) {
   const input = await waitFor(() => scope.querySelector('input[type="password"]'));
+  await changeInput(scope.querySelector('input[type="email"]'), email);
   await changeInput(input, password);
   await act(async () => {
     scope.querySelector("form.admin-login-form").requestSubmit();
@@ -140,6 +154,7 @@ describe("AdminApp", () => {
   let queryClient;
 
   beforeEach(() => {
+    navigateTo.mockReset();
     localStorage.clear();
     window.history.replaceState(null, "", "/admin#settings/config");
     // jsdom không có scrollIntoView; ChatView gọi khi cuộn xuống tin nhắn cuối.
@@ -169,28 +184,25 @@ describe("AdminApp", () => {
     });
   }
 
-  it("chưa đăng nhập thì hiện form, không gọi API quản trị", async () => {
+  it("chưa đăng nhập thì chuyển sang /login chung, giữ màn đang mở trong next", async () => {
     const backend = createBackend();
     await renderAdmin(backend);
 
-    await waitFor(() => container.querySelector(".admin-login-page"));
+    await waitFor(() => navigateTo.mock.calls.length > 0);
+    expect(navigateTo).toHaveBeenCalledWith("/login?next=%2Fadmin%23settings%2Fconfig");
     expect(container.querySelector(".admin-shell")).toBeNull();
+    expect(container.querySelector("form")).toBeNull();
     const paths = backend.fetchMock.mock.calls.map(([url]) => String(url));
     expect(paths.every((url) => /\/api\/admin\/session$/.test(url))).toBe(true);
   });
 
-  it("sai mật khẩu báo lỗi; đúng mật khẩu vào Settings; đăng xuất về form", async () => {
-    const backend = createBackend();
+  it("đã đăng nhập vào Settings; đăng xuất xoá cache và chuyển về /login", async () => {
+    const backend = createBackend({ authenticated: true });
     await renderAdmin(backend);
 
-    await submitLogin(container, "sai");
-    const alert = await waitFor(() => container.querySelector('[role="alert"]'));
-    expect(alert.textContent).toContain("Mật khẩu không đúng.");
-    expect(container.querySelector(".admin-shell")).toBeNull();
-
-    await submitLogin(container, PASSWORD);
     await waitFor(() => container.querySelector(".admin-shell"));
     await waitFor(() => container.querySelector('input[aria-label="Giá trị Temperature"]'));
+    expect(navigateTo).not.toHaveBeenCalled();
     const labels = [...container.querySelectorAll(".sidebar-nav-label")].map((item) =>
       item.textContent.trim()
     );
@@ -204,18 +216,20 @@ describe("AdminApp", () => {
     await act(async () => {
       buttonByText(container, "Đăng xuất").click();
     });
-    await waitFor(() => container.querySelector(".admin-login-page"));
+    await waitFor(() => navigateTo.mock.calls.length > 0);
+    expect(navigateTo.mock.calls[0][0]).toMatch(/^\/login\?next=%2Fadmin/);
     expect(container.querySelector(".admin-shell")).toBeNull();
     expect(backend.state.authenticated).toBe(false);
     expect(queryClient.getQueryData(["config"])).toBeUndefined();
   });
 
-  it("chưa cấu hình ADMIN_PASSWORD thì báo rõ và khoá form", async () => {
+  it("chưa cấu hình ADMIN_EMAIL/ADMIN_PASSWORD thì báo rõ, không chuyển trang", async () => {
     await renderAdmin(createBackend({ configured: false }));
 
     const notice = await waitFor(() => container.querySelector(".admin-login-alert.is-warning"));
+    expect(notice.textContent).toContain("ADMIN_EMAIL");
     expect(notice.textContent).toContain("ADMIN_PASSWORD");
-    expect(container.querySelector('input[type="password"]').disabled).toBe(true);
+    expect(navigateTo).not.toHaveBeenCalled();
   });
 
   it("401 giữa chừng hiện lớp phủ đăng nhập mà không mất bản nháp Settings", async () => {
@@ -241,7 +255,13 @@ describe("AdminApp", () => {
     expect(container.querySelector("#settings-panel-config")).toBe(panel);
     expect(temperature.value).toBe("0.7");
 
+    await submitLogin(dialog, PASSWORD, "khac@ptit.edu.vn");
+    const alert = await waitFor(() => dialog.querySelector('[role="alert"]'));
+    expect(alert.textContent).toContain("Email hoặc mật khẩu không đúng.");
+    expect(container.querySelector("#settings-panel-config")).toBe(panel);
+
     await submitLogin(dialog, PASSWORD);
+    expect(backend.state.lastLogin).toEqual({ email: EMAIL, password: PASSWORD });
     await waitFor(() => !container.querySelector('[role="dialog"]'));
     expect(container.querySelector(".admin-shell").hasAttribute("inert")).toBe(false);
     expect(container.querySelector("#settings-panel-config")).toBe(panel);

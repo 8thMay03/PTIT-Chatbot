@@ -89,6 +89,24 @@ describe("LoginPage", () => {
   });
 
   it.each([
+    ["", "/admin"],
+    ["?next=%2Fadmin%23documents%2Fabc", "/admin#documents/abc"],
+  ])("tài khoản quản trị (next=%s) chuyển tới %s, không ghi phiên sinh viên", async (search, target) => {
+    window.history.replaceState(null, "", `/login${search}`);
+    const backend = createBackend({
+      "GET auth/me": GUEST,
+      "POST auth/login": { ...GUEST, admin: true, admin_expires_at: "2026-11-04T12:00:00+00:00" },
+    });
+    page = await renderPage(<LoginPage />);
+
+    await fillAndSubmit("admin@ptit.edu.vn", "mat-khau-admin");
+
+    await waitFor(() => navigateTo.mock.calls.length > 0);
+    expect(navigateTo).toHaveBeenCalledWith(target);
+    expect(callsTo(backend, "POST auth/login")).toHaveLength(1);
+  });
+
+  it.each([
     [401, { detail: "Email hoặc mật khẩu không đúng." }, "Email hoặc mật khẩu không đúng."],
     [429, { detail: "Quá nhiều lần thử." }, "Bạn đã thử quá nhiều lần. Vui lòng đợi vài phút rồi thử lại."],
     [503, { detail: "Bảo trì" }, "Máy chủ gặp sự cố"],
@@ -158,6 +176,17 @@ describe("LoginPage", () => {
 
     await waitFor(() => navigateTo.mock.calls.length > 0);
     expect(navigateTo).toHaveBeenCalledWith("/chat");
+  });
+
+  it("sinh viên đã đăng nhập mở /login?next=/admin không bị chuyển lặp", async () => {
+    window.history.replaceState(null, "", "/login?next=%2Fadmin");
+    createBackend({ "GET auth/me": STUDENT });
+    page = await renderPage(<LoginPage />);
+
+    await waitFor(() => page.container.querySelector("form"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(navigateTo).not.toHaveBeenCalled();
+    expect(page.container.textContent).toContain("tài khoản quản trị");
   });
 
   it("liên kết sang đăng ký giữ next", async () => {

@@ -175,7 +175,10 @@ class Settings(BaseSettings):
     # ==========================================
     # Admin authentication (FE-06)
     # ==========================================
-    # Bật trang quản trị: bỏ trống thì login trả 503 và mọi route admin 401 (fail closed).
+    # Bật trang quản trị: cần cả email và mật khẩu; thiếu một trong hai (hoặc email sai
+    # định dạng) thì login admin trả 503 và mọi route admin 401 (fail closed). Admin đăng
+    # nhập ở /login như sinh viên; email trùng ADMIN_EMAIL được nhận là admin.
+    admin_email: str | None = Field(default=None, alias="ADMIN_EMAIL")
     admin_password: str | None = Field(default=None, alias="ADMIN_PASSWORD")
     # Khóa ký cookie phiên admin; bỏ trống thì sinh ngẫu nhiên lúc khởi động (phiên mất khi restart).
     admin_session_secret: str | None = Field(default=None, alias="ADMIN_SESSION_SECRET")
@@ -266,6 +269,7 @@ _INITIAL_SETTINGS = settings.model_dump()
 # đổi các trường này có thể khoá admin khỏi hệ thống (ví dụ env không đặt ADMIN_PASSWORD).
 _RESET_EXCLUDED_FIELDS = frozenset(
     {
+        "admin_email",
         "admin_password",
         "admin_session_secret",
         "admin_session_ttl_hours",

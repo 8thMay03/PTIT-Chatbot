@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw, ShieldCheck } from "lucide-react";
 import { adminApi, describeError, onUnauthorized, queryKeys } from "../api";
 import Modal from "../components/Modal";
 import { ToastProvider } from "../components/Toast";
-import AdminLogin, { AdminLoginForm } from "./AdminLogin";
+import { authPageHref, navigateTo } from "../lib/appRoute";
+import { AdminLoginForm } from "./AdminLogin";
 import AdminShell from "./AdminShell";
 import "../styles/admin.css";
 
@@ -13,7 +14,8 @@ const noop = () => {};
 /**
  * App quản trị tại `/admin` (lazy-load từ main.jsx).
  *
- * - Chưa có phiên → màn đăng nhập.
+ * - Chưa có phiên → chuyển sang trang `/login` chung (`?next=` giữ đúng màn đang mở).
+ * - Backend chưa cấu hình ADMIN_EMAIL/ADMIN_PASSWORD → thẻ cảnh báo tại chỗ.
  * - Đã đăng nhập → shell Dataset/Settings.
  * - Phiên hết hạn giữa chừng (request admin trả 401) → lớp phủ đăng nhập, KHÔNG
  *   unmount shell để giữ bản nháp; đăng nhập lại thì refetch các query lỗi.
@@ -87,6 +89,14 @@ export default function AdminApp() {
   }, [queryClient, configured]);
 
   const showShell = shellUnlocked || authenticated;
+  const redirectToLogin =
+    !showShell && sessionQuery.isSuccess && !authenticated && configured;
+
+  useEffect(() => {
+    if (!redirectToLogin) return;
+    const { pathname, hash } = window.location;
+    navigateTo(authPageHref("login", `${pathname}${hash}`));
+  }, [redirectToLogin]);
 
   if (!showShell) {
     if (sessionQuery.isPending) {
@@ -115,7 +125,12 @@ export default function AdminApp() {
         </main>
       );
     }
-    return <AdminLogin configured={configured} onSuccess={handleLoggedIn} />;
+    if (!configured) return <AdminNotConfigured />;
+    return (
+      <div className="app-loading" role="status">
+        Đang chuyển tới trang đăng nhập…
+      </div>
+    );
   }
 
   const showOverlay = expired || session?.authenticated === false;
@@ -130,8 +145,38 @@ export default function AdminApp() {
         title="Phiên đăng nhập đã hết hạn"
         description="Đăng nhập lại để tiếp tục. Nội dung đang sửa vẫn được giữ nguyên."
       >
-        <AdminLoginForm configured={configured} onSuccess={handleLoggedIn} />
+        <AdminLoginForm onSuccess={handleLoggedIn} />
       </Modal>
     </ToastProvider>
+  );
+}
+
+/** Backend chưa bật quản trị: báo cách cấu hình thay vì chuyển sang /login. */
+function AdminNotConfigured() {
+  return (
+    <main className="admin-login-page">
+      <section className="admin-login-card" aria-labelledby="admin-config-title">
+        <div className="admin-login-heading">
+          <span className="brand-mark" aria-hidden="true">
+            <ShieldCheck size={19} />
+          </span>
+          <div>
+            <h1 id="admin-config-title">Quản trị PTIT Chatbot</h1>
+            <p>Trang quản trị chưa được bật.</p>
+          </div>
+        </div>
+        <div className="admin-login-alert is-warning" role="status">
+          <AlertCircle size={16} aria-hidden="true" />
+          <span>
+            Backend chưa cấu hình <code>ADMIN_EMAIL</code> và <code>ADMIN_PASSWORD</code>. Đặt
+            hai biến môi trường này rồi khởi động lại backend, sau đó đăng nhập tại trang đăng
+            nhập chung bằng email quản trị.
+          </span>
+        </div>
+        <a className="admin-login-back" href="/chat">
+          ← Về trang chat
+        </a>
+      </section>
+    </main>
   );
 }

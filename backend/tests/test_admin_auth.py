@@ -1,7 +1,7 @@
 """Test xác thực admin và bảo vệ route quản trị (FE-06, AC-01).
 
 Bao gồm: luồng đăng nhập/đăng xuất/phiên, cookie giả chữ ký hoặc hết hạn, fail
-closed khi chưa cấu hình ADMIN_PASSWORD, ma trận tham số hoá trên từng route
+closed khi chưa cấu hình ADMIN_EMAIL/ADMIN_PASSWORD, ma trận tham số hoá trên từng route
 quản trị (không cookie/sai cookie → 401; phiên hợp lệ → không 401/403), và test
 quét `app.routes` đối chiếu `PUBLIC_API_ROUTES` để route mới thiếu bảo vệ làm
 test đỏ.
@@ -23,7 +23,7 @@ from app.core import auth
 from app.core.config import settings
 from app.ingestion.jobs import ParseJob
 from app.main import app
-from tests.conftest import ADMIN_TEST_PASSWORD
+from tests.conftest import ADMIN_TEST_EMAIL, ADMIN_TEST_PASSWORD
 
 # (method, path, kwargs) cho mọi route quản trị. Doc id "doc-404"/job id không
 # tồn tại khiến route trả 404/409 nghiệp vụ — điều quan trọng là KHÔNG phải 401.
@@ -195,7 +195,7 @@ def test_public_api_routes_all_exist() -> None:
 def test_login_success_sets_http_only_cookie(admin_credentials) -> None:
     with TestClient(app) as test_client:
         response = test_client.post(
-            "/api/admin/login", json={"password": ADMIN_TEST_PASSWORD}
+            "/api/admin/login", json={"email": ADMIN_TEST_EMAIL, "password": ADMIN_TEST_PASSWORD}
         )
 
     assert response.status_code == 200
@@ -215,26 +215,36 @@ def test_login_success_sets_http_only_cookie(admin_credentials) -> None:
 
 
 def test_login_wrong_password_returns_401(admin_credentials, client) -> None:
-    response = client.post("/api/admin/login", json={"password": "sai-mat-khau"})
+    response = client.post("/api/admin/login", json={"email": ADMIN_TEST_EMAIL, "password": "sai-mat-khau"})
     assert response.status_code == 401
-    assert response.json()["detail"] == "Mật khẩu không đúng."
+    assert response.json()["detail"] == "Email hoặc mật khẩu không đúng."
+
+
+def test_admin_login_rejects_non_admin_email(admin_credentials, client) -> None:
+    """Lớp phủ /admin: đúng mật khẩu admin nhưng sai email vẫn là đăng nhập sai."""
+    response = client.post(
+        "/api/admin/login", json={"email": "khac@ptit.edu.vn", "password": ADMIN_TEST_PASSWORD}
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Email hoặc mật khẩu không đúng."
+    assert auth.ADMIN_COOKIE_NAME not in response.cookies
 
 
 def test_login_bruteforce_is_throttled(admin_credentials) -> None:
     test_client = TestClient(app)
     for _ in range(auth.LOGIN_MAX_FAILURES):
-        response = test_client.post("/api/admin/login", json={"password": "sai"})
+        response = test_client.post("/api/admin/login", json={"email": ADMIN_TEST_EMAIL, "password": "sai"})
         assert response.status_code == 401
 
     throttled = test_client.post(
-        "/api/admin/login", json={"password": ADMIN_TEST_PASSWORD}
+        "/api/admin/login", json={"email": ADMIN_TEST_EMAIL, "password": ADMIN_TEST_PASSWORD}
     )
     assert throttled.status_code == 429
     assert "thử lại" in throttled.json()["detail"].lower()
 
     # Ngay cả mật khẩu đúng cũng bị chặn trong cửa sổ 5 phút.
     still_throttled = test_client.post(
-        "/api/admin/login", json={"password": ADMIN_TEST_PASSWORD}
+        "/api/admin/login", json={"email": ADMIN_TEST_EMAIL, "password": ADMIN_TEST_PASSWORD}
     )
     assert still_throttled.status_code == 429
 
@@ -243,13 +253,13 @@ def test_successful_login_clears_failure_counter(admin_credentials) -> None:
     test_client = TestClient(app)
     for _ in range(auth.LOGIN_MAX_FAILURES - 1):
         assert (
-            test_client.post("/api/admin/login", json={"password": "sai"}).status_code == 401
+            test_client.post("/api/admin/login", json={"email": ADMIN_TEST_EMAIL, "password": "sai"}).status_code == 401
         )
     # Lần cuối đúng mật khẩu trước khi chạm ngưỡng: đăng nhập thành công và xoá bộ đếm.
-    response = test_client.post("/api/admin/login", json={"password": ADMIN_TEST_PASSWORD})
+    response = test_client.post("/api/admin/login", json={"email": ADMIN_TEST_EMAIL, "password": ADMIN_TEST_PASSWORD})
     assert response.status_code == 200
     # Bộ đếm đã xoá nên lần sai tiếp theo vẫn chỉ là 401.
-    assert test_client.post("/api/admin/login", json={"password": "sai"}).status_code == 401
+    assert test_client.post("/api/admin/login", json={"email": ADMIN_TEST_EMAIL, "password": "sai"}).status_code == 401
 
 
 def test_logout_clears_cookie_and_session(admin_client) -> None:
@@ -293,7 +303,7 @@ def test_changing_password_invalidates_sessions(admin_client, monkeypatch) -> No
 def test_unconfigured_admin_is_fail_closed(client, admin_route_mocks, api_db, monkeypatch) -> None:
     monkeypatch.setattr(settings, "admin_password", None)
 
-    response = client.post("/api/admin/login", json={"password": "whatever"})
+    response = client.post("/api/admin/login", json={"email": ADMIN_TEST_EMAIL, "password": "whatever"})
     assert response.status_code == 503
     assert "ADMIN_PASSWORD" in response.json()["detail"]
 
@@ -307,6 +317,18 @@ def test_unconfigured_admin_is_fail_closed(client, admin_route_mocks, api_db, mo
     assert response.status_code == 401
     response = client.get("/api/documents")
     assert response.status_code == 401
+
+
+def test_invalid_admin_email_is_fail_closed(client, admin_credentials, monkeypatch) -> None:
+    """Có mật khẩu nhưng ADMIN_EMAIL trống/sai định dạng: admin vẫn tắt."""
+    for value in (None, "", "khong-phai-email"):
+        monkeypatch.setattr(settings, "admin_email", value)
+        assert auth.is_admin_configured() is False
+        response = client.post(
+            "/api/admin/login", json={"email": "admin@ptit.edu.vn", "password": ADMIN_TEST_PASSWORD}
+        )
+        assert response.status_code == 503
+        assert client.get("/api/admin/session").json()["configured"] is False
 
 
 # ==========================================

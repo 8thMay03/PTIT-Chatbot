@@ -1,6 +1,6 @@
 """Fixtures dùng chung cho test backend (FE-06).
 
-- ``admin_credentials``: bật mật khẩu admin trên settings CHỈ trong phạm vi test
+- ``admin_credentials``: bật email + mật khẩu admin trên settings CHỈ trong phạm vi test
   (monkeypatch tự phục hồi); test không dùng fixture này vẫn thấy hành vi fail
   closed mặc định.
 - ``login_admin``: đăng nhập admin cho một TestClient bất kỳ.
@@ -29,6 +29,7 @@ from app.db import get_session
 from app.db.models import AppConfigOverride, Base, ModelProfile
 from app.main import app
 
+ADMIN_TEST_EMAIL = "admin@ptit.edu.vn"
 ADMIN_TEST_PASSWORD = "unit-test-admin-password"
 ADMIN_TEST_SECRET = "unit-test-session-secret"
 USER_TEST_PASSWORD = "mat-khau-sinh-vien-1"
@@ -68,6 +69,7 @@ def config_store_db(_config_store_session_factory, monkeypatch):
 
 @pytest.fixture
 def admin_credentials(monkeypatch):
+    monkeypatch.setattr(settings, "admin_email", ADMIN_TEST_EMAIL)
     monkeypatch.setattr(settings, "admin_password", ADMIN_TEST_PASSWORD)
     monkeypatch.setattr(settings, "admin_session_secret", ADMIN_TEST_SECRET)
 
@@ -78,7 +80,7 @@ def login_admin(admin_credentials):
 
     def _login(test_client: TestClient) -> TestClient:
         response = test_client.post(
-            "/api/admin/login", json={"password": ADMIN_TEST_PASSWORD}
+            "/api/admin/login", json={"email": ADMIN_TEST_EMAIL, "password": ADMIN_TEST_PASSWORD}
         )
         assert response.status_code == 200, response.text
         return test_client

@@ -4,7 +4,8 @@ Bao gồm: chuẩn hoá email và 409 khi trùng; 422 theo trường (định d�
 khẩu ngắn, tên trống, ngoài tên miền); hash scrypt có salt trong DB; 401 giống hệt
 cho sai mật khẩu và email không tồn tại; 429 theo IP + email không khoá client
 khác (cả khi đứng sau proxy tin cậy — rút kinh nghiệm R-01 FE-06); cookie hỏng/hết
-hạn/user đã xoá coi là chưa đăng nhập; cookie người dùng không mở route admin.
+hạn/user đã xoá coi là chưa đăng nhập; cookie người dùng không mở route admin;
+/auth/login dùng chung cho admin (email trùng ADMIN_EMAIL) mà không lộ email admin.
 """
 
 from __future__ import annotations
@@ -15,11 +16,12 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api import routes
 from app.core import auth, user_auth
 from app.core.config import settings
 from app.db.models import User
 from app.main import app
-from tests.conftest import ADMIN_TEST_PASSWORD, USER_TEST_PASSWORD
+from tests.conftest import ADMIN_TEST_EMAIL, ADMIN_TEST_PASSWORD, USER_TEST_PASSWORD
 from tests.test_admin_auth import ADMIN_ROUTE_TABLE, admin_route_mocks  # noqa: F401 (fixture)
 
 EMAIL = "sv@stu.ptit.edu.vn"
@@ -29,6 +31,10 @@ def _register_payload(**overrides) -> dict:
     payload = {"email": EMAIL, "password": USER_TEST_PASSWORD, "full_name": "Nguyễn Văn A"}
     payload.update(overrides)
     return payload
+
+
+def _admin_body(password: str = ADMIN_TEST_PASSWORD, email: str = ADMIN_TEST_EMAIL) -> dict:
+    return {"email": email, "password": password}
 
 
 def _error_fields(response) -> dict[str, str]:
@@ -334,7 +340,13 @@ def test_successful_login_clears_failure_counter(api_db, register_user) -> None:
 def test_me_without_cookie_is_unauthenticated(api_db, client) -> None:
     response = client.get("/api/auth/me")
     assert response.status_code == 200
-    assert response.json() == {"authenticated": False, "user": None, "registration_enabled": True}
+    assert response.json() == {
+        "authenticated": False,
+        "user": None,
+        "registration_enabled": True,
+        "admin": False,
+        "admin_expires_at": None,
+    }
 
 
 @pytest.mark.parametrize("cookie_mode", ["garbage", "tampered", "expired", "deleted_user", "admin_token"])
@@ -431,10 +443,73 @@ def test_admin_login_throttle_behind_trusted_proxy_does_not_lock_other_clients(
     monkeypatch.setattr(settings, "trusted_proxy_ips", "testclient")
     attacker = TestClient(app, headers={"X-Forwarded-For": "10.0.0.66"})
     for _ in range(auth.LOGIN_MAX_FAILURES):
-        assert attacker.post("/api/admin/login", json={"password": "sai"}).status_code == 401
-    assert (
-        attacker.post("/api/admin/login", json={"password": ADMIN_TEST_PASSWORD}).status_code == 429
-    )
+        assert attacker.post("/api/admin/login", json=_admin_body("sai")).status_code == 401
+    assert attacker.post("/api/admin/login", json=_admin_body()).status_code == 429
 
     admin = TestClient(app, headers={"X-Forwarded-For": "10.0.0.1"})
-    assert admin.post("/api/admin/login", json={"password": ADMIN_TEST_PASSWORD}).status_code == 200
+    assert admin.post("/api/admin/login", json=_admin_body()).status_code == 200
+
+
+# ==========================================
+# Trang /login dùng chung cho admin (unified-login)
+# ==========================================
+def test_auth_login_with_admin_email_issues_admin_session_only(
+    admin_credentials, api_db, client
+) -> None:
+    response = client.post("/api/auth/login", json=_admin_body(email="  Admin@PTIT.edu.vn "))
+
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["admin"] is True
+    assert data["authenticated"] is False
+    assert data["user"] is None
+    assert data["admin_expires_at"]
+    assert auth.ADMIN_COOKIE_NAME in response.cookies
+    assert user_auth.USER_COOKIE_NAME not in response.cookies
+    # Cookie admin mở được route quản trị.
+    assert client.get("/api/admin/session").json()["authenticated"] is True
+
+
+def test_auth_login_wrong_admin_password_matches_user_error(
+    admin_credentials, api_db, client, register_user
+) -> None:
+    register_user(TestClient(app))
+    admin_fail = client.post("/api/auth/login", json=_admin_body("sai-mat-khau"))
+    user_fail = client.post("/api/auth/login", json={"email": EMAIL, "password": "sai-mat-khau"})
+
+    assert admin_fail.status_code == user_fail.status_code == 401
+    assert admin_fail.json() == user_fail.json()
+    assert auth.ADMIN_COOKIE_NAME not in admin_fail.cookies
+
+
+def test_auth_login_admin_is_throttled(admin_credentials, api_db, client) -> None:
+    for _ in range(auth.LOGIN_MAX_FAILURES):
+        assert client.post("/api/auth/login", json=_admin_body("sai")).status_code == 401
+    throttled = client.post("/api/auth/login", json=_admin_body())
+    assert throttled.status_code == 429
+    assert throttled.json()["detail"] == routes.USER_THROTTLED_DETAIL
+
+
+def test_auth_login_for_user_still_works_with_admin_configured(
+    admin_credentials, api_db, client, register_user, login_user
+) -> None:
+    register_user(TestClient(app))
+    data = login_user(client)
+    assert data["authenticated"] is True
+    assert data["admin"] is False
+    assert client.get("/api/admin/session").json()["authenticated"] is False
+
+
+def test_admin_email_cannot_be_registered(admin_credentials, api_db, client) -> None:
+    response = client.post(
+        "/api/auth/register", json=_register_payload(email=ADMIN_TEST_EMAIL.upper())
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == routes.EMAIL_TAKEN_DETAIL
+
+
+def test_admin_email_is_plain_user_when_admin_not_configured(api_db, client) -> None:
+    """Chưa bật admin: email trùng ADMIN_EMAIL đi luồng người dùng bình thường."""
+    response = client.post("/api/auth/login", json=_admin_body())
+    assert response.status_code == 401
+    assert auth.ADMIN_COOKIE_NAME not in response.cookies
