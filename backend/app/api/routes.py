@@ -83,7 +83,6 @@ from app.db.repositories import (
     delete_conversation,
     delete_dataset_records,
     ensure_conversation,
-    ensure_default_dataset,
     get_conversation,
     get_conversation_messages,
     get_dataset_with_stats,
@@ -731,7 +730,7 @@ def parsers_for_file(file_name: str = Query(min_length=1)) -> dict:
 def upload_document(
     file: UploadFile = File(...),
     parser_name: str | None = Form(default=None, min_length=1),
-    dataset_id: str | None = Form(default=None, min_length=1),
+    dataset_id: str = Form(min_length=1),
     session: Session = Depends(get_session),
 ) -> ParseJobItem:
     """Validate and stage the upload, then parse it in a background job.
@@ -742,16 +741,12 @@ def upload_document(
     """
     from app.db.models import Dataset as _Dataset
 
-    target = dataset_id or "default"
-    # api_db (SQLite test) tạo bảng rỗng chưa có dòng default; bảo đảm tồn tại.
-    ensure_default_dataset(session)
-    session.commit()
-    if session.get(_Dataset, target) is None:
+    if session.get(_Dataset, dataset_id) is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy dataset.")
     try:
         options = {"parser_name": parser_name} if parser_name is not None else {}
         job = parse_jobs.enqueue_upload(
-            file.filename or "", file.file.read(), dataset_id=target, **options
+            file.filename or "", file.file.read(), dataset_id=dataset_id, **options
         )
     except DocumentUploadError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
@@ -918,8 +913,6 @@ def _dataset_error_to_http(exc: Exception) -> HTTPException:
 
 @router.get("/datasets", response_model=DatasetListResponse, dependencies=[Depends(require_admin)])
 def list_datasets_api(session: Session = Depends(get_session)) -> DatasetListResponse:
-    ensure_default_dataset(session)
-    session.commit()
     return DatasetListResponse(
         datasets=[DatasetItem(**item) for item in list_datasets_with_stats(session)]
     )

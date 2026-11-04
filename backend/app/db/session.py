@@ -60,17 +60,6 @@ def init_db() -> None:
     except Exception as exc:
         import logging
         logging.getLogger("app.db").warning("Could not auto-create tables during init_db: %s", exc)
-        return
-    try:
-        from app.db.repositories import ensure_default_dataset
-
-        with SessionLocal() as session:
-            ensure_default_dataset(session)
-            session.commit()
-    except Exception as exc:
-        import logging
-        logging.getLogger("app.db").warning("Could not ensure default dataset during init_db: %s", exc)
-
 
 
 def get_session() -> Generator[Session, None, None]:

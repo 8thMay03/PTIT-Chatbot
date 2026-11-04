@@ -8,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 
 import app.parsers as parsers
 from app.core.config import settings
-from app.db.models import Base, Chunk, Document
+from app.db.models import Base, Chunk, Dataset, Document
 from app.embeddings.models import HashEmbeddingModel
 from app.ingestion import uploads
 from app.ingestion.pipeline import DocumentStateError, IngestionPipeline
@@ -40,6 +40,9 @@ class RecordingVectorStore:
         return []
 
 
+DATASET_ID = "ds-test"
+
+
 def _patch_sessions(monkeypatch, engine) -> None:
     TestSession = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
     monkeypatch.setattr("app.ingestion.pipeline.SessionLocal", TestSession)
@@ -62,27 +65,27 @@ def _memory_engine():
         cursor.close()
 
     Base.metadata.create_all(engine)
-    # Dataset mặc định cho FK documents.dataset_id (multi-dataset, AC-01).
-    from app.db.repositories import ensure_default_dataset
-
+    # Dataset cho FK documents.dataset_id: mọi tài liệu phải thuộc một dataset.
     with sessionmaker(bind=engine)() as session:
-        ensure_default_dataset(session)
+        session.add(Dataset(id=DATASET_ID, name="Test"))
         session.commit()
     return engine
 
 
 def _parse_and_chunk(pipeline: IngestionPipeline, path: Path, **kwargs) -> dict:
+    if "document_id" not in kwargs:
+        kwargs["dataset_id"] = DATASET_ID
     parsed = pipeline.parse_path(path, **kwargs)
     return pipeline.chunk_document(parsed["id"])
 
 
 def _dataset_source(filename: str) -> Path:
-    """Đường dẫn file nguồn mới sau multi-dataset (DOCUMENTS_PATH/datasets/default/)."""
-    return settings.documents_path / "datasets" / "default" / filename
+    """Đường dẫn file nguồn mới sau multi-dataset (DOCUMENTS_PATH/datasets/<id>/)."""
+    return settings.documents_path / "datasets" / DATASET_ID / filename
 
 
 def _upload_and_chunk(pipeline: IngestionPipeline, filename: str, content: bytes, **kwargs) -> dict:
-    parsed = pipeline.parse_upload(filename, content, **kwargs)
+    parsed = pipeline.parse_upload(filename, content, dataset_id=DATASET_ID, **kwargs)
     return pipeline.chunk_document(parsed["id"])
 
 
@@ -252,7 +255,7 @@ def test_failed_upload_preserves_source_and_index(upload_pipeline, monkeypatch, 
         monkeypatch.setattr("app.ingestion.pipeline.SessionLocal", sessionmaker(bind=engine, class_=FailingSession))
 
     with pytest.raises(RuntimeError, match="injected"):
-        pipeline.parse_upload("policy.pdf", b"%PDF broken replacement")
+        pipeline.parse_upload("policy.pdf", b"%PDF broken replacement", dataset_id=DATASET_ID)
 
     assert source.exists() is replace_existing
     if replace_existing:
@@ -273,7 +276,7 @@ def test_upload_replacement_publishes_final_source_and_metadata(upload_pipeline,
     first = _upload_and_chunk(pipeline, filename, signature + b" original")
     replacement = signature + b" updated content with a different size"
 
-    second = pipeline.parse_upload(filename, replacement)
+    second = pipeline.parse_upload(filename, replacement, dataset_id=DATASET_ID)
     assert second["status"] == "parsed"
     # The previous chunks keep serving until the replacement is chunked.
     assert second["chunk_count"] == first["chunk_count"]
@@ -327,8 +330,8 @@ def test_rebuild_parse_failure_preserves_entire_index(upload_pipeline, monkeypat
 
 def test_rebuild_valid_documents_replaces_index(upload_pipeline):
     pipeline, engine, store, _parsed_paths = upload_pipeline
-    pipeline.parse_upload("policy.pdf", b"%PDF policy")
-    pipeline.parse_upload("ok.md", b"# Original\nOld text")
+    pipeline.parse_upload("policy.pdf", b"%PDF policy", dataset_id=DATASET_ID)
+    pipeline.parse_upload("ok.md", b"# Original\nOld text", dataset_id=DATASET_ID)
     _dataset_source("ok.md").write_text("# Changed\nNew text", encoding="utf-8")
 
     result = pipeline.ingest_documents()
@@ -351,7 +354,7 @@ def test_upload_parses_with_selected_parser_and_stores_it(upload_pipeline, monke
     monkeypatch.setattr(parsers, "registry", build_registry())
     monkeypatch.setattr(llamaparse, "convert_with_llamaparse", lambda path, **_: "# LlamaParse\n\nNội dung từ LlamaParse")
 
-    pipeline.parse_upload("chosen.pdf", b"%PDF chosen", parser_name="llamaparse")
+    pipeline.parse_upload("chosen.pdf", b"%PDF chosen", parser_name="llamaparse", dataset_id=DATASET_ID)
 
     with sessionmaker(bind=engine)() as session:
         document = session.scalars(select(Document).options(undefer(Document.parsed_text))).one()
@@ -359,10 +362,10 @@ def test_upload_parses_with_selected_parser_and_stores_it(upload_pipeline, monke
     assert "Nội dung từ LlamaParse" in document.parsed_text
     assert docling_paths == []
     with pytest.raises(DocumentParseError, match="không hỗ trợ"):
-        pipeline.parse_upload("notes.md", b"# Notes", parser_name="llamaparse")
+        pipeline.parse_upload("notes.md", b"# Notes", parser_name="llamaparse", dataset_id=DATASET_ID)
 
     # A pinned tier is stored with the parser so later reads and bulk re-parses reuse it.
-    pipeline.parse_upload("agentic.pdf", b"%PDF agentic", parser_name="llamaparse:agentic")
+    pipeline.parse_upload("agentic.pdf", b"%PDF agentic", parser_name="llamaparse:agentic", dataset_id=DATASET_ID)
     with sessionmaker(bind=engine)() as session:
         stored = {
             Path(source).name: metadata["parser"]
@@ -383,8 +386,8 @@ def test_parser_choice_is_stored_and_kept_by_preview_and_full_reload(upload_pipe
         return "# LlamaParse\n\nNội dung từ LlamaParse"
 
     monkeypatch.setattr(llamaparse, "convert_with_llamaparse", convert)
-    chosen = pipeline.parse_upload("chosen.pdf", b"%PDF chosen")
-    pipeline.parse_upload("other.pdf", b"%PDF other")
+    chosen = pipeline.parse_upload("chosen.pdf", b"%PDF chosen", dataset_id=DATASET_ID)
+    pipeline.parse_upload("other.pdf", b"%PDF other", dataset_id=DATASET_ID)
     chosen_path = _dataset_source("chosen.pdf")
 
     pipeline.parse_path(chosen_path, document_id=chosen["id"], parser_name="llamaparse")
@@ -434,7 +437,7 @@ def test_upload_only_parses_and_waits_for_chunking(upload_pipeline, monkeypatch)
     pipeline, engine, store, _parsed_paths = upload_pipeline
     monkeypatch.setattr(pipeline.embedding_model, "embed", _fail_embedding)
 
-    item = pipeline.parse_upload("policy.md", "# Học phí\nNội dung chờ kiểm tra".encode())
+    item = pipeline.parse_upload("policy.md", "# Học phí\nNội dung chờ kiểm tra".encode(), dataset_id=DATASET_ID)
 
     assert item["status"] == "parsed"
     assert item["chunk_count"] == 0
@@ -452,7 +455,7 @@ def test_parse_staged_upload_publishes_source(upload_pipeline, tmp_path: Path):
     staged = tmp_path / "staged-policy.md"
     staged.write_text("# Staged\nNội dung đã stage", encoding="utf-8")
 
-    item = pipeline.parse_staged_upload(staged, parser_name="text")
+    item = pipeline.parse_staged_upload(staged, dataset_id=DATASET_ID, parser_name="text")
 
     assert item["status"] == "parsed"
     assert item["file_name"] == "staged-policy.md"
@@ -482,7 +485,7 @@ def test_reparse_with_same_text_keeps_document_active(upload_pipeline, monkeypat
 
 def test_chunk_document_reads_stored_markdown_without_parsing(upload_pipeline, monkeypatch):
     pipeline, engine, store, _parsed_paths = upload_pipeline
-    item = pipeline.parse_upload("policy.pdf", b"%PDF stored parser output")
+    item = pipeline.parse_upload("policy.pdf", b"%PDF stored parser output", dataset_id=DATASET_ID)
     # Chunking must not need the source, the parser cache or a parser at all.
     _dataset_source("policy.pdf").unlink()
     shutil.rmtree(settings.converted_documents_path)
@@ -507,7 +510,7 @@ def test_chunk_document_requires_stored_markdown(upload_pipeline):
     pipeline, engine, _store, _parsed_paths = upload_pipeline
     with sessionmaker(bind=engine)() as session:
         # Indexed before parse results were stored.
-        session.add(Document(id="legacy", source_path="data/legacy.md", content_hash="h", status="active"))
+        session.add(Document(id="legacy", dataset_id=DATASET_ID, source_path="data/legacy.md", content_hash="h", status="active"))
         session.commit()
 
     assert pipeline.chunk_document("missing") is None
@@ -575,7 +578,9 @@ def test_bulk_parse_keeps_manual_edits_but_single_reparse_replaces_them(upload_p
     item = _upload_and_chunk(pipeline, "policy.pdf", b"%PDF parser output")
     pipeline.save_markdown(item["id"], "# Chính sách\n\nBản sửa tay")
     chunks_before = _chunk_texts(engine, item["id"])
-    (settings.documents_path / "fresh.md").write_text("# Mới\nTài liệu mới thêm", encoding="utf-8")
+    _dataset_source("fresh.md").write_text("# Mới\nTài liệu mới thêm", encoding="utf-8")
+    # File mới ngoài datasets/<id>/ chưa thuộc dataset nào nên bị bỏ qua.
+    (settings.documents_path / "stray.md").write_text("# Lạc\nKhông thuộc dataset", encoding="utf-8")
 
     assert pipeline.parse_documents() == {"documents": 2}
 
@@ -586,6 +591,8 @@ def test_bulk_parse_keeps_manual_edits_but_single_reparse_replaces_them(upload_p
     with sessionmaker(bind=engine)() as session:
         fresh = session.scalars(select(Document).where(Document.source_path.like("%fresh.md"))).one()
         assert fresh.status == "parsed"
+        assert fresh.dataset_id == DATASET_ID
+        assert session.scalars(select(Document).where(Document.source_path.like("%stray.md"))).first() is None
 
     pipeline.ingest_documents()
 
@@ -606,9 +613,9 @@ def test_chunk_documents_rechunks_from_stored_markdown(upload_pipeline, monkeypa
     pipeline, engine, store, _parsed_paths = upload_pipeline
     body = "\n\n".join(f"Đoạn {index}: " + "nội dung quy chế học vụ " * 6 for index in range(8))
     first = _upload_and_chunk(pipeline, "a.md", f"# Quy chế\n\n{body}".encode())
-    second = pipeline.parse_upload("b.md", "# B\nChưa chia đoạn".encode())
+    second = pipeline.parse_upload("b.md", "# B\nChưa chia đoạn".encode(), dataset_id=DATASET_ID)
     with sessionmaker(bind=engine)() as session:
-        session.add(Document(id="legacy", source_path="data/legacy.md", content_hash="h", status="active"))
+        session.add(Document(id="legacy", dataset_id=DATASET_ID, source_path="data/legacy.md", content_hash="h", status="active"))
         session.commit()
     old_vectors = list(store.added)
     _dataset_source("a.md").unlink()

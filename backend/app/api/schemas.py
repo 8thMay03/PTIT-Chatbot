@@ -72,7 +72,7 @@ class ChunkAllResponse(IngestResponse):
 
 class DocumentItem(BaseModel):
     id: str
-    dataset_id: str = "default"
+    dataset_id: str | None = None
     title: str
     file_name: str
     source_path: str
@@ -169,7 +169,6 @@ class DatasetItem(BaseModel):
     name: str
     description: str | None = None
     enabled: bool = True
-    is_default: bool = False
     document_count: int = 0
     chunk_count: int = 0
     pending_count: int = 0

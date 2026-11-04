@@ -11,7 +11,7 @@ Mỗi mục đã có phương án đề xuất. Nếu người dùng không ch�
 | D-03 | Sinh viên có chọn dataset khi chat không? | **Chưa làm trong task này.** Retriever vẫn nhận `dataset_ids` để làm sau. | Cần thêm UI ở trang chat và thay đổi `ChatRequest`. Nên tách thành task riêng sau khi admin đã chia dataset ổn định. |
 | D-04 | Toggle “Bật/Tắt” từng tài liệu (hiện chỉ lưu trong phiên)? | **Gỡ khỏi bảng.** Thay bằng toggle thật ở cấp dataset. | Hai toggle, một thật một giả, dễ làm admin hiểu sai. Nếu cần tắt từng tài liệu, làm `documents.enabled` thật ở task sau, dùng lại bộ lọc của S-03. |
 | D-05 | Mỗi dataset có cấu hình parser/chunk riêng không? | **Chưa.** Vẫn dùng cấu hình chung ở Settings. | Embedding dùng chung một chiều vector (1536). Cấu hình chunk riêng cần thêm UI và bước kiểm chứng eval, nên để task sau. |
-| D-06 | Dataset mặc định | ID cố định `default`, tên “Mặc định”. **Đổi tên được, không xóa được.** Upload không ghi dataset sẽ vào đây. | Giữ API cũ tương thích và có chỗ chứa toàn bộ tài liệu hiện có khi migrate. |
+| D-06 | Dataset mặc định | ID cố định `default`, tên “Mặc định”. **Đổi tên được, không xóa được.** Upload không ghi dataset sẽ vào đây. | Giữ API cũ tương thích và có chỗ chứa toàn bộ tài liệu hiện có khi migrate. **Đã thay thế** bởi `2026-11-04-remove-default-dataset`: không còn dataset mặc định, dòng `default` cũ là dataset thường. |
 | D-07 | Xóa dataset còn tài liệu | **Cho phép.** Xóa luôn tài liệu, đoạn và file nguồn sau khi admin **gõ lại tên dataset** để xác nhận. | Bắt xóa từng tài liệu trước thì quá chậm. Bước gõ tên tránh xóa nhầm khi thao tác không hoàn tác được. |
 
 ## Thiết kế kỹ thuật

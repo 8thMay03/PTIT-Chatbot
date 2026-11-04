@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.db.models import Base, Chunk, Document
+from app.db.models import Base, Chunk, Dataset, Document
 from app.vectordb.base import VectorStore
 from app.vectordb.pgvector_store import PgVectorStore
 from app.vectordb import create_vector_store
@@ -22,8 +22,10 @@ def test_pgvector_store_add_search_and_delete(memory_session_factory) -> None:
     store = PgVectorStore(session_factory=memory_session_factory)
 
     with memory_session_factory() as session:
+        session.add(Dataset(id="ds-test", name="Test"))
         doc = Document(
             id="doc-1",
+            dataset_id="ds-test",
             source_path="data/doc1.md",
             title="Doc 1",
             file_type="md",

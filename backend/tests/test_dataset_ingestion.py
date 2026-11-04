@@ -7,13 +7,16 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.config import settings
-from app.db.models import Base, Chunk, Document
+from app.db.models import Base, Chunk, Dataset, Document
 from app.db.repositories import DatasetConflict, DatasetNotFound
 from app.embeddings.models import HashEmbeddingModel
 from app.ingestion import uploads
 from app.ingestion.jobs import ParseJobManager
 from app.ingestion.pipeline import IngestionPipeline, dataset_dir
 from app.ingestion import pipeline as pipeline_module
+
+
+LEGACY_DATASET_ID = "default"
 
 
 def _memory_engine():
@@ -26,10 +29,9 @@ def _memory_engine():
         cursor.close()
 
     Base.metadata.create_all(engine)
-    from app.db.repositories import ensure_default_dataset
-
+    # Dòng `default` còn lại từ bản cũ: giờ chỉ là dataset thường, không tự tạo nữa.
     with sessionmaker(bind=engine)() as session:
-        ensure_default_dataset(session)
+        session.add(Dataset(id=LEGACY_DATASET_ID, name="Mặc định"))
         session.commit()
     return engine
 
@@ -75,9 +77,8 @@ class _RecordingStore:
         return []
 
 
-def _upload(pipe, filename, content, dataset_id=None):
-    kwargs = {"dataset_id": dataset_id} if dataset_id else {}
-    parsed = pipe.parse_upload(filename, content, **kwargs)
+def _upload(pipe, filename, content, dataset_id=LEGACY_DATASET_ID):
+    parsed = pipe.parse_upload(filename, content, dataset_id=dataset_id)
     return pipe.chunk_document(parsed["id"])
 
 
@@ -93,10 +94,10 @@ def test_upload_to_dataset_and_same_name_isolation(tmp_path, monkeypatch):
     first = _upload(pipe, "chung.md", "# A\nNội dung A".encode(), dataset_id=ds_id)
     second = _upload(pipe, "chung.md", "# B\nNội dung B".encode())
     assert first["dataset_id"] == ds_id
-    assert second["dataset_id"] == "default"
+    assert second["dataset_id"] == LEGACY_DATASET_ID
     assert first["id"] != second["id"]
     assert (dataset_dir(ds_id) / "chung.md").is_file()
-    assert (dataset_dir("default") / "chung.md").is_file()
+    assert (dataset_dir(LEGACY_DATASET_ID) / "chung.md").is_file()
     # Cùng tên trong cùng dataset thay thế bản cũ.
     third = _upload(pipe, "chung.md", "# A2\nNội dung A2".encode(), dataset_id=ds_id)
     assert third["id"] == first["id"]
@@ -170,7 +171,7 @@ def test_move_documents_conflict_and_rollback(tmp_path, monkeypatch):
 def test_move_documents_missing_and_state(tmp_path, monkeypatch):
     pipe, engine, _store = _pipeline(tmp_path, monkeypatch)
     with pytest.raises(DatasetNotFound):
-        pipe.move_documents(["missing"], "default")
+        pipe.move_documents(["missing"], LEGACY_DATASET_ID)
     with pytest.raises(DatasetNotFound):
         pipe.move_documents(["missing"], "no-such")
 
@@ -195,10 +196,8 @@ def test_delete_dataset_removes_files_and_vectors(tmp_path, monkeypatch):
     assert set(store.deleted) >= set(vector_ids)
 
 
-def test_delete_default_and_busy_job_conflict(tmp_path, monkeypatch):
+def test_delete_legacy_default_and_busy_job_conflict(tmp_path, monkeypatch):
     pipe, engine, _store = _pipeline(tmp_path, monkeypatch)
-    with pytest.raises(DatasetConflict, match="mặc định"):
-        pipe.delete_dataset("default")
     with pytest.raises(DatasetNotFound):
         pipe.delete_dataset("missing")
     # Dataset còn job parse → 409.
@@ -217,9 +216,17 @@ def test_delete_default_and_busy_job_conflict(tmp_path, monkeypatch):
 
     monkeypatch.setattr(_jobs, "active_for_document", lambda doc_id: _Busy() if doc_id == item["id"] else None)
     with pytest.raises(DatasetConflict, match="đang parse"):
-        pipe.move_documents([item["id"]], "default")
+        pipe.move_documents([item["id"]], LEGACY_DATASET_ID)
     with pytest.raises(DatasetConflict, match="đang parse"):
         pipe.delete_dataset(ds_id)
+    # Dataset `default` cũ không còn được bảo vệ: xóa được cùng tài liệu và file.
+    legacy_item = _upload(pipe, "cu.md", "# Cũ\nTài liệu của dataset cũ".encode())
+    result = pipe.delete_dataset(LEGACY_DATASET_ID)
+    assert result == {"id": LEGACY_DATASET_ID, "deleted": True, "documents": 1}
+    with sessionmaker(bind=engine)() as session:
+        assert session.get(Dataset, LEGACY_DATASET_ID) is None
+        assert session.get(Document, legacy_item["id"]) is None
+    assert not (dataset_dir(LEGACY_DATASET_ID) / "cu.md").exists()
 
 
 def test_chunk_and_parse_by_dataset(tmp_path, monkeypatch):
@@ -231,7 +238,7 @@ def test_chunk_and_parse_by_dataset(tmp_path, monkeypatch):
         session.commit()
         ds_id = ds.id
     a = pipe.parse_upload("a.md", "# A".encode(), dataset_id=ds_id)
-    b = pipe.parse_upload("b.md", "# B".encode())
+    b = pipe.parse_upload("b.md", "# B".encode(), dataset_id=LEGACY_DATASET_ID)
     result = pipe.chunk_documents(dataset_id=ds_id)
     assert result["documents"] == 1
     with pytest.raises(DatasetNotFound):
@@ -273,6 +280,26 @@ def test_rebuild_keeps_dataset_and_id(tmp_path, monkeypatch):
         assert doc.dataset_id == ds_id
 
 
+def test_rebuild_skips_files_outside_known_datasets(tmp_path, monkeypatch):
+    pipe, engine, _store = _pipeline(tmp_path, monkeypatch)
+    kept = _upload(pipe, "giu.md", "# Giữ\nTài liệu thuộc dataset".encode())
+    stray_root = settings.documents_path / "lac.md"
+    stray_root.write_text("# Lạc\nFile ở gốc chưa thuộc dataset", encoding="utf-8")
+    stray_unknown = settings.documents_path / "datasets" / "khong-ton-tai" / "mo-coi.md"
+    stray_unknown.parent.mkdir(parents=True)
+    stray_unknown.write_text("# Mồ côi\nDataset không còn", encoding="utf-8")
+
+    assert pipe.parse_documents() == {"documents": 1}
+    result = pipe.ingest_documents()
+
+    assert result["documents"] == 1
+    with sessionmaker(bind=engine)() as session:
+        docs = list(session.scalars(select(Document)))
+        assert [(d.id, d.dataset_id) for d in docs] == [(kept["id"], LEGACY_DATASET_ID)]
+    # File bị bỏ qua vẫn nằm nguyên trên đĩa.
+    assert stray_root.is_file() and stray_unknown.is_file()
+
+
 def test_upload_job_key_includes_dataset_and_result_dataset(tmp_path, monkeypatch):
     pipe, engine, _store = _pipeline(tmp_path, monkeypatch)
     from app.db.repositories import create_dataset
@@ -286,18 +313,18 @@ def test_upload_job_key_includes_dataset_and_result_dataset(tmp_path, monkeypatc
         job = manager.enqueue_upload("job.md", "# Job".encode(), dataset_id=ds_id)
         assert job.dataset_id == ds_id
         # Upload cùng tên ở dataset khác không xung đột key.
-        job2 = manager.enqueue_upload("job.md", "# Job".encode(), dataset_id="default")
-        assert job2.dataset_id == "default"
+        job2 = manager.enqueue_upload("job.md", "# Job".encode(), dataset_id=LEGACY_DATASET_ID)
+        assert job2.dataset_id == LEGACY_DATASET_ID
     finally:
         # Job nền phải xong khi monkeypatch còn hiệu lực, nếu không nó ghi vào data/ và DB thật.
         manager._executor.shutdown(wait=True)
     assert manager.get(job.id).status == "succeeded"
-    assert manager.get(job2.id).dataset_id == "default"
+    assert manager.get(job2.id).dataset_id == LEGACY_DATASET_ID
     assert (dataset_dir(ds_id) / "job.md").is_file()
 
 
 def _seed_legacy(engine, tmp_path, rel_path: str, text: str, *, parser: str | None = None, with_file=True):
-    """Tài liệu kho cũ thuộc default, nằm ngoài datasets/ (vd. data/raw/x.md)."""
+    """Tài liệu kho cũ thuộc dataset `default` cũ, nằm ngoài datasets/ (vd. data/raw/x.md)."""
     from app.db.repositories import DocumentRecord, save_parsed_document
 
     if with_file:
@@ -311,7 +338,7 @@ def _seed_legacy(engine, tmp_path, rel_path: str, text: str, *, parser: str | No
         save_parsed_document(
             session,
             DocumentRecord(
-                id=doc_id, dataset_id="default", source_path=rel_path, title=Path(rel_path).stem,
+                id=doc_id, dataset_id=LEGACY_DATASET_ID, source_path=rel_path, title=Path(rel_path).stem,
                 file_type=Path(rel_path).suffix.lstrip("."), content_hash="h-" + doc_id,
                 metadata=metadata, parsed_text=text,
             ),
@@ -337,32 +364,32 @@ def test_dataset_parse_uses_stored_parser_and_counts_conflicts(tmp_path, monkeyp
         calls.append((document_id, parser_name))
         return ParseJob(
             id="job-" + document_id, kind="parse", status="queued", document_id=document_id,
-            file_name=file_name, parser_name=parser_name, dataset_id="default",
+            file_name=file_name, parser_name=parser_name, dataset_id=LEGACY_DATASET_ID,
             created_at=datetime.now(timezone.utc),
         )
 
     monkeypatch.setattr(_jobs, "enqueue_parse", fake_enqueue)
     monkeypatch.setattr(_jobs, "active_for_document", lambda doc_id: None)
-    result = pipe.enqueue_dataset_parse("default")
+    result = pipe.enqueue_dataset_parse(LEGACY_DATASET_ID)
     # Parser đã lưu được giữ; parser không còn đọc được file thì về mặc định (None).
     assert sorted(calls) == sorted([(kept, "text"), (gone, None)])
     assert result["skipped_busy"] == 1
     assert {job.document_id for job in result["jobs"]} == {kept, gone}
-    assert all(job.dataset_id == "default" and job.created_at for job in result["jobs"])
+    assert all(job.dataset_id == LEGACY_DATASET_ID and job.created_at for job in result["jobs"])
 
 
 def test_upload_same_name_replaces_legacy_document_in_place(tmp_path, monkeypatch):
     pipe, engine, _store = _pipeline(tmp_path, monkeypatch)
     legacy_id = _seed_legacy(engine, tmp_path, "data/raw/x.md", "# Cũ")
 
-    result = pipe.parse_upload("X.md", "# Mới\nNội dung mới".encode())
+    result = pipe.parse_upload("X.md", "# Mới\nNội dung mới".encode(), dataset_id=LEGACY_DATASET_ID)
 
     assert result["id"] == legacy_id
-    assert result["dataset_id"] == "default"
+    assert result["dataset_id"] == LEGACY_DATASET_ID
     assert (tmp_path / "data/raw/x.md").read_text(encoding="utf-8").startswith("# Mới")
-    assert not (dataset_dir("default") / "X.md").exists()
+    assert not (dataset_dir(LEGACY_DATASET_ID) / "X.md").exists()
     with sessionmaker(bind=engine)() as session:
-        docs = list(session.scalars(select(Document).where(Document.dataset_id == "default")))
+        docs = list(session.scalars(select(Document).where(Document.dataset_id == LEGACY_DATASET_ID)))
         assert [(d.id, d.source_path) for d in docs] == [(legacy_id, "data/raw/x.md")]
     # Dataset khác không bị ảnh hưởng: cùng tên ở đó vẫn tạo tài liệu riêng.
     from app.db.repositories import create_dataset
@@ -389,9 +416,9 @@ def test_upload_replacing_legacy_document_restores_file_when_commit_fails(tmp_pa
         "app.ingestion.pipeline.SessionLocal", sessionmaker(bind=engine, class_=FailingCommit)
     )
     with pytest.raises(RuntimeError, match="commit lỗi"):
-        pipe.parse_upload("x.md", "# Mới".encode())
+        pipe.parse_upload("x.md", "# Mới".encode(), dataset_id=LEGACY_DATASET_ID)
     assert (tmp_path / "data/raw/x.md").read_text(encoding="utf-8") == "# Cũ"
-    assert not (dataset_dir("default") / "x.md").exists()
+    assert not (dataset_dir(LEGACY_DATASET_ID) / "x.md").exists()
     with sessionmaker(bind=engine)() as session:
         assert session.get(Document, legacy_id).parsed_text == "# Cũ"
 

@@ -10,8 +10,6 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.db.models import (
-    DEFAULT_DATASET_ID,
-    DEFAULT_DATASET_NAME,
     Chunk,
     Conversation,
     Dataset,
@@ -27,7 +25,7 @@ class DatasetNotFound(RuntimeError):
 
 
 class DatasetConflict(RuntimeError):
-    """Tên dataset trùng hoặc thao tác bị cấm (mặc định / còn job)."""
+    """Tên dataset trùng hoặc thao tác bị cấm (còn job)."""
 
 
 def validate_dataset_name(name: str) -> str:
@@ -51,22 +49,6 @@ def validate_dataset_description(description: str | None) -> str | None:
     return text
 
 
-def ensure_default_dataset(session: Session) -> Dataset:
-    """Tạo dataset mặc định nếu chưa có (idempotent cho init_db và SQLite test)."""
-    existing = session.get(Dataset, DEFAULT_DATASET_ID)
-    if existing is not None:
-        return existing
-    dataset = Dataset(
-        id=DEFAULT_DATASET_ID,
-        name=DEFAULT_DATASET_NAME,
-        description=None,
-        enabled=True,
-    )
-    session.add(dataset)
-    session.flush()
-    return dataset
-
-
 def get_dataset(session: Session, dataset_id: str) -> Dataset | None:
     return session.get(Dataset, dataset_id)
 
@@ -84,7 +66,7 @@ def get_dataset_by_name_ci(session: Session, name: str) -> Dataset | None:
 
 def list_datasets(session: Session) -> list[Dataset]:
     rows = list(session.scalars(select(Dataset)))
-    rows.sort(key=lambda d: (d.id != DEFAULT_DATASET_ID, (d.name or "").casefold()))
+    rows.sort(key=lambda d: (d.name or "").casefold())
     return rows
 
 
@@ -177,7 +159,6 @@ def serialize_dataset(
         "name": dataset.name,
         "description": dataset.description,
         "enabled": bool(dataset.enabled),
-        "is_default": dataset.id == DEFAULT_DATASET_ID,
         "document_count": document_count,
         "chunk_count": chunk_count,
         "pending_count": pending_count,
@@ -188,7 +169,6 @@ def serialize_dataset(
 
 
 def list_datasets_with_stats(session: Session) -> list[dict]:
-    ensure_default_dataset(session)
     payloads: list[dict] = []
     for dataset in list_datasets(session):
         doc_count, chunk_count, pending_count, size_bytes = get_dataset_stats(session, dataset.id)
@@ -248,7 +228,9 @@ def replace_knowledge_base(
     documents: list[DocumentRecord],
     chunks: list[ChunkRecord],
 ) -> None:
-    ensure_default_dataset(session)
+    for document in documents:
+        if document.dataset_id is None:
+            raise ValueError(f"Tài liệu {document.source_path} chưa thuộc dataset nào.")
     session.execute(delete(Document))
     session.flush()
 
@@ -256,7 +238,7 @@ def replace_knowledge_base(
     session.add_all(
         Document(
             id=document.id,
-            dataset_id=document.dataset_id or DEFAULT_DATASET_ID,
+            dataset_id=document.dataset_id,
             source_path=document.source_path,
             title=document.title,
             file_type=document.file_type,
@@ -370,10 +352,11 @@ def save_parsed_document(session: Session, document: DocumentRecord) -> Document
     now = datetime.now(timezone.utc)
     existing = session.get(Document, document.id)
     if existing is None:
-        ensure_default_dataset(session)
+        if document.dataset_id is None:
+            raise ValueError(f"Tài liệu {document.source_path} chưa thuộc dataset nào.")
         existing = Document(
             id=document.id,
-            dataset_id=document.dataset_id or DEFAULT_DATASET_ID,
+            dataset_id=document.dataset_id,
             status="parsed",
         )
         session.add(existing)
@@ -453,10 +436,8 @@ def apply_document_move(
 def delete_dataset_records(session: Session, dataset_id: str) -> tuple[int, list[str], list[str]]:
     """Xóa tài liệu + dataset trong một transaction; trả (số tài liệu, source_paths, vector_ids).
 
-    Không xóa file/vector ngoài ở đây — pipeline làm sau commit. Cấm xóa dataset mặc định.
+    Không xóa file/vector ngoài ở đây — pipeline làm sau commit.
     """
-    if dataset_id == DEFAULT_DATASET_ID:
-        raise DatasetConflict("Không thể xóa dataset mặc định.")
     dataset = session.get(Dataset, dataset_id)
     if dataset is None:
         raise DatasetNotFound("Không tìm thấy dataset.")
@@ -530,7 +511,7 @@ def get_document_chunks(
 def serialize_document(document: Document, chunk_count: int, size_bytes: int | None = None) -> dict:
     metadata = document.document_metadata if isinstance(getattr(document, "document_metadata", None), dict) else (getattr(document, "document_metadata", None) or {})
     # Tương thích test cũ dùng SimpleNamespace chưa có dataset_id.
-    dataset_id = getattr(document, "dataset_id", None) or DEFAULT_DATASET_ID
+    dataset_id = getattr(document, "dataset_id", None)
     file_name = Path(document.source_path).name
     if size_bytes is None:
         raw_size = metadata.get("size_bytes") if isinstance(metadata, dict) else None

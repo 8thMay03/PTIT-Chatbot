@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api import routes
+from app.db.models import Dataset
 from app.ingestion.jobs import ParseJob
 from app.ingestion.uploads import DocumentUploadError
 from app.main import app
@@ -22,6 +23,13 @@ def _admin_session(login_admin):
     login_admin(client)
     yield
     client.cookies.clear()
+
+
+def _seed_dataset(session_factory, dataset_id: str = "ds-test") -> str:
+    with session_factory() as session:
+        session.add(Dataset(id=dataset_id, name="Test"))
+        session.commit()
+    return dataset_id
 
 
 def _parse_job(**overrides) -> ParseJob:
@@ -55,6 +63,7 @@ def test_rebuild_maps_conversion_error_to_422(monkeypatch):
 def test_list_documents_returns_serialized_items(monkeypatch) -> None:
     document = SimpleNamespace(
         id="doc-1",
+        dataset_id="ds-test",
         title="Sổ tay",
         source_path="data/so-tay.md",
         file_type="md",
@@ -72,13 +81,14 @@ def test_list_documents_returns_serialized_items(monkeypatch) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["documents"][0]["id"] == "doc-1"
-    assert payload["documents"][0]["dataset_id"] == "default"
+    assert payload["documents"][0]["dataset_id"] == "ds-test"
     assert payload["documents"][0]["file_name"] == "so-tay.md"
     assert payload["documents"][0]["chunk_count"] == 4
     assert payload["documents"][0]["parsed_at"] is None
 
 
-def test_upload_document_enqueues_parse_job(monkeypatch) -> None:
+def test_upload_document_enqueues_parse_job(monkeypatch, api_db) -> None:
+    dataset_id = _seed_dataset(api_db)
     calls = []
     job = _parse_job(id="job-upload", kind="upload", document_id=None, file_name="faq.md")
 
@@ -91,6 +101,7 @@ def test_upload_document_enqueues_parse_job(monkeypatch) -> None:
     response = client.post(
         "/api/documents",
         files={"file": ("faq.md", b"# FAQ\n", "text/markdown")},
+        data={"dataset_id": dataset_id},
     )
 
     assert response.status_code == 202
@@ -101,10 +112,29 @@ def test_upload_document_enqueues_parse_job(monkeypatch) -> None:
     assert payload["file_name"] == "faq.md"
     assert payload["progress"] == 0
     assert payload["progress_message"] == "Đang chờ trong hàng đợi"
-    assert calls == [("faq.md", b"# FAQ\n", {"dataset_id": "default"})]
+    assert calls == [("faq.md", b"# FAQ\n", {"dataset_id": dataset_id})]
 
 
-def test_upload_document_maps_validation_errors(monkeypatch) -> None:
+def test_upload_document_requires_dataset(monkeypatch, api_db) -> None:
+    _seed_dataset(api_db)
+    calls = []
+    monkeypatch.setattr(routes.parse_jobs, "enqueue_upload", lambda *args, **kwargs: calls.append(args))
+
+    missing = client.post("/api/documents", files={"file": ("faq.md", b"# FAQ\n", "text/markdown")})
+    unknown = client.post(
+        "/api/documents",
+        files={"file": ("faq.md", b"# FAQ\n", "text/markdown")},
+        data={"dataset_id": "missing"},
+    )
+
+    assert missing.status_code == 422
+    assert unknown.status_code == 404
+    assert calls == []
+
+
+def test_upload_document_maps_validation_errors(monkeypatch, api_db) -> None:
+    dataset_id = _seed_dataset(api_db)
+
     def fail_upload(filename, content, **options):
         raise DocumentUploadError("Chỉ hỗ trợ tài liệu .md, .txt.")
 
@@ -113,6 +143,7 @@ def test_upload_document_maps_validation_errors(monkeypatch) -> None:
     response = client.post(
         "/api/documents",
         files={"file": ("notes.pdf", b"%PDF", "application/pdf")},
+        data={"dataset_id": dataset_id},
     )
 
     assert response.status_code == 400
@@ -218,7 +249,8 @@ def test_parser_options_by_file_name_before_upload(monkeypatch) -> None:
     assert client.get("/api/parsers").status_code == 422
 
 
-def test_upload_document_passes_selected_parser(monkeypatch) -> None:
+def test_upload_document_passes_selected_parser(monkeypatch, api_db) -> None:
+    dataset_id = _seed_dataset(api_db)
     calls = []
     job = _parse_job(id="job-upload", kind="upload", document_id=None, file_name="policy.pdf")
 
@@ -231,12 +263,12 @@ def test_upload_document_passes_selected_parser(monkeypatch) -> None:
     response = client.post(
         "/api/documents",
         files={"file": ("policy.pdf", b"%PDF", "application/pdf")},
-        data={"parser_name": "llamaparse"},
+        data={"parser_name": "llamaparse", "dataset_id": dataset_id},
     )
 
     assert response.status_code == 202
     assert response.json()["id"] == "job-upload"
-    assert calls == [("policy.pdf", {"parser_name": "llamaparse", "dataset_id": "default"})]
+    assert calls == [("policy.pdf", {"parser_name": "llamaparse", "dataset_id": dataset_id})]
 
 
 def test_parse_job_status_and_list(monkeypatch) -> None:
