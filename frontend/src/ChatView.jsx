@@ -652,9 +652,6 @@ const ChatView = forwardRef(function ChatView(
             </button>
           )}
         </form>
-        <p className="composer-hint">
-          Enter để gửi · Shift + Enter để xuống dòng · Trả lời có thể chưa hoàn toàn chính xác
-        </p>
       </div>
     </section>
   );
