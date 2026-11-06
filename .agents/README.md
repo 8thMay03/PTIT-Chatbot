@@ -56,6 +56,7 @@ git checkout -b feat/<ten-ngan>
 - Không commit tính năng trực tiếp lên `dev` hoặc `main`.
 - Nếu working tree đang có thay đổi chưa commit, hoặc tính năng cần dựa trên một nhánh chưa merge vào `dev`, hỏi người dùng/coordinator trước khi đổi nhánh; không tự stash hay bỏ thay đổi.
 - Ghi nhánh và commit nền trong `implementation.md`, ví dụ: nhánh `feat/<ten-ngan>` (tách từ `dev` tại `<commit>`).
+- Commit message bắt buộc viết bằng tiếng Anh, theo dạng `<type>: <mô tả ngắn>` (ví dụ `feat: serialize table rows into search_text`, `fix: keep merged header cells when chunking tables`, `chore: close table-search-context task`). Không viết commit message bằng tiếng Việt, kể cả tiếng Việt không dấu.
 
 ## Nhận việc và triển khai
 

@@ -5,6 +5,7 @@
 - Tìm task phù hợp đang tồn tại trước khi tạo mới từ `.agents/tasks/_template/`; không coi `_template` là task đang chạy.
 - Đọc cả năm file của task, kiểm tra trạng thái mới nhất và xác nhận nhiệm vụ, phạm vi file, phụ thuộc trước khi sửa mã.
 - Mỗi khi triển khai tính năng mới, phải checkout một nhánh mới từ `dev` đã cập nhật; không commit tính năng trực tiếp lên `dev` hoặc `main`. Xem [quy ước nhánh Git](.agents/README.md#nhánh-git).
+- Commit message bắt buộc viết bằng tiếng Anh (dạng `<type>: <mô tả ngắn>`, ví dụ `feat: serialize table rows into search_text`); không dùng tiếng Việt, kể cả không dấu.
 - Chỉ sửa phần việc đã nhận; phối hợp với coordinator trước khi sửa file thuộc agent khác hoặc thay đổi giao diện dùng chung.
 - Ghi tiến độ, quyết định, blocker và bàn giao theo quy ước; đọc lại cập nhật liên quan trước khi tiếp tục.
 - Không ghi đè thay đổi có sẵn của người dùng hoặc agent khác. Không ghi secret, token hay nội dung `.env` vào nhật ký.
