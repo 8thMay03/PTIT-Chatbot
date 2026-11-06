@@ -2,9 +2,9 @@
 
 - Reviewer: `claude-code-agent`.
 - Hình thức: `self_review`.
-- Trạng thái: `approved` (cho phần mã nguồn; task vẫn `in_review` vì AC-07 chưa đạt — xem R-05).
+- Trạng thái: `approved` (vòng 2: AC-07/R-05 đạt qua task `2026-11-05-table-search-context`).
 - Bản được review: nhánh `feat/table-chunking-coverage` sau S-01…S-07 + 2 vòng sửa review.
-- Cập nhật lúc: `2026-11-05T23:42:51+07:00`.
+- Cập nhật lúc: `2026-11-06T22:52:59+07:00`.
 
 ## Phạm vi và cơ sở đánh giá
 
@@ -42,20 +42,26 @@
   chunk chứa hàng không vào top-k — lever nằm ở `search_text` (D-01, đã hoãn có điều
   kiện). Chuyển sang task tiếp theo `2026-11-05-table-search-context` làm tiêu chí
   chính; task này giữ `in_review`. Người xử lý: task tiếp theo.
-  Trạng thái: `open` (theo dõi ở task mới).
+  Trạng thái: `resolved` (`2026-11-06T22:52:59+07:00`): task `2026-11-05-table-search-context`
+  đạt AC-03/AC-04 — bảng bm25 hit@4 0.857→0.929, hybrid không giảm; golden không thụt lùi về
+  thực chất (hybrid −1 câu do nhiễu HNSW, có đối chứng) — xem V-07 và
+  `documents/rag-eval/table-search-context/README.md`.
 
 ## Lịch sử các vòng review
 
 - Vòng 1 (`2026-11-05T23:42:51+07:00`, self_review): đọc diff + bằng chứng V-01…V-08;
   nêu R-01…R-05; sửa R-03 (3 lỗi), xác nhận R-04 đã sửa đúng; R-01/R-02 chấp nhận có
   ghi nhận; R-05 chuyển follow-up. Kết luận `approved` cho mã nguồn.
+- Vòng 2 (`2026-11-06T22:52:59+07:00`, self_review): đối chiếu bằng chứng task
+  `2026-11-05-table-search-context`; R-05 → `resolved`. Mã nguồn của task này không đổi.
+  Kết luận `approved` (task + mã nguồn).
 
 ## Kết luận
 
-- Kết luận: `approved` (mã nguồn; task vẫn `in_review` vì R-05/AC-07 mở).
-- Nhận xét bắt buộc còn mở: không còn (R-03, R-04 đã sửa + kiểm tra lại xanh; R-05 là
-  việc tồn đọng cấp task, theo dõi ở `2026-11-05-table-search-context`).
+- Kết luận: `approved` (vòng 2: R-05/AC-07 đã đạt qua task `2026-11-05-table-search-context`).
+- Nhận xét bắt buộc còn mở: không còn (R-03, R-04 đã sửa + kiểm tra lại xanh; R-05 đã
+  `resolved` qua `2026-11-05-table-search-context`).
 - Nhận xét hoãn lại: R-01, R-02 (không bắt buộc, có lý do và hướng theo dõi trong mục trên).
 - Phần chưa review / giới hạn: self_review (một agent); eval retrieval phụ thuộc DB local
   và API embedding (đã chạy thật, số liệu trong `documents/rag-eval/table-chunking/`).
-- Bước tiếp theo: coordinator giữ task `in_review`; triển khai task D-01 tiếp theo.
+- Bước tiếp theo: coordinator đề xuất đóng task (`done`) cùng task `2026-11-05-table-search-context`, chờ người dùng xác nhận.

@@ -5,7 +5,7 @@
 - Coordinator: `claude-code-agent`
 - Người yêu cầu: người dùng (phiên Claude Code 2026-11-05: "bảng quá dài thì khi chunk hệ thống bỏ qua luôn làm sót mất dữ liệu quan trọng")
 - Tạo lúc: `2026-11-05T22:30:22+07:00`
-- Cập nhật lúc: `2026-11-05T23:42:51+07:00`
+- Cập nhật lúc: `2026-11-06T22:52:59+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -43,7 +43,7 @@ Kết quả cần có: mọi hàng bảng sau cleaner nằm nguyên vẹn (khôn
 - [x] AC-04: Bảng bị ngắt trang (các khối bảng liền kề cùng header, hoặc khối tiếp theo không header nhưng cùng số cột) được ghép thành một bảng logic trước khi tách; không sinh child chỉ có header hoặc mảnh < 3 hàng khi có thể gộp trong hard limit.
 - [x] AC-05: `scripts.check_chunks` có mã lỗi mới cho hàng bảng bị vỡ/thiếu header (`--strict` trả 1 khi vi phạm); pipeline ghi cảnh báo khi tài liệu có nhiều dòng bắt đầu bằng `|` nhưng chunker không nhận ra bảng nào.
 - [x] AC-06: Bảng ngay sau "MỤC LỤC" không bị cleaner bỏ nếu không phải bảng mục lục (hàng không kết thúc bằng số trang); bảng mục lục thật trong D26 vẫn bị lọc như hiện tại.
-- [ ] AC-07: Sau khi chunk lại index local, hit@4 và MRR hybrid trên `ptit_ragas_100.json` không thấp hơn lần chạy baseline trên cùng index trước khi sửa; bộ câu hỏi về bảng mới (≥ 10 câu, fixture riêng) có hit@4 cao hơn baseline. → Kết quả: golden bm25 giữ nguyên, golden hybrid −0.01 (nhiễu 1 câu); bảng bm25/hybrid giữ nguyên (0.857/0.786). Vế cải thiện bảng chưa đạt — cần D-01 (task tiếp theo đã mở).
+- [x] AC-07: Sau khi chunk lại index local, hit@4 và MRR hybrid trên `ptit_ragas_100.json` không thấp hơn lần chạy baseline trên cùng index trước khi sửa; bộ câu hỏi về bảng mới (≥ 10 câu, fixture riêng) có hit@4 cao hơn baseline. → Kết quả task này: golden bm25 giữ nguyên, golden hybrid −0.01 (nhiễu 1 câu); bảng bm25/hybrid giữ nguyên (0.857/0.786). Vế cải thiện bảng **đạt qua task `2026-11-05-table-search-context`** (AC-03/AC-04, `2026-11-06`): trên index hiện tại 2.020 chunk, bảng bm25 hit@4 0.857→0.929, hybrid 0.786→0.786; golden bm25 0.78→0.79, golden hybrid MRR 0.7086→0.7140 (hit@4 −1 câu do nhiễu HNSW, đối chứng vector chính xác không tụt) — xem `documents/rag-eval/table-search-context/README.md`.
 - [x] AC-08: Toàn bộ test backend xanh (782 passed, 1 skipped thực tế).
 
 ## Tài liệu và phụ thuộc
@@ -74,8 +74,13 @@ Kết quả cần có: mọi hàng bảng sau cleaner nằm nguyên vẹn (khôn
 - Bước tiếp theo: reviewer tự review (self_review), xử lý nhận xét, verifier
   xác nhận V-01…V-08; coordinator kết luận (task ở `in_review`, chưa `done`
   vì AC-07 chưa đạt).
+- Cập nhật `2026-11-06T22:52:59+07:00`: AC-07 đạt qua task `2026-11-05-table-search-context`
+  (V-07/R-05 cập nhật tham chiếu). Đề xuất đóng task (`done`) cùng task D-01 khi người dùng
+  duyệt; task vẫn `in_review` tới khi người dùng xác nhận.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
 - `2026-11-05T22:30:22+07:00` — `claude-code-agent`: tạo task từ kết quả điều tra. Chốt: (1) sửa chunker để chấp nhận dạng compact thay vì tắt `compact_markdown_tables` — không cần parse lại (tốn credit LlamaParse) và chunker phải chịu được cả hai dạng; (2) AC-07 so với baseline chạy lại trên cùng index ngay trước khi sửa, vì kho hiện tại khác kho lúc chạy `rag-06/`; (3) không sửa golden set, câu hỏi về bảng đặt trong fixture riêng.
 - `2026-11-05T23:42:51+07:00` — người dùng duyệt: tạo nhánh mới từ `dev` (không dùng chung nhánh `feat/fix-chunk-pagination`); D-01 hoãn sang task tiếp theo (chỉ mở khi hit@4 bảng vẫn hụt — điều kiện đã xảy ra); D-02 đồng ý chunk lại + đo retrieval trên DB local.
+- `2026-11-06T22:52:59+07:00` — `claude-code-agent`: AC-07 đánh dấu đạt dựa trên bằng chứng của task
+  `2026-11-05-table-search-context` (vế cải thiện bảng); đề xuất đóng task, chờ người dùng xác nhận.

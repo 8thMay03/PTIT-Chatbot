@@ -50,6 +50,8 @@ from app.ingestion.chunker import (
     find_table_coverage_issues,
     split_parent_child,
     split_text,
+    table_row_search_index,
+    table_search_body,
 )
 from app.ingestion.cleaner import clean_text
 from app.ingestion.loaders import SourceDocument, load_documents
@@ -787,6 +789,8 @@ def _chunk_records(
     chunk_records: list[ChunkRecord] = []
     chunks_payload: list[dict] = []
     source_name = Path(source_path).name
+    cleaned = clean_text(text)
+    row_index = table_row_search_index(cleaned)
     for chunk in _split_document(text):
         if isinstance(chunk, ParentChildChunk):
             parent_index = chunk.parent_index
@@ -800,7 +804,9 @@ def _chunk_records(
             chunk_id = _chunk_id(document_id, chunk.index)
             parent_id = chunk_id
             parent_text = chunk.text
-        search_text = compose_search_text(document_title, chunk.section_path, chunk.text)
+        search_text = compose_search_text(
+            document_title, chunk.section_path, table_search_body(chunk.text, row_index)
+        )
         metadata = {
             "source": source_path,
             "source_name": source_name,
@@ -837,17 +843,17 @@ def _chunk_records(
             }
         )
 
-    _log_table_coverage(document_id, text, [record.text for record in chunk_records])
+    _log_table_coverage(document_id, cleaned, [record.text for record in chunk_records])
     return chunk_records, chunks_payload
 
 
-def _log_table_coverage(document_id: str, text: str, child_texts: list[str]) -> None:
+def _log_table_coverage(document_id: str, cleaned: str, child_texts: list[str]) -> None:
     """Cảnh báo khi bảng có nguy cơ mất dữ liệu (không chặn ingest).
 
-    Hai dấu hiệu: tài liệu có nhiều dòng bắt đầu bằng ``|`` nhưng chunker
-    không nhận ra bảng nào, hoặc bất biến bảo toàn hàng S-02 báo vi phạm.
+    ``cleaned`` là văn bản đã qua ``clean_text``. Hai dấu hiệu: tài liệu có
+    nhiều dòng bắt đầu bằng ``|`` nhưng chunker không nhận ra bảng nào, hoặc
+    bất biến bảo toàn hàng S-02 báo vi phạm.
     """
-    cleaned = clean_text(text)
     pipe_lines = sum(1 for line in cleaned.splitlines() if line.strip().startswith("|"))
     if pipe_lines < 5:
         return

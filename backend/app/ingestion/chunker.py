@@ -58,7 +58,9 @@ def compose_search_text(document_title: str, section_path: str, text: str) -> st
 
     Embedding and BM25 run on this field so every chunk carries its document and
     section context (e.g. "BHYT" for an insurance clause that never spells it out);
-    the plain ``text`` stays what users see and what feeds the prompt.
+    the plain ``text`` stays what users see and what feeds the prompt. The
+    pipeline passes ``table_search_body(chunk.text, …)`` as body so table rows
+    are searchable as "Column: value" lines.
     """
     header = " > ".join(part for part in (document_title.strip(), section_path.strip()) if part)
     if not header:
@@ -849,6 +851,111 @@ def count_recognized_tables(cleaned_text: str) -> int:
         for block in _split_blocks(cleaned_text)
         if _is_markdown_table(block) or _is_html_table(block)
     )
+
+
+def _table_cell_text(cell: str) -> str:
+    """Chuẩn hóa một ô bảng cho tìm kiếm: ``<br/>`` thành khoảng trắng, gộp khoảng trắng."""
+    return re.sub(r"\s+", " ", re.sub(r"<br\s*/?>", " ", cell, flags=re.IGNORECASE)).strip()
+
+
+def serialize_table_row(
+    header_cells: list[str], row_cells: list[str], prev_filled: list[str]
+) -> tuple[str, list[str]]:
+    """Tuần tự hóa một hàng bảng thành ``"Cột A: giá trị; Cột B: giá trị"`` cho tìm kiếm.
+
+    Các ô trống đầu hàng (gộp ô dọc, vd. ``||||ULO1.3: …``) lấy giá trị cùng cột
+    của hàng ngay trên đã điền (``prev_filled``). Ô trống sau ô có giá trị đầu
+    tiên được giữ trống vì thường mang nghĩa "không áp dụng" (vd. cột hình thức
+    kỷ luật bỏ trống) — điền từ hàng trên sẽ gán sai dữ liệu. Ô vẫn trống thì bỏ
+    cặp đó; cột không có tên chỉ ghi giá trị. Trả về dòng tuần tự hóa và các ô
+    đã điền để truyền cho hàng kế tiếp trong cùng bảng; hàng toàn ô trống trả về
+    ``""`` và giữ nguyên ``prev_filled``.
+    """
+    names = [_table_cell_text(cell) for cell in header_cells]
+    values = [_table_cell_text(cell) for cell in row_cells]
+    if not any(values):
+        return "", list(prev_filled)
+
+    leading_empty = next(index for index, value in enumerate(values) if value)
+    filled: list[str] = []
+    pairs: list[str] = []
+    for column in range(max(len(names), len(values))):
+        value = values[column] if column < len(values) else ""
+        if not value and column < leading_empty and column < len(prev_filled):
+            value = prev_filled[column]
+        filled.append(value)
+        if not value:
+            continue
+        name = names[column] if column < len(names) else ""
+        pairs.append(f"{name}: {value}" if name else value)
+    return "; ".join(pairs), filled
+
+
+def _markdown_table_header_rows(block: str) -> tuple[str, list[str]]:
+    lines = [line.strip() for line in block.splitlines() if line.strip()]
+    return lines[0], lines[2:]
+
+
+def table_row_search_index(cleaned_text: str) -> dict[tuple[str, str], str]:
+    """Dòng tuần tự hóa của mọi hàng bảng Markdown trong tài liệu.
+
+    Khóa là (header đã chuẩn hóa, dòng hàng). Ô trống được điền từ hàng trên
+    trong cùng bảng logic của cả tài liệu (sau khi ghép bảng ngắt trang), nên
+    hàng đầu của một child vẫn nhận giá trị từ hàng nằm ở child trước. Bảng
+    HTML không được tuần tự hóa (ô gộp là ``rowspan``/``colspan`` chứ không phải
+    ô trống).
+    """
+    index: dict[tuple[str, str], str] = {}
+    for block in _split_blocks(cleaned_text):
+        if not _is_markdown_table(block):
+            continue
+        header, rows = _markdown_table_header_rows(block)
+        header_key = _normalize_table_header(header)
+        header_cells = _table_cells_safe(header)
+        filled: list[str] = []
+        for row in rows:
+            line, filled = serialize_table_row(header_cells, _table_cells_safe(row), filled)
+            index.setdefault((header_key, row), line)
+    return index
+
+
+def table_search_body(
+    chunk_text: str, row_index: dict[tuple[str, str], str] | None = None
+) -> str:
+    """Thân ``search_text`` của một chunk: mỗi bảng Markdown thay bằng dòng tuần tự hóa.
+
+    Mỗi hàng thành một dòng ``Cột: giá trị; …`` (lấy từ ``row_index`` của
+    ``table_row_search_index`` khi có, nếu không thì tuần tự hóa ngay trong
+    chunk); dòng header/phân cách và hàng thô bị bỏ vì tên cột và giá trị đã có
+    trong dòng tuần tự hóa — giữ cả hai sẽ nhân đôi độ dài và BM25 phạt chunk
+    bảng. Bảng không sinh dòng nào (chỉ có header) giữ các ô header. Văn xuôi
+    và bảng HTML giữ nguyên. Chunk không có bảng Markdown trả về nguyên văn.
+    """
+    blocks = _split_blocks(chunk_text)
+    if not any(_is_markdown_table(block) for block in blocks):
+        return chunk_text
+
+    parts: list[str] = []
+    for block in blocks:
+        if not _is_markdown_table(block):
+            parts.append(block)
+            continue
+        header, rows = _markdown_table_header_rows(block)
+        header_key = _normalize_table_header(header)
+        header_cells = _table_cells_safe(header)
+        filled: list[str] = []
+        lines: list[str] = []
+        for row in rows:
+            local, filled = serialize_table_row(header_cells, _table_cells_safe(row), filled)
+            line = row_index.get((header_key, row), local) if row_index else local
+            if line:
+                lines.append(line)
+        if not lines:
+            # Bảng chỉ có header (LlamaParse hay coi hàng dữ liệu duy nhất là
+            # header, vd. một dòng liên hệ) — giữ nội dung header.
+            lines = ["; ".join(cell for cell in map(_table_cell_text, header_cells) if cell)]
+        parts.append("\n".join(line for line in lines if line))
+    return "\n\n".join(part for part in parts if part)
 
 
 @dataclass(frozen=True)

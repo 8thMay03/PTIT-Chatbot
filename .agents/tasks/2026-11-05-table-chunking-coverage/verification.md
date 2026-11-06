@@ -88,6 +88,13 @@
   `documents/rag-eval/table-chunking/README.md` (+ 8 JSON).
 - Trạng thái: `failed` (vế cải thiện bảng chưa đạt; vế không thụt lùi đạt về thực chất).
 - Bằng chứng: `documents/rag-eval/table-chunking/before_*.json`, `after_*.json`, `README.md`.
+- Cập nhật `2026-11-06T22:52:59+07:00` → `passed` qua task `2026-11-05-table-search-context`
+  (V-02 của task đó): trên index hiện tại (2 tài liệu / 2.020 chunk), baseline đo lại rồi cập nhật
+  `search_text` (không embed lại): bảng bm25 hit@4 0.857143→0.928571 (MRR 0.857→0.929), bảng hybrid
+  0.785714→0.785714; golden bm25 0.78→0.79 (MRR 0.743302→0.745746), golden hybrid 0.74→0.73 với MRR
+  0.708619→0.713952 — câu tụt `process_grade_complaint` 4→5 do HNSW xáo thứ tự hai bản sao sau
+  `UPDATE`; đối chứng vector chính xác: golden hybrid 0.74→0.74, MRR 0.709452→0.711119. Bằng chứng:
+  `documents/rag-eval/table-search-context/{before,after}_*.json`, `README.md`.
 
 ### V-08 — AC-08
 
@@ -134,6 +141,7 @@ Ghi chú cho người đọc sau:
 ## Kết luận
 
 - Vòng 2 xác nhận lại AC-01…AC-06 và AC-08 (AC-08 với 1 lỗi môi trường đã giải thích); AC-07 vẫn chưa đạt.
-- Tiêu chí đã đạt: AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-08.
-- Tiêu chí chưa đạt/chưa xác minh: AC-07 (vế tăng hit@4 bảng; vế golden không thụt lùi đạt về thực chất).
+- Tiêu chí đã đạt: AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-08; AC-07 đạt qua task
+  `2026-11-05-table-search-context` (cập nhật `2026-11-06T22:52:59+07:00`, xem V-07).
+- Tiêu chí chưa đạt/chưa xác minh: không còn.
 - Đề xuất: self-review diff; mở task tiếp theo D-01 (`2026-11-05-table-search-context`); task này giữ `in_review`, chưa `done`.

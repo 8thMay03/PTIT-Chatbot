@@ -669,3 +669,51 @@ def test_chunk_records_warns_on_table_coverage_violation(caplog, monkeypatch):
         _chunk_records("doc1", "data/bang-diem.md", "Bảng điểm", text)
 
     assert any("bất biến bảng" in record.message for record in caplog.records)
+
+
+def test_chunk_records_serialize_table_rows_into_search_text_only():
+    from app.ingestion.chunker import split_parent_child
+
+    text = (
+        "## Chuẩn đầu ra\n\nBảng chuẩn đầu ra của Học viện.\n\n"
+        "|Phẩm chất<br/>(GA)|Chuẩn đầu ra|\n|-|-|\n"
+        "|GA1|ULO1.1: Áp dụng kiến thức|\n"
+        "||ULO1.2: Phân tích vấn đề|\n"
+        "|GA2|ULO2.1: Đạo đức nghề nghiệp|\n"
+    )
+
+    records, payload = _chunk_records("doc1", "data/cdr.md", "Chuẩn đầu ra", text)
+
+    children = split_parent_child(
+        text,
+        parent_size=settings.chunk_size,
+        parent_overlap=settings.chunk_overlap,
+        child_size=settings.child_chunk_size,
+        child_overlap=settings.child_chunk_overlap,
+        min_child_size=settings.min_child_chunk_chars,
+    )
+    assert [record.text for record in records] == [child.text for child in children]
+    table_record = next(record for record in records if "|GA1|" in record.text)
+    assert "||ULO1.2: Phân tích vấn đề|" in table_record.text
+    assert table_record.metadata["parent_text"] == next(
+        child.parent_text for child in children if child.text == table_record.text
+    )
+    assert table_record.search_text.startswith("Chuẩn đầu ra > Chuẩn đầu ra\n")
+    assert "Phẩm chất (GA): GA1; Chuẩn đầu ra: ULO1.2: Phân tích vấn đề" in table_record.search_text
+    assert "|GA1|" not in table_record.search_text
+    assert "Bảng chuẩn đầu ra của Học viện." in table_record.search_text
+    assert payload[records.index(table_record)]["search_text"] == table_record.search_text
+
+
+def test_chunk_records_search_text_unchanged_without_tables():
+    from app.ingestion.chunker import compose_search_text
+
+    text = "## Học phí\n\nHọc phí theo tín chỉ được thu đầu mỗi học kỳ, nộp qua ngân hàng."
+
+    records, _ = _chunk_records("doc1", "data/hoc-phi.md", "Học phí", text)
+
+    assert records
+    for record in records:
+        assert record.search_text == compose_search_text(
+            "Học phí", record.metadata["section_path"], record.text
+        )
