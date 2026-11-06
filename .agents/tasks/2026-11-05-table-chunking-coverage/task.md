@@ -1,11 +1,11 @@
 # Task: Chunk bảng không làm mất dữ liệu (nhận diện bảng LlamaParse, ghép bảng ngắt trang, bảo toàn hàng)
 
 - ID: `2026-11-05-table-chunking-coverage`
-- Trạng thái: `in_review`
+- Trạng thái: `done`
 - Coordinator: `claude-code-agent`
 - Người yêu cầu: người dùng (phiên Claude Code 2026-11-05: "bảng quá dài thì khi chunk hệ thống bỏ qua luôn làm sót mất dữ liệu quan trọng")
 - Tạo lúc: `2026-11-05T22:30:22+07:00`
-- Cập nhật lúc: `2026-11-06T22:52:59+07:00`
+- Cập nhật lúc: `2026-11-06T22:57:08+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -75,8 +75,9 @@ Kết quả cần có: mọi hàng bảng sau cleaner nằm nguyên vẹn (khôn
   xác nhận V-01…V-08; coordinator kết luận (task ở `in_review`, chưa `done`
   vì AC-07 chưa đạt).
 - Cập nhật `2026-11-06T22:52:59+07:00`: AC-07 đạt qua task `2026-11-05-table-search-context`
-  (V-07/R-05 cập nhật tham chiếu). Đề xuất đóng task (`done`) cùng task D-01 khi người dùng
-  duyệt; task vẫn `in_review` tới khi người dùng xác nhận.
+  (V-07/R-05 cập nhật tham chiếu).
+- Cập nhật `2026-11-06T22:57:08+07:00`: người dùng đóng task → `done` (AC-01…AC-08 đạt, review `approved`).
+  Mã nằm ở commit `eeaf045` trên `feat/table-chunking-coverage`, chưa merge vào `dev`.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
@@ -84,3 +85,6 @@ Kết quả cần có: mọi hàng bảng sau cleaner nằm nguyên vẹn (khôn
 - `2026-11-05T23:42:51+07:00` — người dùng duyệt: tạo nhánh mới từ `dev` (không dùng chung nhánh `feat/fix-chunk-pagination`); D-01 hoãn sang task tiếp theo (chỉ mở khi hit@4 bảng vẫn hụt — điều kiện đã xảy ra); D-02 đồng ý chunk lại + đo retrieval trên DB local.
 - `2026-11-06T22:52:59+07:00` — `claude-code-agent`: AC-07 đánh dấu đạt dựa trên bằng chứng của task
   `2026-11-05-table-search-context` (vế cải thiện bảng); đề xuất đóng task, chờ người dùng xác nhận.
+- `2026-11-06T22:57:08+07:00` — người dùng đóng task (cùng task `2026-11-05-table-search-context`). `claude-code-agent`
+  (coordinator): `in_review` → `done` — mọi AC có bằng chứng, review vòng 2 `approved`, không còn
+  nhận xét bắt buộc mở.

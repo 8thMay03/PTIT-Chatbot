@@ -64,4 +64,4 @@
 - Nhận xét hoãn lại: R-01, R-02 (không bắt buộc, có lý do và hướng theo dõi trong mục trên).
 - Phần chưa review / giới hạn: self_review (một agent); eval retrieval phụ thuộc DB local
   và API embedding (đã chạy thật, số liệu trong `documents/rag-eval/table-chunking/`).
-- Bước tiếp theo: coordinator đề xuất đóng task (`done`) cùng task `2026-11-05-table-search-context`, chờ người dùng xác nhận.
+- Bước tiếp theo: không còn — người dùng đóng task (`2026-11-06T22:57:08+07:00`).

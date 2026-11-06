@@ -3,9 +3,9 @@
 - Reviewer: `claude-code-agent`.
 - Hình thức: `self_review` (một agent; không phải review độc lập).
 - Trạng thái: `approved`.
-- Bản được review: nhánh `feat/table-search-context`, thay đổi trên nền `eeaf045` (S-01…S-03, gồm
-  cả sửa R-01/R-02 trong lúc triển khai) — commit đầu tiên của nhánh sau `eeaf045`.
-- Cập nhật lúc: `2026-11-06T22:52:59+07:00`.
+- Bản được review: nhánh `feat/table-search-context`, commit `3c26865` (nền `eeaf045`; S-01…S-03,
+  gồm cả sửa R-01/R-02 trong lúc triển khai).
+- Cập nhật lúc: `2026-11-06T22:57:08+07:00`.
 
 ## Phạm vi và cơ sở đánh giá
 
@@ -65,4 +65,4 @@
 - Nhận xét hoãn lại: R-03, R-06.
 - Phần chưa review / giới hạn: self_review; eval chạy trên index local trùng tài liệu; `q_table_ulo13`
   và hybrid bảng chưa cải thiện (ngoài phạm vi, xem README).
-- Bước tiếp theo: người dùng duyệt Q-01/Q-02; đóng task này và task `2026-11-05-table-chunking-coverage`.
+- Bước tiếp theo: không còn — người dùng duyệt Q-01/Q-02 và đóng hai task (`2026-11-06T22:57:08+07:00`).

@@ -1,11 +1,11 @@
 # Task: Ngữ cảnh hàng bảng cho tìm kiếm (điền ô trống, tuần tự hóa "Cột: giá trị")
 
 - ID: `2026-11-05-table-search-context`
-- Trạng thái: `in_review`
+- Trạng thái: `done`
 - Coordinator: `claude-code-agent`
 - Người yêu cầu: người dùng (quyết định hoãn D-01 có điều kiện trong task `2026-11-05-table-chunking-coverage`, điều kiện đã xảy ra ngày `2026-11-05T23:42:51+07:00`)
 - Tạo lúc: `2026-11-05T23:42:51+07:00`
-- Cập nhật lúc: `2026-11-06T22:52:59+07:00`
+- Cập nhật lúc: `2026-11-06T22:57:08+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -72,9 +72,9 @@ của `table-chunking/after_*.json`).
 - Blocker: không có.
 - Còn lại (không bắt buộc, ghi nhận): `q_table_ulo13` vẫn hụt (tokenizer), hybrid bảng không
   tăng (phía vector) — xem `documents/rag-eval/table-search-context/README.md` mục "Còn chưa đạt".
-- Bước tiếp theo: người dùng duyệt kết quả + 2 lệch plan (Q-01, Q-02); đề xuất đóng task này và
-  task `2026-11-05-table-chunking-coverage`; push/PR khi người dùng yêu cầu (task 1 chưa merge
-  vào `dev`, nhánh này chồng lên nó).
+- Bước tiếp theo: không còn việc bắt buộc. Task `done` (`2026-11-06T22:57:08+07:00`, người dùng duyệt Q-01/Q-02 và
+  đóng). Push/PR khi người dùng yêu cầu (nhánh chồng lên `feat/table-chunking-coverage` chưa merge
+  vào `dev`).
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
@@ -88,3 +88,7 @@ của `table-chunking/after_*.json`).
   cập nhật `search_text` không embed lại — mọi luồng chunk có sẵn đều embed). Hai lệch plan có số
   liệu đối chứng: Q-01 thay hàng thô bằng dòng tuần tự hóa thay vì nối thêm; Q-02 chỉ điền ô trống
   đầu hàng (xem `implementation.md`).
+- `2026-11-06T22:57:08+07:00` — người dùng duyệt Q-01 (thay hàng thô bằng dòng tuần tự hóa trong `search_text`) và
+  Q-02 (chỉ điền ô trống đầu hàng), yêu cầu đóng task. `claude-code-agent` (coordinator): `in_review` →
+  `done` — AC-01…AC-05 có bằng chứng (`verification.md`), review `approved`, không còn nhận xét bắt
+  buộc mở (R-03/R-06 hoãn, không bắt buộc).
