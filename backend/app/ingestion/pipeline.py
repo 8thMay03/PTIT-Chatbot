@@ -46,9 +46,12 @@ from app.ingestion.chunker import (
     Chunk,
     ParentChildChunk,
     compose_search_text,
+    count_recognized_tables,
+    find_table_coverage_issues,
     split_parent_child,
     split_text,
 )
+from app.ingestion.cleaner import clean_text
 from app.ingestion.loaders import SourceDocument, load_documents
 from app.ingestion.uploads import (
     delete_source_file,
@@ -834,7 +837,40 @@ def _chunk_records(
             }
         )
 
+    _log_table_coverage(document_id, text, [record.text for record in chunk_records])
     return chunk_records, chunks_payload
+
+
+def _log_table_coverage(document_id: str, text: str, child_texts: list[str]) -> None:
+    """Cảnh báo khi bảng có nguy cơ mất dữ liệu (không chặn ingest).
+
+    Hai dấu hiệu: tài liệu có nhiều dòng bắt đầu bằng ``|`` nhưng chunker
+    không nhận ra bảng nào, hoặc bất biến bảo toàn hàng S-02 báo vi phạm.
+    """
+    cleaned = clean_text(text)
+    pipe_lines = sum(1 for line in cleaned.splitlines() if line.strip().startswith("|"))
+    if pipe_lines < 5:
+        return
+    tables = count_recognized_tables(cleaned)
+    if tables == 0:
+        logger.warning(
+            "Tài liệu %s có %d dòng bắt đầu bằng '|' nhưng chunker không nhận ra bảng nào.",
+            document_id,
+            pipe_lines,
+        )
+        return
+    issues = find_table_coverage_issues(cleaned, child_texts)
+    if issues:
+        by_kind: dict[str, int] = {}
+        for issue in issues:
+            by_kind[issue.kind] = by_kind.get(issue.kind, 0) + 1
+        summary = ", ".join(f"{kind}={count}" for kind, count in sorted(by_kind.items()))
+        logger.warning(
+            "Tài liệu %s vi phạm bất biến bảng (%d bảng, %s).",
+            document_id,
+            tables,
+            summary,
+        )
 
 
 def _embedding_input(chunk_payload: dict) -> str:

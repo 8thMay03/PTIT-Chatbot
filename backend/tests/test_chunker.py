@@ -1,10 +1,25 @@
+from pathlib import Path
+
+import pytest
+
 from app.ingestion.chunker import (
+    _split_blocks,
+    _starts_markdown_table,
     _table_cells_safe,
     compose_search_text,
+    find_table_coverage_issues,
     split_parent_child,
     split_text,
 )
 from app.ingestion.cleaner import clean_text
+
+COMPACT_TABLE_FIXTURE = (
+    Path(__file__).parent / "fixtures" / "corpus" / "chunker-tables-llamaparse-compact.md"
+)
+
+
+def _compact_fixture_text() -> str:
+    return COMPACT_TABLE_FIXTURE.read_text(encoding="utf-8")
 
 
 def _clause(number: int, article: int) -> str:
@@ -604,6 +619,450 @@ def test_compose_search_text_prefixes_document_and_section_path() -> None:
 def test_compose_search_text_without_section_path() -> None:
     assert compose_search_text("TB nội trú", "", "Nội dung thông báo.") == "TB nội trú\nNội dung thông báo."
     assert compose_search_text("", "", "Nội dung thông báo.") == "Nội dung thông báo."
+
+
+# ---------------------------------------------------------------------------
+# S-01: bảng compact của LlamaParse (dòng phân cách 1–2 gạch)
+# ---------------------------------------------------------------------------
+
+
+def test_compact_delimiter_tables_are_recognized_as_tables() -> None:
+    blocks = _split_blocks(_compact_fixture_text())
+    table_blocks = [block for block in blocks if block.splitlines() and block.splitlines()[0].strip().startswith("|")]
+    assert len(table_blocks) == 2
+    assert all(
+        _starts_markdown_table(block.splitlines(), 0) for block in table_blocks
+    )
+    prose_with_pipes = [
+        block
+        for block in blocks
+        if not _starts_markdown_table(block.splitlines(), 0)
+        and any(line.strip().startswith("|") for line in block.splitlines())
+    ]
+    assert prose_with_pipes == []
+
+
+def test_compact_table_splits_between_rows_and_repeats_header() -> None:
+    text = _compact_fixture_text()
+    chunks = split_text(text, chunk_size=400, chunk_overlap=20)
+    contact_children = [chunk for chunk in chunks if "ĐƠN VỊ" in chunk.text]
+    drl_children = [chunk for chunk in chunks if "Nội dung đánh giá" in chunk.text]
+
+    assert len(contact_children) > 1
+    assert all("|-|-|-|-|-|" in chunk.text for chunk in contact_children)
+    assert len(drl_children) > 1
+    assert all("|-|-|-|-|-|-|-|" in chunk.text for chunk in drl_children)
+
+    data_rows = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip().startswith("|")
+        and not all(cell.strip().strip(":") and set(cell.strip().strip(":")) <= {"-"} for cell in line.strip().strip("|").split("|"))
+    ]
+    for row in data_rows:
+        assert any(row in chunk.text for chunk in chunks), row[:60]
+
+    assert any(
+        "GS.TS. Phạm Ngọc<br/>Anh|Trưởng khoa|0912 316<br/>141" in chunk.text
+        for chunk in chunks
+    )
+    assert any(
+        "phân công làm lớp trưởng" in chunk.text and "|4 điểm|" in chunk.text
+        for chunk in chunks
+    )
+
+
+def test_stray_delimiter_line_is_not_a_table() -> None:
+    assert not _starts_markdown_table(["Some prose.", "|-|"], 0)
+    assert not _starts_markdown_table(["|-|"], 0)
+    chunks = split_text("Ghi chú quan trọng.\n\n|-|", chunk_size=500, chunk_overlap=20)
+    assert len(chunks) == 1
+    assert "Ghi chú quan trọng." in chunks[0].text
+
+
+# ---------------------------------------------------------------------------
+# S-03: ghép bảng bị ngắt trang
+# ---------------------------------------------------------------------------
+
+
+def _page_break_fixture() -> str:
+    page1 = "\n".join(f"| {index} | Môn {index} | {index} |" for index in range(1, 31))
+    page2 = "\n".join(f"| {index} | Môn {index} | {index} |" for index in range(31, 36))
+    return (
+        "## Kế hoạch\n\n"
+        f"| TT | Môn | TC |\n| --- | --- | --- |\n{page1}\n\n"
+        f"| TT | Môn | TC |\n| --- | --- | --- |\n{page2}\n"
+    )
+
+
+def test_page_break_tables_with_same_header_are_merged() -> None:
+    blocks = _split_blocks(_page_break_fixture())
+    tables = [block for block in blocks if _starts_markdown_table(block.splitlines(), 0)]
+    assert len(tables) == 1
+
+    chunks = split_text(_page_break_fixture(), chunk_size=200, chunk_overlap=20)
+    table_chunks = [chunk for chunk in chunks if "| TT | Môn | TC |" in chunk.text]
+    assert len(table_chunks) >= 2
+    assert all("| --- | --- | --- |" in chunk.text for chunk in table_chunks)
+    counts = [
+        sum(
+            1
+            for line in chunk.text.splitlines()
+            if line.startswith("| ") and "Môn" in line and line.strip() != "| TT | Môn | TC |"
+        )
+        for chunk in table_chunks
+    ]
+    assert all(count >= 3 for count in counts)
+    assert sum(counts) == 35
+
+
+def test_page_break_continuation_without_header_is_merged() -> None:
+    text = (
+        "## Kế hoạch\n\n"
+        "| TT | Môn | TC |\n| --- | --- | --- |\n| 1 | Toán | 2 |\n| 2 | Lý | 2 |\n\n"
+        "| 3 | Hóa | 2 |\n| 4 | Văn | 2 |\n"
+    )
+    blocks = _split_blocks(text)
+    tables = [block for block in blocks if _starts_markdown_table(block.splitlines(), 0)]
+    assert len(tables) == 1
+
+    chunks = split_text(text, chunk_size=500, chunk_overlap=20)
+    assert any("| 4 | Văn | 2 |" in chunk.text for chunk in chunks)
+    assert all("| TT | Môn | TC |" in chunk.text for chunk in chunks if "| 4 |" in chunk.text)
+
+    issues = find_table_coverage_issues(
+        clean_text(text), [chunk.text for chunk in chunks]
+    )
+    assert issues == []
+
+
+def test_tables_with_different_headers_are_not_merged() -> None:
+    text = (
+        "## Kế hoạch\n\n"
+        "| TT | Môn HK1 | TC |\n| --- | --- | --- |\n| 1 | Toán | 2 |\n\n"
+        "| TT | Môn HK2 | TC |\n| --- | --- | --- |\n| 2 | Lý | 2 |\n"
+    )
+    blocks = _split_blocks(text)
+    tables = [block for block in blocks if _starts_markdown_table(block.splitlines(), 0)]
+
+    assert len(tables) == 2
+
+
+def test_continuation_with_different_column_count_is_not_merged() -> None:
+    text = (
+        "## Kế hoạch\n\n"
+        "| TT | Môn | TC |\n| --- | --- | --- |\n| 1 | Toán | 2 |\n\n"
+        "| 2 | Lý |\n"
+    )
+    blocks = _split_blocks(text)
+    tables = [block for block in blocks if _starts_markdown_table(block.splitlines(), 0)]
+
+    assert len(tables) == 1
+    assert any(
+        "| 2 | Lý |" in block and not _starts_markdown_table(block.splitlines(), 0)
+        for block in blocks
+    )
+
+
+def test_prose_between_same_header_tables_blocks_merge() -> None:
+    text = (
+        "## Kế hoạch\n\n"
+        "| TT | Môn | TC |\n| --- | --- | --- |\n| 1 | Toán | 2 |\n\n"
+        "Ghi chú: bảng tiếp theo là học kỳ khác.\n\n"
+        "| TT | Môn | TC |\n| --- | --- | --- |\n| 2 | Lý | 2 |\n"
+    )
+    blocks = _split_blocks(text)
+    tables = [block for block in blocks if _starts_markdown_table(block.splitlines(), 0)]
+
+    assert len(tables) == 2
+
+
+def test_header_only_page_fragment_does_not_become_header_only_child() -> None:
+    text = (
+        "## Kế hoạch\n\n"
+        "| TT | Môn | TC |\n| --- | --- | --- |\n| 1 | Toán | 2 |\n\n"
+        "| TT | Môn | TC |\n| --- | --- | --- |\n\n"
+        "| 2 | Lý | 2 |\n| 3 | Hóa | 2 |\n"
+    )
+    chunks = split_text(text, chunk_size=500, chunk_overlap=20)
+
+    assert not any(chunk.text.strip().endswith("| --- | --- | --- |") for chunk in chunks)
+    assert any("| 3 | Hóa | 2 |" in chunk.text for chunk in chunks)
+
+
+# ---------------------------------------------------------------------------
+# S-02/S-03: cân bằng độ dài không được xé hàng bảng (hồi quy từ D26 PDF)
+# ---------------------------------------------------------------------------
+
+
+def test_short_tail_after_table_does_not_steal_table_row() -> None:
+    rows = "\n".join(f"| {index} | Môn {index} | {index} |" for index in range(1, 13))
+    text = (
+        "## Kế hoạch\n\n"
+        "Giới thiệu ngắn về bảng kế hoạch học tập.\n\n"
+        f"| TT | Môn | TC |\n| --- | --- | --- |\n{rows}\n\n"
+        "| 1 | Java | 3 |\n| --- | --- |\n| 2 | Âm thanh | 3 |"
+    )
+    children = split_parent_child(
+        text,
+        parent_size=2048,
+        parent_overlap=256,
+        child_size=300,
+        child_overlap=30,
+        min_child_size=120,
+    )
+
+    assert len(children) == 1
+    issues = find_table_coverage_issues(
+        clean_text(text), [chunk.text for chunk in children]
+    )
+    assert issues == [], [(issue.kind, issue.child_index, issue.excerpt) for issue in issues]
+    assert "| 12 | Môn 12 | 12 |" in children[0].text
+    assert "| 2 | Âm thanh | 3 |" in children[0].text
+    for line in children[0].text.splitlines():
+        assert not ("Môn 12" in line and "Java" in line)
+
+
+# ---------------------------------------------------------------------------
+# S-04: tách bảng HTML (nhiều tbody, thiếu </tr>, tfoot, caption)
+# ---------------------------------------------------------------------------
+
+
+def _html_table_text(
+    body: str,
+    *,
+    thead: str = "    <tr><th>Mã</th><th>Giá trị</th></tr>",
+    caption: str = "",
+    tfoot: str = "",
+    with_thead: bool = True,
+) -> str:
+    lines = ["## Báo cáo", "", "<table>"]
+    if caption:
+        lines.append(f"  <caption>{caption}</caption>")
+    if with_thead:
+        lines += ["  <thead>", thead, "  </thead>", body]
+    else:
+        lines.append(body)
+    if tfoot:
+        lines.append(tfoot)
+    lines.append("</table>")
+    return "\n".join(lines)
+
+
+def _html_children(text: str) -> list[str]:
+    return [
+        chunk.text
+        for chunk in split_parent_child(
+            text,
+            parent_size=2048,
+            parent_overlap=256,
+            child_size=1024,
+            child_overlap=128,
+            min_child_size=120,
+        )
+    ]
+
+
+def test_html_table_missing_tr_close_tag_loses_no_rows() -> None:
+    body = "<tbody>\n" + "\n".join(
+        f"    <tr><td>R-{index:03d}</td><td>Giá trị {index}</td>" for index in range(1, 121)
+    ) + "\n  </tbody>"
+    text = _html_table_text(body)
+    children = _html_children(text)
+
+    assert len(children) > 1
+    assert sum(child.count("R-") for child in children) == 120
+    assert find_table_coverage_issues(clean_text(text), children) == []
+
+
+def test_html_table_with_multiple_tbodies_loses_no_rows() -> None:
+    bodies = "\n".join(
+        "  <tbody>\n"
+        + "\n".join(
+            f"    <tr><td>R-{page * 40 + index:03d}</td><td>Trang {page + 1}</td></tr>"
+            for index in range(1, 41)
+        )
+        + "\n  </tbody>"
+        for page in range(3)
+    )
+    text = _html_table_text(bodies)
+    children = _html_children(text)
+
+    assert sum(child.count("R-") for child in children) == 120
+    assert find_table_coverage_issues(clean_text(text), children) == []
+
+
+def test_html_table_keeps_tfoot_in_last_piece_and_thead_everywhere() -> None:
+    body = "<tbody>\n" + "\n".join(
+        f"    <tr><td>R-{index:03d}</td><td>{index * 100}</td></tr>" for index in range(1, 61)
+    ) + "\n  </tbody>"
+    tfoot = "  <tfoot>\n    <tr><td>Tổng cộng</td><td>183000</td></tr>\n  </tfoot>"
+    text = _html_table_text(body, tfoot=tfoot)
+    children = _html_children(text)
+    table_children = [child for child in children if "<table" in child.lower()]
+
+    assert len(table_children) > 1
+    assert all("<thead>" in child.lower() for child in table_children)
+    assert "Tổng cộng" in table_children[-1]
+    assert sum(child.count("R-") for child in table_children) == 60
+    assert find_table_coverage_issues(clean_text(text), children) == []
+
+
+def test_html_table_keeps_caption_in_every_piece() -> None:
+    body = "<tbody>\n" + "\n".join(
+        f"    <tr><td>R-{index:03d}</td><td>{index * 100}</td></tr>" for index in range(1, 61)
+    ) + "\n  </tbody>"
+    text = _html_table_text(body, caption="Bảng kết quả vận hành")
+    children = _html_children(text)
+    table_children = [child for child in children if "<table" in child.lower()]
+
+    assert len(table_children) > 1
+    assert all("Bảng kết quả vận hành" in child for child in table_children)
+    assert find_table_coverage_issues(clean_text(text), children) == []
+
+
+def test_html_table_without_thead_has_no_missing_header() -> None:
+    body = "<tbody>\n" + "\n".join(
+        f"    <tr><td>R-{index:03d}</td><td>{index * 100}</td></tr>" for index in range(1, 61)
+    ) + "\n  </tbody>"
+    text = _html_table_text(body, with_thead=False)
+    children = _html_children(text)
+
+    assert len(children) > 1
+    assert find_table_coverage_issues(clean_text(text), children) == []
+
+
+# ---------------------------------------------------------------------------
+# S-05: cleaner giữ bảng dữ liệu sau "MỤC LỤC", vẫn lọc bảng mục lục
+# ---------------------------------------------------------------------------
+
+
+def test_clean_text_drops_compact_toc_table() -> None:
+    text = "\n".join(
+        [
+            "# MỤC LỤC",
+            "",
+            "|Lời nói đầu|3|",
+            "|-|-|",
+            "|**PHẦN I: TỔNG QUAN**|**5**|",
+            "|Giới thiệu|6|",
+            "",
+            "# LỜI NÓI ĐẦU",
+            "",
+            "Nội dung thật.",
+        ]
+    )
+
+    cleaned = clean_text(text)
+
+    assert "MỤC LỤC" not in cleaned
+    assert "Lời nói đầu" not in cleaned
+    assert "PHẦN I" not in cleaned
+    assert "# LỜI NÓI ĐẦU" in cleaned
+    assert "Nội dung thật." in cleaned
+
+
+def test_clean_text_keeps_data_table_after_toc_heading() -> None:
+    text = "\n".join(
+        [
+            "# MỤC LỤC",
+            "",
+            "|Lời nói đầu|3|",
+            "|-|-|",
+            "|Giới thiệu|6|",
+            "",
+            "|ĐƠN VỊ|HỌ VÀ TÊN|CHỨC VỤ|",
+            "|-|-|-|",
+            "|BM Toán|TS. Lê Văn Ngọc|Trưởng bộ môn|",
+            "|BM Vật lý|TS. Lê Thị Minh Thanh|Trưởng bộ môn|",
+            "",
+            "Đoạn văn sau bảng dữ liệu.",
+        ]
+    )
+
+    cleaned = clean_text(text)
+
+    assert "Lời nói đầu" not in cleaned
+    assert "|BM Toán|TS. Lê Văn Ngọc|Trưởng bộ môn|" in cleaned
+    assert "|BM Vật lý|TS. Lê Thị Minh Thanh|Trưởng bộ môn|" in cleaned
+    assert "Đoạn văn sau bảng dữ liệu." in cleaned
+
+
+def test_clean_text_drops_toc_like_html_table_keeps_data_html_table() -> None:
+    toc_table = "\n".join(
+        [
+            "# MỤC LỤC",
+            "",
+            "<table>",
+            "<tbody>",
+            "<tr><td>Lời nói đầu</td><td>3</td></tr>",
+            "<tr><td>Giới thiệu</td><td>6</td></tr>",
+            "</tbody>",
+            "</table>",
+            "",
+            "<table>",
+            "<thead><tr><th>Đơn vị</th><th>Điện thoại</th></tr></thead>",
+            "<tbody>",
+            "<tr><td>BM Toán</td><td>0985 913 158</td></tr>",
+            "</tbody>",
+            "</table>",
+            "",
+            "Đoạn văn sau bảng.",
+        ]
+    )
+
+    cleaned = clean_text(toc_table)
+
+    assert "Lời nói đầu" not in cleaned
+    assert "BM Toán" in cleaned
+    assert "Đoạn văn sau bảng." in cleaned
+
+
+def test_clean_text_truncated_toc_table_does_not_swallow_rest() -> None:
+    text = "\n".join(
+        [
+            "# MỤC LỤC",
+            "",
+            "<table>",
+            "<tbody>",
+            "<tr><td>Lời nói đầu</td><td>3</td></tr>",
+            "<tr><td>Giới thiệu</td><td>6</td></tr>",
+            "",
+            "# PHẦN I",
+            "",
+            "Nội dung thật sau bảng cụt.",
+        ]
+    )
+
+    cleaned = clean_text(text)
+
+    assert "Lời nói đầu" not in cleaned
+    assert "# PHẦN I" in cleaned
+    assert "Nội dung thật sau bảng cụt." in cleaned
+
+
+def test_clean_text_drops_same_pipe_count_on_d26_toc() -> None:
+    from app.core.config import settings
+
+    candidates = list(Path(settings.documents_path).rglob("*.md"))
+    if not candidates:
+        pytest.skip("Thiếu file dữ liệu D26 trong data/ (thư mục bị gitignore).")
+    raw = max(candidates, key=lambda path: path.stat().st_size).read_text(encoding="utf-8")
+
+    raw_lines = raw.splitlines()
+    cleaned = clean_text(raw)
+    cleaned_lines = cleaned.splitlines()
+    before = sum(1 for line in raw_lines if line.strip().startswith("|"))
+    after = sum(1 for line in cleaned_lines if line.strip().startswith("|"))
+
+    # Bảng mục lục D26 vẫn bị lọc như trước: 87 dòng `|` bị bỏ (báo cáo điều
+    # tra ghi 85 vì đếm theo nội dung duy nhất — hai dòng `|-|-|` trong mục
+    # lục trùng nội dung với bảng ở phần khác nên phép đếm đó bỏ sót).
+    assert before - after == 87
+    kept = cleaned_lines
+    for number, line in enumerate(raw_lines, start=1):
+        if line.strip().startswith("|") and line not in kept:
+            assert number <= 130, (number, line[:80])
 
 
 # ---------------------------------------------------------------------------

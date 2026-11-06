@@ -1,0 +1,1513 @@
+{
+  "schema_version": 3,
+  "mode": "hybrid",
+  "created_at": "2026-11-05T22:49:28+07:00",
+  "elapsed_seconds": 6.515,
+  "git": {
+    "commit": "14c4eb611d271d159297094418b5190aebe8dc53",
+    "branch": "feat/table-chunking-coverage",
+    "dirty": false
+  },
+  "dataset": {
+    "path": "tests\\fixtures\\table_questions.json",
+    "cases": 14,
+    "sha256": "a512d8a3a2f3b60aca071d76dc5e1e0fd932e06cc782518b13ea512e33d516d4"
+  },
+  "embedding": {
+    "provider": "openai",
+    "model": "text-embedding-3-small",
+    "cache_file": "D:\\GithubRepositories\\PTIT Chatbot\\backend\\storage\\eval\\embedding_cache.json",
+    "cache_hits": 14,
+    "cache_misses": 14
+  },
+  "corpus": {
+    "fingerprint": "4c60e512ef0c156aa346cb5f1b7d90a6e7020ed32a0ee2f7b8bfb612182a0675",
+    "documents": 2,
+    "chunks": 1013,
+    "embedded_chunks": 1013,
+    "method": "sha256(sorted document content_hash + chunk counts)"
+  },
+  "config": {
+    "chunk_size": 2048,
+    "chunk_overlap": 256,
+    "parent_child_chunking_enabled": true,
+    "child_chunk_size": 1024,
+    "child_chunk_overlap": 128,
+    "min_child_chunk_chars": 120,
+    "hybrid_vector_weight": 0.8,
+    "hybrid_candidate_multiplier": 4,
+    "hybrid_rrf_k": 60,
+    "retrieval_min_vector_score": 0.3,
+    "retrieval_min_bm25_score": 2.0,
+    "query_rewrite_use_llm": false,
+    "multi_query_enabled": false,
+    "multi_query_use_llm": false,
+    "multi_query_count": 3,
+    "reranker_enabled": false,
+    "reranker_provider": "cross-encoder",
+    "reranker_model": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+    "reranker_candidate_multiplier": 3,
+    "reranker_vector_weight": 0.6,
+    "reranker_bm25_weight": 0.2,
+    "reranker_lexical_weight": 0.2,
+    "retrieval_default_top_k": 4
+  },
+  "eval": {
+    "top_k": 10,
+    "metric_ks": [
+      1,
+      4,
+      10
+    ]
+  },
+  "metrics": {
+    "overall": {
+      "cases": 14,
+      "hit@1": 0.714286,
+      "hit@4": 0.785714,
+      "hit@10": 1.0,
+      "mrr": 0.783333,
+      "coverage@1": 0.571429,
+      "coverage@4": 0.75,
+      "coverage@10": 0.964286
+    },
+    "by_diacritics": {
+      "co_dau": {
+        "cases": 14,
+        "hit@1": 0.714286,
+        "hit@4": 0.785714,
+        "hit@10": 1.0,
+        "mrr": 0.783333,
+        "coverage@1": 0.571429,
+        "coverage@4": 0.75,
+        "coverage@10": 0.964286
+      }
+    },
+    "by_question_type": {
+      "unknown": {
+        "cases": 14,
+        "hit@1": 0.714286,
+        "hit@4": 0.785714,
+        "hit@10": 1.0,
+        "mrr": 0.783333,
+        "coverage@1": 0.571429,
+        "coverage@4": 0.75,
+        "coverage@10": 0.964286
+      }
+    },
+    "by_source": {
+      "unknown": {
+        "cases": 14,
+        "hit@1": 0.714286,
+        "hit@4": 0.785714,
+        "hit@10": 1.0,
+        "mrr": 0.783333,
+        "coverage@1": 0.571429,
+        "coverage@4": 0.75,
+        "coverage@10": 0.964286
+      }
+    },
+    "section_dominance": {
+      "k": 4,
+      "max_share": 0.357143,
+      "top": [
+        {
+          "section": "Sổ tay sinh viên D26 _1_.pdf :: PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "cases": 5,
+          "share": 0.357143
+        },
+        {
+          "section": "Sổ tay sinh viên D26 _1_.pdf :: PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "cases": 5,
+          "share": 0.357143
+        },
+        {
+          "section": "Sổ tay sinh viên D26 _1_.pdf :: PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > THÔNG TIN VỀ CÁC KHOA, VIỆN THUỘC VÀ TRỰC THUỘC HỌC VIỆN > I. Khoa Cơ bản 1",
+          "cases": 4,
+          "share": 0.285714
+        },
+        {
+          "section": "Sổ tay sinh viên D26 _1_.pdf :: PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > THÔNG TIN VỀ CÁC KHOA, VIỆN THUỘC VÀ TRỰC THUỘC HỌC VIỆN > II. Khoa Công nghệ thông tin 1",
+          "cases": 4,
+          "share": 0.285714
+        },
+        {
+          "section": "Sổ tay sinh viên D26 _1_.pdf :: PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > III. Khoa Viễn thông 1",
+          "cases": 3,
+          "share": 0.214286
+        },
+        {
+          "section": "Sổ tay sinh viên D26 _1_.pdf :: PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VIII. Khoa Quản trị Kinh doanh 1",
+          "cases": 2,
+          "share": 0.142857
+        },
+        {
+          "section": "Sổ tay sinh viên D26 _1_.pdf :: PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > IX. Khoa Tài chính Kế toán",
+          "cases": 1,
+          "share": 0.071429
+        },
+        {
+          "section": "Sổ tay sinh viên D26 _1_.pdf :: PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > V. Khoa An toàn thông tin",
+          "cases": 1,
+          "share": 0.071429
+        },
+        {
+          "section": "Sổ tay sinh viên D26 _1_.pdf :: PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VI. PHÒNG KHOA HỌC CÔNG NGHỆ & HỢP TÁC QUỐC TẾ",
+          "cases": 1,
+          "share": 0.071429
+        },
+        {
+          "section": "Sổ tay sinh viên D26 _1_.pdf :: PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN CHƯƠNG TRÌNH CÔNG NGHỆ UAV VÀ ROBOT TỰ HÀNH - KHÓA 2026 > NĂM HỌC THỨ HAI",
+          "cases": 1,
+          "share": 0.071429
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "id": "q_table_drl_tc3_max",
+      "question": "Mức điểm tối đa của Tiêu chí 3 (ý thức và kết quả tham gia hoạt động chính trị - xã hội, văn hóa, văn nghệ, thể thao) trong đánh giá điểm rèn luyện là bao nhiêu?",
+      "source": "unknown",
+      "question_type": "unknown",
+      "diacritics": "co_dau",
+      "first_hit_rank": 1,
+      "matched_term": "20 điểm",
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-565::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "score": 0.016393
+        },
+        {
+          "rank": 2,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-593::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.015775
+        },
+        {
+          "rank": 3,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-564::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "score": 0.01553
+        },
+        {
+          "rank": 4,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-592::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.015166
+        },
+        {
+          "rank": 5,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-571::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 14. Tổ chức đánh giá",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 14. Tổ chức đánh giá",
+          "score": 0.014505
+        },
+        {
+          "rank": 6,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-566::child-2",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "score": 0.014493
+        },
+        {
+          "rank": 7,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-570::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 13: Quy trình đánh giá kết quả rèn luyện",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 13: Quy trình đánh giá kết quả rèn luyện",
+          "score": 0.014168
+        },
+        {
+          "rank": 8,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-594::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.013701
+        },
+        {
+          "rank": 9,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-379::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 23. Tiêu chí đánh giá kết quả học tập",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > QUY ĐỊNH ĐÀO TẠO ĐẠI HỌC THEO TÍN CHỈ CỦA HỌC VIỆN > Chương V: ĐÁNH GIÁ KẾT QUẢ VÀ THI KẾT THÚC HỌC PHẦN > Điều 23. Tiêu chí đánh giá kết quả học tập",
+          "score": 0.013
+        },
+        {
+          "rank": 10,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-569::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 12. Phân loại đánh giá kết quả rèn luyện",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 12. Phân loại đánh giá kết quả rèn luyện",
+          "score": 0.012954
+        }
+      ],
+      "coverage": {
+        "coverage@1": 0.5,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
+    },
+    {
+      "id": "q_table_drl_35_penalty",
+      "question": "Sinh viên đưa thông tin sai lệch, chưa được kiểm chứng về Học viện lên mạng xã hội thì bị trừ bao nhiêu điểm rèn luyện?",
+      "source": "unknown",
+      "question_type": "unknown",
+      "diacritics": "co_dau",
+      "first_hit_rank": 1,
+      "matched_term": "thông tin sai lệch",
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-565::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "score": 0.016393
+        },
+        {
+          "rank": 2,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-668::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 16. Ứng xử trên không gian mạng",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH VỀ VĂN HÓA HỌC ĐƯỜNG VÀ CHUẨN MỰC ỨNG XỬ CỦA NGƯỜI HỌC > Chương III: CHUẨN MỰC ỨNG XỬ CỦA NGƯỜI HỌC > Điều 16. Ứng xử trên không gian mạng",
+          "score": 0.014853
+        },
+        {
+          "rank": 3,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-593::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.013892
+        },
+        {
+          "rank": 4,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-429::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 29. Xử lý vi phạm của thí sinh",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > QUY ĐỊNH TỔ CHỨC THI KẾT THÚC HỌC PHẦN, THI HỌC PHẦN THAY THẾ TỐT NGHIỆP TRÌNH ĐỘ ĐẠI HỌC CỦA HỌC VIỆN > Chương VII: XỬ LÝ VI PHẠM > Điều 29. Xử lý vi phạm của thí sinh",
+          "score": 0.013727
+        },
+        {
+          "rank": 5,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-566::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "score": 0.01342
+        },
+        {
+          "rank": 6,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-569::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 12. Phân loại đánh giá kết quả rèn luyện",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 12. Phân loại đánh giá kết quả rèn luyện",
+          "score": 0.013051
+        },
+        {
+          "rank": 7,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-374::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 20. Nghĩa vụ của sinh viên",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > QUY ĐỊNH ĐÀO TẠO ĐẠI HỌC THEO TÍN CHỈ CỦA HỌC VIỆN > Chương IV: GIẢNG VIÊN, CỐ VẤN HỌC TẬP VÀ SINH VIÊN > Điều 20. Nghĩa vụ của sinh viên",
+          "score": 0.012903
+        },
+        {
+          "rank": 8,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-572::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 15. Sử dụng kết quả rèn luyện",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 15. Sử dụng kết quả rèn luyện",
+          "score": 0.012715
+        },
+        {
+          "rank": 9,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-588::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "PHỤ LỤC 1: MỘT SỐ NỘI DUNG VI PHẠM VÀ KHUNG XỬ LÝ KỸ LUẬT",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 1: MỘT SỐ NỘI DUNG VI PHẠM VÀ KHUNG XỬ LÝ KỸ LUẬT",
+          "score": 0.012698
+        },
+        {
+          "rank": 10,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-661::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 9. Ứng xử với bạn bè, người học trong Học viện",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH VỀ VĂN HÓA HỌC ĐƯỜNG VÀ CHUẨN MỰC ỨNG XỬ CỦA NGƯỜI HỌC > Chương III: CHUẨN MỰC ỨNG XỬ CỦA NGƯỜI HỌC > Điều 9. Ứng xử với bạn bè, người học trong Học viện",
+          "score": 0.01231
+        }
+      ],
+      "coverage": {
+        "coverage@1": 0.5,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
+    },
+    {
+      "id": "q_table_drl_51",
+      "question": "Sinh viên được Học viện phân công làm lớp trưởng được cộng bao nhiêu điểm rèn luyện (mục 5.1, Tiêu chí 5)?",
+      "source": "unknown",
+      "question_type": "unknown",
+      "diacritics": "co_dau",
+      "first_hit_rank": 1,
+      "matched_term": "phân công làm lớp trưởng",
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-566::child-2",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "score": 0.016393
+        },
+        {
+          "rank": 2,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-594::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.016129
+        },
+        {
+          "rank": 3,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-567::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "score": 0.015556
+        },
+        {
+          "rank": 4,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-592::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.014788
+        },
+        {
+          "rank": 5,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-571::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 14. Tổ chức đánh giá",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 14. Tổ chức đánh giá",
+          "score": 0.014663
+        },
+        {
+          "rank": 6,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-564::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "score": 0.014226
+        },
+        {
+          "rank": 7,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-584::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 22. Lớp sinh viên",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > Chương VI: HỆ THỐNG TỔ CHỨC, QUẢN LÝ > Điều 22. Lớp sinh viên",
+          "score": 0.014045
+        },
+        {
+          "rank": 8,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-593::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.013369
+        },
+        {
+          "rank": 9,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-570::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 13: Quy trình đánh giá kết quả rèn luyện",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 13: Quy trình đánh giá kết quả rèn luyện",
+          "score": 0.01258
+        },
+        {
+          "rank": 10,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-598::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 1: Học bổng khuyến khích học tập",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH VỀ TẠO LẬP, QUẢN LÝ VÀ SỬ DỤNG QUỸ HỌC BỔNG VÀ HỖ TRỢ NGƯỜI HỌC > Chương III: CHI HỌC BỔNG > Điều 1: Học bổng khuyến khích học tập",
+          "score": 0.0125
+        }
+      ],
+      "coverage": {
+        "coverage@1": 0.5,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
+    },
+    {
+      "id": "q_table_ulo13",
+      "question": "Chuẩn đầu ra ULO1.3 yêu cầu sinh viên ứng dụng điều gì (kể cả nội dung tiếng Anh)?",
+      "source": "unknown",
+      "question_type": "unknown",
+      "diacritics": "co_dau",
+      "first_hit_rank": 5,
+      "matched_term": "ULO1.3",
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-449::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 3. Khung chương trình đào tạo chuẩn môn học tiếng Anh theo chuẩn TOEIC quốc tế",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > QUY ĐỊNH TỔ CHỨC ĐÀO TẠO VÀ KIỂM TRA CHUẨN ĐẦU RA TIẾNG ANH TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY TẠI HỌC VIỆN > Điều 3. Khung chương trình đào tạo chuẩn môn học tiếng Anh theo chuẩn TOEIC quốc tế",
+          "score": 0.015924
+        },
+        {
+          "rank": 2,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-466::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "~~Điều 3. Khung~~ chương trình đào tạo chuẩn môn học tiếng Anh theo chuẩn TOEFL iBT quốc tế",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > QUY ĐỊNH TỔ CHỨC ĐÀO TẠO VÀ KIỂM TRA CHUẨN ĐẦU RA TIẾNG ANH TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY HỆ CHẤT LƯỢNG CAO > Điều 2. Mục đích > ~~Điều 3. Khung~~ chương trình đào tạo chuẩn môn học tiếng Anh theo chuẩn TOEFL iBT quốc tế",
+          "score": 0.015554
+        },
+        {
+          "rank": 3,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-448::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 2. Mục đích",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > QUY ĐỊNH TỔ CHỨC ĐÀO TẠO VÀ KIỂM TRA CHUẨN ĐẦU RA TIẾNG ANH TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY TẠI HỌC VIỆN > Điều 2. Mục đích",
+          "score": 0.014653
+        },
+        {
+          "rank": 4,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-465::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 2. Mục đích",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > QUY ĐỊNH TỔ CHỨC ĐÀO TẠO VÀ KIỂM TRA CHUẨN ĐẦU RA TIẾNG ANH TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY HỆ CHẤT LƯỢNG CAO > Điều 2. Mục đích",
+          "score": 0.014409
+        },
+        {
+          "rank": 5,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-99::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "4. Mô tả nội dung",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > BỘ PHẢI CHẤT NGƯỜI TỐT NGHIỆP VÀ CHUẨN ĐẦU RA CƠ SỞ GIÁO DỤC TRÌNH ĐỘ ĐẠI HỌC CỦA HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG > 4. Mô tả nội dung",
+          "score": 0.014349
+        },
+        {
+          "rank": 6,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-468::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Miễn kiểm tra trình độ tiếng Anh",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > QUY ĐỊNH TỔ CHỨC ĐÀO TẠO VÀ KIỂM TRA CHUẨN ĐẦU RA TIẾNG ANH TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY HỆ CHẤT LƯỢNG CAO > Điều 4. Tổ chức kiểm tra trình độ tiếng Anh > Miễn kiểm tra trình độ tiếng Anh",
+          "score": 0.014192
+        },
+        {
+          "rank": 7,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-473::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 9. Công nhận đạt chuẩn đầu ra tiếng Anh trước khi tốt nghiệp",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > QUY ĐỊNH TỔ CHỨC ĐÀO TẠO VÀ KIỂM TRA CHUẨN ĐẦU RA TIẾNG ANH TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY HỆ CHẤT LƯỢNG CAO > Điều 9. Công nhận đạt chuẩn đầu ra tiếng Anh trước khi tốt nghiệp",
+          "score": 0.013989
+        },
+        {
+          "rank": 8,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-454::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 8. Kiểm tra chuẩn đầu ra tiếng Anh trước khi tốt nghiệp",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > QUY ĐỊNH TỔ CHỨC ĐÀO TẠO VÀ KIỂM TRA CHUẨN ĐẦU RA TIẾNG ANH TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY TẠI HỌC VIỆN > Điều 8. Kiểm tra chuẩn đầu ra tiếng Anh trước khi tốt nghiệp",
+          "score": 0.013889
+        },
+        {
+          "rank": 9,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-98::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "4. Mô tả nội dung",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > BỘ PHẢI CHẤT NGƯỜI TỐT NGHIỆP VÀ CHUẨN ĐẦU RA CƠ SỞ GIÁO DỤC TRÌNH ĐỘ ĐẠI HỌC CỦA HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG > 4. Mô tả nội dung",
+          "score": 0.01381
+        },
+        {
+          "rank": 10,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-455::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 9. Công nhận đạt chuẩn đầu ra tiếng Anh trước khi tốt nghiệp",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > QUY ĐỊNH TỔ CHỨC ĐÀO TẠO VÀ KIỂM TRA CHUẨN ĐẦU RA TIẾNG ANH TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY TẠI HỌC VIỆN > Điều 9. Công nhận đạt chuẩn đầu ra tiếng Anh trước khi tốt nghiệp",
+          "score": 0.013564
+        }
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 1.0
+      }
+    },
+    {
+      "id": "q_table_contact_toan",
+      "question": "Trưởng bộ môn Toán của Khoa Cơ bản 1 là ai, email liên hệ là gì?",
+      "source": "unknown",
+      "question_type": "unknown",
+      "diacritics": "co_dau",
+      "first_hit_rank": 1,
+      "matched_term": "Lê Văn Ngọc",
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-51::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "I. Khoa Cơ bản 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > THÔNG TIN VỀ CÁC KHOA, VIỆN THUỘC VÀ TRỰC THUỘC HỌC VIỆN > I. Khoa Cơ bản 1",
+          "score": 0.016393
+        },
+        {
+          "rank": 2,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-52::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "II. Khoa Công nghệ thông tin 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > THÔNG TIN VỀ CÁC KHOA, VIỆN THUỘC VÀ TRỰC THUỘC HỌC VIỆN > II. Khoa Công nghệ thông tin 1",
+          "score": 0.015823
+        },
+        {
+          "rank": 3,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-55::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "V. Khoa An toàn thông tin",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > V. Khoa An toàn thông tin",
+          "score": 0.015577
+        },
+        {
+          "rank": 4,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-59::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "IX. Khoa Tài chính Kế toán",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > IX. Khoa Tài chính Kế toán",
+          "score": 0.015533
+        },
+        {
+          "rank": 5,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-58::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "VIII. Khoa Quản trị Kinh doanh 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VIII. Khoa Quản trị Kinh doanh 1",
+          "score": 0.015115
+        },
+        {
+          "rank": 6,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-68::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "V. PHÒNG TÀI CHÍNH KẾ TOÁN",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > V. PHÒNG TÀI CHÍNH KẾ TOÁN",
+          "score": 0.014394
+        },
+        {
+          "rank": 7,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-53::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "III. Khoa Viễn thông 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > III. Khoa Viễn thông 1",
+          "score": 0.013929
+        },
+        {
+          "rank": 8,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-57::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "VII. Khoa Đa phương tiện",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VII. Khoa Đa phương tiện",
+          "score": 0.013814
+        },
+        {
+          "rank": 9,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-69::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "VI. PHÒNG KHOA HỌC CÔNG NGHỆ & HỢP TÁC QUỐC TẾ",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VI. PHÒNG KHOA HỌC CÔNG NGHỆ & HỢP TÁC QUỐC TẾ",
+          "score": 0.013745
+        },
+        {
+          "rank": 10,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-54::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "IV. Khoa Kỹ thuật Điện tử 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > IV. Khoa Kỹ thuật Điện tử 1",
+          "score": 0.013652
+        }
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
+    },
+    {
+      "id": "q_table_contact_vatly",
+      "question": "Số điện thoại của Trưởng bộ môn Vật lý Khoa Cơ bản 1 là gì?",
+      "source": "unknown",
+      "question_type": "unknown",
+      "diacritics": "co_dau",
+      "first_hit_rank": 1,
+      "matched_term": "Lê Thị Minh Thanh",
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-51::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "I. Khoa Cơ bản 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > THÔNG TIN VỀ CÁC KHOA, VIỆN THUỘC VÀ TRỰC THUỘC HỌC VIỆN > I. Khoa Cơ bản 1",
+          "score": 0.016341
+        },
+        {
+          "rank": 2,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-53::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "III. Khoa Viễn thông 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > III. Khoa Viễn thông 1",
+          "score": 0.015515
+        },
+        {
+          "rank": 3,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-52::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "II. Khoa Công nghệ thông tin 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > THÔNG TIN VỀ CÁC KHOA, VIỆN THUỘC VÀ TRỰC THUỘC HỌC VIỆN > II. Khoa Công nghệ thông tin 1",
+          "score": 0.015385
+        },
+        {
+          "rank": 4,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-58::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "VIII. Khoa Quản trị Kinh doanh 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VIII. Khoa Quản trị Kinh doanh 1",
+          "score": 0.014939
+        },
+        {
+          "rank": 5,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-69::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "VI. PHÒNG KHOA HỌC CÔNG NGHỆ & HỢP TÁC QUỐC TẾ",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VI. PHÒNG KHOA HỌC CÔNG NGHỆ & HỢP TÁC QUỐC TẾ",
+          "score": 0.014504
+        },
+        {
+          "rank": 6,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-54::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "IV. Khoa Kỹ thuật Điện tử 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > IV. Khoa Kỹ thuật Điện tử 1",
+          "score": 0.014236
+        },
+        {
+          "rank": 7,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-64::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "I. PHÒNG GIÁO VỤ",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > Thông tin về các phòng/trung tâm chức năng, đơn vị đoàn thể > I. PHÒNG GIÁO VỤ",
+          "score": 0.013867
+        },
+        {
+          "rank": 8,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-57::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "VII. Khoa Đa phương tiện",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VII. Khoa Đa phương tiện",
+          "score": 0.013677
+        },
+        {
+          "rank": 9,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-61::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "XI. Viện Khoa học Kỹ thuật Bưu điện",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > XI. Viện Khoa học Kỹ thuật Bưu điện",
+          "score": 0.013383
+        },
+        {
+          "rank": 10,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-55::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "V. Khoa An toàn thông tin",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > V. Khoa An toàn thông tin",
+          "score": 0.013112
+        }
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
+    },
+    {
+      "id": "q_table_contact_truongkhoa",
+      "question": "Trưởng khoa Cơ bản 1 là ai, số điện thoại liên hệ là gì?",
+      "source": "unknown",
+      "question_type": "unknown",
+      "diacritics": "co_dau",
+      "first_hit_rank": 1,
+      "matched_term": "Phạm Ngọc",
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-51::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "I. Khoa Cơ bản 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > THÔNG TIN VỀ CÁC KHOA, VIỆN THUỘC VÀ TRỰC THUỘC HỌC VIỆN > I. Khoa Cơ bản 1",
+          "score": 0.016013
+        },
+        {
+          "rank": 2,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-69::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "VI. PHÒNG KHOA HỌC CÔNG NGHỆ & HỢP TÁC QUỐC TẾ",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VI. PHÒNG KHOA HỌC CÔNG NGHỆ & HỢP TÁC QUỐC TẾ",
+          "score": 0.015085
+        },
+        {
+          "rank": 3,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-53::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "III. Khoa Viễn thông 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > III. Khoa Viễn thông 1",
+          "score": 0.014757
+        },
+        {
+          "rank": 4,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-52::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "II. Khoa Công nghệ thông tin 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > THÔNG TIN VỀ CÁC KHOA, VIỆN THUỘC VÀ TRỰC THUỘC HỌC VIỆN > II. Khoa Công nghệ thông tin 1",
+          "score": 0.014654
+        },
+        {
+          "rank": 5,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-58::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "VIII. Khoa Quản trị Kinh doanh 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VIII. Khoa Quản trị Kinh doanh 1",
+          "score": 0.014546
+        },
+        {
+          "rank": 6,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-64::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "I. PHÒNG GIÁO VỤ",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > Thông tin về các phòng/trung tâm chức năng, đơn vị đoàn thể > I. PHÒNG GIÁO VỤ",
+          "score": 0.014174
+        },
+        {
+          "rank": 7,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-65::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "II. PHÒNG CHÍNH TRỊ & CÔNG TÁC SINH VIÊN",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > Thông tin về các phòng/trung tâm chức năng, đơn vị đoàn thể > II. PHÒNG CHÍNH TRỊ & CÔNG TÁC SINH VIÊN",
+          "score": 0.013491
+        },
+        {
+          "rank": 8,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-57::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "VII. Khoa Đa phương tiện",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VII. Khoa Đa phương tiện",
+          "score": 0.013437
+        },
+        {
+          "rank": 9,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-70::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "VII. KHOA ĐÀO TẠO SAU ĐẠI HỌC",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VII. KHOA ĐÀO TẠO SAU ĐẠI HỌC",
+          "score": 0.013333
+        },
+        {
+          "rank": 10,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-68::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "V. PHÒNG TÀI CHÍNH KẾ TOÁN",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > V. PHÒNG TÀI CHÍNH KẾ TOÁN",
+          "score": 0.013158
+        }
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
+    },
+    {
+      "id": "q_table_tc_tritiet",
+      "question": "Học phần Triết học Mác - Lênin có bao nhiêu tín chỉ và học vào học kỳ nào?",
+      "source": "unknown",
+      "question_type": "unknown",
+      "diacritics": "co_dau",
+      "first_hit_rank": 2,
+      "matched_term": "HK1",
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-314::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ HAI",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN CHƯƠNG TRÌNH CÔNG NGHỆ UAV VÀ ROBOT TỰ HÀNH - KHÓA 2026 > NĂM HỌC THỨ HAI",
+          "score": 0.0161
+        },
+        {
+          "rank": 2,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-215::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ NHẤT",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH KỸ THUẬT ĐIỆN TỬ VIỄN THÔNG - KHÓA 2026 > NĂM HỌC THỨ NHẤT",
+          "score": 0.015606
+        },
+        {
+          "rank": 3,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-224::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ NHẤT",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH KHOA HỌC MÁY TÍNH (ĐỊNH HƯỚNG KHOA HỌC DỮ LIỆU) - KHÓA 2026 > NĂM HỌC THỨ NHẤT",
+          "score": 0.015476
+        },
+        {
+          "rank": 4,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-318::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ NHẤT",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN CHƯƠNG TRÌNH TRUYỀN THÔNG HÀNG KHÔNG VŨ TRỤ - KHÓA 2026 > NĂM HỌC THỨ NHẤT",
+          "score": 0.015032
+        },
+        {
+          "rank": 5,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-294::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ NHẤT",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN CHƯƠNG TRÌNH THIẾT KẾ VÀ PHÁT TRIỂN GAME (NGÀNH CÔNG NGHỆ ĐA PHƯƠNG TIỆN) KHÓA 2026 > NĂM HỌC THỨ NHẤT",
+          "score": 0.014607
+        },
+        {
+          "rank": 6,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-232::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ NHẤT",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH MẠNG MÁY TÍNH VÀ TRUYỀN THÔNG DỮ LIỆU > (CHƯƠNG TRÌNH KỸ THUẬT DỮ LIỆU) - KHÓA 2026 > NĂM HỌC THỨ NHẤT",
+          "score": 0.014531
+        },
+        {
+          "rank": 7,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-171::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ HAI",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH CÔNG NGHỆ KỸ THUẬT ĐIỆN – ĐIỆN TỬ KHÓA 2026 > NĂM HỌC THỨ HAI",
+          "score": 0.014146
+        },
+        {
+          "rank": 8,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-128::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ HAI",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN CHƯƠNG TRÌNH CÔNG NGHỆ THÔNG TIN ĐỊNH HƯỚNG ỨNG DỤNG KHÓA 2026 > NĂM HỌC THỨ HAI",
+          "score": 0.014125
+        },
+        {
+          "rank": 9,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-254::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ NHẤT",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN CHƯƠNG TRÌNH QUAN HỆ CÔNG CHỨNG (NGÀNH MARKETING) - KHÓA 2026 > NĂM HỌC THỨ NHẤT",
+          "score": 0.014094
+        },
+        {
+          "rank": 10,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-279::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ NHẤT",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH TRUYỀN THÔNG ĐA PHƯƠNG TIỆN - KHÓA 2026 > NĂM HỌC THỨ NHẤT",
+          "score": 0.014026
+        }
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.5,
+        "coverage@10": 0.5
+      }
+    },
+    {
+      "id": "q_table_tc_python",
+      "question": "Học phần Lập trình Python (Fintech) có bao nhiêu tín chỉ và học vào học kỳ nào?",
+      "source": "unknown",
+      "question_type": "unknown",
+      "diacritics": "co_dau",
+      "first_hit_rank": 1,
+      "matched_term": "Lập trình Python",
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-167::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ HAI",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH CÔNG NGHỆ TÀI CHÍNH FINTECH KHÓA 2026 > NĂM HỌC THỨ HAI",
+          "score": 0.016393
+        },
+        {
+          "rank": 2,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-323::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "TRONG TÀI CHÍNH, KINH DOANH KHÓA 2026",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH TÀI CHÍNH NGÂN HÀNG - CHƯƠNG TRÌNH PHÂN TÍCH DỮ LIỆU > TRONG TÀI CHÍNH, KINH DOANH KHÓA 2026",
+          "score": 0.015775
+        },
+        {
+          "rank": 3,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-168::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ BA",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH CÔNG NGHỆ TÀI CHÍNH FINTECH KHÓA 2026 > NĂM HỌC THỨ BA",
+          "score": 0.015726
+        },
+        {
+          "rank": 4,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-166::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ NHẤT",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH CÔNG NGHỆ TÀI CHÍNH FINTECH KHÓA 2026 > NĂM HỌC THỨ NHẤT",
+          "score": 0.014579
+        },
+        {
+          "rank": 5,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-271::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ NHẤT",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH TRÍ TUỆ NHÂN TẠO - KHÓA 2026 > NĂM HỌC THỨ NHẤT",
+          "score": 0.014472
+        },
+        {
+          "rank": 6,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-127::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ NHẤT",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN CHƯƠNG TRÌNH CÔNG NGHỆ THÔNG TIN ĐỊNH HƯỚNG ỨNG DỤNG KHÓA 2026 > NĂM HỌC THỨ NHẤT",
+          "score": 0.014362
+        },
+        {
+          "rank": 7,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-169::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ TƯ",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH CÔNG NGHỆ TÀI CHÍNH FINTECH KHÓA 2026 > NĂM HỌC THỨ TƯ",
+          "score": 0.014209
+        },
+        {
+          "rank": 8,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-317::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ NĂM",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN CHƯƠNG TRÌNH CÔNG NGHỆ UAV VÀ ROBOT TỰ HÀNH - KHÓA 2026 > NĂM HỌC THỨ NĂM",
+          "score": 0.013469
+        },
+        {
+          "rank": 9,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-546::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "- Học phí chi tiết từng kỳ (chọn kỳ cần xem)",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > HƯỚNG DẪN ĐĂNG KÝ MÔN HỌC VÀ TRA CỨU THỜI KHÓA BIỂU, THÔNG TIN HỌC TẬP CỦA SINH VIÊN > - Học phí chi tiết từng kỳ (chọn kỳ cần xem)",
+          "score": 0.012903
+        },
+        {
+          "rank": 10,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-214::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ NĂM",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH KỸ THUẬT ĐIỀU KHIỂN VÀ TỰ ĐỘNG HÓA - KHÓA 2026 > CHUYÊN NGÀNH ROBOT VÀ TRÍ TUỆ NHÂN TẠO > NĂM HỌC THỨ NĂM",
+          "score": 0.012666
+        }
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
+    },
+    {
+      "id": "q_table_drl_vanghop",
+      "question": "Sinh viên vắng một buổi họp lớp hoặc sinh hoạt đoàn thể không có lý do thì bị trừ mấy điểm rèn luyện?",
+      "source": "unknown",
+      "question_type": "unknown",
+      "diacritics": "co_dau",
+      "first_hit_rank": 6,
+      "matched_term": "Vắng 01 buổi họp lớp",
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-578::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 18. Kỷ luật sinh viên.",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG V: KHEN THƯỞNG VÀ KÝ LUẬT SINH VIÊN > Điều 18. Kỷ luật sinh viên.",
+          "score": 0.015597
+        },
+        {
+          "rank": 2,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-584::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 22. Lớp sinh viên",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > Chương VI: HỆ THỐNG TỔ CHỨC, QUẢN LÝ > Điều 22. Lớp sinh viên",
+          "score": 0.01501
+        },
+        {
+          "rank": 3,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-569::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 12. Phân loại đánh giá kết quả rèn luyện",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 12. Phân loại đánh giá kết quả rèn luyện",
+          "score": 0.015
+        },
+        {
+          "rank": 4,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-572::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 15. Sử dụng kết quả rèn luyện",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 15. Sử dụng kết quả rèn luyện",
+          "score": 0.014572
+        },
+        {
+          "rank": 5,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-594::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.013851
+        },
+        {
+          "rank": 6,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-592::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.013832
+        },
+        {
+          "rank": 7,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-374::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 20. Nghĩa vụ của sinh viên",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > QUY ĐỊNH ĐÀO TẠO ĐẠI HỌC THEO TÍN CHỈ CỦA HỌC VIỆN > Chương IV: GIẢNG VIÊN, CỐ VẤN HỌC TẬP VÀ SINH VIÊN > Điều 20. Nghĩa vụ của sinh viên",
+          "score": 0.013115
+        },
+        {
+          "rank": 8,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-566::child-2",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "score": 0.013073
+        },
+        {
+          "rank": 9,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-591::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.013058
+        },
+        {
+          "rank": 10,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-575::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 17. Nội dung và hình thức khen thưởng",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG V: KHEN THƯỞNG VÀ KÝ LUẬT SINH VIÊN > Điều 17. Nội dung và hình thức khen thưởng",
+          "score": 0.012907
+        }
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 1.0
+      }
+    },
+    {
+      "id": "q_table_drl_hienmau",
+      "question": "Sinh viên tham gia hiến máu nhân đạo được cộng điểm rèn luyện như thế nào?",
+      "source": "unknown",
+      "question_type": "unknown",
+      "diacritics": "co_dau",
+      "first_hit_rank": 10,
+      "matched_term": "hiến máu nhân đạo",
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-567::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "score": 0.01624
+        },
+        {
+          "rank": 2,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-594::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.01576
+        },
+        {
+          "rank": 3,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-566::child-2",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "score": 0.015296
+        },
+        {
+          "rank": 4,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-570::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 13: Quy trình đánh giá kết quả rèn luyện",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 13: Quy trình đánh giá kết quả rèn luyện",
+          "score": 0.015115
+        },
+        {
+          "rank": 5,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-571::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 14. Tổ chức đánh giá",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 14. Tổ chức đánh giá",
+          "score": 0.015062
+        },
+        {
+          "rank": 6,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-374::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 20. Nghĩa vụ của sinh viên",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > QUY ĐỊNH ĐÀO TẠO ĐẠI HỌC THEO TÍN CHỈ CỦA HỌC VIỆN > Chương IV: GIẢNG VIÊN, CỐ VẤN HỌC TẬP VÀ SINH VIÊN > Điều 20. Nghĩa vụ của sinh viên",
+          "score": 0.01392
+        },
+        {
+          "rank": 7,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-569::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 12. Phân loại đánh giá kết quả rèn luyện",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 12. Phân loại đánh giá kết quả rèn luyện",
+          "score": 0.013841
+        },
+        {
+          "rank": 8,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-666::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 14. Ứng xử trong học tập, rèn luyện",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH VỀ VĂN HÓA HỌC ĐƯỜNG VÀ CHUẨN MỰC ỨNG XỬ CỦA NGƯỜI HỌC > Chương III: CHUẨN MỰC ỨNG XỬ CỦA NGƯỜI HỌC > Điều 14. Ứng xử trong học tập, rèn luyện",
+          "score": 0.013743
+        },
+        {
+          "rank": 9,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-564::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "score": 0.013626
+        },
+        {
+          "rank": 10,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-593::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.013155
+        }
+      ],
+      "coverage": {
+        "coverage@1": 0.0,
+        "coverage@4": 0.0,
+        "coverage@10": 1.0
+      }
+    },
+    {
+      "id": "q_table_drl_tc5_max",
+      "question": "Mức điểm tối đa của Tiêu chí 5 (tham gia phụ trách lớp, đoàn thể và thành tích đặc biệt) trong đánh giá điểm rèn luyện là bao nhiêu?",
+      "source": "unknown",
+      "question_type": "unknown",
+      "diacritics": "co_dau",
+      "first_hit_rank": 1,
+      "matched_term": "10 điểm",
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-566::child-2",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "score": 0.016341
+        },
+        {
+          "rank": 2,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-594::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.016182
+        },
+        {
+          "rank": 3,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-592::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.01564
+        },
+        {
+          "rank": 4,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-564::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 11. Nội dung, tiêu chí và thang điểm đánh giá.",
+          "score": 0.014663
+        },
+        {
+          "rank": 5,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-591::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.014572
+        },
+        {
+          "rank": 6,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-593::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Lớp",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > PHỤ LỤC 2: PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Học kỳ ......Năm học........ > Họ và tên > Ngày sinh > Lớp",
+          "score": 0.014297
+        },
+        {
+          "rank": 7,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-571::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 14. Tổ chức đánh giá",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH CÔNG TÁC SINH VIÊN TRÌNH ĐỘ ĐẠI HỌC CHÍNH QUY > CHƯƠNG IV: ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN > Điều 14. Tổ chức đánh giá",
+          "score": 0.014295
+        },
+        {
+          "rank": 8,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-379::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 23. Tiêu chí đánh giá kết quả học tập",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > QUY ĐỊNH ĐÀO TẠO ĐẠI HỌC THEO TÍN CHỈ CỦA HỌC VIỆN > Chương V: ĐÁNH GIÁ KẾT QUẢ VÀ THI KẾT THÚC HỌC PHẦN > Điều 23. Tiêu chí đánh giá kết quả học tập",
+          "score": 0.013782
+        },
+        {
+          "rank": 9,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-484::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 9. Phương thức xét tuyển đầu vào",
+          "section_path": "PHẦN IV: MỘT SỐ QUY CHẾ, QUY ĐỊNH VỀ QUẢN LÝ ĐÀO TẠO > QUY ĐỊNH ĐÀO TẠO SINH VIÊN TÀI NĂNG > Điều 9. Phương thức xét tuyển đầu vào",
+          "score": 0.01355
+        },
+        {
+          "rank": 10,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-598::child-1",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "Điều 1: Học bổng khuyến khích học tập",
+          "section_path": "PHẦN V: MỘT SỐ QUY CHẾ, QUY ĐỊNH, QUY TRÌNH VỀ CÔNG TÁC SINH VIÊN, HỖ TRỢ SINH VIÊN > QUY ĐỊNH VỀ TẠO LẬP, QUẢN LÝ VÀ SỬ DỤNG QUỸ HỌC BỔNG VÀ HỖ TRỢ NGƯỜI HỌC > Chương III: CHI HỌC BỔNG > Điều 1: Học bổng khuyến khích học tập",
+          "score": 0.013232
+        }
+      ],
+      "coverage": {
+        "coverage@1": 0.5,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
+    },
+    {
+      "id": "q_table_contact_gdtc",
+      "question": "Trưởng bộ môn Giáo dục thể chất (GDTC) của Khoa Cơ bản 1 là ai, số điện thoại liên hệ là gì?",
+      "source": "unknown",
+      "question_type": "unknown",
+      "diacritics": "co_dau",
+      "first_hit_rank": 1,
+      "matched_term": "Nguyễn Đức",
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-51::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "I. Khoa Cơ bản 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > THÔNG TIN VỀ CÁC KHOA, VIỆN THUỘC VÀ TRỰC THUỘC HỌC VIỆN > I. Khoa Cơ bản 1",
+          "score": 0.016393
+        },
+        {
+          "rank": 2,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-52::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "II. Khoa Công nghệ thông tin 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > THÔNG TIN VỀ CÁC KHOA, VIỆN THUỘC VÀ TRỰC THUỘC HỌC VIỆN > II. Khoa Công nghệ thông tin 1",
+          "score": 0.015482
+        },
+        {
+          "rank": 3,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-53::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "III. Khoa Viễn thông 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > III. Khoa Viễn thông 1",
+          "score": 0.014978
+        },
+        {
+          "rank": 4,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-58::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "VIII. Khoa Quản trị Kinh doanh 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VIII. Khoa Quản trị Kinh doanh 1",
+          "score": 0.014719
+        },
+        {
+          "rank": 5,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-69::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "VI. PHÒNG KHOA HỌC CÔNG NGHỆ & HỢP TÁC QUỐC TẾ",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VI. PHÒNG KHOA HỌC CÔNG NGHỆ & HỢP TÁC QUỐC TẾ",
+          "score": 0.014674
+        },
+        {
+          "rank": 6,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-55::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "V. Khoa An toàn thông tin",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > V. Khoa An toàn thông tin",
+          "score": 0.014036
+        },
+        {
+          "rank": 7,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-57::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "VII. Khoa Đa phương tiện",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VII. Khoa Đa phương tiện",
+          "score": 0.013611
+        },
+        {
+          "rank": 8,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-54::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "IV. Khoa Kỹ thuật Điện tử 1",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > IV. Khoa Kỹ thuật Điện tử 1",
+          "score": 0.013467
+        },
+        {
+          "rank": 9,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-56::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "VI. Khoa Trí tuệ nhân tạo",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > VI. Khoa Trí tuệ nhân tạo",
+          "score": 0.013155
+        },
+        {
+          "rank": 10,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-64::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "I. PHÒNG GIÁO VỤ",
+          "section_path": "PHẦN II: THÔNG TIN VỀ CÁC ĐƠN VỊ TRONG HỌC VIỆN VÀ CƠ SỞ ĐÀO TẠO HÀ NỘI > Thông tin về các phòng/trung tâm chức năng, đơn vị đoàn thể > I. PHÒNG GIÁO VỤ",
+          "score": 0.012698
+        }
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
+    },
+    {
+      "id": "q_table_ketoan_acca",
+      "question": "Học phần Kế toán Quản trị 2 - ACCA (HK5) và học phần Thuế 2 - ACCA (HK7) nằm cùng một hàng trong kế hoạch học tập, cho biết số tín chỉ của mỗi học phần?",
+      "source": "unknown",
+      "question_type": "unknown",
+      "diacritics": "co_dau",
+      "first_hit_rank": 1,
+      "matched_term": "Assurance - ACCA",
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-201::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ TƯ",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH KẾ TOÁN – CHẤT LƯỢNG CAO CHUẨN QUỐC TẾ ACCA KHÓA 2026 > NĂM HỌC THỨ TƯ",
+          "score": 0.016393
+        },
+        {
+          "rank": 2,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-195::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ BA",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH KẾ TOÁN KHÓA 2026 > NĂM HỌC THỨ BA",
+          "score": 0.015675
+        },
+        {
+          "rank": 3,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-196::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ TƯ",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH KẾ TOÁN KHÓA 2026 > NĂM HỌC THỨ TƯ",
+          "score": 0.015556
+        },
+        {
+          "rank": 4,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-198::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ HAI",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH KẾ TOÁN – CHẤT LƯỢNG CAO CHUẨN QUỐC TẾ ACCA KHÓA 2026 > NĂM HỌC THỨ HAI",
+          "score": 0.015198
+        },
+        {
+          "rank": 5,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-289::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ BA",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH THƯƠNG MẠI ĐIỆN TỬ - KHÓA 2026 > NĂM HỌC THỨ BA",
+          "score": 0.014643
+        },
+        {
+          "rank": 6,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-200::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ TƯ",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH KẾ TOÁN – CHẤT LƯỢNG CAO CHUẨN QUỐC TẾ ACCA KHÓA 2026 > NĂM HỌC THỨ TƯ",
+          "score": 0.013936
+        },
+        {
+          "rank": 7,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-263::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ BA",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH QUẢN TRỊ KINH DOANH - KHÓA 2026 > CHUYÊN NGÀNH KINH DOANH QUỐC TẾ > NĂM HỌC THỨ BA",
+          "score": 0.013816
+        },
+        {
+          "rank": 8,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-260::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ BA",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN NGÀNH QUẢN TRỊ KINH DOANH - KHÓA 2026 > CHUYỂN NGÀNH QUẢN TRỊ DOANH NGHIỆP > NĂM HỌC THỨ BA",
+          "score": 0.013676
+        },
+        {
+          "rank": 9,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-305::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ TƯ",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN CHƯƠNG TRÌNH QUẢN TRỊ ĐỔI MỚI SÁNG TẠO VÀ KHỞI NGHIỆP > NĂM HỌC THỨ TƯ",
+          "score": 0.013288
+        },
+        {
+          "rank": 10,
+          "chunk_id": "e0997dd268c1da48bb6541f81eeb5495dd6381a9a9c22bb41d025760caceed5e::parent-230::child-0",
+          "source_name": "Sổ tay sinh viên D26 _1_.pdf",
+          "heading": "NĂM HỌC THỨ BA",
+          "section_path": "PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO > KẾ HOẠCH VÀ TIẾN TRÌNH HỌC TẬP CHUẨN CHƯƠNG TRÌNH QUẢN TRỊ LOGISTICS VÀ QUẢN LÝ CHUỖI CUNG ỨNG - > KHÓA 2026 > NĂM HỌC THỨ BA",
+          "score": 0.013198
+        }
+      ],
+      "coverage": {
+        "coverage@1": 1.0,
+        "coverage@4": 1.0,
+        "coverage@10": 1.0
+      }
+    }
+  ]
+}

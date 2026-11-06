@@ -20,8 +20,9 @@ from app.db.session import get_engine_options
 config = context.config
 
 # Interpret the config file for Python logging.
-# This line sets up loggers basically.
-if config.config_file_name is not None:
+# This line sets up loggers basically. Tests set configure_logger=False to
+# keep fileConfig from disabling the loggers the suite captures with caplog.
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name)
 
 # add your model's MetaData object here

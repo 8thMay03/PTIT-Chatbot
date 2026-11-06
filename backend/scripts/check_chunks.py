@@ -1,4 +1,4 @@
-"""Kiểm tra chất lượng chunk trên toàn kho sau RAG-06 (AC-01…AC-04).
+"""Kiểm tra chất lượng chunk trên toàn kho sau RAG-06 (AC-01…AC-04) và task bảng (AC-02/AC-03/AC-05).
 
 Quét index trong DB (mặc định) hoặc dry-run chunker trên một thư mục tài liệu
 (không ghi DB). Mỗi phát hiện gắn mã lỗi:
@@ -12,6 +12,9 @@ Quét index trong DB (mặc định) hoặc dry-run chunker trên một thư m�
   chữ ký hoặc số trang còn sót trong index.
 - ``search_text_missing_context`` (lỗi): ``search_text`` thiếu tên tài liệu hoặc
   ``section_path``.
+- ``table_row_broken`` (lỗi): child chứa dòng bảng bị cắt/ghép dở.
+- ``table_row_missing`` (lỗi): hàng bảng không nguyên vẹn trong bất kỳ child nào.
+- ``table_chunk_missing_header`` (lỗi): child có hàng dữ liệu bảng nhưng thiếu header.
 
 Ví dụ::
 
@@ -28,7 +31,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.ingestion.cleaner import _drop_noise_lines, is_noise_line
+from app.ingestion.chunker import find_table_coverage_issues
+from app.ingestion.cleaner import _drop_noise_lines, clean_text, is_noise_line
 
 ERROR_CODES = frozenset(
     {
@@ -37,6 +41,9 @@ ERROR_CODES = frozenset(
         "chunk_too_short",
         "noise_chunk",
         "search_text_missing_context",
+        "table_row_broken",
+        "table_row_missing",
+        "table_chunk_missing_header",
     }
 )
 DEFAULT_MIN_CHARS = 120
@@ -143,6 +150,37 @@ class ChunkView:
     parent_text: str
 
 
+@dataclass
+class TableDocGroup:
+    """Một tài liệu kèm văn bản đã cleaner và các child để kiểm tra bảng."""
+
+    ref: str
+    cleaned_text: str
+    children: list[tuple[str, str]]
+
+
+_TABLE_ISSUE_CODES = {
+    "missing": "table_row_missing",
+    "broken": "table_row_broken",
+    "missing_header": "table_chunk_missing_header",
+}
+
+
+def check_table_documents(groups: list[TableDocGroup]) -> list[Finding]:
+    """AC-02/AC-03: mọi hàng bảng còn nguyên vẹn, child có hàng phải có header."""
+    findings: list[Finding] = []
+    for group in groups:
+        for issue in find_table_coverage_issues(
+            group.cleaned_text, [text for _, text in group.children]
+        ):
+            if issue.child_index < 0:
+                ref = group.ref
+            else:
+                ref = group.children[issue.child_index][0]
+            findings.append(Finding(_TABLE_ISSUE_CODES[issue.kind], ref, issue.excerpt))
+    return findings
+
+
 def check_chunks(views: list[ChunkView], min_chars: int = DEFAULT_MIN_CHARS) -> list[Finding]:
     findings: list[Finding] = []
     seen_parents: set[str] = set()
@@ -169,26 +207,37 @@ def check_chunks(views: list[ChunkView], min_chars: int = DEFAULT_MIN_CHARS) -> 
 # ---------------------------------------------------------------------------
 
 
-def views_from_db() -> tuple[list[ChunkView], dict]:
+def views_from_db() -> tuple[list[ChunkView], dict, list[TableDocGroup]]:
+    """Quét index trong DB; nhóm bảng cần parsed_text đã lưu của từng tài liệu."""
     from sqlalchemy import select
+    from sqlalchemy.orm import undefer
 
     from app.db.models import Chunk, Document
     from app.db.session import SessionLocal
 
     views: list[ChunkView] = []
+    children_by_document: dict[str, list[tuple[str, str]]] = {}
     with SessionLocal() as session:
         documents = {
-            document.id: (document.title or Path(document.source_path).stem)
-            for document in session.scalars(select(Document))
+            document.id: (
+                document.title or Path(document.source_path).stem,
+                document.parsed_text,
+            )
+            for document in session.scalars(
+                select(Document).options(undefer(Document.parsed_text))
+            )
         }
         stats = {"documents": len(documents), "chunks": 0}
         for chunk in session.scalars(select(Chunk).order_by(Chunk.document_id, Chunk.chunk_index)):
             metadata = chunk.chunk_metadata or {}
             stats["chunks"] += 1
+            children_by_document.setdefault(chunk.document_id, []).append(
+                (chunk.id, chunk.text)
+            )
             views.append(
                 ChunkView(
                     ref=chunk.id,
-                    document_title=documents.get(chunk.document_id, ""),
+                    document_title=documents.get(chunk.document_id, ("", None))[0],
                     text=chunk.text,
                     search_text=chunk.search_text or "",
                     section_path=str(metadata.get("section_path") or ""),
@@ -196,23 +245,45 @@ def views_from_db() -> tuple[list[ChunkView], dict]:
                     parent_text=str(metadata.get("parent_text") or chunk.text),
                 )
             )
-    return views, stats
+    groups = [
+        TableDocGroup(
+            ref=document_id,
+            cleaned_text=clean_text(parsed_text),
+            children=children,
+        )
+        for document_id, (_, parsed_text) in documents.items()
+        if parsed_text
+        for children in [children_by_document.get(document_id, [])]
+        if children
+    ]
+    return views, stats, groups
 
 
-def views_from_data(data_dir: Path) -> tuple[list[ChunkView], dict]:
+def views_from_data(data_dir: Path) -> tuple[list[ChunkView], dict, list[TableDocGroup]]:
     """Dry-run: chạy đúng lộ trình ingest (parser + chunker) nhưng không ghi DB."""
     from app.core.config import settings
     from app.ingestion.loaders import load_documents
     from app.ingestion.pipeline import _chunk_records, _document_record
 
     views: list[ChunkView] = []
+    groups: list[TableDocGroup] = []
     stats = {"documents": 0, "chunks": 0}
     for document in load_documents(data_dir):
         record = _document_record(document)
+        cleaned = clean_text(document.text)
         chunk_records, _payload = _chunk_records(
             record.id, record.source_path, record.title or document.path.stem, document.text
         )
         stats["documents"] += 1
+        children = [(chunk_record.id, chunk_record.text) for chunk_record in chunk_records]
+        if children:
+            groups.append(
+                TableDocGroup(
+                    ref=record.title or document.path.stem,
+                    cleaned_text=cleaned,
+                    children=children,
+                )
+            )
         for chunk_record in chunk_records:
             metadata = chunk_record.metadata or {}
             stats["chunks"] += 1
@@ -232,7 +303,7 @@ def views_from_data(data_dir: Path) -> tuple[list[ChunkView], dict]:
         "child_size": settings.child_chunk_size,
         "min_child_chars": settings.min_child_chunk_chars,
     }
-    return views, stats
+    return views, stats, groups
 
 
 def print_report(views: list[ChunkView], findings: list[Finding], min_chars: int) -> None:
@@ -271,11 +342,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.data is not None:
         backend_dir = Path(__file__).resolve().parents[1]
         data_dir = args.data if args.data.is_absolute() else (backend_dir / args.data).resolve()
-        views, stats = views_from_data(data_dir)
+        views, stats, groups = views_from_data(data_dir)
     else:
-        views, stats = views_from_db()
+        views, stats, groups = views_from_db()
 
     findings = check_chunks(views, min_chars=args.min_chars)
+    findings.extend(check_table_documents(groups))
     print(f"nguồn={'data/' + str(args.data) if args.data else 'db'} documents={stats['documents']}")
     print_report(views, findings, args.min_chars)
     has_errors = any(finding.is_error for finding in findings)

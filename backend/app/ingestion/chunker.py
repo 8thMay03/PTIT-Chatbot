@@ -7,8 +7,11 @@ _HR_ONLY = re.compile(r"^(\*\s*){3,}$|^(-\s*){3,}$|^(_\s*){3,}$")
 _HTML_TABLE_START = re.compile(r"<table\b", re.IGNORECASE)
 _HTML_TABLE_END = re.compile(r"</table\s*>", re.IGNORECASE)
 _HTML_THEAD = re.compile(r"<thead\b[^>]*>.*?</thead\s*>", re.IGNORECASE | re.DOTALL)
+_HTML_TFOOT = re.compile(r"<tfoot\b[^>]*>.*?</tfoot\s*>", re.IGNORECASE | re.DOTALL)
+_HTML_CAPTION = re.compile(r"<caption\b[^>]*>.*?</caption\s*>", re.IGNORECASE | re.DOTALL)
 _HTML_TR = re.compile(r"<tr\b[^>]*>.*?</tr\s*>", re.IGNORECASE | re.DOTALL)
 _HTML_TBODY = re.compile(r"<tbody\b[^>]*>.*?</tbody\s*>", re.IGNORECASE | re.DOTALL)
+_HTML_TR_OPEN = re.compile(r"<tr\b[^>]*>", re.IGNORECASE)
 
 # Sentence units end at ".", ";", "!", "?" followed by whitespace, or at a newline.
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?;])\s+|\n+")
@@ -321,6 +324,13 @@ def _merge_short_pieces(pieces: list[str], limit: int, min_len: int) -> list[str
         if len(prev) + 2 + len(last) <= limit:
             merged[-2:] = [f"{prev}\n\n{last}"]
             break
+        if _is_short_table_tail(last):
+            # Mảnh bảng cuối ít hơn 3 hàng dữ liệu: gộp vào mảnh trước khi vừa
+            # hard limit (AC-04), thay vì để lại child cụt.
+            _, hard_limit = _table_split_limits(limit)
+            if len(prev) + 2 + len(last) <= hard_limit:
+                merged[-2:] = [f"{prev}\n\n{last}"]
+                break
         if (_is_markdown_table(prev) or _is_html_table(prev)) and not (
             _is_markdown_table(last) or _is_html_table(last)
         ):
@@ -334,6 +344,16 @@ def _merge_short_pieces(pieces: list[str], limit: int, min_len: int) -> list[str
         merged[-2:] = [moved[0], moved[1]]
 
     return [piece for piece in merged if piece.strip()]
+
+
+def _is_short_table_tail(text: str) -> bool:
+    """Mảnh bảng cuối có ít hơn 3 hàng dữ liệu (kể cả chỉ còn header)."""
+    if _is_markdown_table(text):
+        lines = [line for line in text.splitlines() if line.strip()]
+        return len(lines[2:]) < 3
+    if _is_html_table(text):
+        return len(_split_html_table_parts(text).body_rows) < 3
+    return False
 
 
 def _steal_trailing_unit(prev: str, last: str, limit: int, min_len: int) -> tuple[str, str] | None:
@@ -376,10 +396,17 @@ def _steal_leading_units(prev: str, piece: str, limit: int, min_len: int) -> tup
 
 
 def _split_units(text: str) -> tuple[list[str], str]:
-    """Split a piece into movable units: paragraphs (\\n\\n) or sentences (space)."""
+    """Split a piece into movable units: paragraphs (\\n\\n) or sentences (space).
+
+    Pieces containing a table move only as a whole: rebalancing must never cut
+    a table row or glue it to neighbouring text with a space.
+    """
     blocks = [block for block in _PARAGRAPH_SPLIT.split(text) if block.strip()]
     if len(blocks) > 1 and not any(_is_markdown_table(block) or _is_html_table(block) for block in blocks):
         return blocks, "\n\n"
+
+    if any(_is_markdown_table(block) or _is_html_table(block) for block in blocks):
+        return [text], "\n\n"
 
     if not (_is_markdown_table(text) or _is_html_table(text)):
         sentences = _split_sentences(text)
@@ -495,7 +522,81 @@ def _split_blocks(text: str) -> list[str]:
         index += 1
 
     flush_current()
-    return blocks
+    return _merge_page_break_tables(blocks)
+
+
+def _normalize_table_header(line: str) -> str:
+    """Chuẩn hóa dòng header để so sánh bảng ngắt trang: gộp khoảng trắng/``<br/>``."""
+    no_break = re.sub(r"<br\s*/?>", " ", line, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", no_break).strip()
+
+
+def _group_continuation_rows(lines: list[str]) -> list[str] | None:
+    """Gộp các dòng ``|…|`` kế tiếp thành hàng logic (chịu hàng ngắt dòng giữa chừng).
+
+    Trả về None khi gặp dòng không thuộc cấu trúc hàng bảng.
+    """
+    rows: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or _parse_heading(line) or _HTML_TABLE_START.search(line):
+            return None
+        if stripped.startswith("|"):
+            rows.append(stripped)
+        elif rows and not rows[-1].endswith("|"):
+            rows[-1] = f"{rows[-1]} {stripped}"
+        else:
+            return None
+    if not rows or not rows[-1].endswith("|"):
+        return None
+    return rows
+
+
+def _merge_page_break_tables(blocks: list[str]) -> list[str]:
+    """Ghép các khối bảng liền nhau bị ngắt trang thành một bảng logic.
+
+    LlamaParse nối các trang nên một bảng dài thành nhiều khối liền nhau: lặp
+    lại header, hoặc trang sau chỉ còn các dòng ``|…|`` không có dòng phân
+    cách. Chỉ gộp hai khối kề nhau trong danh sách blocks (giữa chúng không có
+    khối văn bản thật — dòng trống bị bỏ khi tách; dòng ``---`` có dòng trống
+    quanh nó cũng bị bỏ nên hai bảng quanh ``---`` vẫn gộp khi cùng header).
+    """
+    if len(blocks) < 2:
+        return blocks
+
+    merged: list[str] = [blocks[0]]
+    for block in blocks[1:]:
+        prev = merged[-1]
+        combined = _try_merge_tables(prev, block)
+        if combined is None:
+            merged.append(block)
+        else:
+            merged[-1] = combined
+    return merged
+
+
+def _try_merge_tables(prev: str, block: str) -> str | None:
+    """Trả về khối bảng đã gộp, hoặc None khi không đủ điều kiện gộp."""
+    if not _is_markdown_table(prev):
+        return None
+    prev_lines = [line.strip() for line in prev.splitlines() if line.strip()]
+    prev_header, prev_rows = prev_lines[0], prev_lines[2:]
+    column_count = len(_table_cells_safe(prev_header))
+
+    if _is_markdown_table(block):
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        if _normalize_table_header(lines[0]) != _normalize_table_header(prev_header):
+            return None
+        return "\n".join([*prev_lines, *lines[2:]])
+
+    if _is_html_table(block):
+        return None
+    continuation = _group_continuation_rows(block.splitlines())
+    if not continuation:
+        return None
+    if any(len(_table_cells_safe(row)) != column_count for row in continuation):
+        return None
+    return "\n".join([*prev_lines, *continuation])
 
 
 def _is_horizontal_rule(text: str) -> bool:
@@ -527,7 +628,7 @@ def _starts_markdown_table(lines: list[str], index: int) -> bool:
     if index + 1 >= len(lines) or not _looks_like_table_row(lines[index]):
         return False
     cells = _table_cells_safe(lines[index + 1])
-    return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell.strip()) for cell in cells)
+    return bool(cells) and all(re.fullmatch(r":?-+:?", cell.strip()) for cell in cells)
 
 
 def _looks_like_table_row(line: str) -> bool:
@@ -683,37 +784,32 @@ def _merge_short_table_tail(
 
 
 def _split_long_html_table(text: str, chunk_size: int) -> list[str]:
-    """Split an HTML table between body rows and repeat thead in every piece."""
-    thead_match = _HTML_THEAD.search(text)
-    thead = thead_match.group(0) if thead_match else ""
+    """Split an HTML table between body rows and repeat thead in every piece.
 
-    tbody_match = _HTML_TBODY.search(text)
-    body_region = tbody_match.group(0) if tbody_match else text
-    rows = _HTML_TR.findall(body_region)
-    if thead:
-        # Prefer body rows; if thead rows were included, drop duplicates that match thead trs.
-        thead_rows = set(_HTML_TR.findall(thead))
-        rows = [row for row in rows if row not in thead_rows]
-
+    Hỗ trợ bảng Docling/DOCX: hàng từ mọi ``<tbody>``, ``<tr>`` thiếu thẻ
+    đóng, giữ ``<caption>`` trong mọi mảnh và ``<tfoot>`` ở mảnh cuối. Nếu
+    không tách được hàng nào thì giữ nguyên bảng.
+    """
+    parts = _split_html_table_parts(text)
+    rows = parts.body_rows
     if not rows:
         return [text]
 
-    open_tag_match = re.search(r"<table\b[^>]*>", text, flags=re.IGNORECASE)
-    open_tag = open_tag_match.group(0) if open_tag_match else "<table>"
-    close_tag = "</table>"
-
     def render(body_rows: list[str]) -> str:
-        parts = [open_tag]
-        if thead:
-            parts.append(thead)
-        parts.append("<tbody>")
-        parts.extend(body_rows)
-        parts.append("</tbody>")
-        parts.append(close_tag)
-        return "\n".join(parts)
+        rendered = [parts.open_tag]
+        if parts.caption:
+            rendered.append(parts.caption)
+        if parts.thead:
+            rendered.append(parts.thead)
+        rendered.append("<tbody>")
+        rendered.extend(body_rows)
+        rendered.append("</tbody>")
+        rendered.append("</table>")
+        return "\n".join(rendered)
 
     soft_limit, hard_limit = _table_split_limits(chunk_size)
     pieces: list[str] = []
+    piece_rows: list[list[str]] = []
     current_rows: list[str] = []
     for row in rows:
         candidate_rows = [*current_rows, row]
@@ -724,30 +820,253 @@ def _split_long_html_table(text: str, chunk_size: int) -> list[str]:
             hard_limit,
         ):
             pieces.append(render(current_rows))
+            piece_rows.append(list(current_rows))
             current_rows = [row]
         else:
             current_rows.append(row)
 
     if current_rows:
         pieces.append(render(current_rows))
+        piece_rows.append(list(current_rows))
     if not pieces:
         return [text]
-    if len(pieces) < 2:
-        return pieces
 
-    # Merge a short trailing fragment when under the hard cap.
-    last_rows = _HTML_TR.findall(pieces[-1])
-    if thead:
-        thead_rows = set(_HTML_TR.findall(thead))
-        last_rows = [row for row in last_rows if row not in thead_rows]
-    if 0 < len(last_rows) < 3:
-        prev_rows = _HTML_TR.findall(pieces[-2])
-        if thead:
-            prev_rows = [row for row in prev_rows if row not in thead_rows]
-        merged = render([*prev_rows, *last_rows])
-        if len(merged) <= hard_limit:
-            return [*pieces[:-2], merged]
+    if len(pieces) >= 2 and 0 < len(piece_rows[-1]) < 3:
+        merged_rows = [*piece_rows[-2], *piece_rows[-1]]
+        if len(render(merged_rows)) <= hard_limit:
+            pieces[-2:] = [render(merged_rows)]
+            piece_rows[-2:] = [merged_rows]
+
+    if parts.tfoot:
+        pieces[-1] = f"{pieces[-1][: -len('</table>')]}{parts.tfoot}\n</table>"
     return pieces
+
+
+def count_recognized_tables(cleaned_text: str) -> int:
+    """Số khối bảng Markdown/HTML mà chunker nhận diện được trong văn bản đã cleaner."""
+    return sum(
+        1
+        for block in _split_blocks(cleaned_text)
+        if _is_markdown_table(block) or _is_html_table(block)
+    )
+
+
+@dataclass(frozen=True)
+class TableCoverageIssue:
+    """Một hàng bảng bị mất/cắt dở hoặc một child thiếu header (S-02).
+
+    ``kind`` là ``missing`` (hàng không nguyên vẹn trong child nào),
+    ``broken`` (child chứa dòng bảng bị cắt/ghép dở) hoặc ``missing_header``
+    (child có hàng dữ liệu nhưng thiếu header của bảng đó).
+    ``child_index`` là ``-1`` khi hàng vắng mặt trong mọi child.
+    """
+
+    kind: str
+    child_index: int
+    excerpt: str
+
+
+def find_table_coverage_issues(
+    cleaned_text: str, chunks: list[str]
+) -> list[TableCoverageIssue]:
+    """Kiểm tra bất biến bảo toàn hàng bảng trên các chunk cho sẵn.
+
+    ``cleaned_text`` là văn bản đã qua ``clean_text`` (cùng đầu vào của
+    chunker); ``chunks`` là nội dung text của các child đã chia. Mọi hàng
+    bảng (Markdown và HTML) còn lại sau cleaner phải xuất hiện nguyên vẹn
+    trong ít nhất một child, không child nào chứa hàng bị cắt dở, và mọi
+    child chứa hàng dữ liệu đều phải chứa header của bảng đó.
+    """
+    blocks = _split_blocks(cleaned_text)
+    md_tables = [block for block in blocks if _is_markdown_table(block)]
+
+    expected_md_lines: set[str] = set()
+    header_of_table: list[tuple[str, str]] = []
+    headers_of_row: dict[str, set[int]] = {}
+    for table_index, block in enumerate(md_tables):
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        header, delim, rows = lines[0], lines[1], lines[2:]
+        expected_md_lines.update(lines)
+        header_of_table.append((header, delim))
+        for row in rows:
+            headers_of_row.setdefault(row, set()).add(table_index)
+
+    prose_pipe_lines: set[str] = set()
+    for block in blocks:
+        if _is_markdown_table(block) or _is_html_table(block):
+            continue
+        for line in block.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("|"):
+                prose_pipe_lines.add(stripped)
+
+    expected_html_rows: set[str] = set()
+    allowed_html_rows: set[str] = set()
+    html_row_theads: dict[str, set[str]] = {}
+    for block in blocks:
+        if _is_html_table(block):
+            expected_html_rows.update(_html_table_rows(block))
+            parts = _split_html_table_parts(block)
+            if parts.caption:
+                expected_html_rows.add(parts.caption)
+            allowed_html_rows.update(parts.body_rows)
+            allowed_html_rows.update(_html_table_rows(block))
+            if parts.thead:
+                allowed_html_rows.update(_split_html_rows(parts.thead))
+                for row in parts.body_rows:
+                    html_row_theads.setdefault(row, set()).add(parts.thead)
+                for row in _split_html_rows(parts.tfoot):
+                    html_row_theads.setdefault(row, set()).add(parts.thead)
+            if parts.caption:
+                allowed_html_rows.add(parts.caption)
+
+    issues: list[TableCoverageIssue] = []
+    blob = "\n".join(chunks)
+    for row in headers_of_row:
+        if row not in blob:
+            issues.append(TableCoverageIssue("missing", -1, _short_excerpt(row)))
+    for row in expected_html_rows:
+        if row not in blob:
+            issues.append(TableCoverageIssue("missing", -1, _short_excerpt(row)))
+
+    for index, chunk in enumerate(chunks):
+        chunk_low = chunk.lower()
+        for line in chunk.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("|") and stripped not in expected_md_lines:
+                if stripped not in prose_pipe_lines:
+                    issues.append(
+                        TableCoverageIssue("broken", index, _short_excerpt(stripped))
+                    )
+                    break
+        if "<table" in chunk_low:
+            if not _HTML_TABLE_END.search(chunk):
+                issues.append(
+                    TableCoverageIssue("broken", index, _short_excerpt(chunk))
+                )
+            else:
+                for row in _chunk_html_rows(chunk):
+                    if row not in allowed_html_rows:
+                        issues.append(
+                            TableCoverageIssue("broken", index, _short_excerpt(row))
+                        )
+                        break
+
+        md_rows = [
+            line.strip() for line in chunk.splitlines() if line.strip() in headers_of_row
+        ]
+        if md_rows:
+            owners = set()
+            for row in md_rows:
+                owners.update(headers_of_row[row])
+            if not any(
+                header_of_table[i][0] in chunk and header_of_table[i][1] in chunk
+                for i in owners
+            ):
+                issues.append(
+                    TableCoverageIssue("missing_header", index, _short_excerpt(md_rows[0]))
+                )
+        if "<td" in chunk_low:
+            html_rows = [
+                row for row in _chunk_html_rows(chunk) if row in html_row_theads
+            ]
+            theads_needed = {
+                thead for row in html_rows for thead in html_row_theads[row]
+            }
+            if theads_needed and not any(thead in chunk for thead in theads_needed):
+                issues.append(
+                    TableCoverageIssue("missing_header", index, _short_excerpt(html_rows[0]))
+                )
+
+    return issues
+
+
+def _short_excerpt(text: str, limit: int = 120) -> str:
+    """Đoạn hàng rút gọn một dòng, tối đa ``limit`` ký tự."""
+    collapsed = re.sub(r"\s+", " ", text).strip()
+    return collapsed if len(collapsed) <= limit else collapsed[:limit]
+
+
+@dataclass(frozen=True)
+class _HtmlTableParts:
+    """Các thành phần của một bảng HTML: hàng thân tách theo ``<tr>`` mở."""
+
+    open_tag: str
+    caption: str
+    thead: str
+    tfoot: str
+    body_rows: list[str]
+
+
+def _split_html_table_parts(table_text: str) -> _HtmlTableParts:
+    """Tách bảng HTML thành caption/thead/tfoot và các hàng thân.
+
+    Hàng thân lấy từ mọi ``<tbody>`` (kể cả hàng nằm trực tiếp dưới
+    ``<table>``); mỗi hàng bắt đầu tại một thẻ ``<tr>`` mở nên ``<tr>``
+    thiếu thẻ đóng vẫn được giữ nguyên vẹn.
+    """
+    thead_match = _HTML_THEAD.search(table_text)
+    thead = thead_match.group(0) if thead_match else ""
+    tfoot_match = _HTML_TFOOT.search(table_text)
+    tfoot = tfoot_match.group(0) if tfoot_match else ""
+    caption_match = _HTML_CAPTION.search(table_text)
+    caption = caption_match.group(0) if caption_match else ""
+
+    body_source = table_text
+    for block in (thead, tfoot, caption):
+        if block:
+            body_source = body_source.replace(block, "", 1)
+
+    open_tag_match = re.search(r"<table\b[^>]*>", table_text, flags=re.IGNORECASE)
+    open_tag = open_tag_match.group(0) if open_tag_match else "<table>"
+    return _HtmlTableParts(
+        open_tag=open_tag,
+        caption=caption,
+        thead=thead,
+        tfoot=tfoot,
+        body_rows=_split_html_rows(body_source),
+    )
+
+
+def _html_table_rows(table_text: str) -> list[str]:
+    """Các hàng phải còn nguyên vẹn sau khi chia: hàng thân và hàng ``<tfoot>``."""
+    parts = _split_html_table_parts(table_text)
+    rows = list(parts.body_rows)
+    if parts.tfoot:
+        rows.extend(_split_html_rows(parts.tfoot))
+    return rows
+
+
+def _chunk_html_rows(chunk: str) -> list[str]:
+    """Các hàng ``<tr>`` trong một child, tách riêng từng vùng thead/tbody/tfoot."""
+    rows: list[str] = []
+    for region in (
+        _HTML_THEAD.findall(chunk)
+        + _HTML_TBODY.findall(chunk)
+        + _HTML_TFOOT.findall(chunk)
+    ):
+        rows.extend(_split_html_rows(region))
+    return rows
+
+
+def _split_html_rows(source: str) -> list[str]:
+    """Cắt vùng thân bảng thành các hàng, mỗi hàng bắt đầu tại ``<tr>`` mở.
+
+    Hàng kết thúc trước ``<tr>`` kế tiếp hoặc trước thẻ đóng khối
+    (``</tbody>``/``</tfoot>``/``</table>``); thẻ ``</tr>`` (nếu có) được giữ
+    lại trong hàng.
+    """
+    opens = list(_HTML_TR_OPEN.finditer(source))
+    if not opens:
+        return []
+    bounds = re.compile(r"<tr\b|</tbody\s*>|</tfoot\s*>|</table\s*>", re.IGNORECASE)
+    rows: list[str] = []
+    for match in opens:
+        bound = bounds.search(source, match.end())
+        row = source[match.start() : bound.start() if bound else len(source)].strip()
+        if row:
+            rows.append(row)
+    return rows
 
 
 def _split_long_block(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:

@@ -104,6 +104,10 @@ def test_alembic_upgrade_check_and_downgrade_cycle(tmp_path: Path) -> None:
     alembic_ini_path = Path(__file__).resolve().parents[1] / "alembic.ini"
     cfg = Config(str(alembic_ini_path))
     cfg.set_main_option("sqlalchemy.url", db_url)
+    # Không để Alembic fileConfig logging từ alembic.ini: nó disable mọi
+    # logger hiện có (logging.config.disable_existing_loggers) và làm các
+    # test caplog chạy sau (vd. test_document_pipeline) mất bản ghi WARNING.
+    cfg.attributes["configure_logger"] = False
 
     command.upgrade(cfg, "head")
     command.check(cfg)

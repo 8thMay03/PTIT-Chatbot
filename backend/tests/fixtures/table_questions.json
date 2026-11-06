@@ -1,0 +1,142 @@
+[
+  {
+    "evidence": "Sổ tay sinh viên D26, dòng 8398: |Mức điểm tối đa Tiêu chí 3|20 điểm|",
+    "expected_terms": [
+      "Mức điểm tối đa Tiêu chí 3",
+      "20 điểm"
+    ],
+    "id": "q_table_drl_tc3_max",
+    "question": "Mức điểm tối đa của Tiêu chí 3 (ý thức và kết quả tham gia hoạt động chính trị - xã hội, văn hóa, văn nghệ, thể thao) trong đánh giá điểm rèn luyện là bao nhiêu?",
+    "reference_answer": "Mức điểm tối đa của Tiêu chí 3 là 20 điểm."
+  },
+  {
+    "evidence": "Sổ tay sinh viên D26, dòng 8397: |3.5|Đưa các thông tin sai lệch...|-10 điểm|",
+    "expected_terms": [
+      "thông tin sai lệch",
+      "-10 điểm"
+    ],
+    "id": "q_table_drl_35_penalty",
+    "question": "Sinh viên đưa thông tin sai lệch, chưa được kiểm chứng về Học viện lên mạng xã hội thì bị trừ bao nhiêu điểm rèn luyện?",
+    "reference_answer": "Bị trừ 10 điểm (mục 3.5, Tiêu chí 3)."
+  },
+  {
+    "evidence": "Sổ tay sinh viên D26, dòng 8412: |5.1|Sinh viên được Học viện phân công làm lớp trưởng...|4 điểm|",
+    "expected_terms": [
+      "phân công làm lớp trưởng",
+      "4 điểm"
+    ],
+    "id": "q_table_drl_51",
+    "question": "Sinh viên được Học viện phân công làm lớp trưởng được cộng bao nhiêu điểm rèn luyện (mục 5.1, Tiêu chí 5)?",
+    "reference_answer": "Được cộng 4 điểm."
+  },
+  {
+    "evidence": "Bảng chuẩn đầu ra: hàng ||||ULO1.3: Ứng dụng các phương pháp...",
+    "expected_terms": [
+      "ULO1.3",
+      "Utilize advanced methods"
+    ],
+    "id": "q_table_ulo13",
+    "question": "Chuẩn đầu ra ULO1.3 yêu cầu sinh viên ứng dụng điều gì (kể cả nội dung tiếng Anh)?",
+    "reference_answer": "ULO1.3: Ứng dụng các phương pháp và công nghệ tiên tiến trong việc giải quyết vấn đề và ra quyết định (Utilize advanced methods and technologies in solving problems and in making decisions)."
+  },
+  {
+    "evidence": "Sổ tay sinh viên D26, dòng 508: |BM Toán|TS. Lê Văn Ngọc|Trưởng bộ môn|...|ngoclvt@ptit.edu.vn|",
+    "expected_terms": [
+      "Lê Văn Ngọc",
+      "ngoclvt"
+    ],
+    "id": "q_table_contact_toan",
+    "question": "Trưởng bộ môn Toán của Khoa Cơ bản 1 là ai, email liên hệ là gì?",
+    "reference_answer": "TS. Lê Văn Ngọc, email ngoclvt@ptit.edu.vn."
+  },
+  {
+    "evidence": "Sổ tay sinh viên D26, dòng 509: |BM Vật lý|TS. Lê Thị Minh Thanh|Trưởng bộ môn|0904 801...|",
+    "expected_terms": [
+      "Lê Thị Minh Thanh",
+      "0904 801"
+    ],
+    "id": "q_table_contact_vatly",
+    "question": "Số điện thoại của Trưởng bộ môn Vật lý Khoa Cơ bản 1 là gì?",
+    "reference_answer": "0904 801 508 (TS. Lê Thị Minh Thanh)."
+  },
+  {
+    "evidence": "Sổ tay sinh viên D26, dòng 507: |Lãnh đạo Khoa|GS.TS. Phạm Ngọc Anh|Trưởng khoa|0912 316...|",
+    "expected_terms": [
+      "Phạm Ngọc",
+      "0912 316"
+    ],
+    "id": "q_table_contact_truongkhoa",
+    "question": "Trưởng khoa Cơ bản 1 là ai, số điện thoại liên hệ là gì?",
+    "reference_answer": "GS.TS. Phạm Ngọc Anh, số điện thoại 0912 316 141."
+  },
+  {
+    "evidence": "Sổ tay sinh viên D26, dòng 2098: |1|Triết học Mácx-Lê-nin|3|HK1|",
+    "expected_terms": [
+      "Mácx-Lê-nin",
+      "HK1"
+    ],
+    "id": "q_table_tc_tritiet",
+    "question": "Học phần Triết học Mác - Lênin có bao nhiêu tín chỉ và học vào học kỳ nào?",
+    "reference_answer": "3 tín chỉ, học kỳ 1 (HK1)."
+  },
+  {
+    "evidence": "Sổ tay sinh viên D26, dòng 2123: |4|Lập trình Python (Fintech)|3|HK3|",
+    "expected_terms": [
+      "Lập trình Python",
+      "HK3"
+    ],
+    "id": "q_table_tc_python",
+    "question": "Học phần Lập trình Python (Fintech) có bao nhiêu tín chỉ và học vào học kỳ nào?",
+    "reference_answer": "3 tín chỉ, học kỳ 3 (HK3)."
+  },
+  {
+    "evidence": "Sổ tay sinh viên D26, dòng 8385: ||- Vắng 01 buổi họp lớp...|-1 điểm|",
+    "expected_terms": [
+      "Vắng 01 buổi họp lớp",
+      "-1 điểm"
+    ],
+    "id": "q_table_drl_vanghop",
+    "question": "Sinh viên vắng một buổi họp lớp hoặc sinh hoạt đoàn thể không có lý do thì bị trừ mấy điểm rèn luyện?",
+    "reference_answer": "Bị trừ 1 điểm."
+  },
+  {
+    "evidence": "Sổ tay sinh viên D26, dòng 8394: |3.2|Tham gia công tác xã hội như: hiến máu nhân đạo...|4 điểm|",
+    "expected_terms": [
+      "hiến máu nhân đạo",
+      "không vượt quá 4 điểm"
+    ],
+    "id": "q_table_drl_hienmau",
+    "question": "Sinh viên tham gia hiến máu nhân đạo được cộng điểm rèn luyện như thế nào?",
+    "reference_answer": "1 điểm cho mỗi hoạt động tham gia, tổng điểm không vượt quá 4 điểm (mục 3.2, Tiêu chí 3)."
+  },
+  {
+    "evidence": "Sổ tay sinh viên D26, dòng 8415: ||Mức điểm tối đa Tiêu chí 5|10 điểm|",
+    "expected_terms": [
+      "Mức điểm tối đa Tiêu chí 5",
+      "10 điểm"
+    ],
+    "id": "q_table_drl_tc5_max",
+    "question": "Mức điểm tối đa của Tiêu chí 5 (tham gia phụ trách lớp, đoàn thể và thành tích đặc biệt) trong đánh giá điểm rèn luyện là bao nhiêu?",
+    "reference_answer": "Mức điểm tối đa của Tiêu chí 5 là 10 điểm."
+  },
+  {
+    "id": "q_table_contact_gdtc",
+    "question": "Trưởng bộ môn Giáo dục thể chất (GDTC) của Khoa Cơ bản 1 là ai, số điện thoại liên hệ là gì?",
+    "expected_terms": [
+      "Nguyễn Đức",
+      "0913 556"
+    ],
+    "reference_answer": "ThS. Nguyễn Đức Thịnh, số điện thoại 0913 556 590.",
+    "evidence": "Sổ tay sinh viên D26, dòng 512: |BM GDTC|ThS. Nguyễn Đức Thịnh|Trưởng bộ môn|0913 556...|"
+  },
+  {
+    "id": "q_table_ketoan_acca",
+    "question": "Học phần Kế toán Quản trị 2 - ACCA (HK5) và học phần Thuế 2 - ACCA (HK7) nằm cùng một hàng trong kế hoạch học tập, cho biết số tín chỉ của mỗi học phần?",
+    "expected_terms": [
+      "Assurance - ACCA",
+      "Taxation 2- ACCA"
+    ],
+    "reference_answer": "Kế toán Quản trị 2 - ACCA (HK5) 4 tín chỉ; Thuế 2 - ACCA (HK7) 2 tín chỉ.",
+    "evidence": "Sổ tay sinh viên D26, dòng 2749."
+  }
+]

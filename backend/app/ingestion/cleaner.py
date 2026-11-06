@@ -39,6 +39,14 @@ _TOC_LINE_LIKE = re.compile(
 _BOLD_PAGE_SUFFIX = re.compile(r"\*\*\s*\d{1,3}\s*\*\*\s*$")
 # Freestanding page numbers: "- 3 -", "— 12 —", "7"
 _PAGE_NUMBER_ONLY = re.compile(r"^[-–—]?\s*\d{1,3}\s*[-–—]?$")
+# Ô cuối là số trang (có thể bọc **): "3", "**24**", "217".
+_TOC_PAGE_CELL = re.compile(r"^\**\s*\d{1,4}\s*\**$")
+# Ô phân cách bảng Markdown: "-", "--", ":--:", ...
+_MD_DELIMITER_CELL = re.compile(r"^:?-+:?$")
+_TR_OPEN = re.compile(r"<tr\b[^>]*>", re.IGNORECASE)
+_TABLE_CELL = re.compile(r"<t[dh]\b[^>]*>(.*?)</t[dh]\s*>", re.IGNORECASE | re.DOTALL)
+_TAG_ONLY = re.compile(r"<[^>]+>")
+_BLOCK_CLOSE = re.compile(r"</(?:tbody|thead|tfoot|table)\s*>", re.IGNORECASE)
 _NATIONAL_TITLE = re.compile(
     r"^cộng\s+ho[àa]\s+x[ãa]\s+h[ộo]i\s+ch[ủu]\s+ngh[ĩi]a\s+vi[ệe]t\s+nam"
     r"(?:\s+đ[ộo]c\s+l[ậa]p\s*[-–]\s*t[ựu]\s*do\s*[-–]\s*h[ạa]nh\s*ph[úu]c)?$",
@@ -96,15 +104,19 @@ def _drop_noise_lines(lines: list[str]) -> list[str]:
     in_distribution_list = False
     in_toc_section = False
 
-    for line in lines:
+    index = 0
+    while index < len(lines):
+        line = lines[index]
         stripped = line.strip()
 
         if _FENCE.match(stripped):
             in_fence = not in_fence
             kept.append(line)
+            index += 1
             continue
         if in_fence:
             kept.append(line)
+            index += 1
             continue
         if in_toc_section:
             # The whole "MỤC LỤC" section is noise, tables included; it ends at
@@ -113,33 +125,47 @@ def _drop_noise_lines(lines: list[str]) -> list[str]:
             if _ANY_HEADING.match(stripped) and not _TOC_HEADING.match(_ATX_PREFIX.sub("", stripped)):
                 in_toc_section = False
                 kept.append(line)
+                index += 1
                 continue
             if stripped.startswith("|") or _HTML_TABLE_START.search(stripped):
-                continue
-            title = _ATX_PREFIX.sub("", stripped)
-            plain = title.strip("*_ ").strip()
-            if plain and not _TOC_LINE_LIKE.search(plain):
+                run, end = _peek_table_run(lines, index)
+                if _is_toc_like_table(run):
+                    index = end
+                    continue
+                # Bảng dữ liệu thật ngay sau "MỤC LỤC": kết thúc section mục
+                # lục tại đây và giữ bảng; dòng hiện tại xử lý tiếp bên dưới.
                 in_toc_section = False
-                # Fall through to the normal rules for this line.
             else:
-                continue
+                title = _ATX_PREFIX.sub("", stripped)
+                plain = title.strip("*_ ").strip()
+                if plain and not _TOC_LINE_LIKE.search(plain):
+                    in_toc_section = False
+                    # Fall through to the normal rules for this line.
+                else:
+                    index += 1
+                    continue
         if _TOC_HEADING.match(_ATX_PREFIX.sub("", stripped)):
             in_toc_section = True
+            index += 1
             continue
         if in_table:
             in_table = not _HTML_TABLE_END.search(stripped)
             kept.append(line)
+            index += 1
             continue
         if _HTML_TABLE_START.search(stripped):
             in_table = not _HTML_TABLE_END.search(stripped)
             kept.append(line)
+            index += 1
             continue
         if stripped.startswith("|"):
             kept.append(line)
+            index += 1
             continue
         if not stripped:
             # Blank lines do not end a "Nơi nhận" list: its items follow one.
             kept.append(line)
+            index += 1
             continue
 
         title = _ATX_PREFIX.sub("", stripped)
@@ -148,11 +174,13 @@ def _drop_noise_lines(lines: list[str]) -> list[str]:
         if names_to_skip > 0:
             if _PERSON_NAME.match(plain):
                 names_to_skip -= 1
+                index += 1
                 continue
             names_to_skip = 0
 
         if in_distribution_list:
             if _is_distribution_item(stripped):
+                index += 1
                 continue
             in_distribution_list = False
 
@@ -161,11 +189,87 @@ def _drop_noise_lines(lines: list[str]) -> list[str]:
                 names_to_skip = _MAX_NAME_LINES_AFTER_SIGN
             elif _NOI_NHAN.match(plain):
                 in_distribution_list = True
+            index += 1
             continue
 
         kept.append(line)
+        index += 1
 
     return kept
+
+
+def _peek_table_run(lines: list[str], index: int) -> tuple[list[str], int]:
+    """Lấy toàn bộ khối bảng bắt đầu tại ``index`` và vị trí dòng sau khối.
+
+    Khối HTML kết thúc ở `</table>`; nếu file parse bị cắt cụt (không có thẻ
+    đóng), dừng ở heading tiếp theo để không nuốt mất phần còn lại của tài liệu.
+    """
+    if lines[index].strip().startswith("|"):
+        end = index
+        while end < len(lines) and lines[end].strip().startswith("|"):
+            end += 1
+        return lines[index:end], end
+    end = index
+    while end < len(lines):
+        if _HTML_TABLE_END.search(lines[end]):
+            end += 1
+            break
+        if _ANY_HEADING.match(lines[end].strip()):
+            break
+        end += 1
+    return lines[index:end], end
+
+
+def _is_toc_like_table(run: list[str]) -> bool:
+    """Bảng mục lục thật khi phần lớn hàng có ô cuối là số trang.
+
+    Bảng dữ liệu (ô cuối là học kỳ, email, số tín chỉ…) trả về False để
+    caller kết thúc section mục lục và giữ bảng.
+    """
+    lasts = _table_last_cells(run)
+    if not lasts:
+        return True
+    hits = sum(1 for cell in lasts if _TOC_PAGE_CELL.fullmatch(cell))
+    return hits / len(lasts) > 0.5
+
+
+def _table_last_cells(run: list[str]) -> list[str]:
+    """Ô cuối của từng hàng dữ liệu (bỏ dòng tiêu đề và dòng phân cách Markdown)."""
+    if _HTML_TABLE_START.search(run[0]):
+        return _html_table_last_cells(run)
+    rows = list(run)
+    if len(rows) >= 2 and _is_delimiter_row(rows[1]):
+        rows = rows[2:]
+    lasts: list[str] = []
+    for line in rows:
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if cells and all(_MD_DELIMITER_CELL.fullmatch(cell) for cell in cells):
+            continue
+        non_empty = [cell for cell in cells if cell]
+        if non_empty:
+            lasts.append(non_empty[-1])
+    return lasts
+
+
+def _is_delimiter_row(line: str) -> bool:
+    """Dòng phân cách bảng Markdown: mọi ô đều dạng ``:?-+:?``."""
+    cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+    return bool(cells) and all(_MD_DELIMITER_CELL.fullmatch(cell) for cell in cells)
+
+
+def _html_table_last_cells(run: list[str]) -> list[str]:
+    """Ô cuối của từng hàng trong khối bảng HTML."""
+    lasts: list[str] = []
+    segments = _TR_OPEN.split("\n".join(run))
+    for segment in segments[1:]:
+        segment = _BLOCK_CLOSE.split(segment, maxsplit=1)[0]
+        cells = [
+            _TAG_ONLY.sub("", match.group(1)).strip()
+            for match in _TABLE_CELL.finditer(segment)
+        ]
+        if cells:
+            lasts.append(cells[-1])
+    return lasts
 
 
 def is_noise_line(line: str) -> bool:

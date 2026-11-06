@@ -6,12 +6,14 @@ from pathlib import Path
 
 from scripts.check_chunks import (
     ChunkView,
+    TableDocGroup,
     check_chunks,
     check_mid_word_start,
     check_noise_chunk,
     check_parent_spans_articles,
     check_search_text,
     check_short_chunk,
+    check_table_documents,
     views_from_data,
 )
 
@@ -88,6 +90,72 @@ def test_search_text_missing_document_title_is_flagged() -> None:
     assert finding.code == "search_text_missing_context"
 
 
+# ---------------------------------------------------------------------------
+# S-06: mã lỗi bảng (table_row_*, table_chunk_missing_header)
+# ---------------------------------------------------------------------------
+
+
+_CLEAN_TABLE = "## T\n\n| A | B |\n| --- | --- |\n| 1 | x |\n| 2 | y |"
+
+
+def test_table_missing_row_is_flagged() -> None:
+    group = TableDocGroup(ref="doc1", cleaned_text=_CLEAN_TABLE, children=[("c0", "không có bảng")])
+
+    findings = check_table_documents([group])
+
+    assert any(finding.code == "table_row_missing" for finding in findings)
+    assert all(finding.is_error for finding in findings)
+
+
+def test_table_broken_row_is_flagged() -> None:
+    group = TableDocGroup(
+        ref="doc1",
+        cleaned_text=_CLEAN_TABLE,
+        children=[("c0", "## T\n\n| A |\n| 1 | x")],
+    )
+
+    findings = check_table_documents([group])
+
+    assert any(finding.code == "table_row_broken" for finding in findings)
+
+
+def test_table_chunk_missing_header_is_flagged() -> None:
+    group = TableDocGroup(
+        ref="doc1",
+        cleaned_text=_CLEAN_TABLE,
+        children=[("c0", "| 1 | x |\n| 2 | y |")],
+    )
+
+    findings = check_table_documents([group])
+
+    assert [finding.code for finding in findings] == ["table_chunk_missing_header"]
+
+
+def test_table_clean_chunks_produce_no_findings() -> None:
+    children = [
+        ("c0", "## T\n\n| A | B |\n| --- | --- |\n| 1 | x |"),
+        ("c1", "## T\n\n| A | B |\n| --- | --- |\n| 2 | y |"),
+    ]
+    group = TableDocGroup(ref="doc1", cleaned_text=_CLEAN_TABLE, children=children)
+
+    assert check_table_documents([group]) == []
+
+
+def test_views_from_data_groups_table_children_by_document(tmp_path: Path) -> None:
+    source = tmp_path / "bang-diem.md"
+    source.write_text(
+        "## Điểm\n\n| Môn | Điểm |\n| --- | --- |\n| Toán | 9 |\n| Lý | 8 |\n",
+        encoding="utf-8",
+    )
+
+    _views, stats, groups = views_from_data(tmp_path)
+
+    assert stats["documents"] == 1
+    assert len(groups) == 1
+    assert groups[0].children
+    assert check_table_documents(groups) == []
+
+
 def test_views_from_data_dry_run_builds_clean_views(tmp_path: Path) -> None:
     source = tmp_path / "huong-dan-bhyt.md"
     source.write_text(
@@ -97,9 +165,10 @@ def test_views_from_data_dry_run_builds_clean_views(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    views, stats = views_from_data(tmp_path)
+    views, stats, groups = views_from_data(tmp_path)
 
     assert stats["documents"] == 1
     assert stats["chunks"] == len(views) == 1
     assert views[0].search_text.startswith("huong-dan-bhyt > Quy trình BHYT\n")
     assert check_chunks(views) == []
+    assert check_table_documents(groups) == []

@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.db.models import Base, Chunk, Dataset, Document
 from app.embeddings.models import HashEmbeddingModel
 from app.ingestion import uploads
-from app.ingestion.pipeline import DocumentStateError, IngestionPipeline
+from app.ingestion.pipeline import DocumentStateError, IngestionPipeline, _chunk_records
 from app.ingestion.uploads import read_preview
 from app.parsers import DocumentParseError, build_registry, docling, llamaparse
 
@@ -634,3 +634,38 @@ def test_chunk_documents_rechunks_from_stored_markdown(upload_pipeline, monkeypa
     assert _document_row(engine, "legacy").status == "active"
     assert set(store.deleted) == set(old_vectors)
     assert len(store.added) == len(old_vectors) + result["chunks"]
+
+
+def test_chunk_records_warns_when_tables_are_not_recognized(caplog):
+    text = "## Ghi chú\n\n" + "\n".join(f"| mục {index}" for index in range(1, 8))
+
+    with caplog.at_level("WARNING", logger="app.ingestion"):
+        _chunk_records("doc1", "data/ghi-chu.md", "Ghi chú", text)
+
+    assert any("không nhận ra bảng nào" in record.message for record in caplog.records)
+
+
+def test_chunk_records_silent_for_clean_tables(caplog):
+    text = "## Điểm\n\n| Môn | Điểm |\n| --- | --- |\n| Toán | 9 |\n| Lý | 8 |\n| Hóa | 7 |\n"
+
+    with caplog.at_level("WARNING", logger="app.ingestion"):
+        _chunk_records("doc1", "data/bang-diem.md", "Bảng điểm", text)
+
+    assert not [record for record in caplog.records if record.levelname == "WARNING"]
+
+
+def test_chunk_records_warns_on_table_coverage_violation(caplog, monkeypatch):
+    from app.ingestion import pipeline as pipeline_module
+    from app.ingestion.chunker import TableCoverageIssue
+
+    monkeypatch.setattr(
+        pipeline_module,
+        "find_table_coverage_issues",
+        lambda _cleaned, _children: [TableCoverageIssue("missing", -1, "| 1 | x |")],
+    )
+    text = "## Điểm\n\n| Môn | Điểm |\n| --- | --- |\n| Toán | 9 |\n| Lý | 8 |\n| Hóa | 7 |\n"
+
+    with caplog.at_level("WARNING", logger="app.ingestion"):
+        _chunk_records("doc1", "data/bang-diem.md", "Bảng điểm", text)
+
+    assert any("bất biến bảng" in record.message for record in caplog.records)
