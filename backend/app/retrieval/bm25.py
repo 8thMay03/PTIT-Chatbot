@@ -159,9 +159,9 @@ def _score_upper_bound(scorer: BM25Okapi, query_terms: list[str]) -> float:
     Cộng theo từng token kể cả token lặp, đúng như ``BM25Okapi.get_scores``, nên
     điểm thô không bao giờ vượt cận này. Term không có trong kho được tính với
     idf của df = 1: query nhắc tới thứ kho không có thì điểm chuẩn hóa thấp, thay
-    vì được bỏ qua như trong điểm thô. Điểm chuẩn hóa vì vậy chỉ phụ thuộc mức độ
-    chunk phủ các term của query (có trọng số idf), không phụ thuộc độ dài query
-    hay kích thước kho như điểm thô.
+    vì được bỏ qua như trong điểm thô. Điểm chuẩn hóa vì vậy chủ yếu đo mức độ chunk
+    phủ các term của query (có trọng số idf); độ dài query và kích thước kho vẫn ảnh
+    hưởng qua tỉ lệ idf giữa các term nhưng ít hơn nhiều so với điểm thô.
     """
     # Cùng công thức và sàn epsilon như BM25Okapi._calc_idf để kho rất nhỏ không ra idf âm.
     unseen_idf = max(
