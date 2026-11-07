@@ -104,4 +104,8 @@ Q-01..Q-04: người yêu cầu giao "implement task fe14" (2026-11-07) mà khô
 
 ## Bàn giao
 
-Chưa có.
+- Lúc: `2026-11-07T20:03:54+07:00`; từ `claude-fe14` đến `8thMay03`.
+- Commit: `e6a2e99` (`feat: harden production nginx for uploads, streaming and security headers`) trên `feat/nginx-production`, nền `dev` @ `50a2f65`. PR #53 vào `dev`: https://github.com/8thMay03/PTIT-Chatbot/pull/53.
+- Nội dung: S-01..S-04 (`frontend/nginx.conf`, `frontend/nginx/*.conf`, `frontend/Dockerfile`, `.gitattributes`, `frontend/scripts/nginx-csp.test.mjs`, `frontend/scripts/nginx-smoke/*`) và hồ sơ task. Không có thư mục task BE-12 và `frontend/index.html` trong commit (R-05).
+- Kiểm tra: xem `verification.md` (V-01..V-06 `passed`; DOCX của V-05 bằng mô phỏng).
+- Còn lại: theo dõi `docx-preview` với DOCX có ảnh thật; hạ timeout route chia đoạn về 120s khi BE-15 xong; thông điệp 413 (FE-15).

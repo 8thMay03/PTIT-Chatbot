@@ -73,20 +73,21 @@
 - Mức độ: `low`; bắt buộc: không (nhưng nên làm khi commit).
 - Người xử lý: `claude-fe14`.
 - Cách xác nhận: `git show --stat` của commit FE-14 không có file BE-12 hay `frontend/index.html`.
-- Trạng thái: `open`.
+- Xác nhận (2026-11-07T20:03:54+07:00, `claude-review-fe14`): `git show --stat e6a2e99` chỉ có file FE-14 và hồ sơ task, không có `.agents/tasks/2026-11-07-be12-llm-call-layer/` và `frontend/index.html`. Mốc thời gian ghi sau đó lấy từ đồng hồ máy.
+- Trạng thái: `resolved`.
 
 ## Lịch sử các vòng review
 
 - Vòng 1 (`2026-11-07T19:05:00+07:00`): self-review trên working tree; không có nhận xét bắt buộc; chưa kết luận vì V-05 chưa xong.
 - Vòng 2 (`2026-11-07T19:04:15+07:00`, `claude-review-fe14`, `independent`): đọc cả năm file task, diff (`.gitattributes`, `frontend/Dockerfile`, `frontend/nginx.conf`) và file mới (`frontend/nginx/*.conf`, `frontend/scripts/nginx-csp.test.mjs`, `frontend/scripts/nginx-smoke/*`) trên cùng working tree; đối chiếu route/giới hạn backend và mã frontend liên quan CSP (xem "Điểm đã đánh giá"). Chạy lại vitest (191 pass) và smoke `--quick` (109 pass, 0 fail). Xác nhận R-01..R-03 vẫn `deferred`; thêm R-04 (`low`, `deferred`), R-05 (`low`, `open`, làm khi commit). Thiết kế location/kế thừa header/CSP đúng; không có nhận xét bắt buộc về mã. Không `approved` vì AC-04 chưa có bằng chứng đủ.
 
-- Vòng 3 (`2026-11-07T19:58:08+07:00`, `claude-review-fe14`, `independent`): đọc V-05 vòng 2 (`claude-verify-fe14`) — đối chứng âm cho đúng 1 báo cáo, mọi màn admin, iframe PDF (`object-src 'none'` không chặn — rủi ro nêu ở vòng 2 đã được loại trừ), tải tệp, theme, chat đăng nhập đều 0 vi phạm; DOCX có ảnh chỉ có mô phỏng, người yêu cầu chấp nhận (`task.md`). Mã không đổi so với vòng 2. Không phát sinh nhận xét mới. R-05 vẫn `open` (không bắt buộc, làm khi commit). Kết luận `approved`.
+- Vòng 3 (`2026-11-07T19:58:08+07:00`, `claude-review-fe14`, `independent`): đọc V-05 vòng 2 (`claude-verify-fe14`) — đối chứng âm cho đúng 1 báo cáo, mọi màn admin, iframe PDF (`object-src 'none'` không chặn — rủi ro nêu ở vòng 2 đã được loại trừ), tải tệp, theme, chat đăng nhập đều 0 vi phạm; DOCX có ảnh chỉ có mô phỏng, người yêu cầu chấp nhận (`task.md`). Mã không đổi so với vòng 2. Không phát sinh nhận xét mới. R-05 vẫn `open` (không bắt buộc, làm khi commit). Kết luận `approved`. Bổ sung 2026-11-07T20:03:54+07:00: R-05 `resolved` trên `e6a2e99` (PR #53); kết luận không đổi.
 
 ## Kết luận
 
 - Kết luận: `approved` (vòng 3, `independent`). Vòng 2: `blocked` — chờ V-05; mã không cần sửa.
 - Giới hạn của kết luận vòng 3: `docx-preview` chưa được thấy trên DOCX có ảnh thật dưới CSP (chỉ mô phỏng, theo quyết định của người yêu cầu); smoke bản đầy đủ không chạy lại ở vòng 2/3. Nếu sau này có vi phạm khi xem DOCX, mở nhận xét mới cho `page-headers.conf`.
 - Nhận xét bắt buộc còn mở: không có.
-- Nhận xét hoãn lại/không bắt buộc: R-01 (FE-15), R-02, R-03, R-04 (`deferred`); R-05 (`open`, làm khi commit).
+- Nhận xét hoãn lại/không bắt buộc: R-01 (FE-15), R-02, R-03, R-04 (`deferred`); R-05 `resolved` trên commit `e6a2e99`.
 - Phần chưa review / giới hạn: hành vi CSP trên trình duyệt ở trang admin, iframe PDF (gồm ảnh hưởng của `object-src 'none'` trang cha), `docx-preview` có ảnh/phông nhúng, tải Markdown/tệp — chờ V-05. Không chạy lại smoke bản đầy đủ (timeout 120/200/150s) ở vòng 2.
 - Điều kiện `approved`: V-05 `passed` không có báo cáo vi phạm CSP (ngoài đối chứng âm) trên các màn hình còn lại; nếu V-05 buộc sửa CSP thì review lại `page-headers.conf` và test hash. Sau đó reviewer xác nhận R-05 trên commit và kết luận `approved`.

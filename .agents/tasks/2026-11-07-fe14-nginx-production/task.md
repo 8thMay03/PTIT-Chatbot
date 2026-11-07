@@ -5,7 +5,7 @@
 - Coordinator: `claude-fe14`
 - Người yêu cầu: `8thMay03`
 - Tạo lúc: `2026-11-07T18:41:19+07:00`
-- Cập nhật lúc: `2026-11-07T19:58:08+07:00`
+- Cập nhật lúc: `2026-11-07T20:03:54+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -73,9 +73,9 @@ Kết quả cần có:
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: Q-01..Q-04 chốt theo đề xuất (MSG-claude-fe14-001 trong `implementation.md`). S-01..S-04 xong; AC-01..AC-06 có bằng chứng `passed` (`verification.md`; phần DOCX của AC-04 bằng mô phỏng theo quyết định của người yêu cầu). Review vòng 3 `approved`. Chưa commit.
+- Tóm tắt: Q-01..Q-04 chốt theo đề xuất (MSG-claude-fe14-001 trong `implementation.md`). S-01..S-04 xong; commit `e6a2e99`, PR #53 vào `dev`; AC-01..AC-06 có bằng chứng `passed` (`verification.md`; phần DOCX của AC-04 bằng mô phỏng theo quyết định của người yêu cầu). Review vòng 3 `approved`.
 - Blocker: không.
-- Bước tiếp theo: `claude-fe14` — commit/PR khi người yêu cầu giao; khi commit xử lý R-05 của `review.md` (không đưa thư mục task BE-12 vào commit). Theo dõi: kiểm `docx-preview` thật khi có DOCX có ảnh trong dữ liệu.
+- Bước tiếp theo: người yêu cầu review/merge PR #53 (https://github.com/8thMay03/PTIT-Chatbot/pull/53). Theo dõi: kiểm `docx-preview` thật khi có DOCX có ảnh trong dữ liệu.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
@@ -83,3 +83,4 @@ Kết quả cần có:
 - 2026-11-07T19:05:00+07:00 — claude-fe14: người yêu cầu giao "implement task fe14" → chấp nhận đề xuất Q-01..Q-04, chuyển `in_progress`, tạo nhánh `feat/nginx-production` từ `dev` @ `50a2f65`.
 - 2026-11-07T19:05:00+07:00 — claude-fe14: sửa câu chữ AC-03 cho khớp Q-04 đã chốt (CSP trang chỉ trên phần SPA; `/api/` mang header chung). Đánh dấu AC-01/02/03/05/06 theo bằng chứng trong `verification.md`.
 - 2026-11-07T19:58:08+07:00 — claude-fe14: V-05 vòng 2 (`claude-verify-fe14`) đạt mọi màn còn lại với 0 vi phạm CSP; chỉ DOCX có ảnh chưa kiểm được vì dữ liệu không có DOCX (MSG-claude-verify-fe14-001). Người yêu cầu (8thMay03) quyết định chấp nhận bằng chứng mô phỏng cho phần DOCX. Lý do ghi nhận: các thao tác của `docx-preview` chịu CSP (chèn `<style>`, ảnh và phông `blob:`) đã chạy được dưới đúng CSP với 0 báo cáo, và `style-src 'unsafe-inline'`, `img-src`/`font-src` có `blob:` đúng như thiết kế. Rủi ro còn lại: hành vi riêng của `docx-preview` chưa thấy trên tệp thật. Đánh dấu AC-04, S-04 `done`, task `done` sau review vòng 3 `approved`.
+- 2026-11-07T20:03:54+07:00 — claude-fe14: commit `e6a2e99` trên `feat/nginx-production`, mở PR #53 vào `dev` theo yêu cầu của người yêu cầu.
