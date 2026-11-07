@@ -5,7 +5,7 @@
 - Coordinator: `claude-be13`
 - Người yêu cầu: `8thMay03`
 - Tạo lúc: `2026-11-07T17:17:49+07:00`
-- Cập nhật lúc: `2026-11-07T17:33:32+07:00`
+- Cập nhật lúc: `2026-11-07T18:19:21+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -77,11 +77,12 @@ Người yêu cầu giao "triển khai task be13" (2026-11-07) mà không đổi
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: S-01..S-05 xong trên nhánh `feat/safe-embedding-startup` (tách từ `dev` @ `6257004`), chưa commit. AC-01..AC-06 có bằng chứng tự động `passed` (V-01..V-06); V-07 (UI) mới chạy phần API trên uvicorn thật, phần giao diện `not_run`. Self-review `approved`.
+- Tóm tắt: S-01..S-05 đã commit `3557f87` trên `feat/safe-embedding-startup` (tách từ `dev` @ `6257004`). PR vào `dev`: https://github.com/8thMay03/PTIT-Chatbot/pull/52. AC-01..AC-06 có bằng chứng tự động `passed` (V-01..V-06); V-07 (UI) mới chạy phần API trên uvicorn thật, phần giao diện `not_run`. Review `approved` (vòng 1 `self_review`, vòng 2 độc lập `grok-review-be13`). R-01..R-05 `low`/`deferred`.
 - Blocker: không.
-- Bước tiếp theo: người yêu cầu xem diff, quyết định commit/PR; đề nghị một vòng review `independent` (như BE-10) và kiểm tra UI V-07 trước khi đóng `done`.
+- Bước tiếp theo: chờ merge PR #52; khi merge — chuyển task `done`. Theo dõi: R-05 (FE-15), R-01 (health tạo mô hình), R-04 (`hash` ở production). Kiểm tra UI V-07 vẫn chưa chạy.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
 - 2026-11-07T17:17:49+07:00 — claude-be13: tạo task `draft` từ Notion BE-13, dựa trên `origin/dev` @ `6257004`. Giới hạn thay nóng embedder ở trạng thái chưa chạy được (Q-01); để embed lại cho BE-15 và UX lỗi chat cho FE-15.
 - 2026-11-07T17:33:32+07:00 — claude-be13: được giao triển khai → `in_progress`; chấp nhận đề xuất Q-01..Q-04. Mở rộng nhỏ có ghi trong `implementation.md` (D-02: sửa profile embedding đang chọn khi embedder chưa chạy được cũng áp ngay; D-01: `load()` thay `reload()`). Xong S-01..S-05 → `in_review`.
+- 2026-11-07T18:19:21+07:00 — grok-review-be13: người yêu cầu giao commit và mở PR. Commit `3557f87`, PR #52 vào `dev`: https://github.com/8thMay03/PTIT-Chatbot/pull/52. Task vẫn `in_review` đến khi merge.

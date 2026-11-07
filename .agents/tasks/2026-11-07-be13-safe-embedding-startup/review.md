@@ -80,4 +80,4 @@
 - Nhận xét bắt buộc còn mở: không.
 - Nhận xét hoãn lại: R-01 (health có thể tạo mô hình), R-02 (áp profile ngoài lock), R-03 (comment `config.py`), R-04 (`hash` chỉ cảnh báo), R-05 (FE-15: toast restart, alert `load_error`, tiêu đề 503).
 - Phần chưa review / giới hạn: không chạy lại `pytest` toàn bộ và không mở UI (V-07). Đọc tĩnh `errors.js` và `ModelKindPanel.jsx` như R-05. Chưa chạy Postgres thật; cột `Vector(1536)` được đọc từ model và kiểm bằng proxy trên SQLite.
-- Bước tiếp theo: người yêu cầu quyết định commit/PR. Chưa chuyển task sang `done`.
+- Bước tiếp theo: commit `3557f87` và PR #52 vào `dev` đã mở (https://github.com/8thMay03/PTIT-Chatbot/pull/52). Chưa chuyển task sang `done`; làm vậy sau khi merge.

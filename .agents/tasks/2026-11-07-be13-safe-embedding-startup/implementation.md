@@ -2,7 +2,7 @@
 
 ## Tổng quan triển khai
 
-Nhánh `feat/safe-embedding-startup` (tách từ `dev` @ `6257004`, `dev` đã khớp `origin/dev`). Chưa commit. Một agent `claude-be13` làm tuần tự S-01 → S-05.
+Nhánh `feat/safe-embedding-startup` (tách từ `dev` @ `6257004`, `dev` đã khớp `origin/dev`). Commit `3557f87`, PR #52 vào `dev`: https://github.com/8thMay03/PTIT-Chatbot/pull/52. Một agent `claude-be13` làm tuần tự S-01 → S-05.
 
 Mốc trước khi sửa: `pytest` trong `backend/` với `.env` dev → 858 passed / 1 skipped.
 
@@ -59,3 +59,8 @@ Chưa có thông báo.
 - Kiểm tra: xem `verification.md` (894 passed / 1 skipped, có và không có key).
 - Chưa xong: V-07 phần giao diện; review `independent`; commit/PR theo quyết định người yêu cầu.
 - Người nhận / bước tiếp theo: `8thMay03`.
+
+- Từ `grok-review-be13` (`2026-11-07T18:19:21+07:00`) tới người yêu cầu `8thMay03`:
+  - Đã làm: review độc lập `approved` (R-05 `low`/`deferred`); commit `3557f87`; mở PR #52 vào `dev`.
+  - File: hồ sơ task cập nhật liên kết PR.
+  - Bước tiếp theo: merge PR #52 khi sẵn sàng; sau merge chuyển task `done`. Kiểm tra UI V-07 vẫn chưa chạy.
