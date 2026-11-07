@@ -212,6 +212,23 @@ class Settings(BaseSettings):
     user_auth_max_failures: int = Field(default=5, ge=1, alias="USER_AUTH_MAX_FAILURES")
     user_auth_window_seconds: float = Field(default=300.0, gt=0, alias="USER_AUTH_WINDOW_SECONDS")
 
+    # ==========================================
+    # Chống lạm dụng /api/chat (BE-10)
+    # ==========================================
+    # Độ dài tối đa của câu hỏi (ký tự, đếm cả khoảng trắng); vượt thì 422.
+    chat_message_max_chars: int = Field(default=2000, ge=1, alias="CHAT_MESSAGE_MAX_CHARS")
+    # false -> bỏ hạn mức theo owner/IP và khóa một lượt đang chạy; vẫn kiểm tra độ dài.
+    chat_rate_limit_enabled: bool = Field(default=True, alias="CHAT_RATE_LIMIT_ENABLED")
+    # Số câu hỏi theo owner (tài khoản hoặc phiên ẩn danh) và theo IP; <= 0 tắt riêng ngưỡng đó.
+    chat_rate_owner_per_minute: int = Field(default=10, alias="CHAT_RATE_OWNER_PER_MINUTE")
+    chat_rate_owner_per_day: int = Field(default=200, alias="CHAT_RATE_OWNER_PER_DAY")
+    chat_rate_ip_per_minute: int = Field(default=60, alias="CHAT_RATE_IP_PER_MINUTE")
+    chat_rate_ip_per_day: int = Field(default=2000, alias="CHAT_RATE_IP_PER_DAY")
+    # Khóa "một lượt đang chạy" tự hết hạn sau TTL nếu không được nhả (dự phòng).
+    chat_active_slot_ttl_seconds: float = Field(default=600.0, gt=0, alias="CHAT_ACTIVE_SLOT_TTL_SECONDS")
+    # Số khóa owner/IP tối đa giữ trong bộ nhớ cho mỗi limiter; vượt thì bỏ khóa ít dùng nhất.
+    chat_rate_limit_max_keys: int = Field(default=100000, ge=1, alias="CHAT_RATE_LIMIT_MAX_KEYS")
+
     @property
     def allowed_email_domains(self) -> list[str]:
         return [
@@ -283,6 +300,15 @@ _RESET_EXCLUDED_FIELDS = frozenset(
         "user_email_domains",
         "user_auth_max_failures",
         "user_auth_window_seconds",
+        # Chống lạm dụng chat (BE-10): chỉ cấu hình qua env.
+        "chat_message_max_chars",
+        "chat_rate_limit_enabled",
+        "chat_rate_owner_per_minute",
+        "chat_rate_owner_per_day",
+        "chat_rate_ip_per_minute",
+        "chat_rate_ip_per_day",
+        "chat_active_slot_ttl_seconds",
+        "chat_rate_limit_max_keys",
         # Embedder đã tạo lúc khởi động (có thể từ profile embedding); reset không đổi được
         # mô hình đang chạy nên giữ nguyên để GET /config phản ánh đúng. Lựa chọn
         # embedding_profile_id vẫn bị reset và có hiệu lực ở lần khởi động sau.

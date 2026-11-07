@@ -10,6 +10,8 @@
   tạm trong ``tmp_path`` để test hội thoại không ghi vào DB dev.
 - ``register_user`` / ``login_user``: đăng ký/đăng nhập tài khoản người dùng cho một
   TestClient (landing-user-auth); cần ``api_db``.
+- ``_isolated_chat_limits`` (autouse): hạn mức chat và khóa "một lượt đang chạy" (BE-10)
+  sạch mỗi test; ngưỡng vẫn là mặc định, test cần gửi nhiều câu thì tự nâng ngưỡng.
 - ``config_store_db`` (autouse): bảng cấu hình đã lưu (PUT /config, lifespan) và kho
   mô hình (``model_profiles``) trỏ sang SQLite tạm, dọn sau mỗi test; không test nào
   đọc/ghi cấu hình trong DB dev.
@@ -22,7 +24,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, delete
 from sqlalchemy.orm import sessionmaker
 
-from app.core import auth
+from app.core import auth, rate_limit
 from app.core import config_store, model_profiles
 from app.core.config import settings
 from app.db import get_session, get_session_factory
@@ -41,6 +43,14 @@ def _isolated_admin_login_state():
     auth.reset_login_attempts()
     yield
     auth.reset_login_attempts()
+
+
+@pytest.fixture(autouse=True)
+def _isolated_chat_limits():
+    """Mỗi test bắt đầu/kết thúc với bộ đếm hạn mức chat và khóa lượt chat sạch."""
+    rate_limit.reset_chat_limits()
+    yield
+    rate_limit.reset_chat_limits()
 
 
 @pytest.fixture(scope="session")

@@ -16,7 +16,7 @@ from anyio.lowlevel import RunVar
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from starlette.types import Send
+from starlette.types import Receive, Scope, Send
 from sqlalchemy.orm import Session
 
 from app.api.schemas import (
@@ -65,7 +65,7 @@ from app.api.schemas import (
     UpdateMarkdownRequest,
     UpdateModelProfileRequest,
 )
-from app.core import auth, model_profiles, user_auth
+from app.core import auth, model_profiles, rate_limit, user_auth
 from app.core.auth import require_admin
 from app.core.config import (
     PROJECT_ROOT,
@@ -1048,8 +1048,20 @@ def _document_payload(document, chunk_count: int) -> dict:
 # (c) `_save_chat_answer`: session ngắn mới ghi câu trả lời (hoặc phần đã sinh khi
 #     client ngắt), nguồn và `retrieval_debug` của câu hỏi.
 #
-# Điểm móc BE-10: kiểm tra hạn mức/độ dài đặt ở đầu pha (a), trước khi mở session;
-# khóa "một stream mỗi phiên" lấy ở cuối pha (a) và nhả sau pha (c).
+# Chống lạm dụng (BE-10), theo thứ tự chi phí tăng dần; request bị chặn không ghi DB
+# và không gọi retrieval/LLM:
+# 1. `ChatRequest` từ chối câu hỏi dài hơn `CHAT_MESSAGE_MAX_CHARS` (422).
+# 2. Hạn mức theo IP trước pha (a), chưa cần DB (`_enforce_chat_ip_limit`).
+# 3. Trong pha (a), ngay sau khi xác định owner (cần DB để đọc tài khoản) và trước khi
+#    chạm hội thoại: lấy khóa "một lượt đang chạy" rồi kiểm tra hạn mức theo owner.
+# Khóa được nhả sau pha (c): `chat` trong `finally`; `chat_stream` qua `on_close` của
+# `_ClosingStreamingResponse` (mọi đường kết thúc, kể cả generator chưa từng chạy); pha (a)
+# lỗi thì nhả ngay. Dự phòng: tự hết hạn sau `CHAT_ACTIVE_SLOT_TTL_SECONDS` nếu response
+# không bao giờ được gửi.
+# Admin đã đăng nhập không bị hạn mức phút/ngày nhưng vẫn chỉ một lượt mỗi lần.
+CHAT_RATE_LIMIT_DETAIL = "Bạn đã gửi quá nhiều câu hỏi. Vui lòng thử lại sau {seconds} giây."
+CHAT_BUSY_DETAIL = "Câu trả lời trước vẫn đang được tạo. Vui lòng đợi hoặc bấm Dừng rồi gửi lại."
+CHAT_BUSY_RETRY_AFTER_SECONDS = 1
 
 # Luồng sinh event của /chat/stream chạy trong worker thread và bị chặn suốt lúc
 # chờ LLM. Dùng limiter riêng để các stream dài không chiếm hết limiter mặc định
@@ -1074,7 +1086,22 @@ class _ClosingStreamingResponse(StreamingResponse):
     Starlette không đóng body iterator: nếu client ngắt đúng lúc đang `await send`,
     async generator dừng ở `yield` và `finally` (đóng LLM, lưu phần đã sinh) chỉ chạy
     khi GC thu hồi generator.
+
+    ``on_close`` chạy khi response kết thúc theo mọi đường (xong, lỗi, client ngắt), kể
+    cả khi body iterator chưa từng chạy: `aclose()` một async generator chưa bắt đầu
+    không chạy `finally` của nó.
     """
+
+    def __init__(self, *args: Any, on_close: Callable[[], None] | None = None, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._on_close = on_close
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            if self._on_close is not None:
+                self._on_close()
 
     async def stream_response(self, send: Send) -> None:
         async with aclosing(self.body_iterator):
@@ -1089,6 +1116,58 @@ class _ChatTurn:
     user_message_id: str
     history: list[dict[str, str]]
     client: auth.ClientSession
+    # Khóa "một lượt đang chạy" của owner; None khi tắt hạn mức hoặc ngoài ngữ cảnh HTTP.
+    slot: rate_limit.ChatSlot | None = None
+
+    def release_slot(self) -> None:
+        if self.slot is not None:
+            self.slot.release()
+
+
+def _too_many_requests(detail: str, retry_after: int) -> HTTPException:
+    return HTTPException(status_code=429, detail=detail, headers={"Retry-After": str(retry_after)})
+
+
+def _chat_limits_apply(http_request: Request | None) -> bool:
+    # Gọi hàm route trực tiếp (unit test, không có Request) thì không có phiên để giới hạn.
+    return settings.chat_rate_limit_enabled and http_request is not None
+
+
+def _is_admin_request(http_request: Request) -> bool:
+    """Cookie admin hợp lệ (chỉ kiểm chữ ký, không truy vấn DB)."""
+    return auth.is_admin_configured() and (
+        auth.verify_admin_token(http_request.cookies.get(auth.ADMIN_COOKIE_NAME)) is not None
+    )
+
+
+def _enforce_chat_ip_limit(http_request: Request | None) -> None:
+    if not _chat_limits_apply(http_request) or _is_admin_request(http_request):
+        return
+    decision = rate_limit.chat_ip_limiter.check_and_consume(auth.client_ip(http_request))
+    if not decision.allowed:
+        raise _too_many_requests(
+            CHAT_RATE_LIMIT_DETAIL.format(seconds=decision.retry_after), decision.retry_after
+        )
+
+
+def _acquire_chat_slot(
+    http_request: Request | None, client: auth.ClientSession
+) -> rate_limit.ChatSlot | None:
+    """Khóa một lượt đang chạy rồi trừ hạn mức theo owner; 429 khi không được phép."""
+    if not _chat_limits_apply(http_request):
+        return None
+    slot = rate_limit.chat_active_slots.acquire(client.owner_key)
+    if slot is None:
+        # Lượt bị từ chối vì đang bận không trừ hạn mức owner.
+        raise _too_many_requests(CHAT_BUSY_DETAIL, CHAT_BUSY_RETRY_AFTER_SECONDS)
+    if not _is_admin_request(http_request):
+        decision = rate_limit.chat_owner_limiter.check_and_consume(client.owner_key)
+        if not decision.allowed:
+            slot.release()
+            raise _too_many_requests(
+                CHAT_RATE_LIMIT_DETAIL.format(seconds=decision.retry_after), decision.retry_after
+            )
+    return slot
 
 
 def _open_chat_turn(
@@ -1096,38 +1175,47 @@ def _open_chat_turn(
     request: ChatRequest,
     http_request: Request | None,
 ) -> _ChatTurn:
-    with session_factory() as session:
-        # Phiên (tài khoản hoặc ẩn danh) quyết định owner; user_id client gửi bị bỏ qua.
-        client = auth.get_client_session(http_request, session)
-        conversation = ensure_conversation(
-            session,
-            request.conversation_id,
-            user_id=client.owner_key,
-            title=request.message.strip()[:80],
-        )
-        if conversation is None:
-            raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
-        # Đọc history trước khi ghi câu hỏi để câu hỏi hiện tại không lọt vào history.
-        history = (
-            get_recent_conversation_history(
+    slot: rate_limit.ChatSlot | None = None
+    try:
+        with session_factory() as session:
+            # Phiên (tài khoản hoặc ẩn danh) quyết định owner; user_id client gửi bị bỏ qua.
+            client = auth.get_client_session(http_request, session)
+            slot = _acquire_chat_slot(http_request, client)
+            conversation = ensure_conversation(
                 session,
-                conversation.id,
-                max_messages=settings.conversation_memory_max_messages,
-                max_chars=settings.conversation_memory_max_chars,
+                request.conversation_id,
+                user_id=client.owner_key,
+                title=request.message.strip()[:80],
             )
-            if settings.conversation_memory_enabled
-            else []
+            if conversation is None:
+                raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
+            # Đọc history trước khi ghi câu hỏi để câu hỏi hiện tại không lọt vào history.
+            history = (
+                get_recent_conversation_history(
+                    session,
+                    conversation.id,
+                    max_messages=settings.conversation_memory_max_messages,
+                    max_chars=settings.conversation_memory_max_chars,
+                )
+                if settings.conversation_memory_enabled
+                else []
+            )
+            user_message = add_message(session, conversation.id, "user", request.message, metadata={})
+            # Lấy id trước commit: sau commit object hết hạn, đọc lại sẽ query DB.
+            conversation_id, user_message_id = conversation.id, user_message.id
+            session.commit()
+        return _ChatTurn(
+            conversation_id=conversation_id,
+            user_message_id=user_message_id,
+            history=filter_safe_history(history),
+            client=client,
+            slot=slot,
         )
-        user_message = add_message(session, conversation.id, "user", request.message, metadata={})
-        # Lấy id trước commit: sau commit object hết hạn, đọc lại sẽ query DB.
-        conversation_id, user_message_id = conversation.id, user_message.id
-        session.commit()
-    return _ChatTurn(
-        conversation_id=conversation_id,
-        user_message_id=user_message_id,
-        history=filter_safe_history(history),
-        client=client,
-    )
+    except BaseException:
+        # Pha (a) thất bại (404, lỗi DB...): lượt chat không chạy, nhả khóa ngay.
+        if slot is not None:
+            slot.release()
+        raise
 
 
 def _save_chat_answer(
@@ -1177,29 +1265,33 @@ def chat(
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message must not be empty.")
 
+    _enforce_chat_ip_limit(http_request)
     turn = _open_chat_turn(session_factory, request, http_request)
-    turn.client.apply(response)
     try:
-        result = rag_chain.answer(request.message, top_k=request.effective_top_k, history=turn.history)
-    except Exception as exc:
-        # Câu hỏi đã được lưu ở pha (a): ghi câu trả lời lỗi để giữ cặp hỏi - đáp,
-        # rồi ném tiếp để giữ mã lỗi HTTP như cũ.
-        _save_chat_answer_logged(
+        turn.client.apply(response)
+        try:
+            result = rag_chain.answer(request.message, top_k=request.effective_top_k, history=turn.history)
+        except Exception as exc:
+            # Câu hỏi đã được lưu ở pha (a): ghi câu trả lời lỗi để giữ cặp hỏi - đáp,
+            # rồi ném tiếp để giữ mã lỗi HTTP như cũ.
+            _save_chat_answer_logged(
+                session_factory,
+                turn,
+                answer="",
+                assistant_metadata={"error": {"type": "answer", "message": str(exc) or type(exc).__name__}},
+                contexts=[],
+            )
+            raise
+        _save_chat_answer(
             session_factory,
             turn,
-            answer="",
-            assistant_metadata={"error": {"type": "answer", "message": str(exc) or type(exc).__name__}},
-            contexts=[],
+            answer=result["answer"],
+            assistant_metadata={"sources": _serialize_sources(result["sources"])},
+            contexts=result["contexts"],
+            retrieval_debug=result["retrieval_debug"],
         )
-        raise
-    _save_chat_answer(
-        session_factory,
-        turn,
-        answer=result["answer"],
-        assistant_metadata={"sources": _serialize_sources(result["sources"])},
-        contexts=result["contexts"],
-        retrieval_debug=result["retrieval_debug"],
-    )
+    finally:
+        turn.release_slot()
 
     return ChatResponse(
         conversation_id=turn.conversation_id,
@@ -1404,6 +1496,7 @@ def chat_stream(
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message must not be empty.")
 
+    _enforce_chat_ip_limit(http_request)
     turn = _open_chat_turn(session_factory, request, http_request)
 
     async def event_stream() -> AsyncIterator[str]:
@@ -1438,10 +1531,13 @@ def chat_stream(
     if turn.client.cookie_header is not None:
         stream_headers["Set-Cookie"] = turn.client.cookie_header
 
+    # Nhả khóa lượt chat khi response kết thúc: sau `finally` của event_stream (đã lưu
+    # câu trả lời) nên lượt kế tiếp đọc được câu trả lời này trong history.
     return _ClosingStreamingResponse(
         event_stream(),
         media_type="application/x-ndjson",
         headers=stream_headers,
+        on_close=turn.release_slot,
     )
 
 

@@ -25,6 +25,19 @@ class ChatRequest(BaseModel):
     user_id: str | None = None
     top_k: int | None = None
 
+    @field_validator("message")
+    @classmethod
+    def validate_message_length(cls, value: str) -> str:
+        # Đếm nguyên chuỗi gửi lên (cả khoảng trắng) để chặn cả payload toàn khoảng trắng.
+        max_chars = settings.chat_message_max_chars
+        if len(value) > max_chars:
+            raise PydanticCustomError(
+                "message_too_long",
+                "Câu hỏi quá dài (tối đa {max} ký tự).",
+                {"max": max_chars},
+            )
+        return value
+
     @field_validator("top_k")
     @classmethod
     def validate_top_k(cls, value: int | None) -> int | None:
