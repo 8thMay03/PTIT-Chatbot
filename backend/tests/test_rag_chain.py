@@ -73,6 +73,10 @@ def test_rag_chain_rejects_weak_context_without_calling_llm(monkeypatch) -> None
     assert retrieved_chunk["text"] == "Unrelated content"
     assert retrieved_chunk["vector_score"] == 0.1
     assert retrieved_chunk["bm25_score"] == 0.5
+    confidence = result["retrieval_debug"]["confidence"]
+    assert confidence["reason"] == "below_bm25_norm"
+    assert confidence["signals"]["vector"] == 0.1
+    assert confidence["thresholds"]["min_bm25_norm_score"] > 0
 
 
 class CapturingRetriever:
@@ -89,6 +93,7 @@ class CapturingRetriever:
                 "text": "Tuition content",
                 "vector_score": 0.8,
                 "bm25_score": None,
+                "bm25_norm_score": 0.6,
             }
         ]
 

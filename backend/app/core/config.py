@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -142,7 +142,14 @@ class Settings(BaseSettings):
     hybrid_vector_weight: float = Field(default=0.65, ge=0, le=1, alias="HYBRID_VECTOR_WEIGHT")
     hybrid_candidate_multiplier: int = Field(default=4, ge=1, alias="HYBRID_CANDIDATE_MULTIPLIER")
     hybrid_rrf_k: int = Field(default=60, ge=1, alias="HYBRID_RRF_K")
-    retrieval_min_vector_score: float = Field(default=0.30, alias="RETRIEVAL_MIN_VECTOR_SCORE")
+    # Confidence gate (RAG-18, app.generation.confidence). Ngưỡng vector/rerank để trống thì
+    # dùng bảng hiệu chỉnh theo model; giá trị cũ 0.30 của vector được coi là chưa đặt.
+    retrieval_min_vector_score: float | None = Field(default=None, alias="RETRIEVAL_MIN_VECTOR_SCORE")
+    retrieval_min_bm25_norm_score: float = Field(
+        default=0.25, ge=0, le=1, alias="RETRIEVAL_MIN_BM25_NORM_SCORE"
+    )
+    retrieval_min_rerank_score: float | None = Field(default=None, alias="RETRIEVAL_MIN_RERANK_SCORE")
+    # Deprecated: BM25 thô phụ thuộc kích thước kho, gate không còn dùng; giữ để đọc cấu hình cũ.
     retrieval_min_bm25_score: float = Field(default=2.0, ge=0, alias="RETRIEVAL_MIN_BM25_SCORE")
     query_rewrite_use_llm: bool = Field(default=False, alias="QUERY_REWRITE_USE_LLM")
     multi_query_enabled: bool = Field(default=True, alias="MULTI_QUERY_ENABLED")
@@ -233,6 +240,14 @@ class Settings(BaseSettings):
     chat_active_slot_ttl_seconds: float = Field(default=600.0, gt=0, alias="CHAT_ACTIVE_SLOT_TTL_SECONDS")
     # Số khóa owner/IP tối đa giữ trong bộ nhớ cho mỗi limiter; vượt thì bỏ khóa ít dùng nhất.
     chat_rate_limit_max_keys: int = Field(default=100000, ge=1, alias="CHAT_RATE_LIMIT_MAX_KEYS")
+
+    @field_validator("retrieval_min_vector_score", "retrieval_min_rerank_score", mode="before")
+    @classmethod
+    def _blank_threshold_is_unset(cls, value: object) -> object:
+        """`RETRIEVAL_MIN_VECTOR_SCORE=` để trống nghĩa là dùng bảng hiệu chỉnh theo model."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @property
     def allowed_email_domains(self) -> list[str]:
@@ -461,6 +476,9 @@ def _mask_api_key(key: str | None) -> str | None:
 
 def get_runtime_config_dict() -> dict:
     """Return a comprehensive runtime configuration dictionary with masked API keys."""
+    from app.generation.confidence import thresholds_from_settings
+
+    gate = thresholds_from_settings()
     provider = settings.llm_provider.lower()
     
     has_active_key = False
@@ -527,8 +545,12 @@ def get_runtime_config_dict() -> dict:
         },
         "guardrails": {
             "scope_enabled": settings.guardrail_scope_enabled,
-            "min_vector_score": settings.retrieval_min_vector_score,
+            # Ngưỡng hiệu lực (bảng theo model hoặc ghi đè); None khi model chưa hiệu chỉnh.
+            "min_vector_score": gate.min_vector_score,
             "min_bm25_score": settings.retrieval_min_bm25_score,
+            "min_bm25_norm_score": gate.min_bm25_norm_score,
+            "min_rerank_score": gate.min_rerank_score,
+            "vector_threshold_source": gate.vector_source,
         },
         "embedding": {
             "provider": settings.embedding_provider,
@@ -544,6 +566,8 @@ def get_runtime_config_dict() -> dict:
 
 def update_runtime_config(payload: dict) -> dict:
     """Update runtime settings in-memory and return refreshed config dict."""
+    from app.generation.confidence import effective_vector_override, thresholds_from_settings
+
     # Kiểm URL trước khi chạm vào setting nào: request vi phạm bị từ chối toàn bộ.
     _validate_llm_urls_in_payload(payload)
     llm = payload.get("llm") or {}
@@ -656,9 +680,19 @@ def update_runtime_config(payload: dict) -> dict:
     if "scope_enabled" in guardrails and guardrails["scope_enabled"] is not None:
         settings.guardrail_scope_enabled = bool(guardrails["scope_enabled"])
     if "min_vector_score" in guardrails and guardrails["min_vector_score"] is not None:
-        settings.retrieval_min_vector_score = float(guardrails["min_vector_score"])
+        # UI gửi lại ngưỡng đang hiển thị mỗi lần lưu: trùng ngưỡng hiệu lực (hoặc là mặc
+        # định cũ 0.30) thì không biến nó thành ghi đè, để bảng theo model vẫn áp dụng.
+        value = float(guardrails["min_vector_score"])
+        if effective_vector_override(value) is not None and value != thresholds_from_settings().min_vector_score:
+            settings.retrieval_min_vector_score = value
     if "min_bm25_score" in guardrails and guardrails["min_bm25_score"] is not None:
         settings.retrieval_min_bm25_score = float(guardrails["min_bm25_score"])
+    if "min_bm25_norm_score" in guardrails and guardrails["min_bm25_norm_score"] is not None:
+        settings.retrieval_min_bm25_norm_score = max(0.0, min(1.0, float(guardrails["min_bm25_norm_score"])))
+    if "min_rerank_score" in guardrails and guardrails["min_rerank_score"] is not None:
+        value = float(guardrails["min_rerank_score"])
+        if value != thresholds_from_settings().min_rerank_score:
+            settings.retrieval_min_rerank_score = value
 
     return get_runtime_config_dict()
 

@@ -12,7 +12,6 @@ from app.db.session import SessionLocal
 
 
 _cache_generation = 0
-_UNSEEN_TERM_MODE = "df1"
 _generation_lock = RLock()
 
 
@@ -169,8 +168,6 @@ def _score_upper_bound(scorer: BM25Okapi, query_terms: list[str]) -> float:
         math.log(scorer.corpus_size - 1 + 0.5) - math.log(1 + 0.5),
         scorer.epsilon * scorer.average_idf,
     )
-    if _UNSEEN_TERM_MODE == "skip":  # RAG-18 S-04: biến thể đo so sánh, xóa sau khi chọn.
-        query_terms = [term for term in query_terms if term in scorer.idf]
     total_idf = sum(scorer.idf.get(term, unseen_idf) for term in query_terms)
     return total_idf * (scorer.k1 + 1)
 

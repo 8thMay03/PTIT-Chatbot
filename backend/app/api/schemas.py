@@ -312,8 +312,13 @@ class RerankerConfigPayload(BaseModel):
 
 class GuardrailsConfigPayload(BaseModel):
     scope_enabled: bool = True
-    min_vector_score: float = 0.30
+    # Ngưỡng hiệu lực của confidence gate (RAG-18); None khi model chưa hiệu chỉnh.
+    min_vector_score: float | None = None
+    # Deprecated: gate không còn dùng BM25 thô, giữ cho client cũ.
     min_bm25_score: float = 2.0
+    min_bm25_norm_score: float = 0.25
+    min_rerank_score: float | None = None
+    vector_threshold_source: str = "calibrated"
 
 
 class EmbeddingConfigPayload(BaseModel):
@@ -389,6 +394,8 @@ class UpdateGuardrailsConfig(BaseModel):
     scope_enabled: bool | None = None
     min_vector_score: float | None = None
     min_bm25_score: float | None = None
+    min_bm25_norm_score: float | None = None
+    min_rerank_score: float | None = None
 
 
 class UpdateConfigRequest(BaseModel):

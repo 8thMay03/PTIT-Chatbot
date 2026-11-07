@@ -50,6 +50,7 @@ class StrongRetriever:
                 "text": "Học phí năm 2026 là 20 triệu đồng.",
                 "vector_score": 0.9,
                 "bm25_score": 5.0,
+                "bm25_norm_score": 0.6,
             }
         ]
 

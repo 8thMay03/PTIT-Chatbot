@@ -356,12 +356,12 @@ def apply_overrides(pairs: list[str]) -> dict[str, Any]:
 def run(datasets: list[Path], top_k: int, cache_file: Path) -> dict:
     from app.core.config import settings
     from app.embeddings import create_embedding_model
+    from app.generation.confidence import (
+        LEGACY_DEFAULT_MIN_VECTOR_SCORE,
+        assess_context,
+        thresholds_from_settings,
+    )
     from app.guardrails import check_scope
-
-    try:  # Gate mới (S-05); thiếu thì chỉ ghi gate cũ.
-        from app.generation.confidence import assess_context, thresholds_from_settings
-    except ImportError:  # pragma: no cover - chỉ khi chạy trên nhánh chưa có gate mới
-        assess_context = thresholds_from_settings = None
 
     started = time.monotonic()
     cases = [case for path in datasets for case in load_cases(path)]
@@ -372,7 +372,9 @@ def run(datasets: list[Path], top_k: int, cache_file: Path) -> dict:
     if warm:
         embedding.embed(warm)
     retrieval_fn = build_retrieval_fn("full", top_k, embedding)
-    thresholds = thresholds_from_settings() if thresholds_from_settings else None
+    thresholds = thresholds_from_settings()
+    # Gate cũ để so sánh: ngưỡng vector cũ (mặc định 0.30 khi chưa đặt) OR BM25 thô.
+    legacy_min_vector = settings.retrieval_min_vector_score or LEGACY_DEFAULT_MIN_VECTOR_SCORE
 
     records: list[dict] = []
     for index, case in enumerate(cases, start=1):
@@ -392,9 +394,7 @@ def run(datasets: list[Path], top_k: int, cache_file: Path) -> dict:
             "scope_reason": scope.reason,
             "signals": signals,
             "first_hit_rank": rank,
-            "gate_legacy": legacy_gate(
-                signals, settings.retrieval_min_vector_score, settings.retrieval_min_bm25_score
-            ),
+            "gate_legacy": legacy_gate(signals, legacy_min_vector, settings.retrieval_min_bm25_score),
             "retrieved": [
                 {
                     "rank": position,
@@ -405,9 +405,8 @@ def run(datasets: list[Path], top_k: int, cache_file: Path) -> dict:
                 for position, context in enumerate(contexts[:3], start=1)
             ],
         }
-        if assess_context is not None:
-            decision = assess_context(contexts, thresholds)
-            record["gate"] = {"strong": decision.strong, "reason": decision.reason}
+        decision = assess_context(contexts, thresholds)
+        record["gate"] = {"strong": decision.strong, "reason": decision.reason}
         records.append(record)
         print(f"\r[{index}/{len(cases)}] {case['id'][:36]:<36}", end="", file=sys.stderr, flush=True)
     print(file=sys.stderr)
@@ -431,7 +430,7 @@ def run(datasets: list[Path], top_k: int, cache_file: Path) -> dict:
         "reranker": {"enabled": settings.reranker_enabled, "provider": settings.reranker_provider},
         "corpus": snapshot_corpus(),
         "config": config,
-        "gate_thresholds": thresholds.as_dict() if thresholds is not None else None,
+        "gate_thresholds": thresholds.as_dict(),
         "eval": {"top_k": top_k, "hit_k": HIT_K},
         "cases": records,
     }

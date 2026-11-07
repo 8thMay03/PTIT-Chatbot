@@ -292,3 +292,27 @@ def test_security_settings_are_never_persisted() -> None:
     }
     assert not (forbidden & config_store.PERSISTED_FIELDS)
     assert config_store.PERSISTED_FIELDS <= set(Settings.model_fields)
+
+
+def test_gate_thresholds_persist_without_freezing_echoed_vector_value(
+    admin_client, config_store_db, monkeypatch
+) -> None:
+    # `.env` của test: vector theo bảng hiệu chỉnh (không đặt), bm25_norm mặc định.
+    monkeypatch.setitem(_INITIAL_SETTINGS, "retrieval_min_vector_score", None)
+    monkeypatch.setattr(settings, "retrieval_min_vector_score", None)
+    monkeypatch.setattr(settings, "embedding_model", "text-embedding-3-small")
+    norm = _different("retrieval_min_bm25_norm_score", 0.4, 0.45)
+    shown = admin_client.get("/api/config").json()["guardrails"]
+
+    response = admin_client.put(
+        "/api/config",
+        json={"guardrails": {"min_vector_score": shown["min_vector_score"], "min_bm25_norm_score": norm}},
+    )
+    assert response.status_code == 200, response.text
+
+    rows = _rows(config_store_db)
+    assert rows["retrieval_min_bm25_norm_score"].value == norm
+    assert "retrieval_min_vector_score" not in rows
+
+    _simulate_restart()
+    assert settings.retrieval_min_bm25_norm_score == norm
