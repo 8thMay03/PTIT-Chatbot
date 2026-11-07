@@ -34,6 +34,9 @@ def collapse_parent_results(results: list[dict], top_k: int) -> list[dict]:
 
         entry["vector_score"] = _maximum(entry.get("vector_score"), result.get("vector_score"))
         entry["bm25_score"] = _maximum(entry.get("bm25_score"), result.get("bm25_score"))
+        entry["bm25_norm_score"] = _maximum(
+            entry.get("bm25_norm_score"), result.get("bm25_norm_score")
+        )
         entry["score"] = max(float(entry.get("score") or 0.0), score)
 
         if score > float(entry.get("_best_child_score") or 0.0):

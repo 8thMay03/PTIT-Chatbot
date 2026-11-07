@@ -47,8 +47,8 @@ def test_reciprocal_rank_fusion_combines_and_deduplicates_results() -> None:
         {"chunk_id": "shared", "text": "shared", "score": 0.8},
     ]
     keyword_results = [
-        {"chunk_id": "shared", "text": "shared", "score": 4.2},
-        {"chunk_id": "exact", "text": "exact", "score": 3.1},
+        {"chunk_id": "shared", "text": "shared", "score": 4.2, "bm25_norm_score": 0.6},
+        {"chunk_id": "exact", "text": "exact", "score": 3.1, "bm25_norm_score": 0.4},
     ]
 
     results = reciprocal_rank_fusion(
@@ -61,6 +61,9 @@ def test_reciprocal_rank_fusion_combines_and_deduplicates_results() -> None:
     assert [result["chunk_id"] for result in results] == ["shared", "semantic", "exact"]
     assert results[0]["vector_score"] == 0.8
     assert results[0]["bm25_score"] == 4.2
+    # Chunk vào trước từ nhánh vector vẫn nhận điểm chuẩn hóa của nhánh BM25.
+    assert results[0]["bm25_norm_score"] == 0.6
+    assert results[1]["bm25_norm_score"] is None
 
 
 def test_parent_child_results_collapse_to_parent_with_best_child_evidence() -> None:
@@ -81,6 +84,7 @@ def test_parent_child_results_collapse_to_parent_with_best_child_evidence() -> N
                 "parent_text": "Điều 10.\nKhoản 1 về học phí.\nKhoản 2 về thời hạn.",
                 "score": 0.9,
                 "bm25_score": 4.0,
+                "bm25_norm_score": 0.5,
             },
             {
                 "chunk_id": "parent-2::child-0",
@@ -101,3 +105,4 @@ def test_parent_child_results_collapse_to_parent_with_best_child_evidence() -> N
     assert results[0]["matched_child_count"] == 2
     assert results[0]["vector_score"] == 0.8
     assert results[0]["bm25_score"] == 4.0
+    assert results[0]["bm25_norm_score"] == 0.5
