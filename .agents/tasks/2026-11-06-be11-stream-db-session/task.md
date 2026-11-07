@@ -72,7 +72,7 @@ Kết quả cần có:
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: S-01..S-05 xong trên nhánh `feat/stream-db-session` (tách từ `dev` tại `9238683`); review vòng 2 (R-05..R-08) đã xử lý. V-01..V-08 `passed` (pytest 815 passed / 1 skipped; load test 50 stream trên PostgreSQL PASSED ở V-02). Review `approved` (vòng 3–4 `self_review` của phiên review), không còn nhận xét bắt buộc. Q-01..Q-04 đã được xác nhận. Đã commit và mở PR vào `dev` (xem `implementation.md` › Bàn giao).
+- Tóm tắt: S-01..S-05 xong trên nhánh `feat/stream-db-session` (tách từ `dev` tại `9238683`); review vòng 2 (R-05..R-08) đã xử lý. V-01..V-08 `passed` (pytest 815 passed / 1 skipped; load test 50 stream trên PostgreSQL PASSED ở V-02). Review `approved` (vòng 3–4 `self_review` của phiên review), không còn nhận xét bắt buộc. Q-01..Q-04 đã được xác nhận. Đã commit (`8e50e30`, hồ sơ task `0fa0707`) và mở PR #50 vào `dev`: https://github.com/8thMay03/PTIT-Chatbot/pull/50.
 - Blocker: không.
 - Bước tiếp theo: chờ review/merge PR; khi merge — chuyển task sang `done`, cập nhật Notion BE-11 (khi người yêu cầu cho phép). Theo dõi sau: task FE hiển thị nhãn "Đã dừng" (Q-02, xem R-01 trong `review.md`).
 

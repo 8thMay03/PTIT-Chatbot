@@ -96,7 +96,7 @@ Người yêu cầu giao "implement task be11" (2026-11-07) mà không trả l�
 ## Bàn giao
 
 - Nhiệm vụ đã làm: S-01..S-05; sửa R-05, R-06, R-08 (review vòng 2).
-- File: `backend/app/api/routes.py`, `backend/app/db/__init__.py`, `backend/app/db/session.py`, `backend/app/db/repositories.py`, `backend/tests/conftest.py`, `backend/tests/test_chat_stream_errors.py`, `backend/tests/test_conversation_memory.py`, `backend/tests/test_chat_db_lifecycle.py` (mới), `backend/scripts/load_chat_stream.py` (mới). Commit `8e50e30` trên `feat/stream-db-session`.
+- File: `backend/app/api/routes.py`, `backend/app/db/__init__.py`, `backend/app/db/session.py`, `backend/app/db/repositories.py`, `backend/tests/conftest.py`, `backend/tests/test_chat_stream_errors.py`, `backend/tests/test_conversation_memory.py`, `backend/tests/test_chat_db_lifecycle.py` (mới), `backend/scripts/load_chat_stream.py` (mới). Commit `8e50e30` trên `feat/stream-db-session`; PR #50 vào `dev`: https://github.com/8thMay03/PTIT-Chatbot/pull/50.
 - Giao diện/quyết định ảnh hưởng agent khác: dependency `get_session_factory` (route chat); `_ClosingStreamingResponse` cho `/api/chat/stream`; `metadata.interrupted` của assistant; `metadata.error.type` mới `retrieval`/`answer`/`internal`; limiter thread riêng cho stream chat. BE-10 thêm kiểm tra ở đầu pha (a) và khóa phiên quanh `_open_chat_turn` … `_finish_chat_stream`.
 - Kiểm tra: xem `verification.md` (tất cả `passed`).
 - Q-01..Q-04: người yêu cầu đã xác nhận (`2026-11-07T09:00:15+07:00`).
