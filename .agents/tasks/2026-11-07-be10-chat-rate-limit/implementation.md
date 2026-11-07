@@ -2,7 +2,7 @@
 
 ## Tổng quan triển khai
 
-Nhánh `feat/chat-rate-limit` (tách từ `dev` tại `67aeec4`, đã gồm BE-11). S-01..S-05 xong, chưa commit (chờ người yêu cầu đồng ý commit/mở PR). Q-01..Q-04 áp dụng đề xuất mặc định trong `task.md` (người yêu cầu giao "triển khai task be10" mà không đổi đề xuất).
+Nhánh `feat/chat-rate-limit` (tách từ `dev` tại `67aeec4`, đã gồm BE-11). S-01..S-05 xong, commit `d0c84d1`, PR #51 vào `dev`: https://github.com/8thMay03/PTIT-Chatbot/pull/51. Q-01..Q-04 áp dụng đề xuất mặc định trong `task.md` (người yêu cầu giao "triển khai task be10" mà không đổi đề xuất).
 
 Thứ tự kiểm tra trong một request chat (request bị chặn không ghi DB, không gọi retrieval/LLM):
 
@@ -73,3 +73,8 @@ Chưa có thông báo.
   - File: `backend/app/core/rate_limit.py` (mới), `backend/app/core/config.py`, `backend/app/api/schemas.py`, `backend/app/api/routes.py`, `backend/tests/conftest.py`, `backend/tests/test_rate_limit.py` (mới), `backend/tests/test_chat_rate_limit.py` (mới), `.env.example`. Chưa commit.
   - Ảnh hưởng agent khác: hợp đồng 422/429 của `/api/chat*` cho FE-15; giao diện `app.core.rate_limit` cho BE-16.
   - Bước tiếp theo: người yêu cầu quyết định commit + mở PR vào `dev` (và có cần review độc lập / `/code-review` trước khi merge không); sau merge chuyển task `done`, cập nhật Notion BE-10 khi được phép.
+
+- Từ `grok-review-be10` (`2026-11-07T17:10:30+07:00`) tới người yêu cầu `8thMay03`:
+  - Đã làm: review độc lập `approved` (R-05 `low`/`deferred`); commit `d0c84d1`; mở PR #51 vào `dev`.
+  - File: hồ sơ task cập nhật liên kết PR.
+  - Bước tiếp theo: merge PR #51 khi sẵn sàng; sau merge chuyển task `done` và cập nhật Notion BE-10 khi được phép.

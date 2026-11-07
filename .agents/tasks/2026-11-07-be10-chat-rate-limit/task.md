@@ -5,7 +5,7 @@
 - Coordinator: `claude-be10`
 - Người yêu cầu: `8thMay03`
 - Tạo lúc: `2026-11-07T16:14:47+07:00`
-- Cập nhật lúc: `2026-11-07T16:41:36+07:00`
+- Cập nhật lúc: `2026-11-07T17:10:30+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -69,12 +69,13 @@ Kết quả cần có:
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: S-01..S-05 xong trên nhánh `feat/chat-rate-limit` (tách từ `dev` tại `67aeec4`), chưa commit. V-01..V-07 `passed` (pytest 858 passed / 1 skipped; kiểm tra thủ công 422/429 trên UI dev). Review `approved` (`self_review`), R-01..R-04 `low`/`deferred`. Q-01..Q-04 áp dụng đề xuất mặc định.
+- Tóm tắt: S-01..S-05 đã commit `d0c84d1` trên `feat/chat-rate-limit` (tách từ `dev` tại `67aeec4`). PR vào `dev`: https://github.com/8thMay03/PTIT-Chatbot/pull/51. V-01..V-07 `passed` (pytest 858 passed / 1 skipped; kiểm tra thủ công 422/429 trên UI dev). Review `approved` (vòng 1 `self_review`, vòng 2 độc lập `grok-review-be10`). R-01..R-05 `low`/`deferred`. Q-01..Q-04 áp dụng đề xuất mặc định.
 - Blocker: không.
-- Bước tiếp theo: người yêu cầu quyết định commit + mở PR vào `dev` (và review độc lập / `/code-review` nếu muốn); khi merge — chuyển task `done`, cập nhật Notion BE-10 (khi được phép). Theo dõi: R-02 (FE-15), R-03 (BE-16), R-01 (giới hạn body).
+- Bước tiếp theo: chờ merge PR #51; khi merge — chuyển task `done`, cập nhật Notion BE-10 (khi được phép). Theo dõi: R-02 (FE-15), R-03 và R-05 (BE-16), R-01 (giới hạn body), R-04 (ghi nhận).
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
 - 2026-11-07T16:14:47+07:00 — claude-be10: tạo task ở trạng thái `draft` từ Notion BE-10, dựa trên `dev` đã có BE-11; để UX 429 cho FE-15 và limiter nhiều worker cho BE-16.
 - 2026-11-07T16:41:36+07:00 — claude-be10: người yêu cầu giao "triển khai task be10"; coi là duyệt plan, áp dụng đề xuất mặc định Q-01..Q-04; `draft` → `in_progress`. Tạo nhánh `feat/chat-rate-limit` từ `dev` @ `67aeec4` (đã khớp `origin/dev`).
 - 2026-11-07T16:41:36+07:00 — claude-be10: thêm 8 trường `chat_*` vào `_RESET_EXCLUDED_FIELDS` của `config.py` (trong phạm vi S-02, để reset cấu hình qua admin không đụng cấu hình chỉ-env). Không sửa `docker-compose.yml` (dùng `env_file`). `in_progress` → `in_review`.
+- 2026-11-07T17:10:30+07:00 — grok-review-be10: người yêu cầu giao commit và mở PR. Commit `d0c84d1`, PR #51 vào `dev`: https://github.com/8thMay03/PTIT-Chatbot/pull/51. Task vẫn `in_review` đến khi merge.

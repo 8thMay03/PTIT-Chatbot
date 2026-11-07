@@ -86,4 +86,4 @@
 - Nhận xét bắt buộc còn mở: không.
 - Nhận xét hoãn lại: R-01 (giới hạn body/422 echo), R-02 (FE-15), R-03 và R-05 (đồng thời theo IP — BE-16 hoặc task sau), R-04 (IP vẫn đếm request sau đó bị 429 owner/bận hoặc 404).
 - Phần chưa review / giới hạn: không chạy lại `pytest` toàn bộ và không lặp thao tác UI ở V-07 (ảnh không có trong repo). Hành vi nhiều worker nằm ngoài phạm vi (BE-16). Câu rỗng hoặc toàn khoảng trắng vẫn 400 trước limiter nên không trừ hạn mức; request đó không gọi LLM.
-- Bước tiếp theo: coordinator có thể ghi nhận vòng review độc lập trong `task.md`. Người yêu cầu quyết định commit và mở PR vào `dev`. Chưa chuyển task sang `done` từ review này.
+- Bước tiếp theo: commit `d0c84d1` và PR #51 vào `dev` đã mở (https://github.com/8thMay03/PTIT-Chatbot/pull/51). Chưa chuyển task sang `done`; làm vậy sau khi merge.
