@@ -39,3 +39,4 @@ Tạo bộ 300 cases đánh giá RAG retrieval-only từ Sổ tay sinh viên D26
 
 - 2026-11-07T14:10:00+07:00 — agent-opencode: chốt retrieval-only, chỉ Sổ tay D26, viết mới 300 (theo trả lời question của user).
 - 2026-11-08T00:10:00+07:00 — agent-claude (theo yêu cầu user sửa các phát hiện code review): mở lại task `done` → `in_review`; thêm AC-05 vì AC-02 (term verbatim) không đủ đảm bảo term đặc hiệu với cách chấm any-term substring của `eval_retrieval.py`; thêm `backend/tests/test_rag_testset_300.py` vào phạm vi.
+- 2026-11-08T00:30:00+07:00 — user: yêu cầu merge `feat/rag-testset-300` vào `dev` qua PR #55 khi review vòng 2 còn `pending`. Task giữ `in_review`; review độc lập vẫn cần thực hiện sau merge, sửa phát sinh làm trên nhánh mới từ `dev`.

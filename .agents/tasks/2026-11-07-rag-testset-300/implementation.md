@@ -96,7 +96,7 @@
 
 - Từ / đến: `agent-claude` / reviewer độc lập (qua coordinator/user).
 - Đã hoàn tất: sửa 87 case + đổi mục tiêu `d26_g5_018`; xóa `drafts/`; thêm `tests/test_rag_testset_300.py`; mở lại task về `in_review`.
-- File/branch/commit/patch: nhánh `feat/rag-testset-300`, commit `33b2921` (LF) và commit sửa vòng 2 ngay sau.
+- File/branch/commit/patch: nhánh `feat/rag-testset-300`, commit `33b2921` (LF) và `dd0cced` (sửa vòng 2); PR #55 vào `dev` (https://github.com/8thMay03/PTIT-Chatbot/pull/55), merge theo yêu cầu user khi review vòng 2 còn `pending`.
 - Kiểm chứng: `verification.md` vòng 2 (V-01, V-02, V-04, V-05).
 - Review: `review.md` vòng 2 `pending`; R-03..R-10 chờ reviewer xác nhận.
 - Hạn chế / còn lại: chưa đo hit@k/MRR thực tế; agent-claude không tự review công việc của mình.
