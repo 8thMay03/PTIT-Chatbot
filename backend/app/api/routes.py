@@ -3,15 +3,20 @@ import logging
 import re
 import time
 import unicodedata
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
+from contextlib import aclosing
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+import anyio
+from anyio.lowlevel import RunVar
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from starlette.types import Send
 from sqlalchemy.orm import Session
 
 from app.api.schemas import (
@@ -71,7 +76,7 @@ from app.core.config import (
 )
 from app.core.config_crypto import SecretEncryptionUnavailable, is_secret_encryption_configured
 from app.core.config_store import apply_config_update, get_config_store_session, reset_config as reset_stored_config
-from app.db import check_db_health, get_session
+from app.db import check_db_health, get_session, get_session_factory
 from app.db.repositories import (
     DatasetConflict,
     DatasetNotFound,
@@ -101,6 +106,7 @@ from app.db.repositories import (
     serialize_document,
     serialize_markdown,
     update_dataset,
+    update_message_metadata,
 )
 from app.generation.citations import public_citations
 from app.generation.llm import (
@@ -1033,60 +1039,350 @@ def _document_payload(document, chunk_count: int) -> dict:
     return serialize_document(document, chunk_count, size_bytes)
 
 
+# ==========================================
+# Chat: 3 pha session ngắn (BE-11)
+# ==========================================
+# (a) `_open_chat_turn`: session ngắn xác định phiên, kiểm tra/tạo hội thoại, đọc
+#     history, ghi ngay câu hỏi, commit, đóng.
+# (b) retrieval + LLM chạy không giữ session/connection nào của route.
+# (c) `_save_chat_answer`: session ngắn mới ghi câu trả lời (hoặc phần đã sinh khi
+#     client ngắt), nguồn và `retrieval_debug` của câu hỏi.
+#
+# Điểm móc BE-10: kiểm tra hạn mức/độ dài đặt ở đầu pha (a), trước khi mở session;
+# khóa "một stream mỗi phiên" lấy ở cuối pha (a) và nhả sau pha (c).
+
+# Luồng sinh event của /chat/stream chạy trong worker thread và bị chặn suốt lúc
+# chờ LLM. Dùng limiter riêng để các stream dài không chiếm hết limiter mặc định
+# của anyio (40) mà route đồng bộ khác (health, admin) cần dùng.
+CHAT_STREAM_THREAD_LIMIT = 100
+# Mỗi event loop một limiter (giống limiter mặc định của anyio).
+_chat_stream_limiter: RunVar[anyio.CapacityLimiter] = RunVar("chat_stream_limiter")
+
+
+def _get_chat_stream_limiter() -> anyio.CapacityLimiter:
+    try:
+        return _chat_stream_limiter.get()
+    except LookupError:
+        limiter = anyio.CapacityLimiter(CHAT_STREAM_THREAD_LIMIT)
+        _chat_stream_limiter.set(limiter)
+        return limiter
+
+
+class _ClosingStreamingResponse(StreamingResponse):
+    """StreamingResponse luôn `aclose()` body iterator khi kết thúc hoặc bị hủy.
+
+    Starlette không đóng body iterator: nếu client ngắt đúng lúc đang `await send`,
+    async generator dừng ở `yield` và `finally` (đóng LLM, lưu phần đã sinh) chỉ chạy
+    khi GC thu hồi generator.
+    """
+
+    async def stream_response(self, send: Send) -> None:
+        async with aclosing(self.body_iterator):
+            await super().stream_response(send)
+
+
+@dataclass(frozen=True)
+class _ChatTurn:
+    """Kết quả pha (a): chỉ giá trị thuần, không mang ORM object ra ngoài session."""
+
+    conversation_id: str
+    user_message_id: str
+    history: list[dict[str, str]]
+    client: auth.ClientSession
+
+
+def _open_chat_turn(
+    session_factory: Callable[[], Session],
+    request: ChatRequest,
+    http_request: Request | None,
+) -> _ChatTurn:
+    with session_factory() as session:
+        # Phiên (tài khoản hoặc ẩn danh) quyết định owner; user_id client gửi bị bỏ qua.
+        client = auth.get_client_session(http_request, session)
+        conversation = ensure_conversation(
+            session,
+            request.conversation_id,
+            user_id=client.owner_key,
+            title=request.message.strip()[:80],
+        )
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
+        # Đọc history trước khi ghi câu hỏi để câu hỏi hiện tại không lọt vào history.
+        history = (
+            get_recent_conversation_history(
+                session,
+                conversation.id,
+                max_messages=settings.conversation_memory_max_messages,
+                max_chars=settings.conversation_memory_max_chars,
+            )
+            if settings.conversation_memory_enabled
+            else []
+        )
+        user_message = add_message(session, conversation.id, "user", request.message, metadata={})
+        # Lấy id trước commit: sau commit object hết hạn, đọc lại sẽ query DB.
+        conversation_id, user_message_id = conversation.id, user_message.id
+        session.commit()
+    return _ChatTurn(
+        conversation_id=conversation_id,
+        user_message_id=user_message_id,
+        history=filter_safe_history(history),
+        client=client,
+    )
+
+
+def _save_chat_answer(
+    session_factory: Callable[[], Session],
+    turn: _ChatTurn,
+    *,
+    answer: str,
+    assistant_metadata: dict[str, Any],
+    contexts: list[dict],
+    retrieval_debug: dict[str, Any] | None = None,
+) -> None:
+    with session_factory() as session:
+        if retrieval_debug is not None:
+            update_message_metadata(session, turn.user_message_id, {"retrieval_debug": retrieval_debug})
+        assistant_message = add_message(
+            session,
+            turn.conversation_id,
+            "assistant",
+            answer,
+            metadata=assistant_metadata,
+        )
+        add_message_sources(session, assistant_message.id, contexts)
+        session.commit()
+
+
+def _save_chat_answer_logged(session_factory: Callable[[], Session], turn: _ChatTurn, **kwargs: Any) -> bool:
+    """Như `_save_chat_answer` nhưng log lỗi DB thay vì ném (response đã gửi một phần)."""
+    try:
+        _save_chat_answer(session_factory, turn, **kwargs)
+    except Exception:
+        logger.exception("Không lưu được câu trả lời của hội thoại %s", turn.conversation_id)
+        return False
+    return True
+
+
+def _serialize_sources(sources: list) -> list[dict]:
+    return [s.model_dump() if hasattr(s, "model_dump") else dict(s) for s in sources]
+
+
 @router.post("/chat", response_model=ChatResponse)
 def chat(
     request: ChatRequest,
     response: Response = None,
     http_request: Request = None,
-    session: Session = Depends(get_session),
+    session_factory: Callable[[], Session] = Depends(get_session_factory),
 ) -> ChatResponse:
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message must not be empty.")
 
-    # Phiên (tài khoản hoặc ẩn danh) quyết định owner; user_id client gửi bị bỏ qua.
-    client = auth.get_client_session(http_request, session)
-    conversation = ensure_conversation(
-        session,
-        request.conversation_id,
-        user_id=client.owner_key,
-        title=request.message.strip()[:80],
-    )
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
-    client.apply(response)
-    history = (
-        get_recent_conversation_history(
-            session,
-            conversation.id,
-            max_messages=settings.conversation_memory_max_messages,
-            max_chars=settings.conversation_memory_max_chars,
+    turn = _open_chat_turn(session_factory, request, http_request)
+    turn.client.apply(response)
+    try:
+        result = rag_chain.answer(request.message, top_k=request.effective_top_k, history=turn.history)
+    except Exception as exc:
+        # Câu hỏi đã được lưu ở pha (a): ghi câu trả lời lỗi để giữ cặp hỏi - đáp,
+        # rồi ném tiếp để giữ mã lỗi HTTP như cũ.
+        _save_chat_answer_logged(
+            session_factory,
+            turn,
+            answer="",
+            assistant_metadata={"error": {"type": "answer", "message": str(exc) or type(exc).__name__}},
+            contexts=[],
         )
-        if settings.conversation_memory_enabled
-        else []
+        raise
+    _save_chat_answer(
+        session_factory,
+        turn,
+        answer=result["answer"],
+        assistant_metadata={"sources": _serialize_sources(result["sources"])},
+        contexts=result["contexts"],
+        retrieval_debug=result["retrieval_debug"],
     )
-    history = filter_safe_history(history)
-    result = rag_chain.answer(request.message, top_k=request.effective_top_k, history=history)
-    add_message(
-        session,
-        conversation.id,
-        "user",
-        request.message,
-        metadata={"retrieval_debug": result["retrieval_debug"]},
-    )
-    assistant_message = add_message(
-        session,
-        conversation.id,
-        "assistant",
-        result["answer"],
-        metadata={"sources": [s.model_dump() if hasattr(s, "model_dump") else dict(s) for s in result["sources"]]},
-    )
-    add_message_sources(session, assistant_message.id, result["contexts"])
-    session.commit()
 
     return ChatResponse(
-        conversation_id=conversation.id,
+        conversation_id=turn.conversation_id,
         answer=result["answer"],
         sources=result["sources"],
+    )
+
+
+@dataclass
+class _ChatStreamState:
+    """Tiến độ của một lượt stream, dùng để lưu phần đã sinh khi client ngắt."""
+
+    steps_log: list[dict[str, Any]] = field(default_factory=list)
+    reasoning_parts: list[str] = field(default_factory=list)
+    deltas: list[str] = field(default_factory=list)
+    contexts: list[dict] = field(default_factory=list)
+    sources: list = field(default_factory=list)
+    retrieval_debug: dict[str, Any] | None = None
+    saved: bool = False
+
+
+def _iter_chat_stream_events(
+    request: ChatRequest,
+    turn: _ChatTurn,
+    state: _ChatStreamState,
+    session_factory: Callable[[], Session],
+) -> Iterator[str]:
+    """Pha (b), và pha (c) khi stream kết thúc bình thường; chạy trong worker thread."""
+    reasoning_enabled = settings.llm_reasoning_stream_enabled
+    retrieval: dict[str, Any] | None = None
+
+    yield _ndjson({"type": "start", "conversation_id": turn.conversation_id})
+
+    # Retrieval chạy trong generator để mỗi bước phát event ngay khi xong.
+    try:
+        for event in rag_chain.iter_retrieve_context(
+            request.message, top_k=request.effective_top_k, history=turn.history
+        ):
+            if "result" in event:
+                retrieval = event["result"]
+                continue
+            entry = {"status": "done", **event}
+            state.steps_log.append(entry)
+            yield _ndjson({"type": "step", **entry})
+    except Exception as exc:
+        # Đã gửi event start nên không thể trả HTTP 500 nữa: báo lỗi qua event.
+        message = f"Retrieval failed: {exc}"
+        state.saved = True
+        _save_chat_answer_logged(
+            session_factory,
+            turn,
+            answer="",
+            assistant_metadata={"steps": state.steps_log, "error": {"type": "retrieval", "message": message}},
+            contexts=[],
+        )
+        yield _ndjson({"type": "error", "message": message})
+        return
+
+    assert retrieval is not None  # iter_retrieve_context luôn kết thúc bằng result
+    contexts = retrieval["contexts"] if retrieval["strong_context"] else []
+    sources = public_citations(contexts)
+    state.contexts, state.sources = contexts, sources
+    state.retrieval_debug = retrieval["retrieval_debug"]
+    stream_error: str | None = None
+
+    generate_started = time.perf_counter()
+    generate_step: dict[str, Any] = {"step": "generate", "status": "start", "detail": {}, "elapsed_ms": 0}
+    yield _ndjson({"type": "step", **generate_step})
+
+    if not retrieval["guardrail_allowed"]:
+        stream: Iterator[StreamDelta] = iter([StreamDelta(kind=CONTENT_DELTA, text=OUT_OF_SCOPE_ANSWER)])
+    elif retrieval["strong_context"]:
+        stream = stream_answer_deltas_with_llm(request.message, contexts, history=turn.history)
+    else:
+        stream = iter([StreamDelta(kind=CONTENT_DELTA, text="Chưa tìm thấy thông tin này trong tài liệu.")])
+
+    try:
+        for delta in stream:
+            if delta.kind == REASONING_DELTA:
+                if reasoning_enabled:
+                    state.reasoning_parts.append(delta.text)
+                    yield _ndjson({"type": "reasoning", "content": delta.text})
+            else:
+                state.deltas.append(delta.text)
+                yield _ndjson({"type": "delta", "content": delta.text})
+    except LLMStreamError as exc:
+        # LLM lỗi sau khi đã stream một phần: báo lỗi cho client thay vì nối
+        # thêm câu trả lời dự phòng vào phần text đã phát ra. Event `error` phát
+        # sau khi lưu (bên dưới).
+        stream_error = str(exc) or "LLM streaming failed."
+    finally:
+        # Client ngắt (GeneratorExit tại yield): đóng stream LLM ngay, không sinh tiếp.
+        close_stream = getattr(stream, "close", None)
+        if close_stream is not None:
+            close_stream()
+
+    generate_step = {
+        "step": "generate",
+        "status": "done",
+        "detail": {},
+        "elapsed_ms": round((time.perf_counter() - generate_started) * 1000),
+    }
+    state.steps_log.append(generate_step)
+
+    reasoning_text = "".join(state.reasoning_parts)
+    assistant_metadata: dict[str, Any] = {
+        "sources": _serialize_sources(sources),
+        "steps": state.steps_log,
+    }
+    if reasoning_text:
+        assistant_metadata["reasoning"] = reasoning_text
+    if stream_error:
+        assistant_metadata["error"] = {
+            "type": "llm_stream",
+            "message": stream_error,
+        }
+
+    raw_answer = "".join(state.deltas)
+    if stream_error:
+        # Phần text nửa vời không phải câu trả lời hoàn chỉnh: bỏ qua chuẩn
+        # hóa trích dẫn (thuộc tính này có thể tự nối thêm "[1]" cho ảo).
+        answer = raw_answer.strip()
+    else:
+        answer = _normalize_answer_citations(raw_answer, contexts) if contexts else raw_answer
+    # Lưu trước event kết thúc: client nhận `done`/`error` là hội thoại đã có câu trả lời.
+    state.saved = True
+    _save_chat_answer_logged(
+        session_factory,
+        turn,
+        answer=answer,
+        assistant_metadata=assistant_metadata,
+        contexts=contexts,
+        retrieval_debug=state.retrieval_debug,
+    )
+    if stream_error:
+        # Event `error` là event kết thúc; client giữ phần text đã stream và
+        # hiển thị nút thử lại, không ghi đè bằng `done`.
+        yield _ndjson({"type": "error", "message": stream_error})
+        return
+    yield _ndjson({
+        "type": "done",
+        "answer": answer,
+        "sources": sources,
+        "conversation_id": turn.conversation_id,
+        "reasoning": reasoning_text or None,
+        "steps": state.steps_log,
+    })
+
+
+def _finish_chat_stream(
+    producer: Iterator[str],
+    session_factory: Callable[[], Session],
+    turn: _ChatTurn,
+    state: _ChatStreamState,
+    failure: Exception | None,
+) -> None:
+    """Pha (c) khi stream không kết thúc bình thường: client ngắt hoặc lỗi bất ngờ."""
+    try:
+        producer.close()
+    except Exception:
+        logger.exception("Không đóng được stream chat của hội thoại %s", turn.conversation_id)
+    if state.saved:
+        return
+    state.saved = True
+    assistant_metadata: dict[str, Any] = {
+        "sources": _serialize_sources(state.sources),
+        "steps": state.steps_log,
+    }
+    reasoning_text = "".join(state.reasoning_parts)
+    if reasoning_text:
+        assistant_metadata["reasoning"] = reasoning_text
+    if failure is None:
+        assistant_metadata["interrupted"] = True
+    else:
+        assistant_metadata["error"] = {"type": "internal", "message": str(failure) or type(failure).__name__}
+    _save_chat_answer_logged(
+        session_factory,
+        turn,
+        # Phần đã sinh dở dang: không chuẩn hóa trích dẫn.
+        answer="".join(state.deltas).strip(),
+        assistant_metadata=assistant_metadata,
+        contexts=state.contexts,
+        retrieval_debug=state.retrieval_debug,
     )
 
 
@@ -1094,159 +1390,55 @@ def chat(
 def chat_stream(
     request: ChatRequest,
     http_request: Request = None,
-    session: Session = Depends(get_session),
+    session_factory: Callable[[], Session] = Depends(get_session_factory),
 ) -> StreamingResponse:
     """Stream newline-delimited JSON events while preserving the normal chat contract.
 
     Event types: ``start``, ``step`` (tiến độ từng bước retrieval/generation),
     ``reasoning`` (thinking của model, khi bật cờ và model hỗ trợ), ``delta``
     (text câu trả lời), ``error`` (event kết thúc), ``done``.
+
+    Câu hỏi được lưu trước khi stream; khi client ngắt giữa chừng, phần trả lời đã
+    sinh được lưu với ``metadata.interrupted = true``.
     """
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message must not be empty.")
 
-    # Phiên (tài khoản hoặc ẩn danh) quyết định owner; user_id client gửi bị bỏ qua.
-    client = auth.get_client_session(http_request, session)
-    conversation = ensure_conversation(
-        session,
-        request.conversation_id,
-        user_id=client.owner_key,
-        title=request.message.strip()[:80],
-    )
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại.")
-    history = (
-        get_recent_conversation_history(
-            session,
-            conversation.id,
-            max_messages=settings.conversation_memory_max_messages,
-            max_chars=settings.conversation_memory_max_chars,
-        )
-        if settings.conversation_memory_enabled
-        else []
-    )
-    history = filter_safe_history(history)
+    turn = _open_chat_turn(session_factory, request, http_request)
 
-    def event_stream() -> Iterator[str]:
-        steps_log: list[dict[str, Any]] = []
-        reasoning_parts: list[str] = []
-        reasoning_enabled = settings.llm_reasoning_stream_enabled
-        retrieval: dict[str, Any] | None = None
-
-        yield _ndjson({"type": "start", "conversation_id": conversation.id})
-
-        # Retrieval chạy trong generator để mỗi bước phát event ngay khi xong.
+    async def event_stream() -> AsyncIterator[str]:
+        # Async generator thay vì sync generator: Starlette không đóng sync generator
+        # khi client ngắt (chỉ tới lúc GC). Async generator nhận CancelledError khi
+        # đang chờ thread, hoặc GeneratorExit từ `_ClosingStreamingResponse` khi đang
+        # dừng ở `yield`, nên `finally` chắc chắn chạy để lưu phần đã sinh.
+        state = _ChatStreamState()
+        producer = _iter_chat_stream_events(request, turn, state, session_factory)
+        limiter = _get_chat_stream_limiter()
+        failure: Exception | None = None
         try:
-            for event in rag_chain.iter_retrieve_context(
-                request.message, top_k=request.effective_top_k, history=history
-            ):
-                if "result" in event:
-                    retrieval = event["result"]
-                    continue
-                entry = {"status": "done", **event}
-                steps_log.append(entry)
-                yield _ndjson({"type": "step", **entry})
+            while True:
+                chunk = await anyio.to_thread.run_sync(next, producer, None, limiter=limiter)
+                if chunk is None:
+                    break
+                yield chunk
         except Exception as exc:
-            # Đã gửi event start nên không thể trả HTTP 500 nữa: báo lỗi qua event.
-            yield _ndjson({"type": "error", "message": f"Retrieval failed: {exc}"})
-            return
-
-        assert retrieval is not None  # iter_retrieve_context luôn kết thúc bằng result
-        contexts = retrieval["contexts"] if retrieval["strong_context"] else []
-        sources = public_citations(contexts)
-        deltas: list[str] = []
-        stream_error: str | None = None
-
-        generate_started = time.perf_counter()
-        generate_step: dict[str, Any] = {"step": "generate", "status": "start", "detail": {}, "elapsed_ms": 0}
-        yield _ndjson({"type": "step", **generate_step})
-
-        if not retrieval["guardrail_allowed"]:
-            stream: Iterator[StreamDelta] = iter([StreamDelta(kind=CONTENT_DELTA, text=OUT_OF_SCOPE_ANSWER)])
-        elif retrieval["strong_context"]:
-            stream = stream_answer_deltas_with_llm(request.message, contexts, history=history)
-        else:
-            stream = iter([StreamDelta(kind=CONTENT_DELTA, text="Chưa tìm thấy thông tin này trong tài liệu.")])
-
-        try:
-            for delta in stream:
-                if delta.kind == REASONING_DELTA:
-                    if reasoning_enabled:
-                        reasoning_parts.append(delta.text)
-                        yield _ndjson({"type": "reasoning", "content": delta.text})
-                else:
-                    deltas.append(delta.text)
-                    yield _ndjson({"type": "delta", "content": delta.text})
-        except LLMStreamError as exc:
-            # LLM lỗi sau khi đã stream một phần: báo lỗi cho client thay vì nối
-            # thêm câu trả lời dự phòng vào phần text đã phát ra.
-            stream_error = str(exc) or "LLM streaming failed."
-            yield _ndjson({"type": "error", "message": stream_error})
-
-        generate_step = {
-            "step": "generate",
-            "status": "done",
-            "detail": {},
-            "elapsed_ms": round((time.perf_counter() - generate_started) * 1000),
-        }
-        steps_log.append(generate_step)
-
-        reasoning_text = "".join(reasoning_parts)
-        assistant_metadata: dict[str, Any] = {
-            "sources": [s.model_dump() if hasattr(s, "model_dump") else dict(s) for s in sources],
-            "steps": steps_log,
-        }
-        if reasoning_text:
-            assistant_metadata["reasoning"] = reasoning_text
-        if stream_error:
-            assistant_metadata["error"] = {
-                "type": "llm_stream",
-                "message": stream_error,
-            }
-
-        raw_answer = "".join(deltas)
-        if stream_error:
-            # Phần text nửa vời không phải câu trả lời hoàn chỉnh: bỏ qua chuẩn
-            # hóa trích dẫn (thuộc tính này có thể tự nối thêm "[1]" cho ảo).
-            answer = raw_answer.strip()
-        else:
-            answer = _normalize_answer_citations(raw_answer, contexts) if contexts else raw_answer
-        add_message(
-            session,
-            conversation.id,
-            "user",
-            request.message,
-            metadata={"retrieval_debug": retrieval["retrieval_debug"]},
-        )
-        assistant_message = add_message(
-            session,
-            conversation.id,
-            "assistant",
-            answer,
-            metadata=assistant_metadata,
-        )
-        add_message_sources(session, assistant_message.id, contexts)
-        session.commit()
-        if stream_error:
-            # Event `error` đã gửi ở trên là event kết thúc; client giữ phần text
-            # đã stream và hiển thị nút thử lại, không ghi đè bằng `done`.
-            return
-        yield _ndjson({
-            "type": "done",
-            "answer": answer,
-            "sources": sources,
-            "conversation_id": conversation.id,
-            "reasoning": reasoning_text or None,
-            "steps": steps_log,
-        })
+            failure = exc
+            raise
+        finally:
+            # Không yield ở đây (generator đang bị đóng). Shield để việc đóng LLM và
+            # ghi DB không bị hủy theo request đã ngắt.
+            with anyio.CancelScope(shield=True):
+                await anyio.to_thread.run_sync(
+                    _finish_chat_stream, producer, session_factory, turn, state, failure, limiter=limiter
+                )
 
     # Route tự trả StreamingResponse nên FastAPI không gộp cookie của response
     # inject: gắn Set-Cookie trực tiếp lên headers của stream cho phiên mới.
     stream_headers = {"X-Accel-Buffering": "no", "Cache-Control": "no-cache"}
-    if client.cookie_header is not None:
-        stream_headers["Set-Cookie"] = client.cookie_header
+    if turn.client.cookie_header is not None:
+        stream_headers["Set-Cookie"] = turn.client.cookie_header
 
-    return StreamingResponse(
+    return _ClosingStreamingResponse(
         event_stream(),
         media_type="application/x-ndjson",
         headers=stream_headers,

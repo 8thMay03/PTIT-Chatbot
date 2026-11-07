@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pytest
@@ -6,6 +7,12 @@ from app.api.schemas import ChatRequest
 from app.api import routes
 from app.db.repositories import limit_history
 from app.llm import CONTENT_DELTA, StreamDelta
+
+
+@contextmanager
+def _fake_session_factory():
+    """Session factory giả: route mở `with session_factory() as session` cho từng pha."""
+    yield SimpleNamespace(commit=lambda: None)
 
 
 def test_limit_history_keeps_newest_messages_within_both_limits() -> None:
@@ -54,16 +61,21 @@ def test_chat_persists_retrieval_debug_on_user_message(monkeypatch) -> None:
     )
 
     def fake_add_message(session, conversation_id, role, content, metadata=None):
-        stored_messages.append({"role": role, "content": content, "metadata": metadata})
+        stored_messages.append({"id": f"{role}-message", "role": role, "content": content, "metadata": metadata})
         return SimpleNamespace(id=f"{role}-message")
+
+    def fake_update_message_metadata(session, message_id, patch):
+        message = next(item for item in stored_messages if item["id"] == message_id)
+        message["metadata"] = {**(message["metadata"] or {}), **patch}
 
     monkeypatch.setattr(routes, "add_message", fake_add_message)
     monkeypatch.setattr(routes, "add_message_sources", lambda *args: None)
-    session = SimpleNamespace(commit=lambda: None)
+    monkeypatch.setattr(routes, "update_message_metadata", fake_update_message_metadata)
 
-    routes.chat(ChatRequest(message="Điều kiện tốt nghiệp?"), session=session)
+    routes.chat(ChatRequest(message="Điều kiện tốt nghiệp?"), session_factory=_fake_session_factory)
 
     assert stored_messages[0] == {
+        "id": "user-message",
         "role": "user",
         "content": "Điều kiện tốt nghiệp?",
         "metadata": {"retrieval_debug": retrieval_debug},
@@ -116,9 +128,9 @@ async def test_chat_stream_delivers_ndjson_events(monkeypatch) -> None:
     )
     monkeypatch.setattr(routes, "add_message", lambda *args, **kwargs: SimpleNamespace(id="msg-1"))
     monkeypatch.setattr(routes, "add_message_sources", lambda *args: None)
-    session = SimpleNamespace(commit=lambda: None)
+    monkeypatch.setattr(routes, "update_message_metadata", lambda *args: None)
 
-    response = routes.chat_stream(ChatRequest(message="Học phí?"), session=session)
+    response = routes.chat_stream(ChatRequest(message="Học phí?"), session_factory=_fake_session_factory)
     events = []
     async for line in response.body_iterator:
         if line.strip():

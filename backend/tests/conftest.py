@@ -6,8 +6,8 @@
 - ``login_admin``: đăng nhập admin cho một TestClient bất kỳ.
 - ``client``: TestClient cookie jar riêng, chưa đăng nhập.
 - ``admin_client``: TestClient đã có cookie phiên admin hợp lệ.
-- ``api_db``: thay dependency ``get_session`` bằng SQLite tạm trong ``tmp_path``
-  để test hội thoại không ghi vào DB dev.
+- ``api_db``: thay dependency ``get_session`` và ``get_session_factory`` bằng SQLite
+  tạm trong ``tmp_path`` để test hội thoại không ghi vào DB dev.
 - ``register_user`` / ``login_user``: đăng ký/đăng nhập tài khoản người dùng cho một
   TestClient (landing-user-auth); cần ``api_db``.
 - ``config_store_db`` (autouse): bảng cấu hình đã lưu (PUT /config, lifespan) và kho
@@ -25,7 +25,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core import auth
 from app.core import config_store, model_profiles
 from app.core.config import settings
-from app.db import get_session
+from app.db import get_session, get_session_factory
 from app.db.models import AppConfigOverride, Base, ModelProfile
 from app.main import app
 
@@ -102,7 +102,7 @@ def admin_client(login_admin):
 
 @pytest.fixture
 def api_db(tmp_path):
-    """Chạy app với get_session trỏ sang SQLite tạm; trả về session factory để seed dữ liệu."""
+    """Chạy app với get_session/get_session_factory trỏ sang SQLite tạm; trả về session factory để seed dữ liệu."""
     engine = create_engine(
         f"sqlite:///{(tmp_path / 'api-test.db').as_posix()}",
         connect_args={"check_same_thread": False},
@@ -117,10 +117,12 @@ def api_db(tmp_path):
             yield session
 
     app.dependency_overrides[get_session] = override_get_session
+    app.dependency_overrides[get_session_factory] = lambda: test_session_factory
     try:
         yield test_session_factory
     finally:
         app.dependency_overrides.pop(get_session, None)
+        app.dependency_overrides.pop(get_session_factory, None)
         engine.dispose()
 
 

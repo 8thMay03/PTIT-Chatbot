@@ -1,4 +1,5 @@
 import json
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pytest
@@ -31,6 +32,12 @@ RETRIEVAL = {
 }
 
 
+@contextmanager
+def _fake_session_factory():
+    """Session factory giả: route mở `with session_factory() as session` cho từng pha."""
+    yield SimpleNamespace(commit=lambda: None)
+
+
 def _prepare(monkeypatch, stored_messages) -> None:
     monkeypatch.setattr(routes.settings, "conversation_memory_enabled", False)
     monkeypatch.setattr(
@@ -50,6 +57,7 @@ def _prepare(monkeypatch, stored_messages) -> None:
 
     monkeypatch.setattr(routes, "add_message", fake_add_message)
     monkeypatch.setattr(routes, "add_message_sources", lambda *args: None)
+    monkeypatch.setattr(routes, "update_message_metadata", lambda *args: None)
 
 
 async def _read_events(response) -> list[dict]:
@@ -71,7 +79,7 @@ async def test_stream_providers_error_before_first_token_returns_extractive_fall
 
     monkeypatch.setattr(routes, "stream_answer_deltas_with_llm", fake_stream)
 
-    response = routes.chat_stream(ChatRequest(message="Học phí?"), session=SimpleNamespace(commit=lambda: None))
+    response = routes.chat_stream(ChatRequest(message="Học phí?"), session_factory=_fake_session_factory)
     events = await _read_events(response)
 
     # Bước retrieval bị mock bỏ qua nên chỉ còn event step "generate".
@@ -96,7 +104,7 @@ async def test_stream_providers_error_after_tokens_emits_error_event_without_fal
 
     monkeypatch.setattr(routes, "stream_answer_deltas_with_llm", fake_stream)
 
-    response = routes.chat_stream(ChatRequest(message="Học phí?"), session=SimpleNamespace(commit=lambda: None))
+    response = routes.chat_stream(ChatRequest(message="Học phí?"), session_factory=_fake_session_factory)
     events = await _read_events(response)
 
     types = [event["type"] for event in events]
@@ -133,7 +141,7 @@ async def test_stream_emits_step_events_and_persists_timeline(monkeypatch) -> No
         ),
     )
 
-    response = routes.chat_stream(ChatRequest(message="Học phí?"), session=SimpleNamespace(commit=lambda: None))
+    response = routes.chat_stream(ChatRequest(message="Học phí?"), session_factory=_fake_session_factory)
     events = await _read_events(response)
 
     step_events = [event for event in events if event["type"] == "step"]
@@ -167,7 +175,7 @@ async def test_stream_emits_reasoning_events_and_persists_reasoning(monkeypatch)
 
     monkeypatch.setattr(routes, "stream_answer_deltas_with_llm", fake_stream)
 
-    response = routes.chat_stream(ChatRequest(message="Học phí?"), session=SimpleNamespace(commit=lambda: None))
+    response = routes.chat_stream(ChatRequest(message="Học phí?"), session_factory=_fake_session_factory)
     events = await _read_events(response)
 
     reasoning_events = [event for event in events if event["type"] == "reasoning"]
@@ -197,7 +205,7 @@ async def test_stream_hides_reasoning_when_disabled(monkeypatch) -> None:
 
     monkeypatch.setattr(routes, "stream_answer_deltas_with_llm", fake_stream)
 
-    response = routes.chat_stream(ChatRequest(message="Học phí?"), session=SimpleNamespace(commit=lambda: None))
+    response = routes.chat_stream(ChatRequest(message="Học phí?"), session_factory=_fake_session_factory)
     events = await _read_events(response)
 
     assert not any(event["type"] == "reasoning" for event in events)
