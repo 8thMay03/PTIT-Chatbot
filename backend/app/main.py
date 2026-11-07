@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.config_store import load_persisted_config
 from app.core.model_profiles import load_selected_embedding_at_startup
 from app.db import init_db
+from app.embeddings import embedding_runtime
 
 
 @asynccontextmanager
@@ -16,8 +17,11 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     # Áp cấu hình admin đã lưu trong DB lên trên .env. Chạy ở lifespan (không phải lúc
     # import) để test dùng TestClient(app) không đọc cấu hình từ DB dev.
     load_persisted_config()
-    # Embedder đã tạo lúc import theo `.env`; profile embedding đã chọn được áp ở đây.
+    # Embedder không tạo lúc import (thiếu key không làm sập app): áp profile embedding
+    # đã chọn, rồi thử tạo embedder một lần. Lỗi chỉ ghi log; /api/health báo trạng thái
+    # và route cần embedding trả 503.
     load_selected_embedding_at_startup()
+    embedding_runtime.warm_up()
     yield
 
 

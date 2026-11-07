@@ -4,6 +4,7 @@
 - Chọn profile LLM/reranker có hiệu lực ngay, còn sau restart; sửa profile đang dùng
   thì áp lại; không xoá được profile đang dùng.
 - Embedding: chọn chỉ lưu lựa chọn; áp lúc khởi động; số chiều phải bằng VECTOR_DIM.
+  Embedder chưa chạy được thì áp ngay: tests/test_safe_embedding_startup.py.
 
 Bảng chạy trên SQLite tạm (fixture ``config_store_db`` trong conftest).
 """
@@ -18,7 +19,12 @@ from app.api import routes
 from app.core import config_store, model_profiles
 from app.core.config import _INITIAL_SETTINGS, settings
 from app.db.models import AppConfigOverride, ModelProfile
-from app.embeddings.models import EmbeddingModel, HashEmbeddingModel
+from app.embeddings import (
+    EmbeddingUnavailableError,
+    embedding_runtime,
+    runtime_embedding_model,
+)
+from app.embeddings.models import EmbeddingModel
 from app.ingestion import ingestion_pipeline
 from app.retrieval.retriever import retriever
 
@@ -388,10 +394,12 @@ def test_embedding_selection_applies_at_startup(admin_client, config_store_db, m
     fake = _FakeEmbedding()
     monkeypatch.setattr("app.embeddings.create_embedding_model", lambda: fake)
     _simulate_restart()
+    embedding_runtime.reset()
     model_profiles.load_selected_embedding_at_startup()
 
-    assert retriever.embedding_model is fake
-    assert ingestion_pipeline.embedding_model is fake
+    assert embedding_runtime.get() is fake
+    assert retriever.embedding_model is runtime_embedding_model
+    assert ingestion_pipeline.embedding_model is runtime_embedding_model
     assert settings.embedding_model == "unit-test/st-model"
     runtime = admin_client.get("/api/model-profiles").json()["embedding_runtime"]
     assert runtime["profile_id"] == profile["id"]
@@ -407,16 +415,18 @@ def test_embedding_selection_applies_at_startup(admin_client, config_store_db, m
 
 
 def test_embedding_load_failure_keeps_env_embedder(admin_client, config_store_db, monkeypatch) -> None:
-    before = retriever.embedding_model
+    before = embedding_runtime.get()
     running = (settings.embedding_provider, settings.embedding_model)
     profile = _embedding_profile(admin_client)
     _activate(admin_client, "embedding", profile["id"])
 
-    # create_embedding_model quay về Hash khi không tải được sentence-transformers.
-    monkeypatch.setattr("app.embeddings.create_embedding_model", lambda: HashEmbeddingModel())
+    def broken_factory():
+        raise EmbeddingUnavailableError("Không tải được mô hình sentence-transformers 'unit-test/st-model' (OSError).")
+
+    monkeypatch.setattr("app.embeddings.create_embedding_model", broken_factory)
     model_profiles.load_selected_embedding_at_startup()
 
-    assert retriever.embedding_model is before
+    assert embedding_runtime.get() is before
     assert (settings.embedding_provider, settings.embedding_model) == running
     runtime = admin_client.get("/api/model-profiles").json()["embedding_runtime"]
     assert runtime["profile_id"] is None

@@ -486,6 +486,8 @@ class EmbeddingRuntimeInfo(BaseModel):
     vector_dim: int
     # Lựa chọn hiện tại khác embedder đang chạy → cần khởi động lại backend.
     restart_required: bool = False
+    # Trạng thái embedder (BE-13): ready | not_configured | error.
+    status: Literal["ready", "not_configured", "error"] = "ready"
     load_error: str | None = None
 
 

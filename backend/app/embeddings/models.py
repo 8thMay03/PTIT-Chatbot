@@ -61,6 +61,7 @@ class SentenceTransformerEmbeddingModel(EmbeddingModel):
         from sentence_transformers import SentenceTransformer
 
         self.model = SentenceTransformer(model_name)
+        self.dimensions: int | None = self.model.get_sentence_embedding_dimension()
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         embeddings = self.model.encode(texts, normalize_embeddings=True)

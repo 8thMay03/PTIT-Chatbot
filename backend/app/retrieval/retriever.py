@@ -1,5 +1,5 @@
 from app.core.config import settings
-from app.embeddings import EmbeddingModel, create_embedding_model
+from app.embeddings import EmbeddingModel, runtime_embedding_model
 from app.retrieval.bm25 import BM25Search
 from app.retrieval.hybrid import reciprocal_rank_fusion
 from app.retrieval.parent_child import collapse_parent_results
@@ -13,7 +13,7 @@ class Retriever:
         vector_store: VectorStore | None = None,
         keyword_search: BM25Search | None = None,
     ) -> None:
-        self.embedding_model = embedding_model or create_embedding_model()
+        self.embedding_model = embedding_model or runtime_embedding_model
         self.vector_store = vector_store or create_vector_store()
         self.keyword_search = keyword_search or BM25Search()
 
