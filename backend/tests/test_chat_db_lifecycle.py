@@ -108,7 +108,7 @@ def small_pool_db(tmp_path):
 
 @pytest.fixture
 def fake_retrieval(monkeypatch):
-    def fake_iter_retrieve(message, top_k, history=None):
+    def fake_iter_retrieve(message, top_k, history=None, budget=None):
         yield {"step": "retrieve", "detail": {}, "elapsed_ms": 1}
         yield {"result": dict(RETRIEVAL_RESULT)}
 
@@ -206,13 +206,13 @@ def test_chat_stream_holds_no_connection_while_llm_streams(chat_db, monkeypatch)
     factory, counter = chat_db
     observed: list[tuple[str, int]] = []
 
-    def fake_iter_retrieve(message, top_k, history=None):
+    def fake_iter_retrieve(message, top_k, history=None, budget=None):
         observed.append(("retrieval", counter.checked_out))
         yield {"step": "retrieve", "detail": {}, "elapsed_ms": 1}
         observed.append(("retrieval", counter.checked_out))
         yield {"result": dict(RETRIEVAL_RESULT)}
 
-    def fake_stream(question, contexts, history=None, provider=None):
+    def fake_stream(question, contexts, history=None, provider=None, budget=None):
         for text_part in ["Học ", "phí ", "PTIT [1]"]:
             observed.append(("llm", counter.checked_out))
             yield StreamDelta(kind=CONTENT_DELTA, text=text_part)
@@ -240,7 +240,7 @@ def test_chat_sync_holds_no_connection_while_answering(chat_db, monkeypatch) -> 
     factory, counter = chat_db
     observed: list[int] = []
 
-    def fake_answer(message, top_k, history):
+    def fake_answer(message, top_k, history, budget=None):
         observed.append(counter.checked_out)
         return {
             "answer": "Trả lời [1]",
@@ -270,7 +270,7 @@ def test_concurrent_streams_do_not_exhaust_small_pool(small_pool_db, fake_retrie
     factory, counter = small_pool_db
     stream_count = 10
 
-    def slow_stream(question, contexts, history=None, provider=None):
+    def slow_stream(question, contexts, history=None, provider=None, budget=None):
         yield StreamDelta(kind=CONTENT_DELTA, text="Học phí ")
         time.sleep(2)
         yield StreamDelta(kind=CONTENT_DELTA, text="PTIT [1]")
@@ -327,7 +327,7 @@ async def test_interrupted_stream_saves_partial_answer(chat_db, fake_retrieval, 
     llm_closed = threading.Event()
     parts = ["Học ", "phí ", "PTIT ", "là ", "bao ", "nhiêu"]
 
-    def slow_stream(question, contexts, history=None, provider=None):
+    def slow_stream(question, contexts, history=None, provider=None, budget=None):
         try:
             for text_part in parts:
                 produced.append(text_part)
@@ -370,7 +370,7 @@ async def test_disconnect_during_send_saves_without_gc(chat_db, fake_retrieval, 
     factory, counter = chat_db
     llm_closed = threading.Event()
 
-    def slow_stream(question, contexts, history=None, provider=None):
+    def slow_stream(question, contexts, history=None, provider=None, budget=None):
         try:
             for text_part in ["Học ", "phí ", "PTIT ", "là ", "bao ", "nhiêu"]:
                 yield StreamDelta(kind=CONTENT_DELTA, text=text_part)
@@ -407,7 +407,7 @@ async def test_llm_stream_error_is_saved_before_error_event(chat_db, fake_retrie
     """R-06: client ngắt ngay khi nhận event `error` -> vẫn lưu lỗi `llm_stream`, không phải `interrupted`."""
     factory, _ = chat_db
 
-    def failing_stream(question, contexts, history=None, provider=None):
+    def failing_stream(question, contexts, history=None, provider=None, budget=None):
         yield StreamDelta(kind=CONTENT_DELTA, text="Học phí ")
         raise LLMStreamError("LLM streaming failed: boom")
 
@@ -420,10 +420,19 @@ async def test_llm_stream_error_is_saved_before_error_event(chat_db, fake_retrie
         block_send_s=0.5,
     )
 
-    assert events[-1] == {"type": "error", "message": "LLM streaming failed: boom"}
+    request_id = events[-1]["request_id"]
+    assert events[-1] == {
+        "type": "error",
+        "message": routes.CHAT_LLM_STREAM_ERROR_DETAIL.format(request_id=request_id),
+        "request_id": request_id,
+    }
     _, assistant = _messages(factory, events[0]["conversation_id"])
     assert assistant.content == "Học phí"
-    assert assistant.message_metadata["error"] == {"type": "llm_stream", "message": "LLM streaming failed: boom"}
+    assert assistant.message_metadata["error"] == {
+        "type": "llm_stream",
+        "request_id": request_id,
+        "error_class": "LLMStreamError",
+    }
     assert "interrupted" not in assistant.message_metadata
 
 
@@ -431,7 +440,7 @@ async def test_interrupted_answer_is_excluded_from_next_turn_history(chat_db, fa
     factory, _ = chat_db
     monkeypatch.setattr(routes.settings, "conversation_memory_enabled", True)
 
-    def slow_stream(question, contexts, history=None, provider=None):
+    def slow_stream(question, contexts, history=None, provider=None, budget=None):
         for text_part in ["Câu ", "trả ", "lời ", "dở ", "dang"]:
             yield StreamDelta(kind=CONTENT_DELTA, text=text_part)
             time.sleep(0.2)
@@ -447,7 +456,7 @@ async def test_interrupted_answer_is_excluded_from_next_turn_history(chat_db, fa
 
     captured_history: list[list[dict]] = []
 
-    def fake_answer(message, top_k, history):
+    def fake_answer(message, top_k, history, budget=None):
         captured_history.append(history)
         return {"answer": "Trả lời", "sources": [], "contexts": [], "retrieval_debug": {}}
 
@@ -472,14 +481,14 @@ async def test_disconnect_before_delta_keeps_question(chat_db, monkeypatch) -> N
     factory, counter = chat_db
     llm_calls: list[str] = []
 
-    def slow_retrieve(message, top_k, history=None):
+    def slow_retrieve(message, top_k, history=None, budget=None):
         yield {"step": "query_rewrite", "detail": {}, "elapsed_ms": 1}
         time.sleep(0.3)
         yield {"step": "retrieve", "detail": {}, "elapsed_ms": 300}
         time.sleep(0.3)
         yield {"result": dict(RETRIEVAL_RESULT)}
 
-    def fake_stream(question, contexts, history=None, provider=None):
+    def fake_stream(question, contexts, history=None, provider=None, budget=None):
         llm_calls.append(question)
         yield StreamDelta(kind=CONTENT_DELTA, text="không được gọi")
 
@@ -507,7 +516,7 @@ async def test_disconnect_before_delta_keeps_question(chat_db, monkeypatch) -> N
 def test_retrieval_error_keeps_question_and_records_error(chat_db, monkeypatch) -> None:
     factory, _ = chat_db
 
-    def failing_retrieve(message, top_k, history=None):
+    def failing_retrieve(message, top_k, history=None, budget=None):
         yield {"step": "query_rewrite", "detail": {}, "elapsed_ms": 1}
         raise RuntimeError("vector store down")
 
@@ -517,13 +526,17 @@ def test_retrieval_error_keeps_question_and_records_error(chat_db, monkeypatch) 
 
     events = _parse_ndjson(response.text)
     assert [e["type"] for e in events] == ["start", "step", "error"]
-    assert events[-1]["message"] == "Retrieval failed: vector store down"
+    request_id = events[-1]["request_id"]
+    assert response.headers["X-Request-ID"] == request_id
+    assert events[-1]["message"] == routes.CHAT_INTERNAL_ERROR_DETAIL.format(request_id=request_id)
+    assert "vector store down" not in response.text
     user, assistant = _messages(factory, events[0]["conversation_id"])
     assert user.content == "Học phí?"
     assert assistant.content == ""
     assert assistant.message_metadata["error"] == {
         "type": "retrieval",
-        "message": "Retrieval failed: vector store down",
+        "request_id": request_id,
+        "error_class": "RuntimeError",
     }
     assert "interrupted" not in assistant.message_metadata
 
@@ -537,7 +550,7 @@ def test_empty_error_answer_is_excluded_from_next_turn_history(chat_db, monkeypa
     factory, _ = chat_db
     monkeypatch.setattr(routes.settings, "conversation_memory_enabled", True)
 
-    def failing_retrieve(message, top_k, history=None):
+    def failing_retrieve(message, top_k, history=None, budget=None):
         raise RuntimeError("vector store down")
         yield  # pragma: no cover - biến hàm thành generator
 
@@ -551,7 +564,7 @@ def test_empty_error_answer_is_excluded_from_next_turn_history(chat_db, monkeypa
 
     captured_history: list[list[dict]] = []
 
-    def fake_answer(message, top_k, history):
+    def fake_answer(message, top_k, history, budget=None):
         captured_history.append(history)
         return {"answer": "Trả lời", "sources": [], "contexts": [], "retrieval_debug": {}}
 
@@ -570,20 +583,27 @@ def test_empty_error_answer_is_excluded_from_next_turn_history(chat_db, monkeypa
 def test_chat_sync_answer_error_keeps_question_and_status(chat_db, monkeypatch) -> None:
     factory, _ = chat_db
 
-    def failing_answer(message, top_k, history):
+    def failing_answer(message, top_k, history, budget=None):
         raise RuntimeError("retrieval exploded")
 
     monkeypatch.setattr(routes.rag_chain, "answer", failing_answer)
 
     response = TestClient(app, raise_server_exceptions=False).post("/api/chat", json={"message": "Học phí?"})
 
-    assert response.status_code == 500
+    # BE-12 (Q-03): 503 với thông điệp chung + mã tham chiếu thay vì 500.
+    assert response.status_code == 503
+    request_id = response.headers["X-Request-ID"]
+    assert response.json() == {"detail": routes.CHAT_INTERNAL_ERROR_DETAIL.format(request_id=request_id)}
     with factory() as session:
         (conversation,) = list(session.scalars(select(Conversation)))
     user, assistant = _messages(factory, conversation.id)
     assert user.content == "Học phí?"
     assert assistant.content == ""
-    assert assistant.message_metadata["error"] == {"type": "answer", "message": "retrieval exploded"}
+    assert assistant.message_metadata["error"] == {
+        "type": "answer",
+        "request_id": request_id,
+        "error_class": "RuntimeError",
+    }
 
 
 def test_chat_rejects_other_session_conversation_without_writing(chat_db, monkeypatch) -> None:
@@ -591,7 +611,7 @@ def test_chat_rejects_other_session_conversation_without_writing(chat_db, monkey
     monkeypatch.setattr(
         routes.rag_chain,
         "answer",
-        lambda message, top_k, history: {"answer": "Trả lời", "sources": [], "contexts": [], "retrieval_debug": {}},
+        lambda message, top_k, history, budget=None: {"answer": "Trả lời", "sources": [], "contexts": [], "retrieval_debug": {}},
     )
     owner = _client_with_sid(_new_sid())
     conversation_id = owner.post("/api/chat", json={"message": "Câu hỏi?"}).json()["conversation_id"]
@@ -611,7 +631,7 @@ def test_stream_logs_answer_save_failure(chat_db, fake_retrieval, monkeypatch, c
     monkeypatch.setattr(
         routes,
         "stream_answer_deltas_with_llm",
-        lambda question, contexts, history=None, provider=None: iter([StreamDelta(kind=CONTENT_DELTA, text="Trả lời")]),
+        lambda question, contexts, history=None, provider=None, budget=None: iter([StreamDelta(kind=CONTENT_DELTA, text="Trả lời")]),
     )
     original_add_message = routes.add_message
 

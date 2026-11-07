@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Callable
 
 from app.core.config import settings
@@ -16,9 +17,45 @@ logger = logging.getLogger(__name__)
 _PROVIDER_REGISTRY: dict[str, Callable[[], BaseLLMProvider]] = {}
 
 
+# Trường settings mà provider đọc lúc tạo (BE-12). Provider được cache theo giá trị các
+# trường này; đổi bất kỳ trường nào (PUT /config, reset, chọn profile LLM) thì lần gọi sau
+# tạo provider mới. `llm_temperature` đọc lúc gọi nên không cần ở đây.
+LLM_SETTINGS_FIELDS: tuple[str, ...] = (
+    "llm_provider",
+    "llm_timeout",
+    "llm_max_retries",
+    "openai_api_key",
+    "openai_model",
+    "openai_base_url",
+    "gemini_api_key",
+    "gemini_model",
+    "azure_openai_api_key",
+    "azure_openai_endpoint",
+    "azure_openai_deployment_name",
+    "azure_openai_api_version",
+    "openai_compatible_base_url",
+    "openai_compatible_api_key",
+    "openai_compatible_model",
+)
+
+# Tên provider -> (dấu vân tay cấu hình, provider). Provider cũ bị thay không bị đóng ngay
+# (request đang chạy có thể còn dùng); client HTTP tự đóng khi bị thu gom.
+_provider_cache: dict[str, tuple[tuple, BaseLLMProvider]] = {}
+_provider_cache_lock = threading.Lock()
+
+
 def register_llm_provider(name: str, factory_fn: Callable[[], BaseLLMProvider]) -> None:
     """Register a custom LLM provider factory."""
-    _PROVIDER_REGISTRY[name.strip().lower()] = factory_fn
+    key = name.strip().lower()
+    with _provider_cache_lock:
+        _PROVIDER_REGISTRY[key] = factory_fn
+        _provider_cache.pop(key, None)
+
+
+def reset_llm_provider_cache() -> None:
+    """Bỏ mọi provider đã cache (test)."""
+    with _provider_cache_lock:
+        _provider_cache.clear()
 
 
 def create_openai_provider() -> OpenAIProvider:
@@ -92,16 +129,31 @@ register_llm_provider("zhipu", create_openai_compatible_provider)
 register_llm_provider("xai", create_openai_compatible_provider)
 
 
+def _settings_fingerprint() -> tuple:
+    return tuple(getattr(settings, field) for field in LLM_SETTINGS_FIELDS)
+
+
 def get_llm_provider(provider_name: str | None = None) -> BaseLLMProvider:
-    """Get or create an LLM provider based on name or settings.llm_provider."""
+    """Get the shared LLM provider for ``provider_name`` (default ``settings.llm_provider``).
+
+    Provider (và client HTTP của nó) được tái dùng giữa các lượt chat cho tới khi cấu hình
+    LLM trong ``settings`` đổi. Instance dùng chung giữa các thread: không gán thuộc tính
+    lên provider trả về.
+    """
     name = (provider_name or settings.llm_provider).strip().lower()
 
-    factory = _PROVIDER_REGISTRY.get(name)
-    if factory is not None:
-        return factory()
-
-    logger.warning("Unknown LLM provider %r, falling back to 'openai'.", name)
-    return create_openai_provider()
+    with _provider_cache_lock:
+        factory = _PROVIDER_REGISTRY.get(name)
+        if factory is None:
+            logger.warning("Unknown LLM provider %r, falling back to 'openai'.", name)
+            factory = create_openai_provider
+        fingerprint = (factory, *_settings_fingerprint())
+        cached = _provider_cache.get(name)
+        if cached is not None and cached[0] == fingerprint:
+            return cached[1]
+        provider = factory()
+        _provider_cache[name] = (fingerprint, provider)
+        return provider
 
 
 def create_llm_provider_from_config(

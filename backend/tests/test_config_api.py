@@ -141,11 +141,11 @@ def test_retrieval_test_endpoint_returns_disabled_guardrail(monkeypatch) -> None
     assert settings.guardrail_scope_enabled is False
 
     class _Rewriter:
-        def rewrite(self, question, history=None):
+        def rewrite(self, question, history=None, budget=None):
             return question
 
     class _MultiQuery:
-        def generate(self, query):
+        def generate(self, query, budget=None):
             return [query]
 
     class _Retriever:
@@ -190,11 +190,11 @@ def test_chat_endpoint_returns_200_when_scope_guardrail_disabled(monkeypatch) ->
     monkeypatch.setattr(settings, "conversation_memory_enabled", False)
 
     class _Rewriter:
-        def rewrite(self, question, history=None):
+        def rewrite(self, question, history=None, budget=None):
             return question
 
     class _MultiQuery:
-        def generate(self, query):
+        def generate(self, query, budget=None):
             return [query]
 
     class _WeakRetriever:

@@ -52,7 +52,7 @@ def test_chat_persists_retrieval_debug_on_user_message(monkeypatch) -> None:
     monkeypatch.setattr(
         routes.rag_chain,
         "answer",
-        lambda message, top_k, history: {
+        lambda message, top_k, history, budget=None: {
             "answer": "Câu trả lời [1]",
             "sources": [],
             "contexts": [],
@@ -97,7 +97,7 @@ async def test_chat_stream_delivers_ndjson_events(monkeypatch) -> None:
         "ensure_conversation",
         lambda session, conversation_id, user_id, title: SimpleNamespace(id="conversation-stream-1"),
     )
-    def fake_iter_retrieve(message, top_k, history=None):
+    def fake_iter_retrieve(message, top_k, history=None, budget=None):
         yield {
             "result": {
                 "contexts": [
@@ -118,7 +118,7 @@ async def test_chat_stream_delivers_ndjson_events(monkeypatch) -> None:
     monkeypatch.setattr(
         routes,
         "stream_answer_deltas_with_llm",
-        lambda question, contexts, history=None, provider=None: iter(
+        lambda question, contexts, history=None, provider=None, budget=None: iter(
             [
                 StreamDelta(kind=CONTENT_DELTA, text="Học "),
                 StreamDelta(kind=CONTENT_DELTA, text="phí "),

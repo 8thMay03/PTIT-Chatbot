@@ -23,7 +23,7 @@ from app.main import app
 def rag_mocks(monkeypatch):
     """Mock LLM/retrieval để test hội thoại không cần model thật."""
 
-    def fake_answer(message, top_k, history):
+    def fake_answer(message, top_k, history, budget=None):
         return {
             "answer": f"Trả lời cho: {message}",
             "sources": [],
@@ -33,7 +33,7 @@ def rag_mocks(monkeypatch):
 
     monkeypatch.setattr(routes.rag_chain, "answer", fake_answer)
 
-    def fake_iter_retrieve(message, top_k, history=None):
+    def fake_iter_retrieve(message, top_k, history=None, budget=None):
         yield {
             "result": {
                 "contexts": [
@@ -52,7 +52,7 @@ def rag_mocks(monkeypatch):
 
     monkeypatch.setattr(routes.rag_chain, "iter_retrieve_context", fake_iter_retrieve)
 
-    def fake_stream(question, contexts, history=None, provider=None):
+    def fake_stream(question, contexts, history=None, provider=None, budget=None):
         return iter([StreamDelta(kind=CONTENT_DELTA, text=f"Trả lời stream cho: {question}")])
 
     monkeypatch.setattr(routes, "stream_answer_deltas_with_llm", fake_stream)

@@ -4,8 +4,8 @@ import json
 import logging
 from collections.abc import Iterator
 from typing import Any
-import urllib.error
-import urllib.request
+
+import httpx
 
 from app.core.config import settings
 from app.llm.base import (
@@ -16,7 +16,9 @@ from app.llm.base import (
     LLMMessage,
     LLMProviderError,
     StreamDelta,
+    redact_secrets,
 )
+from app.llm.budget import LLMBudget
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +34,12 @@ class GeminiProvider(BaseLLMProvider):
         model_name: str = "gemini-1.5-flash",
         timeout: float = 30.0,
         max_retries: int = 2,
+        http_client: httpx.Client | None = None,
     ) -> None:
         super().__init__(model_name=model_name, timeout=timeout, max_retries=max_retries)
         self.api_key = api_key
+        # httpx.Client tùy chọn (test tiêm MockTransport); None -> tạo lúc gọi đầu tiên.
+        self._http_client = http_client
 
     def is_configured(self) -> bool:
         return bool(self.api_key and self.api_key.strip())
@@ -94,91 +99,102 @@ class GeminiProvider(BaseLLMProvider):
             payload["systemInstruction"] = system_instruction
         return payload
 
+    def _get_http_client(self) -> httpx.Client:
+        if not self.is_configured():
+            raise LLMConfigurationError("GEMINI_API_KEY is not configured.")
+        with self._client_lock:
+            if self._http_client is None:
+                # Một client giữ kết nối (keep-alive) cho mọi lời gọi của provider.
+                self._http_client = httpx.Client(timeout=self.timeout)
+        return self._http_client
+
+    def _headers(self) -> dict[str, str]:
+        # Key gửi qua header, không nằm trong URL (URL có thể xuất hiện trong log/exception).
+        return {"Content-Type": "application/json", "x-goog-api-key": (self.api_key or "").strip()}
+
+    def _http_error(self, response: httpx.Response) -> LLMProviderError:
+        """Lỗi HTTP của Gemini, giữ status code để `_is_retryable_error` không retry 4xx."""
+        status = response.status_code
+        message = ""
+        try:
+            message = str(response.json().get("error", {}).get("message", ""))
+        except (ValueError, AttributeError):
+            message = response.text
+        message = redact_secrets(" ".join(message.split())[:200], self._secrets())
+        retry_after = response.headers.get("retry-after")
+        try:
+            retry_after_seconds = float(retry_after) if retry_after is not None else None
+        except ValueError:
+            retry_after_seconds = None
+        return LLMProviderError(
+            f"Gemini API error {status}" + (f": {message}" if message else ""),
+            status_code=status,
+            retry_after=retry_after_seconds,
+        )
+
     def generate(
         self,
         messages: list[LLMMessage | dict[str, str]],
         temperature: float = 0.0,
         max_tokens: int | None = None,
+        budget: LLMBudget | None = None,
         **kwargs: Any,
     ) -> str:
-        if not self.is_configured():
-            raise LLMConfigurationError("GEMINI_API_KEY is not configured.")
-
-        url = f"{GEMINI_API_BASE}/{self.model_name}:generateContent?key={self.api_key}"
+        client = self._get_http_client()
+        url = f"{GEMINI_API_BASE}/{self.model_name}:generateContent"
         payload = self._build_payload(messages, temperature=temperature, max_tokens=max_tokens, **kwargs)
-        data = json.dumps(payload).encode("utf-8")
 
-        def _call() -> str:
-            req = urllib.request.Request(
-                url,
-                data=data,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                    resp_data = json.loads(resp.read().decode("utf-8"))
-                    candidates = resp_data.get("candidates", [])
-                    if not candidates:
-                        return ""
-                    parts = candidates[0].get("content", {}).get("parts", [])
-                    return "".join(part.get("text", "") for part in parts)
-            except urllib.error.HTTPError as exc:
-                err_body = exc.read().decode("utf-8", errors="replace")
-                raise LLMProviderError(f"Gemini API error {exc.code}: {err_body}") from exc
+        def _call(timeout: float) -> str:
+            response = client.post(url, json=payload, headers=self._headers(), timeout=timeout)
+            if response.is_error:
+                raise self._http_error(response)
+            candidates = response.json().get("candidates", [])
+            if not candidates:
+                return ""
+            parts = candidates[0].get("content", {}).get("parts", [])
+            return "".join(part.get("text", "") for part in parts)
 
-        return self._execute_with_retry(_call, operation_name="Gemini completion")
+        return self._execute_with_retry(_call, operation_name="Gemini completion", budget=budget)
 
     def _stream_sse_chunks(
         self,
         messages: list[LLMMessage | dict[str, str]],
         temperature: float = 0.2,
         max_tokens: int | None = None,
+        budget: LLMBudget | None = None,
         **kwargs: Any,
     ) -> Iterator[dict[str, Any]]:
         """POST streamGenerateContent and yield parsed SSE JSON chunks."""
-        if not self.is_configured():
-            raise LLMConfigurationError("GEMINI_API_KEY is not configured.")
-
-        url = f"{GEMINI_API_BASE}/{self.model_name}:streamGenerateContent?alt=sse&key={self.api_key}"
+        client = self._get_http_client()
+        url = f"{GEMINI_API_BASE}/{self.model_name}:streamGenerateContent"
         payload = self._build_payload(messages, temperature=temperature, max_tokens=max_tokens, **kwargs)
-        data = json.dumps(payload).encode("utf-8")
 
-        req = urllib.request.Request(
-            url,
-            data=data,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                for raw_line in resp:
-                    line = raw_line.decode("utf-8").strip()
-                    if not line or not line.startswith("data:"):
-                        continue
-                    data_str = line[len("data:"):].strip()
-                    if not data_str or data_str == "[DONE]":
-                        continue
-                    try:
-                        yield json.loads(data_str)
-                    except json.JSONDecodeError:
-                        continue
-        except urllib.error.HTTPError as exc:
-            err_body = exc.read().decode("utf-8", errors="replace")
-            logger.error("Gemini streaming error: %s", err_body)
-            raise LLMProviderError(f"Gemini streaming error {exc.code}: {err_body}") from exc
-        except Exception as exc:
-            logger.error("Gemini streaming failed: %s", exc)
-            raise LLMProviderError(f"Gemini streaming error: {exc}") from exc
+        def _open(timeout: float) -> Iterator[dict[str, Any]]:
+            request = client.build_request(
+                "POST", url, params={"alt": "sse"}, json=payload, headers=self._headers(), timeout=timeout
+            )
+            response = client.send(request, stream=True)
+            if response.is_error:
+                try:
+                    response.read()
+                    raise self._http_error(response)
+                finally:
+                    response.close()
+            return _iter_sse(response)
+
+        return self._stream_with_retry(_open, operation_name="Gemini streaming", budget=budget)
 
     def generate_stream(
         self,
         messages: list[LLMMessage | dict[str, str]],
         temperature: float = 0.2,
         max_tokens: int | None = None,
+        budget: LLMBudget | None = None,
         **kwargs: Any,
     ) -> Iterator[str]:
-        for chunk in self._stream_sse_chunks(messages, temperature=temperature, max_tokens=max_tokens, **kwargs):
+        for chunk in self._stream_sse_chunks(
+            messages, temperature=temperature, max_tokens=max_tokens, budget=budget, **kwargs
+        ):
             candidates = chunk.get("candidates", [])
             if not candidates:
                 continue
@@ -195,6 +211,7 @@ class GeminiProvider(BaseLLMProvider):
         messages: list[LLMMessage | dict[str, str]],
         temperature: float = 0.2,
         max_tokens: int | None = None,
+        budget: LLMBudget | None = None,
         **kwargs: Any,
     ) -> Iterator[StreamDelta]:
         """Stream content plus thought summaries on thinking models (2.5+).
@@ -205,7 +222,9 @@ class GeminiProvider(BaseLLMProvider):
         """
         if settings.llm_reasoning_stream_enabled:
             kwargs.setdefault("includeThoughts", True)
-        for chunk in self._stream_sse_chunks(messages, temperature=temperature, max_tokens=max_tokens, **kwargs):
+        for chunk in self._stream_sse_chunks(
+            messages, temperature=temperature, max_tokens=max_tokens, budget=budget, **kwargs
+        ):
             candidates = chunk.get("candidates", [])
             if not candidates:
                 continue
@@ -218,3 +237,21 @@ class GeminiProvider(BaseLLMProvider):
                     yield StreamDelta(kind=REASONING_DELTA, text=text)
                 else:
                     yield StreamDelta(kind=CONTENT_DELTA, text=text)
+
+
+def _iter_sse(response: httpx.Response) -> Iterator[dict[str, Any]]:
+    """Đọc từng dòng SSE `data: {...}` của Gemini; luôn đóng response khi dừng."""
+    try:
+        for raw_line in response.iter_lines():
+            line = raw_line.strip()
+            if not line or not line.startswith("data:"):
+                continue
+            data_str = line[len("data:"):].strip()
+            if not data_str or data_str == "[DONE]":
+                continue
+            try:
+                yield json.loads(data_str)
+            except json.JSONDecodeError:
+                continue
+    finally:
+        response.close()

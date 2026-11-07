@@ -123,12 +123,12 @@ def chat_calls(monkeypatch) -> dict[str, list[str]]:
     """Retrieval/LLM giả; câu trả lời có dùng embedder chung như retrieval thật."""
     calls: dict[str, list[str]] = {"answer": [], "retrieve": []}
 
-    def fake_answer(message, top_k, history):
+    def fake_answer(message, top_k, history, budget=None):
         retriever.embedding_model.embed([message])
         calls["answer"].append(message)
         return {"answer": "Trả lời", "sources": [], "contexts": [], "retrieval_debug": {}}
 
-    def fake_iter_retrieve(message, top_k, history=None):
+    def fake_iter_retrieve(message, top_k, history=None, budget=None):
         retriever.embedding_model.embed([message])
         calls["retrieve"].append(message)
         yield {"result": {"contexts": [], "retrieval_debug": {}, "strong_context": False, "guardrail_allowed": True}}

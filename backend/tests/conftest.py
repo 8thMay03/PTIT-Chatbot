@@ -18,10 +18,15 @@
 - ``_ready_embedding`` (autouse): embedder dùng chung (BE-13) là ``HashEmbeddingModel``
   ``VECTOR_DIM`` chiều, đã ``ready``; suite không cần key embedding thật và không gọi
   mạng. Test cần trạng thái thật thì gọi ``embedding_runtime.reset()``.
+- ``_isolated_llm_provider_cache`` (autouse): cache provider LLM theo dấu vân tay cấu hình
+  (BE-12) rỗng mỗi test, để provider/đăng ký của test trước không lọt sang test sau.
+- ``_no_real_http`` (autouse): chặn request mạng thật qua ``httpx.HTTPTransport`` (SDK
+  OpenAI, Gemini provider). Test tiêm ``httpx.MockTransport``; TestClient không bị ảnh hưởng.
 """
 
 from __future__ import annotations
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, delete
@@ -33,6 +38,7 @@ from app.core.config import settings
 from app.db import get_session, get_session_factory
 from app.db.models import AppConfigOverride, Base, ModelProfile
 from app.embeddings import HashEmbeddingModel, embedding_runtime
+from app.llm import reset_llm_provider_cache
 from app.main import app
 
 ADMIN_TEST_EMAIL = "admin@ptit.edu.vn"
@@ -55,6 +61,21 @@ def _isolated_chat_limits():
     rate_limit.reset_chat_limits()
     yield
     rate_limit.reset_chat_limits()
+
+
+@pytest.fixture(autouse=True)
+def _no_real_http(monkeypatch):
+    def _blocked(self, request):
+        raise RuntimeError(f"Test không được gọi mạng thật: {request.method} {request.url.host}")
+
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", _blocked)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_llm_provider_cache():
+    reset_llm_provider_cache()
+    yield
+    reset_llm_provider_cache()
 
 
 @pytest.fixture(autouse=True)

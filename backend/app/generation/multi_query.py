@@ -1,6 +1,9 @@
+import logging
 import re
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 MULTI_QUERY_SYSTEM_PROMPT = """Tạo các truy vấn tìm kiếm tiếng Việt khác nhau cho câu hỏi về tài liệu PTIT.
@@ -22,23 +25,27 @@ DOMAIN_EXPANSIONS = {
 }
 
 
-from app.llm import BaseLLMProvider, get_llm_provider
+from app.llm import BaseLLMProvider, LLMBudget, describe_error, get_llm_provider
 
 
 class VietnameseMultiQueryGenerator:
     def __init__(self, llm_provider: BaseLLMProvider | None = None) -> None:
         self.llm_provider = llm_provider
 
-    def generate(self, query: str) -> list[str]:
+    def generate(self, query: str, budget: LLMBudget | None = None) -> list[str]:
         if not settings.multi_query_enabled:
             return [query]
 
         queries = [query]
         llm = self.llm_provider or get_llm_provider()
-        if settings.multi_query_use_llm and llm.is_configured():
+        # Bước tùy chọn: LLM đã lỗi trong lượt hoặc sắp hết deadline thì dùng rule-based.
+        step_budget = budget.optional_step(llm.timeout) if budget is not None else None
+        skip_llm = budget is not None and step_budget is None
+        if settings.multi_query_use_llm and llm.is_configured() and not skip_llm:
             try:
-                queries.extend(_generate_with_llm(query, llm=llm))
-            except Exception:
+                queries.extend(_generate_with_llm(query, llm=llm, budget=step_budget))
+            except Exception as exc:
+                logger.info("LLM multi-query failed, using rule-based variants: %s", describe_error(exc))
                 queries.extend(_rule_based_variants(query))
         else:
             queries.extend(_rule_based_variants(query))
@@ -60,7 +67,11 @@ def _rule_based_variants(query: str) -> list[str]:
     return variants
 
 
-def _generate_with_llm(query: str, llm: BaseLLMProvider | None = None) -> list[str]:
+def _generate_with_llm(
+    query: str,
+    llm: BaseLLMProvider | None = None,
+    budget: LLMBudget | None = None,
+) -> list[str]:
     provider = llm or get_llm_provider()
     messages = [
         {"role": "system", "content": MULTI_QUERY_SYSTEM_PROMPT},
@@ -70,6 +81,7 @@ def _generate_with_llm(query: str, llm: BaseLLMProvider | None = None) -> list[s
         messages=messages,
         temperature=0.3,
         max_tokens=180,
+        budget=budget,
     )
     return [re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", line) for line in content.splitlines()]
 

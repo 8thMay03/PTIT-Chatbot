@@ -9,7 +9,7 @@ from app.api.schemas import ChatRequest
 from app.llm import CONTENT_DELTA, LLMStreamError, REASONING_DELTA, StreamDelta
 
 EXTRACTIVE_FALLBACK = (
-    "Chưa cấu hình API Key cho LLM nên mình trả về các đoạn liên quan nhất:\n"
+    "Mô hình ngôn ngữ đang tạm thời gặp sự cố nên mình trả về các đoạn liên quan nhất:\n"
     "- Nội dung học phí. [1]"
 )
 
@@ -46,7 +46,7 @@ def _prepare(monkeypatch, stored_messages) -> None:
         lambda session, conversation_id, user_id, title: SimpleNamespace(id="conversation-err-1"),
     )
 
-    def fake_iter_retrieve(message, top_k, history=None):
+    def fake_iter_retrieve(message, top_k, history=None, budget=None):
         yield {"result": dict(RETRIEVAL)}
 
     monkeypatch.setattr(routes.rag_chain, "iter_retrieve_context", fake_iter_retrieve)
@@ -72,7 +72,7 @@ async def test_stream_providers_error_before_first_token_returns_extractive_fall
     stored_messages: list[dict] = []
     _prepare(monkeypatch, stored_messages)
 
-    def fake_stream(question, contexts, history=None, provider=None):
+    def fake_stream(question, contexts, history=None, provider=None, budget=None):
         # Mô phỏng `stream_answer_deltas_with_llm` khi provider lỗi trước token
         # đầu tiên: toàn bộ câu trả lời dự phòng được yield như một delta thường.
         yield StreamDelta(kind=CONTENT_DELTA, text=EXTRACTIVE_FALLBACK)
@@ -97,7 +97,7 @@ async def test_stream_providers_error_after_tokens_emits_error_event_without_fal
     stored_messages: list[dict] = []
     _prepare(monkeypatch, stored_messages)
 
-    def fake_stream(question, contexts, history=None, provider=None):
+    def fake_stream(question, contexts, history=None, provider=None, budget=None):
         yield StreamDelta(kind=CONTENT_DELTA, text="Học ")
         yield StreamDelta(kind=CONTENT_DELTA, text="phí ")
         raise LLMStreamError("LLM streaming failed: boom")
@@ -112,14 +112,21 @@ async def test_stream_providers_error_after_tokens_emits_error_event_without_fal
     assert not any(EXTRACTIVE_FALLBACK in event.get("content", "") for event in events)
 
     error_event = events[-1]
-    assert error_event["message"] == "LLM streaming failed: boom"
+    # BE-12: thông điệp chung kèm mã tham chiếu, không chứa text exception.
+    assert error_event["message"] == routes.CHAT_LLM_STREAM_ERROR_DETAIL.format(
+        request_id=error_event["request_id"]
+    )
+    assert "boom" not in json.dumps(events, ensure_ascii=False)
 
     assistant = stored_messages[-1]
     assert assistant["role"] == "assistant"
     # Không nối thêm câu trả lời dự phòng: chỉ phần text đã stream được lưu.
     assert assistant["content"] == "Học phí"
-    assert assistant["metadata"]["error"]["message"] == "LLM streaming failed: boom"
-    assert assistant["metadata"]["error"]["type"] == "llm_stream"
+    assert assistant["metadata"]["error"] == {
+        "type": "llm_stream",
+        "request_id": error_event["request_id"],
+        "error_class": "LLMStreamError",
+    }
     assert "sources" in assistant["metadata"]
 
 
@@ -127,7 +134,7 @@ async def test_stream_emits_step_events_and_persists_timeline(monkeypatch) -> No
     stored_messages: list[dict] = []
     _prepare(monkeypatch, stored_messages)
 
-    def fake_iter_retrieve(message, top_k, history=None):
+    def fake_iter_retrieve(message, top_k, history=None, budget=None):
         yield {"step": "query_rewrite", "detail": {"rewritten_query": "học phí"}, "elapsed_ms": 3}
         yield {"step": "retrieve", "detail": {"candidate_count": 5}, "elapsed_ms": 12}
         yield {"result": dict(RETRIEVAL)}
@@ -136,7 +143,7 @@ async def test_stream_emits_step_events_and_persists_timeline(monkeypatch) -> No
     monkeypatch.setattr(
         routes,
         "stream_answer_deltas_with_llm",
-        lambda question, contexts, history=None, provider=None: iter(
+        lambda question, contexts, history=None, provider=None, budget=None: iter(
             [StreamDelta(kind=CONTENT_DELTA, text="Trả lời [1]")]
         ),
     )
@@ -168,7 +175,7 @@ async def test_stream_emits_reasoning_events_and_persists_reasoning(monkeypatch)
     _prepare(monkeypatch, stored_messages)
     monkeypatch.setattr(routes.settings, "llm_reasoning_stream_enabled", True)
 
-    def fake_stream(question, contexts, history=None, provider=None):
+    def fake_stream(question, contexts, history=None, provider=None, budget=None):
         yield StreamDelta(kind=REASONING_DELTA, text="Người dùng hỏi học phí, ")
         yield StreamDelta(kind=REASONING_DELTA, text="tìm trong kho điều học phí.")
         yield StreamDelta(kind=CONTENT_DELTA, text="Trả lời [1]")
@@ -199,7 +206,7 @@ async def test_stream_hides_reasoning_when_disabled(monkeypatch) -> None:
     _prepare(monkeypatch, stored_messages)
     monkeypatch.setattr(routes.settings, "llm_reasoning_stream_enabled", False)
 
-    def fake_stream(question, contexts, history=None, provider=None):
+    def fake_stream(question, contexts, history=None, provider=None, budget=None):
         yield StreamDelta(kind=REASONING_DELTA, text="Suy luận bí mật")
         yield StreamDelta(kind=CONTENT_DELTA, text="Trả lời [1]")
 

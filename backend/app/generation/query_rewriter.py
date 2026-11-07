@@ -1,6 +1,9 @@
+import logging
 import re
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 REWRITE_SYSTEM_PROMPT = """Bạn chuyển câu hỏi tiếng Việt thành một truy vấn tìm kiếm tài liệu PTIT.
@@ -28,14 +31,19 @@ CONVERSATIONAL_PREFIXES = (
 )
 
 
-from app.llm import BaseLLMProvider, get_llm_provider
+from app.llm import BaseLLMProvider, LLMBudget, describe_error, get_llm_provider
 
 
 class VietnameseQueryRewriter:
     def __init__(self, llm_provider: BaseLLMProvider | None = None) -> None:
         self.llm_provider = llm_provider
 
-    def rewrite(self, question: str, history: list[dict[str, str]] | None = None) -> str:
+    def rewrite(
+        self,
+        question: str,
+        history: list[dict[str, str]] | None = None,
+        budget: LLMBudget | None = None,
+    ) -> str:
         history = history or []
         fallback = rule_based_rewrite(question)
         fallback = _resolve_rule_based_follow_up(fallback, history)
@@ -46,9 +54,14 @@ class VietnameseQueryRewriter:
         if not llm.is_configured():
             return fallback
 
+        # Bước tùy chọn: LLM đã lỗi trong lượt hoặc sắp hết deadline thì dùng rule-based.
+        step_budget = budget.optional_step(llm.timeout) if budget is not None else None
+        if budget is not None and step_budget is None:
+            return fallback
         try:
-            return _rewrite_with_llm(fallback, history, llm=llm) or fallback
-        except Exception:
+            return _rewrite_with_llm(fallback, history, llm=llm, budget=step_budget) or fallback
+        except Exception as exc:
+            logger.info("LLM query rewrite failed, using rule-based rewrite: %s", describe_error(exc))
             return fallback
 
 
@@ -90,6 +103,7 @@ def _rewrite_with_llm(
     query: str,
     history: list[dict[str, str]],
     llm: BaseLLMProvider | None = None,
+    budget: LLMBudget | None = None,
 ) -> str:
     provider = llm or get_llm_provider()
     history_text = "\n".join(
@@ -107,6 +121,7 @@ def _rewrite_with_llm(
         messages=messages,
         temperature=0.0,
         max_tokens=100,
+        budget=budget,
     )
     rewritten = response_text.strip().strip('"`')
     return " ".join(rewritten.split())[:500]
