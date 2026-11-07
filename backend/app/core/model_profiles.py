@@ -7,9 +7,10 @@ profile đang được chọn (``settings.<kind>_profile_id``):
   ``config_store.settings_transaction`` → có hiệu lực ngay và còn sau restart.
   Sửa profile đang dùng thì áp lại ngay. ``None`` = cấu hình `.env` (LLM) hoặc
   heuristic (reranker).
-- Embedding: embedder được tạo một lần lúc khởi động và quyết định số chiều vector,
-  nên chọn profile chỉ lưu ``embedding_profile_id``; ``load_selected_embedding``
-  áp nó ở lần khởi động sau. Số chiều phải bằng ``VECTOR_DIM``.
+- Embedding: embedder (``app.embeddings.embedding_runtime``) quyết định số chiều vector
+  và được ghim khi đã chạy được, nên chọn/sửa profile chỉ lưu ``embedding_profile_id``;
+  ``load_selected_embedding`` áp nó ở lần khởi động sau. Ngoại lệ: embedder chưa chạy
+  được (thiếu key, lỗi tải) thì áp ngay, không cần restart. Số chiều phải bằng ``VECTOR_DIM``.
 
 API key chỉ lưu dạng bản mã (app.core.config_crypto) và không bao giờ trả về client.
 Lỗi bất kỳ để DB và settings đang chạy như trước thao tác.
@@ -208,6 +209,9 @@ def _embedding_fingerprint(row: ModelProfile) -> tuple:
 
 
 def registry_state(session: Session) -> dict:
+    from app.embeddings import embedding_runtime
+
+    runtime_status = embedding_runtime.status()
     rows = list(session.scalars(select(ModelProfile).order_by(ModelProfile.created_at, ModelProfile.name)))
     by_id = {row.id: row for row in rows}
 
@@ -230,8 +234,10 @@ def registry_state(session: Session) -> dict:
             "profile_id": running_id,
             "vector_dim": settings.vector_dim,
             "restart_required": restart_required,
-            # Lý do profile đã chọn không được áp ở lần khởi động này (khởi động lại không tự hết).
-            "load_error": _running_embedding["error"],
+            "status": runtime_status["state"],
+            # Lý do profile đã chọn không được áp (khởi động lại không tự hết), hoặc lý do
+            # embedder đang chạy không dùng được.
+            "load_error": _running_embedding["error"] or runtime_status["reason"],
         },
         "env_defaults": {
             "llm": {"provider": _INITIAL_SETTINGS["llm_provider"], "model": _env_llm_model()},
@@ -390,6 +396,8 @@ def update_profile(session: Session, profile_id: str, data: dict) -> ModelProfil
     except BaseException:
         session.rollback()
         raise
+    if _is_active(row) and row.kind == "embedding":
+        _apply_embedding_if_not_running(session)
     return row
 
 
@@ -422,6 +430,7 @@ def activate_profile(session: Session, kind: str, profile_id: str | None) -> Non
             _profile_key_or_422(row)
         with config_store.settings_transaction(session):
             settings.embedding_profile_id = row.id if row is not None else None
+        _apply_embedding_if_not_running(session)
 
 
 def resolve_llm_test_key(session: Session, provider: str, profile_id: str | None, api_key: str | None) -> str | None:
@@ -453,7 +462,8 @@ def load_selected_embedding(session: Session) -> bool:
     """Áp profile embedding đã chọn và tạo lại embedder; trả về True nếu đã đổi.
 
     Không dùng được (mất profile, sai số chiều, khoá không giải mã được, không tạo được
-    mô hình) thì giữ embedder `.env` và ghi cảnh báo — không làm sập khởi động.
+    mô hình) thì giữ embedder `.env` (đang chạy, hoặc tạo lười ở lần dùng đầu) và ghi
+    cảnh báo — không làm sập khởi động.
     """
     profile_id = settings.embedding_profile_id
     _set_running_embedding(None, None)
@@ -472,31 +482,32 @@ def load_selected_embedding(session: Session) -> bool:
         _set_running_embedding(None, None, str(exc))
         return False
 
-    from app.embeddings import create_embedding_model
-    from app.embeddings.models import HashEmbeddingModel
-    from app.ingestion import ingestion_pipeline
-    from app.retrieval.retriever import retriever
+    from app.embeddings import EmbeddingUnavailableError, embedding_runtime
 
     previous = (settings.embedding_provider, settings.embedding_model, settings.embedding_api_key)
     settings.embedding_provider = row.provider
     settings.embedding_model = row.model
     settings.embedding_api_key = key
     try:
-        model = create_embedding_model()
-        # create_embedding_model lặng lẽ quay về Hash khi không tải được sentence-transformers.
-        if isinstance(model, HashEmbeddingModel):
-            raise RuntimeError("không tải được mô hình")
-    except Exception as exc:  # noqa: BLE001 — khởi động không được sập vì một profile hỏng
+        embedding_runtime.load()
+    except EmbeddingUnavailableError as exc:
+        # `reason` không chứa chuỗi lỗi thô của SDK nên an toàn để ghi log và hiện cho admin.
         settings.embedding_provider, settings.embedding_model, settings.embedding_api_key = previous
-        logger.warning("Không tạo được embedding '%s' (%s); dùng embedding trong .env.", row.name, exc)
-        _set_running_embedding(None, None, f"Không tạo được mô hình nhúng: {exc}")
+        logger.warning("Không tạo được embedding '%s' (%s); dùng embedding trong .env.", row.name, exc.reason)
+        _set_running_embedding(None, None, exc.reason)
         return False
 
-    retriever.embedding_model = model
-    ingestion_pipeline.embedding_model = model
     _set_running_embedding(row.id, _embedding_fingerprint(row))
     logger.info("Đang dùng embedding '%s' (%s · %s).", row.name, row.provider, row.model)
     return True
+
+
+def _apply_embedding_if_not_running(session: Session) -> None:
+    """Embedder chưa chạy được thì áp ngay profile embedding đã chọn (BE-13); đã chạy thì chờ restart."""
+    from app.embeddings import embedding_runtime
+
+    if not embedding_runtime.is_ready():
+        load_selected_embedding(session)
 
 
 def load_selected_embedding_at_startup() -> None:

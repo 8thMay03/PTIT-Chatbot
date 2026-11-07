@@ -15,6 +15,9 @@
 - ``config_store_db`` (autouse): bảng cấu hình đã lưu (PUT /config, lifespan) và kho
   mô hình (``model_profiles``) trỏ sang SQLite tạm, dọn sau mỗi test; không test nào
   đọc/ghi cấu hình trong DB dev.
+- ``_ready_embedding`` (autouse): embedder dùng chung (BE-13) là ``HashEmbeddingModel``
+  ``VECTOR_DIM`` chiều, đã ``ready``; suite không cần key embedding thật và không gọi
+  mạng. Test cần trạng thái thật thì gọi ``embedding_runtime.reset()``.
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ from app.core import config_store, model_profiles
 from app.core.config import settings
 from app.db import get_session, get_session_factory
 from app.db.models import AppConfigOverride, Base, ModelProfile
+from app.embeddings import HashEmbeddingModel, embedding_runtime
 from app.main import app
 
 ADMIN_TEST_EMAIL = "admin@ptit.edu.vn"
@@ -51,6 +55,13 @@ def _isolated_chat_limits():
     rate_limit.reset_chat_limits()
     yield
     rate_limit.reset_chat_limits()
+
+
+@pytest.fixture(autouse=True)
+def _ready_embedding():
+    embedding_runtime.override(HashEmbeddingModel(dimensions=settings.vector_dim))
+    yield
+    embedding_runtime.reset()
 
 
 @pytest.fixture(scope="session")

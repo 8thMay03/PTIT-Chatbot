@@ -41,7 +41,7 @@ from app.db.repositories import (
     serialize_markdown,
 )
 from app.db.session import SessionLocal, init_db
-from app.embeddings import EmbeddingModel, create_embedding_model
+from app.embeddings import EmbeddingModel, runtime_embedding_model
 from app.ingestion.chunker import (
     Chunk,
     ParentChildChunk,
@@ -136,7 +136,7 @@ class IngestionPipeline:
         embedding_model: EmbeddingModel | None = None,
         vector_store: VectorStore | None = None,
     ) -> None:
-        self.embedding_model = embedding_model or create_embedding_model()
+        self.embedding_model = embedding_model or runtime_embedding_model
         self.vector_store = vector_store or create_vector_store()
 
     # ---- Full rebuild: parse + chunk every source file ----

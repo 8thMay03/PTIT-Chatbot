@@ -108,6 +108,7 @@ from app.db.repositories import (
     update_dataset,
     update_message_metadata,
 )
+from app.embeddings import EmbeddingUnavailableError, embedding_runtime
 from app.generation.citations import public_citations
 from app.generation.llm import (
     _normalize_answer_citations,
@@ -164,13 +165,29 @@ PUBLIC_API_ROUTES: frozenset[tuple[str, str]] = frozenset(
 
 @router.get("/health")
 def health() -> dict[str, Any]:
+    # Luôn HTTP 200 khi DB ổn (healthcheck docker chỉ xét mã HTTP). Route công khai nên
+    # chỉ trả trạng thái embedding, không trả lý do lỗi (admin xem ở /model-profiles).
     db_health = check_db_health()
-    is_ok = db_health.get("status") == "ok"
+    embedding_state = embedding_runtime.status()["state"]
+    is_ok = db_health.get("status") == "ok" and embedding_state == "ready"
     return {
         "status": "ok" if is_ok else "degraded",
         "database": db_health.get("database", "unknown"),
         "database_type": db_health.get("dialect", "unknown"),
+        "embedding": embedding_state,
     }
+
+
+# Mô hình nhúng chưa cấu hình hoặc lỗi (BE-13): chat công khai chỉ báo chung chung,
+# route admin kèm lý do (không chứa chuỗi lỗi thô của SDK).
+CHAT_EMBEDDING_UNAVAILABLE_DETAIL = (
+    "Chatbot chưa sẵn sàng: mô hình nhúng (embedding) chưa được cấu hình hoặc đang lỗi. "
+    "Vui lòng liên hệ quản trị viên."
+)
+
+
+def _embedding_unavailable(exc: EmbeddingUnavailableError) -> HTTPException:
+    return HTTPException(status_code=503, detail=f"Mô hình nhúng chưa sẵn sàng: {exc.reason}")
 
 
 # ==========================================
@@ -572,9 +589,12 @@ def delete_model_profile(
 def test_retrieval(request: RetrievalTestRequest) -> dict:
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="Query must not be empty.")
-    result = rag_chain.retrieve_context(
-        request.query, top_k=request.top_k, dataset_ids=request.dataset_ids
-    )
+    try:
+        result = rag_chain.retrieve_context(
+            request.query, top_k=request.top_k, dataset_ids=request.dataset_ids
+        )
+    except EmbeddingUnavailableError as exc:
+        raise _embedding_unavailable(exc) from exc
     return {
         "query": request.query,
         "contexts": result.get("contexts", []),
@@ -589,6 +609,8 @@ def ingest() -> IngestResponse:
         result = ingestion_pipeline.ingest_documents()
     except DocumentParseError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except EmbeddingUnavailableError as exc:
+        raise _embedding_unavailable(exc) from exc
     return IngestResponse(**result)
 
 
@@ -599,6 +621,8 @@ def chunk_all_documents() -> ChunkAllResponse:
         result = ingestion_pipeline.chunk_documents()
     except DocumentStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except EmbeddingUnavailableError as exc:
+        raise _embedding_unavailable(exc) from exc
     return ChunkAllResponse(**result)
 
 
@@ -820,6 +844,8 @@ def chunk_single_document(document_id: str) -> DocumentItem:
         result = ingestion_pipeline.chunk_document(document_id)
     except DocumentStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except EmbeddingUnavailableError as exc:
+        raise _embedding_unavailable(exc) from exc
     if result is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
     return DocumentItem(**result)
@@ -998,6 +1024,8 @@ def chunk_dataset_api(dataset_id: str) -> ChunkAllResponse:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except DocumentStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except EmbeddingUnavailableError as exc:
+        raise _embedding_unavailable(exc) from exc
     return ChunkAllResponse(**result)
 
 
@@ -1051,6 +1079,8 @@ def _document_payload(document, chunk_count: int) -> dict:
 # Chống lạm dụng (BE-10), theo thứ tự chi phí tăng dần; request bị chặn không ghi DB
 # và không gọi retrieval/LLM:
 # 1. `ChatRequest` từ chối câu hỏi dài hơn `CHAT_MESSAGE_MAX_CHARS` (422).
+#    (BE-13) Câu rỗng → 400; embedding không dùng được → 503 (`_require_embedding_ready`),
+#    trước mọi hạn mức nên request 503 không bị trừ lượt.
 # 2. Hạn mức theo IP trước pha (a), chưa cần DB (`_enforce_chat_ip_limit`).
 # 3. Trong pha (a), ngay sau khi xác định owner (cần DB để đọc tài khoản) và trước khi
 #    chạm hội thoại: lấy khóa "một lượt đang chạy" rồi kiểm tra hạn mức theo owner.
@@ -1138,6 +1168,13 @@ def _is_admin_request(http_request: Request) -> bool:
     return auth.is_admin_configured() and (
         auth.verify_admin_token(http_request.cookies.get(auth.ADMIN_COOKIE_NAME)) is not None
     )
+
+
+def _require_embedding_ready() -> None:
+    try:
+        embedding_runtime.get()
+    except EmbeddingUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=CHAT_EMBEDDING_UNAVAILABLE_DETAIL) from exc
 
 
 def _enforce_chat_ip_limit(http_request: Request | None) -> None:
@@ -1265,6 +1302,7 @@ def chat(
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message must not be empty.")
 
+    _require_embedding_ready()
     _enforce_chat_ip_limit(http_request)
     turn = _open_chat_turn(session_factory, request, http_request)
     try:
@@ -1496,6 +1534,7 @@ def chat_stream(
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message must not be empty.")
 
+    _require_embedding_ready()
     _enforce_chat_ip_limit(http_request)
     turn = _open_chat_turn(session_factory, request, http_request)
 
