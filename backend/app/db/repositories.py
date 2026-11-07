@@ -617,9 +617,27 @@ def get_recent_conversation_history(
     chronological = [
         {"role": message.role, "content": message.content}
         for message in reversed(messages)
-        if message.role in {"user", "assistant"}
+        if message.role in {"user", "assistant"} and not _is_interrupted_answer(message)
     ]
     return limit_history(chronological, max_messages=max_messages, max_chars=max_chars)
+
+
+def _is_interrupted_answer(message: Message) -> bool:
+    """Câu trả lời bị client ngắt giữa chừng: không đưa vào history (câu hỏi vẫn giữ)."""
+    return message.role == "assistant" and bool((message.message_metadata or {}).get("interrupted"))
+
+
+def update_message_metadata(session: Session, message_id: str, patch: dict) -> Message | None:
+    """Gộp ``patch`` vào metadata của tin nhắn; trả None nếu không tìm thấy tin nhắn.
+
+    Gán dict mới (không sửa tại chỗ) để SQLAlchemy nhận thay đổi của cột JSON.
+    """
+    message = session.get(Message, message_id)
+    if message is None:
+        return None
+    message.message_metadata = {**(message.message_metadata or {}), **patch}
+    session.flush()
+    return message
 
 
 def limit_history(

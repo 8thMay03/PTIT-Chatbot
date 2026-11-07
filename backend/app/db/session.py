@@ -1,4 +1,4 @@
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from typing import Any
 
 from sqlalchemy import create_engine, event, text
@@ -66,3 +66,12 @@ def get_session() -> Generator[Session, None, None]:
     with SessionLocal() as session:
         yield session
 
+
+def get_session_factory() -> Callable[[], Session]:
+    """Factory mở session ngắn cho route tự quản lý vòng đời session (chat).
+
+    Khác ``get_session`` (giữ một session tới khi response kết thúc, kể cả response
+    stream), route nhận factory này tự mở ``with factory() as session`` cho từng pha
+    và đóng ngay, để không giữ connection trong lúc retrieval/LLM chạy.
+    """
+    return SessionLocal
