@@ -77,7 +77,7 @@ Kết quả cần có:
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: S-01..S-05 xong trên nhánh `feat/llm-call-layer`, commit và mở PR vào `dev` theo yêu cầu người yêu cầu. V-01..V-06 `passed`; V-07 chỉ chạy bản rút gọn (thời gian thật, không qua trình duyệt) — xem `verification.md`. Review vòng 2 `independent` (`grok-review-be12`) `approved`; R-01..R-04 đều `low`, `deferred`.
+- Tóm tắt: S-01..S-05 xong trên nhánh `feat/llm-call-layer`, commit `d0c2e20`, PR #54 vào `dev` (https://github.com/8thMay03/PTIT-Chatbot/pull/54). V-01..V-06 `passed`; V-07 chỉ chạy bản rút gọn (thời gian thật, không qua trình duyệt) — xem `verification.md`. Review vòng 2 `independent` (`grok-review-be12`) `approved`; R-01..R-04 đều `low`, `deferred`.
 - Blocker: không.
 - Bước tiếp theo: người yêu cầu review/merge PR; chạy V-07 trên dev server trước khi merge nếu muốn; tạo task riêng cho R-01 (Gemini `includeThoughts`). Coordinator chuyển task sang `done` sau khi merge.
 

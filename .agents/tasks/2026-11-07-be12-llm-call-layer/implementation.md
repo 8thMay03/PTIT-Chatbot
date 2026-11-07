@@ -2,7 +2,7 @@
 
 ## Tổng quan triển khai
 
-- Nhánh `feat/llm-call-layer`, tách từ `dev` @ `7d1a717` (khớp `origin/dev`). Thay đổi nằm trong working tree, **chưa commit** (chờ người yêu cầu cho phép).
+- Nhánh `feat/llm-call-layer`, tách từ `dev` @ `7d1a717` (khớp `origin/dev`). Commit `d0c2e20` (theo yêu cầu người yêu cầu, sau review vòng 2 `approved`); PR #54 vào `dev`: https://github.com/8thMay03/PTIT-Chatbot/pull/54.
 - Agent: `claude-be12` (một agent, làm tuần tự S-01 → S-05).
 - Mốc test trước khi sửa: `pytest` trong `backend/` → 894 passed, 1 skipped. Sau khi sửa: 954 passed, 1 skipped (+60 test mới).
 - Chuẩn hóa xuống dòng: nhiều file `backend/**/*.py` trong working tree là CRLF trong khi index là LF; đã ghi lại LF trước khi sửa nên `git diff` chỉ chứa thay đổi thật (26 file, `git diff --stat`). `git status` có thể vẫn liệt kê các file chỉ đổi stat — không có thay đổi nội dung.
@@ -66,8 +66,8 @@ Không có (một agent).
 
 ## Bàn giao
 
-- Đã làm: S-01..S-05 (working tree trên `feat/llm-call-layer`, chưa commit).
+- Đã làm: S-01..S-05 — commit `d0c2e20` trên `feat/llm-call-layer`, PR #54.
 - Giao diện ảnh hưởng agent khác (FE-15, BE-16): event `error` thêm `request_id`, `message` là thông điệp chung; `/api/chat` lỗi bất ngờ trả 503; header `X-Request-ID`; `metadata.error = {type, request_id, error_class}`; provider trả về từ `get_llm_provider()` dùng chung — không gán thuộc tính.
 - Kiểm tra: xem `verification.md` (V-01..V-06 `passed`, V-07 rút gọn `passed`, bản đầy đủ trên dev server `not_run`).
-- Chưa xong: commit/PR (chờ người yêu cầu); V-07 đầy đủ; review `independent`.
+- Chưa xong: merge PR #54; V-07 đầy đủ trên dev server. Review `independent` đã `approved` (vòng 2, `grok-review-be12`).
 - Phát hiện ngoài phạm vi: Gemini từ chối `includeThoughts` đặt trong `generationConfig` (R-01 trong `review.md`).
