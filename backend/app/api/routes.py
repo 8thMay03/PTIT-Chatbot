@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import secrets
 import time
 import unicodedata
 from collections.abc import AsyncIterator, Callable, Iterator
@@ -127,7 +128,7 @@ from app.ingestion.uploads import (
     read_preview,
     resolve_source_path,
 )
-from app.llm import CONTENT_DELTA, REASONING_DELTA, LLMStreamError, StreamDelta
+from app.llm import CONTENT_DELTA, REASONING_DELTA, LLMBudget, LLMStreamError, StreamDelta, describe_error
 from app.llm.factory import create_llm_provider_from_config
 from app.parsers import (
     DocumentParseError,
@@ -1093,6 +1094,13 @@ CHAT_RATE_LIMIT_DETAIL = "Bạn đã gửi quá nhiều câu hỏi. Vui lòng th
 CHAT_BUSY_DETAIL = "Câu trả lời trước vẫn đang được tạo. Vui lòng đợi hoặc bấm Dừng rồi gửi lại."
 CHAT_BUSY_RETRY_AFTER_SECONDS = 1
 
+# Lỗi của lượt chat (BE-12): client chỉ nhận thông điệp chung kèm mã tham chiếu; chi tiết
+# exception chỉ nằm trong log, cùng mã. Mã gửi trong event `error` (`request_id`) và header
+# `X-Request-ID` của cả hai route chat.
+CHAT_REQUEST_ID_HEADER = "X-Request-ID"
+CHAT_INTERNAL_ERROR_DETAIL = "Hệ thống đang bận, vui lòng thử lại sau. (Mã: {request_id})"
+CHAT_LLM_STREAM_ERROR_DETAIL = "Mô hình bị gián đoạn khi đang trả lời. Vui lòng thử lại. (Mã: {request_id})"
+
 # Luồng sinh event của /chat/stream chạy trong worker thread và bị chặn suốt lúc
 # chờ LLM. Dùng limiter riêng để các stream dài không chiếm hết limiter mặc định
 # của anyio (40) mà route đồng bộ khác (health, admin) cần dùng.
@@ -1148,6 +1156,8 @@ class _ChatTurn:
     client: auth.ClientSession
     # Khóa "một lượt đang chạy" của owner; None khi tắt hạn mức hoặc ngoài ngữ cảnh HTTP.
     slot: rate_limit.ChatSlot | None = None
+    # Mã tham chiếu của lượt: có trong thông điệp lỗi, header X-Request-ID và log.
+    request_id: str = field(default_factory=lambda: secrets.token_hex(6))
 
     def release_slot(self) -> None:
         if self.slot is not None:
@@ -1288,6 +1298,19 @@ def _save_chat_answer_logged(session_factory: Callable[[], Session], turn: _Chat
     return True
 
 
+def _chat_error_metadata(kind: str, turn: _ChatTurn, exc: BaseException) -> dict[str, str]:
+    """`metadata.error` lưu DB: loại lỗi, mã tham chiếu, tên lớp exception (không có text lỗi)."""
+    return {"type": kind, "request_id": turn.request_id, "error_class": type(exc).__name__}
+
+
+def _chat_error_event(message_template: str, turn: _ChatTurn) -> dict[str, str]:
+    return {
+        "type": "error",
+        "message": message_template.format(request_id=turn.request_id),
+        "request_id": turn.request_id,
+    }
+
+
 def _serialize_sources(sources: list) -> list[dict]:
     return [s.model_dump() if hasattr(s, "model_dump") else dict(s) for s in sources]
 
@@ -1307,19 +1330,31 @@ def chat(
     turn = _open_chat_turn(session_factory, request, http_request)
     try:
         turn.client.apply(response)
+        if response is not None:
+            response.headers[CHAT_REQUEST_ID_HEADER] = turn.request_id
         try:
-            result = rag_chain.answer(request.message, top_k=request.effective_top_k, history=turn.history)
+            budget = LLMBudget(settings.llm_turn_deadline_seconds)
+            result = rag_chain.answer(
+                request.message, top_k=request.effective_top_k, history=turn.history, budget=budget
+            )
         except Exception as exc:
-            # Câu hỏi đã được lưu ở pha (a): ghi câu trả lời lỗi để giữ cặp hỏi - đáp,
-            # rồi ném tiếp để giữ mã lỗi HTTP như cũ.
+            # Câu hỏi đã được lưu ở pha (a): ghi câu trả lời lỗi để giữ cặp hỏi - đáp, rồi
+            # trả 503 với thông điệp chung; chi tiết chỉ ở log (cùng mã tham chiếu).
+            logger.exception(
+                "chat %s: answer failed (conversation %s)", turn.request_id, turn.conversation_id
+            )
             _save_chat_answer_logged(
                 session_factory,
                 turn,
                 answer="",
-                assistant_metadata={"error": {"type": "answer", "message": str(exc) or type(exc).__name__}},
+                assistant_metadata={"error": _chat_error_metadata("answer", turn, exc)},
                 contexts=[],
             )
-            raise
+            raise HTTPException(
+                status_code=503,
+                detail=CHAT_INTERNAL_ERROR_DETAIL.format(request_id=turn.request_id),
+                headers={CHAT_REQUEST_ID_HEADER: turn.request_id},
+            ) from exc
         _save_chat_answer(
             session_factory,
             turn,
@@ -1360,13 +1395,15 @@ def _iter_chat_stream_events(
     """Pha (b), và pha (c) khi stream kết thúc bình thường; chạy trong worker thread."""
     reasoning_enabled = settings.llm_reasoning_stream_enabled
     retrieval: dict[str, Any] | None = None
+    # Deadline chung cho rewrite + multi-query + sinh câu trả lời (tới chunk đầu tiên).
+    budget = LLMBudget(settings.llm_turn_deadline_seconds)
 
     yield _ndjson({"type": "start", "conversation_id": turn.conversation_id})
 
     # Retrieval chạy trong generator để mỗi bước phát event ngay khi xong.
     try:
         for event in rag_chain.iter_retrieve_context(
-            request.message, top_k=request.effective_top_k, history=turn.history
+            request.message, top_k=request.effective_top_k, history=turn.history, budget=budget
         ):
             if "result" in event:
                 retrieval = event["result"]
@@ -1375,17 +1412,22 @@ def _iter_chat_stream_events(
             state.steps_log.append(entry)
             yield _ndjson({"type": "step", **entry})
     except Exception as exc:
-        # Đã gửi event start nên không thể trả HTTP 500 nữa: báo lỗi qua event.
-        message = f"Retrieval failed: {exc}"
+        # Đã gửi event start nên không thể trả HTTP 5xx nữa: báo lỗi qua event.
+        logger.exception(
+            "chat %s: retrieval failed (conversation %s)", turn.request_id, turn.conversation_id
+        )
         state.saved = True
         _save_chat_answer_logged(
             session_factory,
             turn,
             answer="",
-            assistant_metadata={"steps": state.steps_log, "error": {"type": "retrieval", "message": message}},
+            assistant_metadata={
+                "steps": state.steps_log,
+                "error": _chat_error_metadata("retrieval", turn, exc),
+            },
             contexts=[],
         )
-        yield _ndjson({"type": "error", "message": message})
+        yield _ndjson(_chat_error_event(CHAT_INTERNAL_ERROR_DETAIL, turn))
         return
 
     assert retrieval is not None  # iter_retrieve_context luôn kết thúc bằng result
@@ -1393,7 +1435,7 @@ def _iter_chat_stream_events(
     sources = public_citations(contexts)
     state.contexts, state.sources = contexts, sources
     state.retrieval_debug = retrieval["retrieval_debug"]
-    stream_error: str | None = None
+    stream_error: LLMStreamError | None = None
 
     generate_started = time.perf_counter()
     generate_step: dict[str, Any] = {"step": "generate", "status": "start", "detail": {}, "elapsed_ms": 0}
@@ -1402,7 +1444,7 @@ def _iter_chat_stream_events(
     if not retrieval["guardrail_allowed"]:
         stream: Iterator[StreamDelta] = iter([StreamDelta(kind=CONTENT_DELTA, text=OUT_OF_SCOPE_ANSWER)])
     elif retrieval["strong_context"]:
-        stream = stream_answer_deltas_with_llm(request.message, contexts, history=turn.history)
+        stream = stream_answer_deltas_with_llm(request.message, contexts, history=turn.history, budget=budget)
     else:
         stream = iter([StreamDelta(kind=CONTENT_DELTA, text="Chưa tìm thấy thông tin này trong tài liệu.")])
 
@@ -1418,8 +1460,14 @@ def _iter_chat_stream_events(
     except LLMStreamError as exc:
         # LLM lỗi sau khi đã stream một phần: báo lỗi cho client thay vì nối
         # thêm câu trả lời dự phòng vào phần text đã phát ra. Event `error` phát
-        # sau khi lưu (bên dưới).
-        stream_error = str(exc) or "LLM streaming failed."
+        # sau khi lưu (bên dưới). Chi tiết lỗi chỉ ghi log.
+        logger.warning(
+            "chat %s: LLM stream interrupted after %d delta(s): %s",
+            turn.request_id,
+            len(state.deltas),
+            describe_error(exc.__cause__ or exc),
+        )
+        stream_error = exc
     finally:
         # Client ngắt (GeneratorExit tại yield): đóng stream LLM ngay, không sinh tiếp.
         close_stream = getattr(stream, "close", None)
@@ -1441,14 +1489,11 @@ def _iter_chat_stream_events(
     }
     if reasoning_text:
         assistant_metadata["reasoning"] = reasoning_text
-    if stream_error:
-        assistant_metadata["error"] = {
-            "type": "llm_stream",
-            "message": stream_error,
-        }
+    if stream_error is not None:
+        assistant_metadata["error"] = _chat_error_metadata("llm_stream", turn, stream_error)
 
     raw_answer = "".join(state.deltas)
-    if stream_error:
+    if stream_error is not None:
         # Phần text nửa vời không phải câu trả lời hoàn chỉnh: bỏ qua chuẩn
         # hóa trích dẫn (thuộc tính này có thể tự nối thêm "[1]" cho ảo).
         answer = raw_answer.strip()
@@ -1464,10 +1509,10 @@ def _iter_chat_stream_events(
         contexts=contexts,
         retrieval_debug=state.retrieval_debug,
     )
-    if stream_error:
+    if stream_error is not None:
         # Event `error` là event kết thúc; client giữ phần text đã stream và
         # hiển thị nút thử lại, không ghi đè bằng `done`.
-        yield _ndjson({"type": "error", "message": stream_error})
+        yield _ndjson(_chat_error_event(CHAT_LLM_STREAM_ERROR_DETAIL, turn))
         return
     yield _ndjson({
         "type": "done",
@@ -1504,7 +1549,7 @@ def _finish_chat_stream(
     if failure is None:
         assistant_metadata["interrupted"] = True
     else:
-        assistant_metadata["error"] = {"type": "internal", "message": str(failure) or type(failure).__name__}
+        assistant_metadata["error"] = _chat_error_metadata("internal", turn, failure)
     _save_chat_answer_logged(
         session_factory,
         turn,
@@ -1554,8 +1599,16 @@ def chat_stream(
                     break
                 yield chunk
         except Exception as exc:
+            # Lỗi bất ngờ trong pha (b)/(c): kết thúc bằng event `error` chung (không lộ
+            # text exception); chi tiết ở log cùng mã tham chiếu, lưu ở `finally`.
             failure = exc
-            raise
+            logger.error(
+                "chat %s: stream failed (conversation %s)",
+                turn.request_id,
+                turn.conversation_id,
+                exc_info=exc,
+            )
+            yield _ndjson(_chat_error_event(CHAT_INTERNAL_ERROR_DETAIL, turn))
         finally:
             # Không yield ở đây (generator đang bị đóng). Shield để việc đóng LLM và
             # ghi DB không bị hủy theo request đã ngắt.
@@ -1566,7 +1619,11 @@ def chat_stream(
 
     # Route tự trả StreamingResponse nên FastAPI không gộp cookie của response
     # inject: gắn Set-Cookie trực tiếp lên headers của stream cho phiên mới.
-    stream_headers = {"X-Accel-Buffering": "no", "Cache-Control": "no-cache"}
+    stream_headers = {
+        "X-Accel-Buffering": "no",
+        "Cache-Control": "no-cache",
+        CHAT_REQUEST_ID_HEADER: turn.request_id,
+    }
     if turn.client.cookie_header is not None:
         stream_headers["Set-Cookie"] = turn.client.cookie_header
 

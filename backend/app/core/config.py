@@ -25,7 +25,12 @@ class Settings(BaseSettings):
     # LLM Settings
     llm_provider: str = Field(default="openai", alias="LLM_PROVIDER")
     llm_timeout: float = Field(default=30.0, ge=1.0, alias="LLM_TIMEOUT")
+    # Số lần thử lại của tầng retry duy nhất (SDK không tự retry): tối đa 1 + N lần thử.
     llm_max_retries: int = Field(default=2, ge=0, alias="LLM_MAX_RETRIES")
+    # Deadline tổng cho phần LLM của một lượt chat (BE-12): viết lại câu hỏi + đa truy vấn +
+    # sinh câu trả lời (tới chunk đầu tiên với stream). Phải nhỏ hơn proxy_read_timeout
+    # của nginx (300s). Chỉ cấu hình qua env.
+    llm_turn_deadline_seconds: float = Field(default=60.0, ge=5.0, alias="LLM_TURN_DEADLINE_SECONDS")
     llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0, alias="LLM_TEMPERATURE")
     # Phát reasoning (reasoning_content/thought tokens) lên /chat/stream. Tắt
     # khi dùng model cũ từ chối includeThoughts (ví dụ Gemini 1.5).
@@ -309,6 +314,8 @@ _RESET_EXCLUDED_FIELDS = frozenset(
         "chat_rate_ip_per_day",
         "chat_active_slot_ttl_seconds",
         "chat_rate_limit_max_keys",
+        # Deadline LLM theo lượt chat (BE-12): chỉ cấu hình qua env.
+        "llm_turn_deadline_seconds",
         # Embedder đã tạo lúc khởi động (có thể từ profile embedding); reset không đổi được
         # mô hình đang chạy nên giữ nguyên để GET /config phản ánh đúng. Lựa chọn
         # embedding_profile_id vẫn bị reset và có hiệu lực ở lần khởi động sau.

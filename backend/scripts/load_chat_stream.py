@@ -95,11 +95,11 @@ class HealthProbe:
 
 
 def _install_fakes(delay_s: float) -> None:
-    def fake_iter_retrieve(message, top_k, history=None):
+    def fake_iter_retrieve(message, top_k, history=None, budget=None):
         yield {"step": "retrieve", "detail": {}, "elapsed_ms": 1}
         yield {"result": dict(FAKE_RETRIEVAL)}
 
-    def slow_stream(question, contexts, history=None, provider=None) -> Iterator[StreamDelta]:
+    def slow_stream(question, contexts, history=None, provider=None, budget=None) -> Iterator[StreamDelta]:
         yield StreamDelta(kind=CONTENT_DELTA, text="Câu trả lời ")
         time.sleep(delay_s)
         yield StreamDelta(kind=CONTENT_DELTA, text="giả lập [1]")

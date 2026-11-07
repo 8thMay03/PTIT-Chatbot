@@ -3,6 +3,7 @@ from collections.abc import Iterator
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from app.generation.llm import answer_with_llm, stream_answer_deltas_with_llm, stream_answer_with_llm
@@ -70,7 +71,7 @@ def test_base_provider_retry_succeeds_after_transient_failure() -> None:
                     raise ValueError("Temporary connection drop")
                 return "Success after retry"
 
-            return self._execute_with_retry(_call, operation_name="Test")
+            return self._execute_with_retry(lambda _timeout: _call(), operation_name="Test")
 
         def generate_stream(self, messages, **kwargs):
             yield "unused"
@@ -92,7 +93,7 @@ def test_base_provider_retry_raises_error_after_max_retries() -> None:
             def _call():
                 raise ConnectionError("Server unreachable")
 
-            return self._execute_with_retry(_call, operation_name="FailTest")
+            return self._execute_with_retry(lambda _timeout: _call(), operation_name="FailTest")
 
         def generate_stream(self, messages, **kwargs):
             yield "unused"
@@ -154,9 +155,19 @@ def test_gemini_provider_message_conversion() -> None:
     ]
 
 
-def test_gemini_provider_generate_mock_http() -> None:
-    provider = GeminiProvider(api_key="test-key", model_name="gemini-1.5-flash")
+def _gemini_with_transport(handler, model_name: str = "gemini-1.5-flash") -> GeminiProvider:
+    return GeminiProvider(
+        api_key="test-key",
+        model_name=model_name,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
 
+
+def _sse_response(lines: list[str]) -> httpx.Response:
+    return httpx.Response(200, content="".join(lines).encode("utf-8"), headers={"content-type": "text/event-stream"})
+
+
+def test_gemini_provider_generate_mock_http() -> None:
     mock_response_data = {
         "candidates": [
             {
@@ -166,30 +177,22 @@ def test_gemini_provider_generate_mock_http() -> None:
             }
         ]
     }
-    mock_resp = MagicMock()
-    mock_resp.read.return_value = json.dumps(mock_response_data).encode("utf-8")
-    mock_resp.__enter__.return_value = mock_resp
+    provider = _gemini_with_transport(lambda request: httpx.Response(200, json=mock_response_data))
 
-    with patch("urllib.request.urlopen", return_value=mock_resp):
-        answer = provider.generate([{"role": "user", "content": "Chào"}])
+    answer = provider.generate([{"role": "user", "content": "Chào"}])
 
     assert answer == "Câu trả lời từ Gemini [1]"
 
 
 def test_gemini_provider_generate_stream_mock_http() -> None:
-    provider = GeminiProvider(api_key="test-key", model_name="gemini-1.5-flash")
-
     mock_sse_lines = [
-        b'data: {"candidates": [{"content": {"parts": [{"text": "Gemini "}]}}]}\n',
-        b'data: {"candidates": [{"content": {"parts": [{"text": "streaming"}]}}]}\n',
-        b'data: [DONE]\n',
+        'data: {"candidates": [{"content": {"parts": [{"text": "Gemini "}]}}]}\n',
+        'data: {"candidates": [{"content": {"parts": [{"text": "streaming"}]}}]}\n',
+        "data: [DONE]\n",
     ]
-    mock_resp = MagicMock()
-    mock_resp.__iter__.return_value = iter(mock_sse_lines)
-    mock_resp.__enter__.return_value = mock_resp
+    provider = _gemini_with_transport(lambda request: _sse_response(mock_sse_lines))
 
-    with patch("urllib.request.urlopen", return_value=mock_resp):
-        chunks = list(provider.generate_stream([{"role": "user", "content": "Chào"}]))
+    chunks = list(provider.generate_stream([{"role": "user", "content": "Chào"}]))
 
     assert chunks == ["Gemini ", "streaming"]
 
@@ -267,25 +270,21 @@ def test_default_generate_stream_deltas_wraps_content_only() -> None:
 
 
 def test_gemini_generate_stream_deltas_splits_thought_parts(monkeypatch) -> None:
-    provider = GeminiProvider(api_key="test-key", model_name="gemini-2.5-flash")
     monkeypatch.setattr("app.llm.providers.gemini_provider.settings.llm_reasoning_stream_enabled", True)
 
     mock_sse_lines = [
-        'data: {"candidates": [{"content": {"parts": [{"text": "Tìm điều học phí", "thought": true}]}}]}\n'.encode("utf-8"),
-        'data: {"candidates": [{"content": {"parts": [{"text": "Học phí [1]"}]}}]}\n'.encode("utf-8"),
-        b"data: [DONE]\n",
+        'data: {"candidates": [{"content": {"parts": [{"text": "Tìm điều học phí", "thought": true}]}}]}\n',
+        'data: {"candidates": [{"content": {"parts": [{"text": "Học phí [1]"}]}}]}\n',
+        "data: [DONE]\n",
     ]
     captured: dict = {}
 
-    def fake_urlopen(req, timeout=None):
-        captured["payload"] = json.loads(req.data.decode("utf-8"))
-        mock_resp = MagicMock()
-        mock_resp.__iter__.return_value = iter(mock_sse_lines)
-        mock_resp.__enter__.return_value = mock_resp
-        return mock_resp
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["payload"] = json.loads(request.content.decode("utf-8"))
+        return _sse_response(mock_sse_lines)
 
-    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-        deltas = list(provider.generate_stream_deltas([{"role": "user", "content": "Học phí"}]))
+    provider = _gemini_with_transport(handler, model_name="gemini-2.5-flash")
+    deltas = list(provider.generate_stream_deltas([{"role": "user", "content": "Học phí"}]))
 
     assert [(d.kind, d.text) for d in deltas] == [
         (REASONING_DELTA, "Tìm điều học phí"),
@@ -296,24 +295,20 @@ def test_gemini_generate_stream_deltas_splits_thought_parts(monkeypatch) -> None
 
 
 def test_gemini_generate_stream_deltas_omits_include_thoughts_when_disabled(monkeypatch) -> None:
-    provider = GeminiProvider(api_key="test-key", model_name="gemini-2.5-flash")
     monkeypatch.setattr("app.llm.providers.gemini_provider.settings.llm_reasoning_stream_enabled", False)
 
     mock_sse_lines = [
-        'data: {"candidates": [{"content": {"parts": [{"text": "Học phí [1]"}]}}]}\n'.encode("utf-8"),
-        b"data: [DONE]\n",
+        'data: {"candidates": [{"content": {"parts": [{"text": "Học phí [1]"}]}}]}\n',
+        "data: [DONE]\n",
     ]
     captured: dict = {}
 
-    def fake_urlopen(req, timeout=None):
-        captured["payload"] = json.loads(req.data.decode("utf-8"))
-        mock_resp = MagicMock()
-        mock_resp.__iter__.return_value = iter(mock_sse_lines)
-        mock_resp.__enter__.return_value = mock_resp
-        return mock_resp
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["payload"] = json.loads(request.content.decode("utf-8"))
+        return _sse_response(mock_sse_lines)
 
-    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-        deltas = list(provider.generate_stream_deltas([{"role": "user", "content": "Học phí"}]))
+    provider = _gemini_with_transport(handler, model_name="gemini-2.5-flash")
+    deltas = list(provider.generate_stream_deltas([{"role": "user", "content": "Học phí"}]))
 
     assert [(d.kind, d.text) for d in deltas] == [(CONTENT_DELTA, "Học phí [1]")]
     assert "includeThoughts" not in captured["payload"]["generationConfig"]
@@ -407,7 +402,7 @@ def test_answer_with_llm_falls_back_to_extractive_when_unconfigured() -> None:
         }
     ]
     answer = answer_with_llm("Học phí?", contexts, provider=UnconfiguredProvider())
-    assert "Chưa cấu hình API Key cho LLM" in answer
+    assert answer.startswith("Chưa cấu hình mô hình ngôn ngữ (LLM)")
     assert "Nội dung học phí trích xuất" in answer
 
 
@@ -486,7 +481,9 @@ def test_stream_answer_falls_back_to_extractive_on_failure_before_first_token() 
     chunks = list(stream_answer_with_llm("Học phí?", TEMPERATURE_CONTEXTS, provider=provider))
     text = "".join(chunks)
 
-    assert "Chưa cấu hình API Key cho LLM" in text
+    # BE-12 (AC-05): provider đã cấu hình nhưng lỗi -> "tạm thời gặp sự cố", không phải "chưa cấu hình".
+    assert text.startswith("Mô hình ngôn ngữ đang tạm thời gặp sự cố")
+    assert "Chưa cấu hình" not in text
     assert "Nội dung học phí." in text
 
 

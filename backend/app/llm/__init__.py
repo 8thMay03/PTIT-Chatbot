@@ -3,13 +3,17 @@ from app.llm.base import (
     REASONING_DELTA,
     BaseLLMProvider,
     LLMConfigurationError,
+    LLMDeadlineExceeded,
     LLMMessage,
     LLMProviderError,
     LLMResponse,
     LLMStreamError,
     StreamDelta,
+    describe_error,
+    redact_secrets,
 )
-from app.llm.factory import get_llm_provider, register_llm_provider
+from app.llm.budget import LLMBudget
+from app.llm.factory import get_llm_provider, register_llm_provider, reset_llm_provider_cache
 from app.llm.providers.azure_openai_provider import AzureOpenAIProvider
 from app.llm.providers.gemini_provider import GeminiProvider
 from app.llm.providers.openai_compatible_provider import OpenAICompatibleProvider
@@ -20,7 +24,9 @@ __all__ = [
     "BaseLLMProvider",
     "CONTENT_DELTA",
     "GeminiProvider",
+    "LLMBudget",
     "LLMConfigurationError",
+    "LLMDeadlineExceeded",
     "LLMMessage",
     "LLMProviderError",
     "LLMResponse",
@@ -29,6 +35,9 @@ __all__ = [
     "OpenAIProvider",
     "REASONING_DELTA",
     "StreamDelta",
+    "describe_error",
     "get_llm_provider",
+    "redact_secrets",
     "register_llm_provider",
+    "reset_llm_provider_cache",
 ]

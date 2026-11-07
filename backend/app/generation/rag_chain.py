@@ -53,7 +53,7 @@ def _debug_chunk(context: dict, rank: int) -> dict:
     return snapshot
 
 
-from app.llm import BaseLLMProvider
+from app.llm import BaseLLMProvider, LLMBudget
 
 
 class RagChain:
@@ -78,9 +78,13 @@ class RagChain:
         history: list[dict[str, str]] | None = None,
         llm_provider: BaseLLMProvider | None = None,
         dataset_ids: list[str] | None = None,
+        budget: LLMBudget | None = None,
     ) -> dict:
+        """``budget``: deadline chung cho mọi lời gọi LLM của lượt (None = không giới hạn)."""
         safe_history = filter_safe_history(history)
-        result = self.retrieve_context(question, top_k=top_k, history=safe_history, dataset_ids=dataset_ids)
+        result = self.retrieve_context(
+            question, top_k=top_k, history=safe_history, dataset_ids=dataset_ids, budget=budget
+        )
         if not result["guardrail_allowed"]:
             return {
                 "answer": OUT_OF_SCOPE_ANSWER,
@@ -97,7 +101,9 @@ class RagChain:
             }
 
         provider = llm_provider or self.llm_provider
-        answer = answer_with_llm(question, result["contexts"], history=safe_history, provider=provider)
+        answer = answer_with_llm(
+            question, result["contexts"], history=safe_history, provider=provider, budget=budget
+        )
         return {
             "answer": answer,
             "sources": public_citations(result["contexts"]),
@@ -111,9 +117,12 @@ class RagChain:
         top_k: int = 4,
         history: list[dict[str, str]] | None = None,
         dataset_ids: list[str] | None = None,
+        budget: LLMBudget | None = None,
     ) -> dict:
         """Run retrieval independently so callers can stream generation."""
-        for event in self.iter_retrieve_context(question, top_k=top_k, history=history, dataset_ids=dataset_ids):
+        for event in self.iter_retrieve_context(
+            question, top_k=top_k, history=history, dataset_ids=dataset_ids, budget=budget
+        ):
             if "result" in event:
                 return event["result"]
         # iter_retrieve_context luôn kết thúc bằng event result nên không tới đây.
@@ -125,6 +134,7 @@ class RagChain:
         top_k: int = 4,
         history: list[dict[str, str]] | None = None,
         dataset_ids: list[str] | None = None,
+        budget: LLMBudget | None = None,
     ) -> Iterator[dict]:
         """Yield progress events for each retrieval stage, then the result.
 
@@ -170,9 +180,9 @@ class RagChain:
             }
             return
 
-        rewritten_query = self.query_rewriter.rewrite(question, history=history)
+        rewritten_query = self.query_rewriter.rewrite(question, history=history, budget=budget)
         yield step_event("query_rewrite", {"rewritten_query": rewritten_query})
-        queries = self.multi_query_generator.generate(rewritten_query)
+        queries = self.multi_query_generator.generate(rewritten_query, budget=budget)
         yield step_event("multi_query", {"queries": queries})
         candidate_count = (
             max(top_k, top_k * settings.reranker_candidate_multiplier)

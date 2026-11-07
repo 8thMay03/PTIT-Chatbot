@@ -94,12 +94,12 @@ class CapturingRetriever:
 
 
 class FixedRewriter:
-    def rewrite(self, question: str, history: list[dict[str, str]] | None = None) -> str:
+    def rewrite(self, question: str, history: list[dict[str, str]] | None = None, budget=None) -> str:
         return "truy vấn đã viết lại"
 
 
 class SingleQueryGenerator:
-    def generate(self, query: str) -> list[str]:
+    def generate(self, query: str, budget=None) -> list[str]:
         return [query]
 
 
@@ -108,7 +108,7 @@ def test_rag_chain_retrieves_with_rewritten_query_but_answers_original_question(
     answered_questions = []
     monkeypatch.setattr(
         "app.generation.rag_chain.answer_with_llm",
-        lambda question, contexts, history=None, provider=None: answered_questions.append(question) or "Câu trả lời [1]",
+        lambda question, contexts, history=None, provider=None, budget=None: answered_questions.append(question) or "Câu trả lời [1]",
     )
 
     result = RagChain(
@@ -132,7 +132,7 @@ def test_rag_chain_can_disable_reranker(monkeypatch) -> None:
     monkeypatch.setattr("app.generation.rag_chain.settings.reranker_enabled", False)
     monkeypatch.setattr(
         "app.generation.rag_chain.answer_with_llm",
-        lambda question, contexts, history=None, provider=None: "Câu trả lời [1]",
+        lambda question, contexts, history=None, provider=None, budget=None: "Câu trả lời [1]",
     )
 
     RagChain(
