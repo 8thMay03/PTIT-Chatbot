@@ -62,6 +62,16 @@
 - Đầu ra/bàn giao: verification + self_review approved.
 - Người nhận: `coordinator`.
 
+### S-07 — Sửa phát hiện code review (vòng 2)
+
+- Agent: `agent-claude`
+- Trạng thái: `in_review`
+- Mục tiêu: thay term ngắn/phổ biến/khớp giữa từ bằng cụm đặc hiệu verbatim; bỏ case trùng mục tiêu; xóa `drafts/` đã lỗi thời; thêm test chất lượng dataset; đồng bộ hồ sơ task; phục vụ `AC-01`, `AC-02`, `AC-05`.
+- Phạm vi file được sửa: `backend/tests/fixtures/ptit_rag_300.json`, `backend/tests/test_rag_testset_300.py` (mới), `.agents/tasks/2026-11-07-rag-testset-300/*` (xóa `drafts/`).
+- Phụ thuộc: S-06 (commit `fb63f46`) và kết quả code review.
+- Đầu ra/bàn giao: dataset đã sửa, test mới, ghi `implementation.md`/`verification.md`, `review.md` vòng 2 ở `pending`.
+- Người nhận: reviewer độc lập.
+
 ## Hợp đồng dùng chung
 
 - Schema case: `{id: d26_001..d26_300 duy nhất, question: tiếng Việt có dấu, expected_terms: 1-4 chuỗi verbatim trong nguồn, reference_answer: 1-2 câu tiếng Việt}`. Bên cung cấp: subagent draft; bên sử dụng: S-05 validate bằng `normalize_text` của `eval_retrieval.py`.
@@ -71,9 +81,9 @@
 ## Phân công kiểm chứng và review
 
 - Verifier: `agent-opencode`; phạm vi kiểm chứng: AC-01..AC-04 (đếm JSON, quét terms, phủ section, pytest).
-- Reviewer: `agent-opencode`; phạm vi review: dataset + tính tương thích eval.
-- Hình thức review: `self_review`.
-- Người xử lý nhận xét: agent-opencode.
+- Reviewer vòng 1: `agent-opencode`; phạm vi review: dataset + tính tương thích eval; hình thức `self_review` — không hợp lệ vì task có subagent tham gia (`.agents/README.md` chỉ cho phép self_review khi chỉ có một agent).
+- Reviewer vòng 2: reviewer độc lập do user/coordinator chỉ định (không phải `agent-opencode` hay `agent-claude`); phạm vi: diff `fb63f46..HEAD` của fixture, test mới và hồ sơ task.
+- Người xử lý nhận xét: vòng 1 `agent-opencode`; vòng 2 `agent-claude`.
 
 ## Thứ tự tích hợp và kiểm chứng
 
@@ -81,6 +91,7 @@
 2. S-05 tích hợp, dedup, validate terms, ghi file.
 3. S-06 chạy pytest + ghi verification/review.
 4. Coordinator đối chiếu AC-*, kết luận khi review approved.
+5. Vòng 2: S-07 sửa phát hiện code review → verifier chạy lại V-01, V-02, V-04, V-05 → reviewer độc lập review → coordinator đóng task.
 
 ## Rủi ro và điều chỉnh kế hoạch
 

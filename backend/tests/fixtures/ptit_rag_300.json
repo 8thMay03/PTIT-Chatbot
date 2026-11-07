@@ -104,7 +104,7 @@
     "id": "d26_g1_013",
     "question": "Học viện là loại hình đơn vị sự nghiệp gì?",
     "expected_terms": [
-      "đơn vị sự nghiệp công lập"
+      "đơn vị sự nghiệp công lập trực thuộc Bộ Khoa học và Công nghệ"
     ],
     "reference_answer": "Học viện là đơn vị sự nghiệp công lập."
   },
@@ -294,8 +294,7 @@
     "id": "d26_g1_036",
     "question": "Khoa Viễn thông 1 gồm mấy bộ môn?",
     "expected_terms": [
-      "Khoa gồm 4 Bộ môn",
-      "Bộ môn Mạng viễn thông"
+      "Khoa gồm 4 Bộ môn: Bộ môn Mạng viễn thông"
     ],
     "reference_answer": "Khoa Viễn thông 1 gồm 4 Bộ môn, trong đó có Bộ môn Mạng viễn thông."
   },
@@ -321,7 +320,7 @@
     "question": "Khoa Trí tuệ nhân tạo có bộ môn nào về học máy?",
     "expected_terms": [
       "Bộ môn Học máy",
-      "Trí tuệ nhân tạo"
+      "Bộ môn Trí tuệ nhân tạo ứng dụng"
     ],
     "reference_answer": "Khoa Trí tuệ nhân tạo gồm 2 Bộ môn: Học máy và Trí tuệ nhân tạo ứng dụng, đào tạo ngành Trí tuệ nhân tạo."
   },
@@ -338,7 +337,7 @@
     "id": "d26_g1_041",
     "question": "Muốn học logistics thì đăng ký khoa nào?",
     "expected_terms": [
-      "Logistics và quản lý chuỗi cung ứng"
+      "Thương mại điện tử, Logistics và quản trị chuỗi cung ứng"
     ],
     "reference_answer": "Ngành Logistics và quản lý chuỗi cung ứng do Khoa Quản trị Kinh doanh 1 đào tạo."
   },
@@ -388,8 +387,7 @@
     "id": "d26_g1_047",
     "question": "Phòng Giáo vụ đặt ở đâu?",
     "expected_terms": [
-      "Tầng 1, nhà A1, Cơ sở đào tạo Hà Đông",
-      "PHÒNG GIÁO VỤ"
+      "0243 854 7797"
     ],
     "reference_answer": "Phòng Giáo vụ đặt tại Tầng 1, nhà A1, Cơ sở đào tạo Hà Đông."
   },
@@ -397,8 +395,8 @@
     "id": "d26_g1_048",
     "question": "Phòng nào giải quyết chế độ chính sách, khen thưởng kỷ luật sinh viên?",
     "expected_terms": [
-      "CÔNG TÁC SINH VIÊN",
-      "024.38547795"
+      "024.38547795",
+      "xác nhận sinh viên, xác nhận vay vốn"
     ],
     "reference_answer": "Phòng Chính trị và Công tác sinh viên giải quyết chế độ, chính sách, khen thưởng, kỷ luật sinh viên; điện thoại 024.38547795."
   },
@@ -407,7 +405,7 @@
     "question": "Muốn hỏi về tuyển sinh, nhập học và văn bằng thì liên hệ phòng nào?",
     "expected_terms": [
       "công tác tuyển sinh, nhập học",
-      "PHÒNG ĐÀO TẠO"
+      "024.33512252"
     ],
     "reference_answer": "Phòng Đào tạo giải quyết các vấn đề về công tác tuyển sinh, nhập học và quản lý văn bằng tốt nghiệp."
   },
@@ -415,8 +413,8 @@
     "id": "d26_g1_050",
     "question": "Đóng học phí, nhận học bổng thì liên hệ đơn vị nào ở nhà nào?",
     "expected_terms": [
-      "Phòng Tài chính kế toán",
-      "Nhà B14"
+      "Nhà B14",
+      "chi trả tiền miễn giảm, học bổng"
     ],
     "reference_answer": "Phòng Tài chính kế toán đặt tại Nhà B14, giải quyết thủ tục thu nộp học phí, lệ phí và chi trả học bổng."
   },
@@ -440,8 +438,7 @@
     "id": "d26_g2_003",
     "question": "Ngoài hệ chính quy, đại học còn có những hình thức đào tạo nào?",
     "expected_terms": [
-      "vừa làm vừa học",
-      "giáo dục từ xa"
+      "hệ Đại học Vừa làm vừa học, Hệ Đại học theo hình thức giáo dục từ xa"
     ],
     "reference_answer": "Ngoài chính quy, đại học còn đào tạo hệ vừa làm vừa học và giáo dục từ xa."
   },
@@ -473,7 +470,7 @@
     "id": "d26_g2_007",
     "question": "Chuyên ngành Hệ thống thông tin thuộc bậc đào tạo nào?",
     "expected_terms": [
-      "Chuyên ngành Hệ thống thông tin"
+      "Ngành đào tạo sau đại học (tiến sỹ, thạc sỹ)"
     ],
     "reference_answer": "Chuyên ngành Hệ thống thông tin thuộc ngành đào tạo sau đại học (tiến sỹ, thạc sỹ)."
   },
@@ -489,8 +486,7 @@
     "id": "d26_g2_009",
     "question": "Chương trình tài năng tích hợp Thạc sỹ - Cử nhân có ngành nào về an toàn?",
     "expected_terms": [
-      "tài năng tích hợp",
-      "An toàn thông tin"
+      "tài năng tích hợp"
     ],
     "reference_answer": "Chương trình tài năng tích hợp Thạc sỹ - Cử nhân có ngành An toàn thông tin."
   },
@@ -627,8 +623,7 @@
     "id": "d26_g2_026",
     "question": "Mã chương trình Công nghệ thông tin Chất lượng cao là gì?",
     "expected_terms": [
-      "Công nghệ thông tin - Chất lượng cao",
-      "7480201"
+      "Công nghệ thông tin - Chất lượng cao (mã ngành XT: 7480201"
     ],
     "reference_answer": "Chương trình Công nghệ thông tin - Chất lượng cao có mã ngành XT 7480201_CLC."
   },
@@ -645,8 +640,7 @@
     "id": "d26_g2_028",
     "question": "Chương trình Công nghệ thông tin Việt Nhật mang mã gì?",
     "expected_terms": [
-      "Chương trình Công nghệ thông tin Việt Nhật",
-      "7480201"
+      "Chương trình Công nghệ thông tin Việt Nhật"
     ],
     "reference_answer": "Chương trình Công nghệ thông tin Việt Nhật có mã ngành XT 7480201_VNH."
   },
@@ -654,8 +648,7 @@
     "id": "d26_g2_029",
     "question": "Muốn học chuyên về game thì chọn chương trình nào?",
     "expected_terms": [
-      "Chương trình Thiết kế và phát triển Game",
-      "7329001"
+      "Chương trình Thiết kế và phát triển Game (mã ngành XT: 7329001"
     ],
     "reference_answer": "Chương trình Thiết kế và phát triển Game có mã ngành XT 7329001_GAM."
   },
@@ -663,8 +656,7 @@
     "id": "d26_g2_030",
     "question": "Chương trình cử nhân CNTT định hướng ứng dụng có mã nào?",
     "expected_terms": [
-      "Chương trình Cử nhân Công nghệ thông tin - Định hướng ứng dụng",
-      "7480201"
+      "Chương trình Cử nhân Công nghệ thông tin - Định hướng ứng dụng"
     ],
     "reference_answer": "Chương trình Cử nhân Công nghệ thông tin - Định hướng ứng dụng có mã ngành XT 7480201_UDU."
   },
@@ -744,7 +736,6 @@
     "id": "d26_g2_040",
     "question": "Cuối khóa sinh viên có thể làm gì để tốt nghiệp?",
     "expected_terms": [
-      "đồ án/khóa luận tốt nghiệp",
       "học các học phần thay thế tốt nghiệp"
     ],
     "reference_answer": "Cuối khóa sinh viên làm đồ án/khóa luận tốt nghiệp hoặc học các học phần thay thế tốt nghiệp theo quy chế đào tạo."
@@ -787,9 +778,7 @@
     "id": "d26_g2_045",
     "question": "Ngoài tín chỉ bắt buộc, sinh viên còn phải hoàn thành các môn nào?",
     "expected_terms": [
-      "Giáo dục thể chất",
-      "Giáo dục quốc phòng",
-      "kỹ năng mềm"
+      "sinh viên phải hoàn thành các môn học Giáo dục thể chất, Giáo dục quốc phòng, kỹ năng mềm"
     ],
     "reference_answer": "Ngoài khối lượng bắt buộc, sinh viên phải hoàn thành các môn Giáo dục thể chất, Giáo dục quốc phòng và kỹ năng mềm."
   },
@@ -813,8 +802,7 @@
     "id": "d26_g2_048",
     "question": "Thời gian thực tập cuối khóa tại cơ sở kéo dài bao lâu?",
     "expected_terms": [
-      "05 đến 06 tuần",
-      "thực tập cuối khóa"
+      "Thời gian thực tập cuối khóa tại cơ sở là từ 05 đến 06 tuần"
     ],
     "reference_answer": "Thời gian thực tập cuối khóa tại cơ sở là từ 05 đến 06 tuần."
   },
@@ -856,8 +844,7 @@
     "id": "d26_g3_003",
     "question": "Thời gian tối đa để em hoàn thành khóa học là bao lâu?",
     "expected_terms": [
-      "02 lần",
-      "kế hoạch học tập chuẩn toàn khóa"
+      "không vượt quá 02 lần thời gian theo kế hoạch học tập chuẩn toàn khóa"
     ],
     "reference_answer": "Thời gian tối đa để sinh viên hoàn thành khóa học không vượt quá 02 lần thời gian theo kế hoạch học tập chuẩn toàn khóa."
   },
@@ -865,7 +852,7 @@
     "id": "d26_g3_004",
     "question": "Em học hệ vừa làm vừa học thì kế hoạch học tập dài hơn hệ chính quy tối thiểu bao nhiêu?",
     "expected_terms": [
-      "20%"
+      "vừa làm vừa học dài hơn tối thiểu 20%"
     ],
     "reference_answer": "Kế hoạch học tập chuẩn toàn khóa của hệ vừa làm vừa học dài hơn tối thiểu 20% so với đào tạo chính quy cùng chương trình."
   },
@@ -967,7 +954,7 @@
     "id": "d26_g3_016",
     "question": "Chương trình kiểu ngành chính - ngành phụ thì cộng thêm bao nhiêu tín chỉ?",
     "expected_terms": [
-      "15 tín chỉ"
+      "ngành chính - ngành phụ phải cộng thêm 15 tín chỉ"
     ],
     "reference_answer": "Chương trình kiểu ngành chính - ngành phụ phải cộng thêm 15 tín chỉ so với chương trình đơn ngành tương ứng."
   },
@@ -991,7 +978,7 @@
     "id": "d26_g3_019",
     "question": "Phần kiến thức chung của các chuyên ngành trong một ngành phải chiếm ít nhất bao nhiêu?",
     "expected_terms": [
-      "2/3"
+      "phải chiếm ít nhất 2/3 tổng khối lượng kiến thức"
     ],
     "reference_answer": "Phần kiến thức chung của các chuyên ngành thuộc một ngành phải chiếm ít nhất 2/3 tổng khối lượng kiến thức toàn khóa."
   },
@@ -999,7 +986,7 @@
     "id": "d26_g3_020",
     "question": "Học phần tương đương phải có nội dung giống tối thiểu bao nhiêu phần trăm?",
     "expected_terms": [
-      "80%"
+      "Học phần tương đương phải có nội dung giống tối thiểu 80%"
     ],
     "reference_answer": "Học phần tương đương phải có nội dung giống tối thiểu 80% và có số tín chỉ tương đương hoặc lớn hơn."
   },
@@ -1023,7 +1010,7 @@
     "id": "d26_g3_023",
     "question": "Nếu lớp học phần bị hủy thì em có bao nhiêu ngày để đăng ký lớp thay thế?",
     "expected_terms": [
-      "05 ngày"
+      "sau khi phòng Giáo vụ thông báo hủy lớp"
     ],
     "reference_answer": "Trong thời gian 05 ngày sau khi phòng Giáo vụ thông báo hủy lớp, sinh viên phải đăng ký lớp học phần thay thế nếu chưa đủ khối lượng tối thiểu."
   },
@@ -1031,7 +1018,7 @@
     "id": "d26_g3_024",
     "question": "Trong điều kiện bình thường, tối đa bao nhiêu phần trăm chương trình được học trực tuyến?",
     "expected_terms": [
-      "30%"
+      "không quá 30% khối lượng chương trình đào tạo"
     ],
     "reference_answer": "Tối đa không quá 30% khối lượng chương trình đào tạo được thực hiện bằng lớp học trực tuyến."
   },
@@ -1039,8 +1026,7 @@
     "id": "d26_g3_025",
     "question": "Em học chương trình cử nhân thì mỗi học kỳ phải đăng ký bao nhiêu tín chỉ?",
     "expected_terms": [
-      "15 tín chỉ",
-      "25 tín chỉ"
+      "cử nhân: khối lượng tối thiểu không thấp hơn 15 tín chỉ"
     ],
     "reference_answer": "Chương trình cử nhân đăng ký tối thiểu không thấp hơn 15 tín chỉ và tối đa không vượt quá 25 tín chỉ mỗi học kỳ."
   },
@@ -1074,8 +1060,7 @@
     "id": "d26_g3_029",
     "question": "Học kỳ phụ có bao nhiêu đợt đăng ký học tập?",
     "expected_terms": [
-      "một (01)",
-      "đợt đăng ký học tập"
+      "Học kỳ phụ chỉ có một (01) đợt đăng ký học tập"
     ],
     "reference_answer": "Học kỳ phụ chỉ có một (01) đợt đăng ký học tập."
   },
@@ -1083,7 +1068,7 @@
     "id": "d26_g3_030",
     "question": "Em muốn đăng ký học cho học kỳ tới thì cần hoàn thành điều kiện gì về học phí?",
     "expected_terms": [
-      "hoàn thành nghĩa vụ học phí"
+      "phải hoàn thành nghĩa vụ học phí của học kỳ hiện tại"
     ],
     "reference_answer": "Sinh viên phải hoàn thành nghĩa vụ học phí của học kỳ hiện tại mới được đăng ký học tập cho học kỳ tới."
   },
@@ -1091,8 +1076,7 @@
     "id": "d26_g3_031",
     "question": "Em muốn rút bớt học phần ở học kỳ chính thì phải làm trong thời gian nào?",
     "expected_terms": [
-      "tuần học thứ 2",
-      "tuần học thứ 3"
+      "từ tuần học thứ 2 đến tuần học thứ 3 kể từ ngày bắt đầu học kỳ (đối với học kỳ chính)"
     ],
     "reference_answer": "Sinh viên có thể đăng ký bổ sung hoặc rút bớt học phần từ tuần học thứ 2 đến tuần học thứ 3 kể từ ngày bắt đầu học kỳ chính."
   },
@@ -1100,8 +1084,7 @@
     "id": "d26_g3_032",
     "question": "Em muốn rút bớt học phần ở học kỳ phụ thì phải làm vào tuần nào?",
     "expected_terms": [
-      "tuần học thứ 2",
-      "học kỳ phụ"
+      "tuần học thứ 2 kể từ ngày bắt đầu học kỳ (đối với học kỳ phụ)"
     ],
     "reference_answer": "Đối với học kỳ phụ, sinh viên đăng ký bổ sung hoặc rút bớt học phần trong tuần học thứ 2 kể từ ngày bắt đầu học kỳ."
   },
@@ -1109,9 +1092,8 @@
     "id": "d26_g3_033",
     "question": "Nếu em tự ý bỏ học không đến lớp sau thời hạn rút học phần thì bị xử lý thế nào?",
     "expected_terms": [
-      "tự ý bỏ học",
-      "chịu học phí",
-      "điểm F"
+      "bị coi là tự ý bỏ học",
+      "vẫn phải chịu học phí và nhận điểm F"
     ],
     "reference_answer": "Nếu sinh viên không đi học sau thời hạn rút học phần thì bị coi là tự ý bỏ học, vẫn phải chịu học phí và nhận điểm F."
   },
@@ -1127,7 +1109,7 @@
     "id": "d26_g3_035",
     "question": "Em bị điểm F học phần bắt buộc thì phải học lại đến khi nào?",
     "expected_terms": [
-      "điểm D trở lên"
+      "Sinh viên có học phần bắt buộc bị điểm F phải đăng ký học lại"
     ],
     "reference_answer": "Sinh viên có học phần bắt buộc bị điểm F phải đăng ký học lại cho đến khi đạt điểm D trở lên."
   },
@@ -1168,8 +1150,8 @@
     "id": "d26_g3_040",
     "question": "Mức đăng ký tối thiểu mỗi kỳ của cử nhân và kỹ sư khác nhau thế nào?",
     "expected_terms": [
-      "15 tín chỉ",
-      "16 tín chỉ"
+      "không thấp hơn 15 tín chỉ",
+      "không thấp hơn 16 tín chỉ"
     ],
     "reference_answer": "Cử nhân đăng ký tối thiểu 15 tín chỉ mỗi kỳ còn kỹ sư đăng ký tối thiểu 16 tín chỉ, cả hai đều tối đa 25 tín chỉ."
   },
@@ -1186,8 +1168,8 @@
     "id": "d26_g3_042",
     "question": "Số đợt đăng ký của học kỳ chính và học kỳ phụ khác nhau thế nào?",
     "expected_terms": [
-      "đợt đăng ký điều chỉnh",
-      "một (01)"
+      "đợt đăng ký chính và đợt đăng ký điều chỉnh",
+      "Học kỳ phụ chỉ có một (01) đợt đăng ký học tập"
     ],
     "reference_answer": "Học kỳ chính có đợt đăng ký chính và đợt đăng ký điều chỉnh, còn học kỳ phụ chỉ có một (01) đợt đăng ký duy nhất."
   },
@@ -1195,8 +1177,8 @@
     "id": "d26_g3_043",
     "question": "Thời gian được rút bớt học phần ở kỳ chính và kỳ phụ khác nhau thế nào?",
     "expected_terms": [
-      "tuần học thứ 2",
-      "tuần học thứ 3"
+      "từ tuần học thứ 2 đến tuần học thứ 3",
+      "tuần học thứ 2 kể từ ngày bắt đầu học kỳ (đối với học kỳ phụ)"
     ],
     "reference_answer": "Học kỳ chính được rút bớt từ tuần học thứ 2 đến tuần học thứ 3, còn học kỳ phụ chỉ trong tuần học thứ 2."
   },
@@ -1204,8 +1186,8 @@
     "id": "d26_g3_044",
     "question": "Học thêm song ngành và ngành chính - ngành phụ thì số tín chỉ cộng thêm khác nhau thế nào?",
     "expected_terms": [
-      "30 tín chỉ",
-      "15 tín chỉ"
+      "song ngành phải cộng thêm 30 tín chỉ",
+      "ngành chính - ngành phụ phải cộng thêm 15 tín chỉ"
     ],
     "reference_answer": "Chương trình song ngành cộng thêm 30 tín chỉ còn chương trình ngành chính - ngành phụ cộng thêm 15 tín chỉ."
   },
@@ -1231,8 +1213,8 @@
     "id": "d26_g3_047",
     "question": "Điều kiện học lại khi bị điểm F và học cải thiện điểm khác nhau thế nào?",
     "expected_terms": [
-      "điểm F",
-      "điểm D trở lên"
+      "Sinh viên có học phần bắt buộc bị điểm F phải đăng ký học lại",
+      "Đối với các học phần đạt điểm D trở lên, sinh viên được đăng ký học lại"
     ],
     "reference_answer": "Học phần bị điểm F thì phải học lại cho đến khi đạt điểm D trở lên, còn học phần đã đạt điểm D trở lên thì được học lại để cải thiện điểm."
   },
@@ -1259,7 +1241,7 @@
     "id": "d26_g3_050",
     "question": "Em muốn ra trường đúng hạn và đăng ký môn thuận lợi nhất thì nên bám theo cái gì?",
     "expected_terms": [
-      "tiến trình học tập chuẩn"
+      "Sinh viên theo đúng tiến trình học tập chuẩn sẽ gặp thuận lợi nhất"
     ],
     "reference_answer": "Sinh viên nên theo đúng tiến trình học tập chuẩn vì sẽ thuận lợi nhất trong đăng ký học tập và tốt nghiệp đúng thời gian thiết kế."
   },
@@ -1267,8 +1249,8 @@
     "id": "d26_g3_051",
     "question": "Em bị rớt một môn tự chọn thì có bắt buộc phải học lại đúng môn đó không?",
     "expected_terms": [
-      "điểm F",
-      "học phần thay thế"
+      "học phần tự chọn bắt buộc bị điểm F",
+      "đổi sang học phần tự chọn tương đương"
     ],
     "reference_answer": "Học phần tự chọn bị điểm F thì sinh viên được học lại môn đó hoặc chọn học phần thay thế khác trong danh mục tự chọn."
   },
@@ -1286,8 +1268,7 @@
     "id": "d26_g3_053",
     "question": "Em học nhanh hơn hoặc chậm hơn các bạn cùng khóa thì có được tự điều chỉnh môn học không?",
     "expected_terms": [
-      "bỏ bớt hoặc bổ sung một số học phần",
-      "tiến trình học tập chuẩn"
+      "bỏ bớt hoặc bổ sung một số học phần"
     ],
     "reference_answer": "Sinh viên có thể điều chỉnh tiến độ riêng dựa vào tiến trình học tập chuẩn bằng cách bỏ bớt hoặc bổ sung một số học phần khi đáp ứng điều kiện ràng buộc."
   },
@@ -1295,8 +1276,7 @@
     "id": "d26_g3_054",
     "question": "Việc đánh giá lớp học phần nhằm mục đích gì và ai quyết định cách dùng kết quả?",
     "expected_terms": [
-      "đảm bảo chất lượng",
-      "Giám đốc Học viện"
+      "Giám đốc Học viện quyết định hình thức sử dụng các kết quả đánh giá lớp học phần"
     ],
     "reference_answer": "Đánh giá lớp học phần là biện pháp đảm bảo chất lượng giáo dục và Giám đốc Học viện quyết định hình thức sử dụng kết quả đánh giá."
   },
@@ -1304,8 +1284,7 @@
     "id": "d26_g3_055",
     "question": "Em học cùng lúc hai ngành thì mấy môn trùng nhau có phải học lại không?",
     "expected_terms": [
-      "tương đương",
-      "chương trình thứ nhất"
+      "những học phần có nội dung và khối lượng kiến thức tương đương có trong chương trình thứ nhất"
     ],
     "reference_answer": "Khi học chương trình thứ hai, sinh viên được công nhận kết quả những học phần có nội dung và khối lượng kiến thức tương đương đã học ở chương trình thứ nhất."
   },
@@ -1314,8 +1293,7 @@
     "question": "Điểm A+ tương ứng với khoảng điểm 10 nào và quy đổi sang thang 4 bao nhiêu?",
     "expected_terms": [
       "9,0 - 10,0",
-      "A+",
-      "4,0"
+      "Tương ứng với 4,0"
     ],
     "reference_answer": "Điểm A+ tương ứng với khoảng 9,0 - 10,0 thang điểm 10, quy đổi sang 4,0 thang điểm 4, xếp loại Giỏi."
   },
@@ -1324,7 +1302,7 @@
     "question": "Điểm chữ A tương ứng khoảng điểm 10 nào và mấy điểm thang 4?",
     "expected_terms": [
       "8,5 - 8,9",
-      "3,7"
+      "Tương ứng với 3,7"
     ],
     "reference_answer": "Điểm A tương ứng với khoảng 8,5 - 8,9 thang điểm 10, quy đổi sang 3,7 thang điểm 4, xếp loại Giỏi."
   },
@@ -1333,8 +1311,7 @@
     "question": "Điểm B+ được quy đổi từ khoảng điểm 10 nào và tương ứng bao nhiêu điểm thang 4?",
     "expected_terms": [
       "8,0 - 8,4",
-      "B+",
-      "3,5"
+      "Tương ứng với 3,5"
     ],
     "reference_answer": "Điểm B+ tương ứng với khoảng 8,0 - 8,4 thang điểm 10, quy đổi sang 3,5 thang điểm 4, xếp loại Khá."
   },
@@ -1343,7 +1320,7 @@
     "question": "Khoảng điểm 10 nào được quy đổi thành điểm chữ B?",
     "expected_terms": [
       "7,0 - 7,9",
-      "3,0"
+      "Tương ứng với 3,0"
     ],
     "reference_answer": "Khoảng 7,0 - 7,9 thang điểm 10 được quy đổi thành điểm chữ B, tương ứng 3,0 thang điểm 4, xếp loại Khá."
   },
@@ -1352,7 +1329,7 @@
     "question": "Điểm C+ tương ứng với khoảng điểm 10 nào?",
     "expected_terms": [
       "6,5 - 6,9",
-      "2,5"
+      "Tương ứng với 2,5"
     ],
     "reference_answer": "Điểm C+ tương ứng với khoảng 6,5 - 6,9 thang điểm 10, quy đổi sang 2,5 thang điểm 4, xếp loại Trung bình."
   },
@@ -1361,7 +1338,7 @@
     "question": "Khoảng điểm 10 nào được quy đổi thành điểm chữ C?",
     "expected_terms": [
       "5,5 - 6,4",
-      "2,0"
+      "Tương ứng với 2,0"
     ],
     "reference_answer": "Khoảng 5,5 - 6,4 thang điểm 10 được quy đổi thành điểm chữ C, tương ứng 2,0 thang điểm 4, xếp loại Trung bình."
   },
@@ -1370,7 +1347,7 @@
     "question": "Điểm D+ tương ứng với khoảng điểm 10 nào và bao nhiêu điểm thang 4?",
     "expected_terms": [
       "5,0 - 5,4",
-      "1,5"
+      "Tương ứng với 1,5"
     ],
     "reference_answer": "Điểm D+ tương ứng với khoảng 5,0 - 5,4 thang điểm 10, quy đổi sang 1,5 thang điểm 4, xếp loại Trung bình yếu."
   },
@@ -1379,7 +1356,7 @@
     "question": "Khoảng điểm 10 nào được quy đổi thành điểm chữ D?",
     "expected_terms": [
       "4,0 - 4,9",
-      "1,0"
+      "Tương ứng với 1,0"
     ],
     "reference_answer": "Khoảng 4,0 - 4,9 thang điểm 10 được quy đổi thành điểm chữ D, tương ứng 1,0 thang điểm 4, xếp loại Trung bình yếu."
   },
@@ -1388,7 +1365,7 @@
     "question": "Điểm F được quy định cho khoảng điểm 10 nào và tương ứng bao nhiêu điểm thang 4?",
     "expected_terms": [
       "Dưới 4,0",
-      "0,0"
+      "Tương ứng với 0,0"
     ],
     "reference_answer": "Điểm F áp dụng cho kết quả Dưới 4,0 thang điểm 10, quy đổi sang 0,0 thang điểm 4, xếp loại Kém."
   },
@@ -1396,7 +1373,7 @@
     "id": "d26_g4_010",
     "question": "Điểm P áp dụng cho học phần nào và yêu cầu điểm 10 tối thiểu bao nhiêu?",
     "expected_terms": [
-      "Từ 5,0 trở lên; điểm chữ là P"
+      "Loại đạt không phân mức, áp dụng cho các học phần chỉ yêu cầu đạt"
     ],
     "reference_answer": "Điểm P là loại đạt không phân mức, áp dụng cho học phần chỉ yêu cầu đạt và không tính vào điểm trung bình học tập, yêu cầu Từ 5,0 trở lên."
   },
@@ -1405,7 +1382,7 @@
     "question": "Thang điểm 10 và thang điểm 4 được sử dụng cho những gì?",
     "expected_terms": [
       "điểm chữ (A, B, C, D, F)",
-      "Thang điểm 10"
+      "Thang điểm 10 là thang điểm tiện ích"
     ],
     "reference_answer": "Thang điểm 10 là thang tiện ích dùng cho các điểm thành phần, còn thang điểm 4 là thang chính thức với điểm chữ (A, B, C, D, F) dùng cho điểm học phần."
   },
@@ -1422,8 +1399,7 @@
     "id": "d26_g4_013",
     "question": "Điểm I được xem xét giải quyết cho sinh viên trong trường hợp nào?",
     "expected_terms": [
-      "Điểm chưa đủ dữ liệu để đánh giá",
-      "điểm I"
+      "Điểm chưa đủ dữ liệu để đánh giá"
     ],
     "reference_answer": "Sinh viên không thể dự kiểm tra định kỳ hoặc thi kết thúc học phần vì lý do chính đáng được xem xét giải quyết cho nhận điểm I, tức Điểm chưa đủ dữ liệu để đánh giá."
   },
@@ -1431,8 +1407,7 @@
     "id": "d26_g4_014",
     "question": "Sinh viên phải nộp đơn xin nhận điểm I trong thời hạn nào?",
     "expected_terms": [
-      "05 ngày",
-      "điểm I"
+      "05 ngày trước khi các kỳ thi, kiểm tra được tổ chức"
     ],
     "reference_answer": "Trong thời gian 05 ngày trước khi các kỳ thi, kiểm tra được tổ chức, sinh viên phải nộp đơn trình bày rõ lý do vắng thi để được xem xét nhận điểm I."
   },
@@ -1449,8 +1424,7 @@
     "id": "d26_g4_016",
     "question": "Sinh viên nhận điểm I phải hoàn thành phần thi còn thiếu trong thời hạn nào?",
     "expected_terms": [
-      "trong vòng 2 học kỳ tiếp theo",
-      "điểm I"
+      "trong vòng 2 học kỳ tiếp theo"
     ],
     "reference_answer": "Nếu nhận điểm I, trong vòng 2 học kỳ tiếp theo sinh viên phải đăng ký thi lại các nội dung còn thiếu, nếu không điểm I sẽ bị đổi thành điểm không (0)."
   },
@@ -1458,8 +1432,7 @@
     "id": "d26_g4_017",
     "question": "Điều kiện về thời gian đào tạo để được xét bảo lưu học phần từ trường đại học khác là gì?",
     "expected_terms": [
-      "không quá 5 năm",
-      "Phòng Giáo vụ"
+      "trong thời gian đào tạo không quá 5 năm"
     ],
     "reference_answer": "Học phần đã đạt ở trường đại học khác có trình độ và khối lượng tương đương, trong thời gian đào tạo không quá 5 năm, được xét bảo lưu khi nộp đơn kèm bảng điểm cho Phòng Giáo vụ."
   },
@@ -1467,9 +1440,7 @@
     "id": "d26_g4_018",
     "question": "Điểm R và điểm M có được tính vào điểm trung bình chung học kỳ không?",
     "expected_terms": [
-      "điểm R",
-      "điểm M",
-      "(không tính điểm M và điểm R)"
+      "Điểm R và điểm M không được tính vào điểm trung bình chung học kỳ"
     ],
     "reference_answer": "Điểm R và điểm M không được tính vào điểm trung bình chung học kỳ (không tính điểm M và điểm R) nhưng được tính vào điểm trung bình tích lũy."
   },
@@ -1477,8 +1448,7 @@
     "id": "d26_g4_019",
     "question": "Số tín chỉ của điểm R và điểm M có được dùng để xét khen thưởng, học bổng không?",
     "expected_terms": [
-      "không được tính vào số tín chỉ đạt được của học kỳ",
-      "khen thưởng"
+      "không được tính vào số tín chỉ đạt được của học kỳ"
     ],
     "reference_answer": "Số tín chỉ của điểm R và điểm M không được tính vào số tín chỉ đạt được của học kỳ và không được dùng để xét khen thưởng, học bổng."
   },
@@ -1494,8 +1464,7 @@
     "id": "d26_g4_021",
     "question": "Thời hạn bảo lưu kết quả học tập đối với khối kiến thức giáo dục đại cương là bao lâu?",
     "expected_terms": [
-      "7 năm",
-      "không quá 5 năm"
+      "giáo dục đại cương: không quá 7 năm"
     ],
     "reference_answer": "Khối giáo dục đại cương được bảo lưu không quá 7 năm đối với đại học và không quá 5 năm đối với cao đẳng tính đến ngày xét."
   },
@@ -1512,8 +1481,7 @@
     "id": "d26_g4_023",
     "question": "Kết quả học phần Giáo dục thể chất và Giáo dục quốc phòng có tính vào điểm trung bình tích lũy không?",
     "expected_terms": [
-      "Giáo dục thể chất",
-      "ĐTBCTL"
+      "Không tính kết quả các học phần Giáo dục thể chất, Giáo dục quốc phòng vào ĐTBCTL"
     ],
     "reference_answer": "Không tính kết quả các học phần Giáo dục thể chất, Giáo dục quốc phòng vào ĐTBCTL hoặc ĐTBCHK."
   },
@@ -1521,8 +1489,7 @@
     "id": "d26_g4_024",
     "question": "Điểm trung bình chung học kỳ được tính như thế nào?",
     "expected_terms": [
-      "trung bình có trọng số",
-      "ĐTBCHK"
+      "trung bình có trọng số"
     ],
     "reference_answer": "ĐTBCHK là điểm trung bình có trọng số của các học phần sinh viên đã đăng ký trong học kỳ đó, với trọng số là số tín chỉ tương ứng."
   },
@@ -1530,8 +1497,7 @@
     "id": "d26_g4_025",
     "question": "Sinh viên khiếu nại điểm đánh giá quá trình với ai?",
     "expected_terms": [
-      "khiếu nại trực tiếp",
-      "giảng viên"
+      "khiếu nại trực tiếp với giảng viên giảng dạy học phần"
     ],
     "reference_answer": "Đối với điểm đánh giá quá trình, sinh viên có thể khiếu nại trực tiếp với giảng viên giảng dạy học phần khi công bố điểm."
   },
@@ -1539,8 +1505,7 @@
     "id": "d26_g4_026",
     "question": "Sinh viên khiếu nại điểm thi kết thúc học phần phải làm thủ tục gì?",
     "expected_terms": [
-      "đơn xin phúc tra",
-      "lệ phí"
+      "đơn xin phúc tra"
     ],
     "reference_answer": "Đối với điểm thi kết thúc học phần, sinh viên phải làm đơn xin phúc tra, đóng lệ phí theo quy định và nộp cho Trung tâm KT và ĐBCLGD."
   },
@@ -1548,8 +1513,7 @@
     "id": "d26_g4_027",
     "question": "Thời hạn khiếu nại điểm là bao lâu kể từ ngày công bố điểm?",
     "expected_terms": [
-      "10 ngày",
-      "không được chấp nhận"
+      "Thời hạn khiếu nại điểm là chậm nhất 10 ngày"
     ],
     "reference_answer": "Thời hạn khiếu nại điểm là chậm nhất 10 ngày kể từ ngày công bố điểm; sau thời hạn này mọi yêu cầu khiếu nại điểm đều không được chấp nhận."
   },
@@ -1575,8 +1539,7 @@
     "id": "d26_g4_030",
     "question": "Sinh viên xin cấp bản sao bảng điểm toàn khóa có phải nộp lệ phí không?",
     "expected_terms": [
-      "bản sao",
-      "lệ phí"
+      "Sinh viên có nhu cầu cấp bản sao Bảng điểm toàn khóa"
     ],
     "reference_answer": "Sinh viên có nhu cầu cấp bản sao Bảng điểm toàn khóa hoặc kết quả học tập trong thời gian đang học phải nộp lệ phí theo quy định của Học viện."
   },
@@ -1584,8 +1547,7 @@
     "id": "d26_g4_031",
     "question": "Đơn vị nào thực hiện cấp và chứng thực bảng điểm cho sinh viên?",
     "expected_terms": [
-      "Phòng Giáo vụ",
-      "chứng thực"
+      "chứng thực bảng điểm cho sinh viên"
     ],
     "reference_answer": "Phòng Giáo vụ thực hiện việc cấp Bảng điểm toàn khóa, bản sao Bảng điểm toàn khóa và chứng thực bảng điểm cho sinh viên."
   },
@@ -1611,8 +1573,7 @@
     "id": "d26_g4_034",
     "question": "Kết quả phúc khảo bài thi KTHP được trả trong thời hạn nào?",
     "expected_terms": [
-      "05 ngày làm việc",
-      "7 ngày làm việc"
+      "05 ngày làm việc"
     ],
     "reference_answer": "Thời hạn trả kết quả phúc khảo không quá 05 ngày làm việc kể từ ngày hết hạn nhận đơn, và điểm phúc khảo được công bố chậm nhất sau 7 ngày làm việc kể từ ngày nhận đơn."
   },
@@ -1735,8 +1696,7 @@
     "question": "Sinh viên thi hộ và nhờ thi hộ bị xử lý như thế nào?",
     "expected_terms": [
       "người thi hộ",
-      "đình chỉ học tập 01 năm",
-      "buộc thôi học"
+      "đình chỉ học tập 01 năm"
     ],
     "reference_answer": "Người nhờ thi hộ nhận điểm 0 học phần và cả người thi hộ đều bị đình chỉ học tập 01 năm ở lần vi phạm thứ nhất, vi phạm lần thứ hai thì buộc thôi học."
   },
@@ -1744,8 +1704,7 @@
     "id": "d26_g4_049",
     "question": "Việc xử lý vi phạm quy chế thi do những ai lập biên bản và thu giữ gì?",
     "expected_terms": [
-      "lập biên bản",
-      "hai cán bộ coi thi",
+      "hai cán bộ coi thi lập biên bản",
       "thu tang vật"
     ],
     "reference_answer": "Hai cán bộ coi thi lập biên bản, thu tang vật và thống nhất hình thức kỷ luật; việc xử lý phải được công bố cho sinh viên biết."
@@ -1765,7 +1724,6 @@
     "question": "Thời hạn chấm, nhập điểm thi và lập bảng điểm học phần được quy định thế nào?",
     "expected_terms": [
       "Thời hạn tối đa để chấm và nhập điểm",
-      "7 ngày làm việc",
       "thành 02 bản"
     ],
     "reference_answer": "Thời hạn tối đa để chấm và nhập điểm vào hệ thống kể từ khi nhận bài thi là 7 ngày làm việc, và bảng điểm học phần được lập thành 02 bản."
@@ -1774,7 +1732,7 @@
     "id": "d26_g4_052",
     "question": "Kiểm tra giữa kỳ nhằm mục đích gì và nội dung được thiết kế ra sao?",
     "expected_terms": [
-      "Kiểm tra giữa kỳ",
+      "Kiểm tra giữa kỳ được tổ chức nhằm đo lường",
       "ma trận đề thi gắn với CLO"
     ],
     "reference_answer": "Kiểm tra giữa kỳ nhằm đo lường một số CLO trọng yếu trong tiến trình học tập, nội dung được thiết kế theo ma trận đề thi gắn với CLO và đảm bảo tính phân hóa."
@@ -1811,8 +1769,7 @@
     "id": "d26_g5_001",
     "question": "Sinh viên muốn thôi học theo nguyện vọng cá nhân phải làm thủ tục gì?",
     "expected_terms": [
-      "viết đơn xin được thôi học",
-      "phòng Giáo vụ"
+      "viết đơn xin được thôi học"
     ],
     "reference_answer": "Sinh viên có quyền viết đơn xin được thôi học và nộp cho phòng Giáo vụ; phòng Giáo vụ xem xét, trình Giám đốc Học viện quyết định cho phép thôi học."
   },
@@ -1947,11 +1904,11 @@
   },
   {
     "id": "d26_g5_018",
-    "question": "Theo quy định về thực tập cuối khóa, thời gian sinh viên thực tập tại cơ sở là bao nhiêu tuần?",
+    "question": "Khi nào Khoa/bộ môn tổ chức cho sinh viên đăng ký địa điểm thực tập cuối khóa?",
     "expected_terms": [
-      "từ 05 đến 06 tuần"
+      "Trong tuần đầu tiên của học kỳ cuối cùng trong chương trình đào tạo"
     ],
-    "reference_answer": "Thời gian thực tập cuối khóa tại cơ sở là từ 05 đến 06 tuần."
+    "reference_answer": "Trong tuần đầu tiên của học kỳ cuối cùng trong chương trình đào tạo, Khoa/bộ môn tổ chức cho sinh viên đăng ký địa điểm thực tập cuối khóa."
   },
   {
     "id": "d26_g5_019",
@@ -2023,7 +1980,7 @@
     "id": "d26_g5_027",
     "question": "Điều kiện về ngoại ngữ khi xét công nhận tốt nghiệp là gì?",
     "expected_terms": [
-      "Đạt chuẩn đầu ra trình độ tiếng Anh"
+      "Đạt chuẩn đầu ra trình độ tiếng Anh theo yêu cầu của chương trình đào tạo"
     ],
     "reference_answer": "Sinh viên phải đạt chuẩn đầu ra trình độ tiếng Anh theo yêu cầu của chương trình đào tạo mới được xét công nhận tốt nghiệp."
   },
@@ -2171,8 +2128,7 @@
     "id": "d26_g5_045",
     "question": "Trước khi tốt nghiệp, việc kiểm tra và công nhận chuẩn đầu ra tiếng Anh được thực hiện thế nào?",
     "expected_terms": [
-      "Trước khi tốt nghiệp, Học viện sẽ tổ chức kiểm tra trình độ tiếng Anh",
-      "miễn học, miễn thi và chuyển điểm"
+      "Trước khi tốt nghiệp, Học viện sẽ tổ chức kiểm tra trình độ tiếng Anh"
     ],
     "reference_answer": "Trước khi tốt nghiệp, Học viện sẽ tổ chức kiểm tra trình độ tiếng Anh theo chuẩn đầu ra; sinh viên có chứng chỉ quốc tế phù hợp được xem xét miễn học, miễn thi và chuyển điểm."
   },
@@ -2212,7 +2168,7 @@
     "id": "d26_g6_005",
     "question": "Kết quả rèn luyện của sinh viên được đánh giá theo thang điểm nào?",
     "expected_terms": [
-      "thang điểm 100"
+      "đánh giá kết quả rèn luyện của sinh viên bằng thang điểm 100"
     ],
     "reference_answer": "Kết quả rèn luyện của sinh viên được xem xét, đánh giá bằng thang điểm 100 dựa trên ý thức, thái độ và kết quả rèn luyện."
   },
@@ -2220,8 +2176,7 @@
     "id": "d26_g6_006",
     "question": "Điểm rèn luyện bao nhiêu thì được xếp loại xuất sắc?",
     "expected_terms": [
-      "Từ 90 đến 100 điểm",
-      "loại xuất sắc"
+      "Từ 90 đến 100 điểm"
     ],
     "reference_answer": "Kết quả rèn luyện được xếp loại xuất sắc khi sinh viên đạt từ 90 đến 100 điểm."
   },
@@ -2262,10 +2217,9 @@
     "id": "d26_g6_011",
     "question": "Sinh viên vi phạm có thể chịu những hình thức kỷ luật nào?",
     "expected_terms": [
-      "Khiển trách",
-      "Cảnh cáo",
-      "Đình chỉ học tập có thời hạn",
-      "Buộc thôi học"
+      "Khiển trách: áp dụng đối với sinh viên",
+      "Cảnh cáo: áp dụng đối với sinh viên",
+      "Đình chỉ học tập có thời hạn"
     ],
     "reference_answer": "Tùy tính chất, mức độ vi phạm, sinh viên có thể chịu các hình thức: khiển trách, cảnh cáo, đình chỉ học tập có thời hạn hoặc buộc thôi học."
   },
@@ -2273,8 +2227,7 @@
     "id": "d26_g6_012",
     "question": "Điều kiện về tỷ lệ sinh viên khá trở lên để đạt danh hiệu lớp Tiên tiến là gì?",
     "expected_terms": [
-      "Có từ 50% sinh viên đạt danh hiệu",
-      "Lớp sinh viên Tiên tiến"
+      "Có từ 50% sinh viên đạt danh hiệu"
     ],
     "reference_answer": "Lớp sinh viên Tiên tiến yêu cầu có từ 50% sinh viên đạt danh hiệu sinh viên Khá trở lên và có cá nhân đạt danh hiệu sinh viên Giỏi trở lên."
   },
@@ -2300,8 +2253,7 @@
     "id": "d26_g6_015",
     "question": "Mức học bổng khuyến khích học tập loại Xuất sắc bằng bao nhiêu so với loại Khá?",
     "expected_terms": [
-      "120%",
-      "loại Xuất sắc"
+      "Mức học bổng bằng 120% học bổng KKHT loại Khá"
     ],
     "reference_answer": "Học bổng KKHT loại Xuất sắc có mức bằng 120% học bổng KKHT loại Khá, trong khi loại Giỏi bằng 110% loại Khá."
   },
@@ -2318,8 +2270,7 @@
     "id": "d26_g6_017",
     "question": "Học kỳ xét học bổng yêu cầu sinh viên hoàn thành tối thiểu bao nhiêu tín chỉ?",
     "expected_terms": [
-      "15 tín chỉ",
-      "16 tín chỉ"
+      "ít nhất 15 tín chỉ đối với các ngành thuộc khối kinh tế"
     ],
     "reference_answer": "Tại học kỳ xét học bổng, sinh viên phải hoàn thành ít nhất 15 tín chỉ đối với ngành khối kinh tế, báo chí và 16 tín chỉ đối với ngành khối kỹ thuật."
   },
@@ -2353,8 +2304,7 @@
     "id": "d26_g6_021",
     "question": "Người học được miễn học phải nộp bao nhiêu phần trăm học phí?",
     "expected_terms": [
-      "được Miễn học",
-      "50% học phí"
+      "Miễn học: Người học phải nộp 50% học phí"
     ],
     "reference_answer": "Đối với các trường hợp được miễn học, người học phải nộp 50% học phí tương ứng."
   },
@@ -2362,7 +2312,7 @@
     "id": "d26_g6_022",
     "question": "Học phí được thu bằng những hình thức nào?",
     "expected_terms": [
-      "bằng tiền mặt",
+      "thu nộp bằng tiền mặt, thu nộp qua ngân hàng",
       "Thông báo thu học phí"
     ],
     "reference_answer": "Học phí được thu theo học kỳ bằng hình thức thu nộp bằng tiền mặt, qua ngân hàng và thanh toán trực tuyến theo các thông báo thu học phí."
@@ -2388,7 +2338,7 @@
     "id": "d26_g6_025",
     "question": "Người học được động viên vào lực lượng vũ trang được hoàn học phí thế nào?",
     "expected_terms": [
-      "Hoàn 100% học phí kỳ học"
+      "Hoàn 100% học phí kỳ học đối với người học được động viên"
     ],
     "reference_answer": "Người học được động viên và tham gia vào lực lượng vũ trang được hoàn 100% học phí kỳ học."
   },
@@ -2504,7 +2454,7 @@
     "id": "d26_g6_039",
     "question": "Sinh viên tra cứu lịch thi học kỳ ở đâu?",
     "expected_terms": [
-      "Xem lịch thi"
+      "Cung cấp thông tin về lịch thi học kỳ cho sinh viên"
     ],
     "reference_answer": "Sinh viên tra cứu thông tin về lịch thi học kỳ tại trang xem lịch thi trên cổng thông tin quản lý đào tạo."
   },
@@ -2512,7 +2462,7 @@
     "id": "d26_g6_040",
     "question": "Sinh viên xem kết quả học tập các kỳ học ở trang nào?",
     "expected_terms": [
-      "Xem điểm"
+      "Cung cấp kết quả học tập của các kỳ học cho sinh viên"
     ],
     "reference_answer": "Sinh viên xem kết quả học tập của các kỳ học tại trang xem điểm trên cổng thông tin quản lý đào tạo."
   },
@@ -2545,8 +2495,7 @@
     "id": "d26_g6_044",
     "question": "Sinh viên thực hiện thủ tục hành chính bằng những hình thức nào?",
     "expected_terms": [
-      "PTIT Slink",
-      "Văn phòng một cửa"
+      "Thực hiện trực tuyền trên ứng dụng PTIT Slink"
     ],
     "reference_answer": "Thủ tục hành chính được thực hiện trực tuyến trên ứng dụng PTIT Slink hoặc trực tiếp tại Văn phòng một cửa theo lịch tiếp sinh viên."
   },
