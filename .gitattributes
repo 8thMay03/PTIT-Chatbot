@@ -1,1 +1,3 @@
 *.sh text eol=lf
+# Hash CSP của theme script inline (frontend/nginx/page-headers.conf) tính trên bản LF.
+frontend/index.html text eol=lf
