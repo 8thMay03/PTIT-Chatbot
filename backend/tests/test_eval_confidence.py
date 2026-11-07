@@ -6,6 +6,7 @@ import pytest
 
 from scripts.eval_confidence import (
     DEFAULT_UNANSWERABLE,
+    build_summary,
     case_groups,
     evaluate_decisions,
     histogram,
@@ -161,3 +162,19 @@ def test_load_cases_reads_answerable_and_unanswerable_sets() -> None:
     assert {case["category"] for case in unanswerable} == {"in_domain_missing", "near_miss", "out_of_domain"}
     assert all(case["answerable"] and case["expected_terms"] for case in answerable)
     assert answerable[0]["dataset"] == "ptit_rag_300"
+
+
+def test_rerank_rules_are_only_swept_for_cross_encoder_reports() -> None:
+    records = [_record("a", True, 0.6, 0.5), _record("u", False, 0.4, 0.1)]
+    for record, score in zip(records, (5.0, -3.0)):
+        record["signals"]["rerank"] = score
+        record["gate_legacy"] = True
+
+    heuristic = build_summary({"cases": records, "reranker": {"enabled": True, "provider": "heuristic"}}, sweep=True)
+    cross_encoder = build_summary(
+        {"cases": records, "reranker": {"enabled": True, "provider": "cross-encoder"}}, sweep=True
+    )
+
+    assert heuristic["sweep"]["rerank"] == {"rule": "rerank", "available": False}
+    assert heuristic["sweep"]["rerank_and_norm"]["available"] is False
+    assert cross_encoder["sweep"]["rerank_and_norm"]["best"]["refusal_gate"] == 1.0

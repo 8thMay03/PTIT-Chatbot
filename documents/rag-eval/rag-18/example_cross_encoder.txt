@@ -1,0 +1,122 @@
+embedding=text-embedding-3-small reranker={'enabled': True, 'provider': 'cross-encoder'} top_k=4 corpus=d33ac7329944edef… (1 tài liệu, 1010 chunk) git=4289a134074d dirty=True
+
+Phân bố tín hiệu top-1 (p5 / p25 / p50 / p75 / p95; thiếu):
+  no_answer (n=56, scope pass 0.91)
+    vector     0.358 / 0.470 / 0.507 / 0.538 / 0.600   thiếu 0
+    bm25       9.353 / 14.101 / 19.797 / 28.499 / 37.045   thiếu 3
+    bm25_norm  0.114 / 0.205 / 0.271 / 0.314 / 0.462   thiếu 3
+    rerank     -4.543 / -3.427 / -2.227 / -1.261 / 1.389   thiếu 0
+  no_answer:in_domain_missing (n=22, scope pass 1.00)
+    vector     0.465 / 0.494 / 0.525 / 0.549 / 0.605   thiếu 0
+    bm25       11.610 / 16.104 / 19.660 / 28.215 / 33.006   thiếu 0
+    bm25_norm  0.179 / 0.230 / 0.283 / 0.329 / 0.491   thiếu 0
+    rerank     -3.796 / -2.712 / -1.739 / -0.425 / 1.188   thiếu 0
+  no_answer:near_miss (n=20, scope pass 1.00)
+    vector     0.413 / 0.486 / 0.514 / 0.538 / 0.584   thiếu 0
+    bm25       12.572 / 16.691 / 24.581 / 32.595 / 39.651   thiếu 0
+    bm25_norm  0.133 / 0.188 / 0.304 / 0.382 / 0.441   thiếu 0
+    rerank     -4.451 / -3.156 / -2.456 / -1.618 / 3.754   thiếu 0
+  no_answer:out_of_domain (n=14, scope pass 0.64)
+    vector     0.354 / 0.366 / 0.435 / 0.496 / 0.552   thiếu 0
+    bm25       6.723 / 9.542 / 13.924 / 17.818 / 23.754   thiếu 3
+    bm25_norm  0.082 / 0.155 / 0.211 / 0.235 / 0.263   thiếu 3
+    rerank     -5.222 / -4.337 / -3.435 / -1.743 / -0.209   thiếu 0
+  ptit_rag_300 (n=300, scope pass 0.85)
+    vector     0.504 / 0.567 / 0.613 / 0.655 / 0.708   thiếu 0
+    bm25       14.585 / 24.110 / 33.138 / 39.442 / 49.916   thiếu 2
+    bm25_norm  0.310 / 0.434 / 0.510 / 0.594 / 0.720   thiếu 2
+    rerank     -1.339 / 1.614 / 3.924 / 6.078 / 9.039   thiếu 0
+  ptit_rag_300@hit4 (n=262, scope pass 0.85)
+    vector     0.504 / 0.570 / 0.616 / 0.662 / 0.708   thiếu 0
+    bm25       15.348 / 25.498 / 33.376 / 39.831 / 50.862   thiếu 0
+    bm25_norm  0.320 / 0.440 / 0.517 / 0.592 / 0.719   thiếu 0
+    rerank     -0.460 / 2.224 / 4.136 / 6.304 / 9.227   thiếu 0
+  ptit_ragas_100 (n=100, scope pass 1.00)
+    vector     0.501 / 0.571 / 0.620 / 0.671 / 0.713   thiếu 0
+    bm25       18.003 / 25.229 / 30.226 / 37.159 / 49.051   thiếu 0
+    bm25_norm  0.301 / 0.402 / 0.477 / 0.605 / 0.716   thiếu 0
+    rerank     -1.407 / 1.047 / 3.661 / 5.629 / 9.172   thiếu 0
+  ptit_ragas_100@hit4 (n=87, scope pass 1.00)
+    vector     0.516 / 0.571 / 0.625 / 0.676 / 0.717   thiếu 0
+    bm25       18.493 / 25.407 / 29.948 / 36.950 / 49.774   thiếu 0
+    bm25_norm  0.310 / 0.407 / 0.490 / 0.619 / 0.720   thiếu 0
+    rerank     -1.021 / 1.881 / 4.141 / 6.075 / 9.255   thiếu 0
+
+Histogram vector:
+  [0.00,0.05)  có đáp án  0.0%                      không  0.0% 
+  [0.05,0.10)  có đáp án  0.0%                      không  0.0% 
+  [0.10,0.15)  có đáp án  0.0%                      không  0.0% 
+  [0.15,0.20)  có đáp án  0.0%                      không  0.0% 
+  [0.20,0.25)  có đáp án  0.0%                      không  0.0% 
+  [0.25,0.30)  có đáp án  0.0%                      không  0.0% 
+  [0.30,0.35)  có đáp án  0.0%                      không  0.0% 
+  [0.35,0.40)  có đáp án  0.2%                      không  2.0% +
+  [0.40,0.45)  có đáp án  1.2% #                    không  9.8% ++++++
+  [0.45,0.50)  có đáp án  2.8% ##                   không 29.4% ++++++++++++++++++
+  [0.50,0.55)  có đáp án 14.5% #########            không 37.3% ++++++++++++++++++++++
+  [0.55,0.60)  có đáp án 23.2% ##############       không 15.7% +++++++++
+  [0.60,0.65)  có đáp án 29.0% #################    không  3.9% ++
+  [0.65,0.70)  có đáp án 19.2% ############         không  2.0% +
+  [0.70,0.75)  có đáp án  8.8% #####                không  0.0% 
+  [0.75,0.80)  có đáp án  1.0% #                    không  0.0% 
+
+Histogram bm25_norm:
+  [0.00,0.06)  có đáp án  0.0%                      không  0.0% 
+  [0.06,0.12)  có đáp án  0.0%                      không  5.9% ++++
+  [0.12,0.19)  có đáp án  0.5%                      không 15.7% +++++++++
+  [0.19,0.25)  có đáp án  0.3%                      không 23.5% ++++++++++++++
+  [0.25,0.31)  có đáp án  5.5% ###                  không 27.5% ++++++++++++++++
+  [0.31,0.38)  có đáp án  7.8% #####                không 11.8% +++++++
+  [0.38,0.44)  có đáp án 15.8% #########            không  7.8% +++++
+  [0.44,0.50)  có đáp án 18.1% ###########          không  3.9% ++
+  [0.50,0.56)  có đáp án 21.1% #############        không  3.9% ++
+  [0.56,0.62)  có đáp án 11.1% #######              không  0.0% 
+  [0.62,0.69)  có đáp án  9.8% ######               không  0.0% 
+  [0.69,0.75)  có đáp án  8.0% #####                không  0.0% 
+  [0.75,0.81)  có đáp án  1.5% #                    không  0.0% 
+  [0.81,0.88)  có đáp án  0.5%                      không  0.0% 
+  [0.88,0.94)  có đáp án  0.0%                      không  0.0% 
+  [0.94,1.00)  có đáp án  0.0%                      không  0.0% 
+
+Gate đã ghi:
+  legacy (vector OR bm25 thô)                  từ chối đúng gate 0.000 e2e 0.089 | từ chối nhầm (gate/e2e) ptit_rag_300 0.000/0.147  ptit_rag_300@hit4 0.000/0.153  ptit_ragas_100 0.000/0.000  ptit_ragas_100@hit4 0.000/0.000
+  gate hiện tại (assess_context)               từ chối đúng gate 0.824 e2e 0.839 | từ chối nhầm (gate/e2e) ptit_rag_300 0.040/0.173  ptit_rag_300@hit4 0.011/0.153  ptit_ragas_100 0.040/0.040  ptit_ragas_100@hit4 0.011/0.011
+
+Quét ngưỡng (từ chối nhầm ptit_rag_300 ≤ 5%, tối đa từ chối đúng):
+  or_raw     vector=0.52, bm25=24.0            từ chối đúng gate 0.510 e2e 0.554 | từ chối nhầm (gate/e2e) ptit_rag_300 0.040/0.177  ptit_rag_300@hit4 0.034/0.176  ptit_ragas_100 0.040/0.040  ptit_ragas_100@hit4 0.023/0.023
+      vector×0.9=0.468             từ chối đúng 0.176  từ chối nhầm ptit_rag_300 0.017
+      vector×1.1=0.572             từ chối đúng 0.608  từ chối nhầm ptit_rag_300 0.127
+      bm25×0.9=21.6                từ chối đúng 0.471  từ chối nhầm ptit_rag_300 0.033
+      bm25×1.1=26.4                từ chối đúng 0.510  từ chối nhầm ptit_rag_300 0.050
+  vector     vector=0.5                        từ chối đúng gate 0.412 e2e 0.464 | từ chối nhầm (gate/e2e) ptit_rag_300 0.040/0.163  ptit_rag_300@hit4 0.042/0.168  ptit_ragas_100 0.050/0.050  ptit_ragas_100@hit4 0.034/0.034
+      vector×0.9=0.45              từ chối đúng 0.118  từ chối nhầm ptit_rag_300 0.017
+      vector×1.1=0.55              từ chối đúng 0.784  từ chối nhầm ptit_rag_300 0.193
+  bm25_raw   bm25=14.0                         từ chối đúng gate 0.216 e2e 0.286 | từ chối nhầm (gate/e2e) ptit_rag_300 0.050/0.183  ptit_rag_300@hit4 0.034/0.179  ptit_ragas_100 0.030/0.030  ptit_ragas_100@hit4 0.023/0.023
+      bm25×0.9=12.6                từ chối đúng 0.118  từ chối nhầm ptit_rag_300 0.043
+      bm25×1.1=15.4                từ chối đúng 0.294  từ chối nhầm ptit_rag_300 0.073
+  bm25_norm  bm25_norm=0.3                     từ chối đúng gate 0.627 e2e 0.661 | từ chối nhầm (gate/e2e) ptit_rag_300 0.050/0.187  ptit_rag_300@hit4 0.031/0.179  ptit_ragas_100 0.050/0.050  ptit_ragas_100@hit4 0.034/0.034
+      bm25_norm×0.9=0.27           từ chối đúng 0.471  từ chối nhầm ptit_rag_300 0.030
+      bm25_norm×1.1=0.33           từ chối đúng 0.745  từ chối nhầm ptit_rag_300 0.073
+  and        vector=0.1, bm25_norm=0.3         từ chối đúng gate 0.627 e2e 0.661 | từ chối nhầm (gate/e2e) ptit_rag_300 0.050/0.187  ptit_rag_300@hit4 0.031/0.179  ptit_ragas_100 0.050/0.050  ptit_ragas_100@hit4 0.034/0.034
+      vector×0.9=0.09              từ chối đúng 0.627  từ chối nhầm ptit_rag_300 0.050
+      vector×1.1=0.11              từ chối đúng 0.627  từ chối nhầm ptit_rag_300 0.050
+      bm25_norm×0.9=0.27           từ chối đúng 0.471  từ chối nhầm ptit_rag_300 0.030
+      bm25_norm×1.1=0.33           từ chối đúng 0.745  từ chối nhầm ptit_rag_300 0.073
+  or_norm    vector=0.61, bm25_norm=0.31       từ chối đúng gate 0.725 e2e 0.750 | từ chối nhầm (gate/e2e) ptit_rag_300 0.043/0.180  ptit_rag_300@hit4 0.031/0.179  ptit_ragas_100 0.050/0.050  ptit_ragas_100@hit4 0.034/0.034
+      vector×0.9=0.549             từ chối đúng 0.627  từ chối nhầm ptit_rag_300 0.017
+      vector×1.1=0.671             từ chối đúng 0.725  từ chối nhầm ptit_rag_300 0.053
+      bm25_norm×0.9=0.279          từ chối đúng 0.529  từ chối nhầm ptit_rag_300 0.023
+      bm25_norm×1.1=0.341          từ chối đúng 0.745  từ chối nhầm ptit_rag_300 0.063
+  weighted   weight=0.5, threshold=0.42        từ chối đúng gate 0.725 e2e 0.750 | từ chối nhầm (gate/e2e) ptit_rag_300 0.043/0.187  ptit_rag_300@hit4 0.019/0.172  ptit_ragas_100 0.070/0.070  ptit_ragas_100@hit4 0.046/0.046
+      threshold×0.9=0.378          từ chối đúng 0.412  từ chối nhầm ptit_rag_300 0.013
+      threshold×1.1=0.462          từ chối đúng 0.804  từ chối nhầm ptit_rag_300 0.103
+  rerank     rerank=-1.5                       từ chối đúng gate 0.706 e2e 0.732 | từ chối nhầm (gate/e2e) ptit_rag_300 0.043/0.180  ptit_rag_300@hit4 0.015/0.156  ptit_ragas_100 0.050/0.050  ptit_ragas_100@hit4 0.023/0.023
+      rerank×0.9=-1.35             từ chối đúng 0.725  từ chối nhầm ptit_rag_300 0.050
+      rerank×1.1=-1.65             từ chối đúng 0.627  từ chối nhầm ptit_rag_300 0.037
+  rerank_and_norm rerank=-1.55, bm25_norm=0.26 từ chối đúng gate 0.882 e2e 0.893 | từ chối nhầm (gate/e2e) ptit_rag_300 0.047/0.180  ptit_rag_300@hit4 0.015/0.156  ptit_ragas_100 0.040/0.040  ptit_ragas_100@hit4 0.011/0.011
+      rerank×0.9=-1.395            từ chối đúng 0.882  từ chối nhầm ptit_rag_300 0.053
+      rerank×1.1=-1.705            từ chối đúng 0.824  từ chối nhầm ptit_rag_300 0.040
+      bm25_norm×0.9=0.234          từ chối đúng 0.843  từ chối nhầm ptit_rag_300 0.047
+      bm25_norm×1.1=0.286          từ chối đúng 0.922  từ chối nhầm ptit_rag_300 0.063
+
+Đã ghi ..\documents\rag-eval\rag-18\example_cross_encoder.json

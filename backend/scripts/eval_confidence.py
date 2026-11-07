@@ -127,6 +127,11 @@ RULES: dict[str, tuple[RuleFn, dict[str, list[float]]]] = {
         lambda s, p: _value(s, "rerank") >= p["rerank"],
         {"rerank": _frange(-10.0, 10.0, 0.1)},
     ),
+    # Luật gate đang cài khi reranker là cross-encoder (bỏ sàn cosine vì không đổi kết quả).
+    "rerank_and_norm": (
+        lambda s, p: _value(s, "rerank") >= p["rerank"] and _value(s, "bm25_norm") >= p["bm25_norm"],
+        {"rerank": _frange(-4.0, 2.0, 0.05), "bm25_norm": _frange(0.0, 0.50, 0.01)},
+    ),
 }
 
 
@@ -241,6 +246,7 @@ def sweep_rule(
         "or_norm": ("vector", "bm25_norm"),
         "weighted": ("vector", "bm25_norm"),
         "rerank": ("rerank",),
+        "rerank_and_norm": ("rerank", "bm25_norm"),
     }[rule]
     if not any(record["signals"].get(name) is not None for record in records for name in signal_names):
         return {"rule": rule, "available": False}
@@ -451,7 +457,15 @@ def build_summary(report: dict, sweep: bool) -> dict:
     if any("gate" in record for record in records):
         summary["gate"] = _decision_metrics(records, "gate")
     if sweep:
-        summary["sweep"] = {rule: sweep_rule(records, rule) for rule in RULES}
+        # rerank_score của reranker heuristic là min-max trong danh sách ứng viên: không quét ngưỡng.
+        reranker = report.get("reranker") or {}
+        absolute_rerank = bool(reranker.get("enabled")) and reranker.get("provider") == "cross-encoder"
+        summary["sweep"] = {
+            rule: sweep_rule(records, rule)
+            if absolute_rerank or not rule.startswith("rerank")
+            else {"rule": rule, "available": False}
+            for rule in RULES
+        }
         for result in summary["sweep"].values():
             if result.get("best"):
                 result["neighborhood"] = neighborhood(records, result["rule"], result["best"]["params"])
