@@ -14,7 +14,7 @@ Nhánh `feat/rag22-citation-accuracy` tách từ `dev` tại `e6981f1` (`git dif
 | `e3356c0` | S-06 | nhãn "Nguồn trích dẫn"/"Nguồn liên quan" |
 | `bdc6d0f` | S-04 | in báo cáo backfill bằng UTF-8 (console Windows cp1252 khi pipe) |
 | `c4bcd78` | S-02/S-05 | Khoản giữa dòng + đánh số bắt đầu lại (sửa kế thừa sai phát hiện ở S-05b) |
-| (commit S-07) | S-07 | báo cáo `documents/rag-eval/rag-22/`, mục RAG-22 trong README, năm file task |
+| `4977e1f` | S-07 | báo cáo `documents/rag-eval/rag-22/`, mục RAG-22 trong README, năm file task |
 
 ## Nhật ký theo nhiệm vụ
 
@@ -85,7 +85,7 @@ Không có (một agent).
 
 - Từ / đến: `agent-claude` / reviewer (ưu tiên reviewer độc lập do người dùng chỉ định).
 - Đã hoàn tất: S-01…S-07.
-- File/branch/commit: nhánh `feat/rag22-citation-accuracy`, `4ce8bad..HEAD` (bảng ở trên); chưa push, chưa mở PR.
+- File/branch/commit: nhánh `feat/rag22-citation-accuracy`, `4ce8bad..HEAD` (bảng ở trên); push và mở PR vào `dev` theo yêu cầu người dùng `2026-11-08`.
 - Kiểm chứng: `verification.md` V-01…V-06 đều `passed`.
 - Review: `review.md` — `self_review`, kết luận `approved`; chưa có review độc lập.
 - Hạn chế / còn lại: giới hạn ghi trong README mục RAG-22 và `review.md`; môi trường khác cần chạy `refresh_legal_metadata --apply` và khởi động lại backend; thẻ Notion RAG-22 chưa cập nhật.
