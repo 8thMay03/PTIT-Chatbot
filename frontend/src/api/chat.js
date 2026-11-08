@@ -6,19 +6,13 @@ import { ApiError } from "./errors";
  *
  * Toàn bộ chi tiết giao thức stream nằm ở đây; view chỉ xử lý loại event.
  */
-export async function* streamChat({
-  message,
-  conversationId = null,
-  topK = 4,
-  signal,
-}) {
+export async function* streamChat({ message, conversationId = null, topK, signal }) {
+  const body = { message, conversation_id: conversationId };
+  // Không gửi `top_k` thì server dùng mặc định admin cấu hình (`RETRIEVAL_DEFAULT_TOP_K`).
+  if (typeof topK === "number") body.top_k = topK;
   const response = await request("chat/stream", {
     method: "POST",
-    body: {
-      message,
-      conversation_id: conversationId,
-      top_k: topK,
-    },
+    body,
     signal,
     responseType: "stream",
   });

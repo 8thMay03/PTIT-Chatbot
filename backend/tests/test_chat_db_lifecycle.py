@@ -27,6 +27,7 @@ from sqlalchemy import create_engine, event, select, text
 from sqlalchemy.orm import sessionmaker
 
 from app.api import routes
+from app.core.auth import anon_owner_key
 from app.db import get_session, get_session_factory
 from app.db.models import Base, Conversation, Message
 from app.llm import CONTENT_DELTA, LLMStreamError, StreamDelta
@@ -358,6 +359,9 @@ async def test_interrupted_stream_saves_partial_answer(chat_db, fake_retrieval, 
     assert [m["role"] for m in messages] == ["user", "assistant"]
     assert messages[0]["content"] == "Học phí?"
     assert messages[1]["content"].startswith("Học phí")
+    # FE-15: chi tiết hội thoại cho biết câu trả lời bị dừng.
+    assert (messages[0]["interrupted"], messages[0]["error"]) == (False, None)
+    assert (messages[1]["interrupted"], messages[1]["error"]) == (True, None)
 
     user, assistant = _messages(factory, conversation_id)
     assert assistant.message_metadata["interrupted"] is True
@@ -511,6 +515,8 @@ async def test_disconnect_before_delta_keeps_question(chat_db, monkeypatch) -> N
     assert user.message_metadata == {}
     assert (assistant.role, assistant.content) == ("assistant", "")
     assert assistant.message_metadata["interrupted"] is True
+    restored = _client_with_sid(sid).get(f"/api/conversations/{events[0]['conversation_id']}").json()
+    assert [(m["content"], m["interrupted"]) for m in restored["messages"]] == [("Học phí?", False), ("", True)]
 
 
 def test_retrieval_error_keeps_question_and_records_error(chat_db, monkeypatch) -> None:
@@ -521,8 +527,9 @@ def test_retrieval_error_keeps_question_and_records_error(chat_db, monkeypatch) 
         raise RuntimeError("vector store down")
 
     monkeypatch.setattr(routes.rag_chain, "iter_retrieve_context", failing_retrieve)
+    sid = _new_sid()
 
-    response = _client_with_sid(_new_sid()).post("/api/chat/stream", json={"message": "Học phí?"})
+    response = _client_with_sid(sid).post("/api/chat/stream", json={"message": "Học phí?"})
 
     events = _parse_ndjson(response.text)
     assert [e["type"] for e in events] == ["start", "step", "error"]
@@ -539,6 +546,13 @@ def test_retrieval_error_keeps_question_and_records_error(chat_db, monkeypatch) 
         "error_class": "RuntimeError",
     }
     assert "interrupted" not in assistant.message_metadata
+    # FE-15: mở lại hội thoại thấy lỗi + mã tham chiếu, không lộ tên lớp exception.
+    detail = _client_with_sid(sid).get(f"/api/conversations/{events[0]['conversation_id']}")
+    restored = detail.json()["messages"][1]
+    assert restored["error"] == {"type": "retrieval", "request_id": request_id}
+    assert restored["interrupted"] is False
+    assert "error_class" not in detail.text
+    assert "RuntimeError" not in detail.text
 
 
 def test_empty_error_answer_is_excluded_from_next_turn_history(chat_db, monkeypatch) -> None:
@@ -652,3 +666,41 @@ def test_stream_logs_answer_save_failure(chat_db, fake_retrieval, monkeypatch, c
     assert counter.checked_out == 0
     # Câu hỏi đã được lưu ở pha (a); câu trả lời không lưu được (đã rollback).
     assert [m.role for m in _messages(factory, conversation_id)] == ["user"]
+
+
+# ==========================================
+# FE-15: metadata interrupted/error trong chi tiết hội thoại
+# ==========================================
+def test_conversation_detail_reads_status_metadata_defensively(chat_db, admin_client) -> None:
+    """Metadata thiếu hoặc sai kiểu -> mặc định; route admin trả cùng trường."""
+    factory, _ = chat_db
+    sid = _new_sid()
+    cases = [
+        (None, False, None),
+        ({}, False, None),
+        ({"interrupted": True}, True, None),
+        ({"interrupted": "yes"}, False, None),
+        (
+            {"error": {"type": "llm_stream", "request_id": "abc123", "error_class": "LLMStreamError"}},
+            False,
+            {"type": "llm_stream", "request_id": "abc123"},
+        ),
+        ({"error": {"type": "internal", "request_id": 42}}, False, {"type": "internal", "request_id": None}),
+        ({"error": {"request_id": "abc"}}, False, None),
+        ({"error": "boom"}, False, None),
+    ]
+    with factory() as session:
+        conversation = routes.ensure_conversation(session, None, user_id=anon_owner_key(sid))
+        conversation_id = conversation.id
+        for metadata, _, _ in cases:
+            routes.add_message(session, conversation_id, "assistant", "", metadata=metadata)
+        session.commit()
+
+    expected = [(interrupted, error) for _, interrupted, error in cases]
+    for response in (
+        _client_with_sid(sid).get(f"/api/conversations/{conversation_id}"),
+        admin_client.get(f"/api/admin/conversations/{conversation_id}"),
+    ):
+        assert response.status_code == 200, response.text
+        assert [(m["interrupted"], m["error"]) for m in response.json()["messages"]] == expected
+        assert "error_class" not in response.text

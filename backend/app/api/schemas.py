@@ -649,6 +649,13 @@ class ConversationListResponse(BaseModel):
     conversations: list[ConversationItem]
 
 
+class ConversationMessageError(BaseModel):
+    """Lỗi đã lưu của một câu trả lời (``metadata.error``), không gồm tên lớp exception."""
+
+    type: str  # retrieval | answer | llm_stream | internal
+    request_id: str | None = None
+
+
 class ConversationMessage(BaseModel):
     id: str
     role: str
@@ -658,6 +665,9 @@ class ConversationMessage(BaseModel):
     # cũ (trước khi có trường này) sẽ trả về None/rỗng.
     reasoning: str | None = None
     steps: list[dict] = Field(default_factory=list)
+    # Câu trả lời bị dừng khi client ngắt stream (``metadata.interrupted``).
+    interrupted: bool = False
+    error: ConversationMessageError | None = None
     created_at: datetime | None = None
 
 
