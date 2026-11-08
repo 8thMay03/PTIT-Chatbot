@@ -1,4 +1,5 @@
 from app.generation.citations import numbered_contexts
+from app.generation.refusal import NO_CONTEXT_ANSWER
 from app.guardrails import OUT_OF_SCOPE_ANSWER
 
 
@@ -72,5 +73,6 @@ def build_context_prompt(
         "- Gắn citation [n] ngay sau từng thông tin được lấy từ tài liệu.\n"
         "- Khi phù hợp, nêu rõ Điều/Khoản/Điểm theo vị trí trích dẫn đã cung cấp.\n"
         "- Không thêm mục tài liệu tham khảo riêng và không hiển thị đường dẫn file.\n"
+        f"- Câu từ chối khi ngữ cảnh không có thông tin để trả lời: {NO_CONTEXT_ANSWER}\n"
         f"- Câu từ chối ngoài phạm vi: {OUT_OF_SCOPE_ANSWER}"
     )

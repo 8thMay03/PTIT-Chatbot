@@ -1,11 +1,11 @@
 import logging
 import re
-from collections.abc import Iterator
+from collections.abc import Collection, Iterator
 
 from app.core.config import settings
 from app.generation.citations import numbered_contexts, public_citations
-from app.guardrails import OUT_OF_SCOPE_ANSWER
 from app.generation.prompts import SYSTEM_PROMPT, build_context_prompt
+from app.generation.refusal import CITATION_RE, NO_CONTEXT_ANSWER, is_refusal
 from app.llm import (
     CONTENT_DELTA,
     BaseLLMProvider,
@@ -38,7 +38,7 @@ def answer_with_llm(
     budget: LLMBudget | None = None,
 ) -> str:
     if not contexts:
-        return "Mình chưa tìm thấy thông tin phù hợp trong kho tài liệu."
+        return NO_CONTEXT_ANSWER
 
     llm = provider or get_llm_provider()
     if not llm.is_configured():
@@ -71,7 +71,7 @@ def stream_answer_deltas_with_llm(
       ``/chat/stream``) gửi event báo lỗi thay vì nối thêm text dự phòng lộn xộn.
     """
     if not contexts:
-        yield StreamDelta(kind=CONTENT_DELTA, text="Mình chưa tìm thấy thông tin phù hợp trong kho tài liệu.")
+        yield StreamDelta(kind=CONTENT_DELTA, text=NO_CONTEXT_ANSWER)
         return
 
     llm = provider or get_llm_provider()
@@ -130,19 +130,20 @@ def _extractive_answer(contexts: list[dict], reason: str = FALLBACK_UNAVAILABLE)
 
 
 def _normalize_answer_citations(answer: str, contexts: list[dict]) -> str:
-    """Remove invented citation numbers and ensure grounded answers cite a valid source."""
+    """Remove invented citation numbers; never add one (RAG-22).
+
+    Câu từ chối mất mọi ``[n]``. Câu trả lời không có ``[n]`` được giữ nguyên: số
+    citation tự gắn (trước đây là ``[1]``) trỏ vào nguồn không hỗ trợ câu đó.
+    """
     valid_ids = {citation["citation_id"] for citation in public_citations(contexts)}
-    if not answer.strip() or not valid_ids:
-        return answer.strip()
+    if is_refusal(answer, valid_ids):
+        return _strip_citations(answer, keep_ids=())
+    return _strip_citations(answer, keep_ids=valid_ids)
 
-    def keep_valid(match: re.Match[str]) -> str:
-        return match.group(0) if int(match.group(1)) in valid_ids else ""
 
-    normalized = re.sub(r"\[(\d+)\]", keep_valid, answer).strip()
-    if normalized in {"Chưa tìm thấy thông tin này trong tài liệu.", OUT_OF_SCOPE_ANSWER}:
-        return normalized
+def _strip_citations(answer: str, keep_ids: Collection[int]) -> str:
+    def replace(match: re.Match[str]) -> str:
+        return match.group(0) if int(match.group(2)) in keep_ids else ""
 
-    cited_ids = {int(value) for value in re.findall(r"\[(\d+)\]", normalized)}
-    if not cited_ids:
-        normalized = f"{normalized} [{min(valid_ids)}]"
-    return normalized
+    # Xóa cả khoảng trắng ngay trước [n] để không để lại "tài liệu ." sau khi bỏ số.
+    return re.sub(rf"([ \t]*){CITATION_RE.pattern}", replace, answer).strip()

@@ -286,3 +286,38 @@ def test_rag_chain_supports_pluggable_llm_provider() -> None:
     assert result["answer"] == "Câu trả lời từ CustomTestProvider [1]"
     assert len(result["sources"]) == 1
 
+
+
+class _FixedAnswerProvider:
+    def __init__(self, answer: str) -> None:
+        self.answer = answer
+
+    def is_configured(self) -> bool:
+        return True
+
+    def generate(self, messages, **kwargs) -> str:
+        return self.answer
+
+
+def _chain_answer(llm_answer: str) -> dict:
+    chain = RagChain(
+        retriever_=CapturingRetriever(),
+        multi_query_generator=SingleQueryGenerator(),
+        llm_provider=_FixedAnswerProvider(llm_answer),
+    )
+    return chain.answer("Học phí PTIT?")
+
+
+def test_rag_chain_keeps_uncited_answer_and_sources_without_adding_citation() -> None:
+    result = _chain_answer("Tài liệu chưa đề cập mức phạt khi đóng học phí trễ.")
+
+    assert result["answer"] == "Tài liệu chưa đề cập mức phạt khi đóng học phí trễ."
+    assert len(result["sources"]) == 1
+
+
+def test_rag_chain_llm_refusal_has_no_citation_and_no_sources() -> None:
+    result = _chain_answer("Xin lỗi, chưa tìm thấy thông tin này trong tài liệu được cung cấp [1].")
+
+    assert result["answer"] == "Xin lỗi, chưa tìm thấy thông tin này trong tài liệu được cung cấp."
+    assert result["sources"] == []
+    assert len(result["contexts"]) == 1

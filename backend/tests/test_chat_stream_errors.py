@@ -220,3 +220,37 @@ async def test_stream_hides_reasoning_when_disabled(monkeypatch) -> None:
     assert done_event["reasoning"] is None
     assistant = stored_messages[-1]
     assert "reasoning" not in assistant["metadata"]
+
+
+async def _stream_answer(monkeypatch, llm_answer: str) -> tuple[dict, dict]:
+    stored_messages: list[dict] = []
+    _prepare(monkeypatch, stored_messages)
+
+    def fake_stream(question, contexts, history=None, provider=None, budget=None):
+        yield StreamDelta(kind=CONTENT_DELTA, text=llm_answer)
+
+    monkeypatch.setattr(routes, "stream_answer_deltas_with_llm", fake_stream)
+    response = routes.chat_stream(ChatRequest(message="Học phí?"), session_factory=_fake_session_factory)
+    events = await _read_events(response)
+    assert events[-1]["type"] == "done"
+    return events[-1], stored_messages[-1]
+
+
+async def test_stream_done_keeps_uncited_answer_and_sources(monkeypatch) -> None:
+    done_event, assistant = await _stream_answer(monkeypatch, "Tài liệu chưa đề cập mức phạt [9].")
+
+    assert done_event["answer"] == "Tài liệu chưa đề cập mức phạt."
+    assert [source["citation_id"] for source in done_event["sources"]] == [1]
+    assert assistant["content"] == "Tài liệu chưa đề cập mức phạt."
+    assert len(assistant["metadata"]["sources"]) == 1
+
+
+async def test_stream_refusal_has_no_citation_and_no_sources(monkeypatch) -> None:
+    done_event, assistant = await _stream_answer(
+        monkeypatch, "**Xin lỗi, chưa tìm thấy thông tin này trong tài liệu** [1]."
+    )
+
+    assert done_event["answer"] == "**Xin lỗi, chưa tìm thấy thông tin này trong tài liệu**."
+    assert done_event["sources"] == []
+    assert assistant["content"] == done_event["answer"]
+    assert assistant["metadata"]["sources"] == []
