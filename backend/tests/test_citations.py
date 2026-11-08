@@ -54,3 +54,29 @@ def test_parent_context_uses_child_evidence_for_precise_clause_citation() -> Non
 
     assert citation["clauses"] == ["2"]
     assert citation["locator"] == "Điều 12. Thu học phí — Khoản 2"
+
+
+def test_numbered_steps_outside_an_article_are_not_clauses_or_points() -> None:
+    citation = public_citations([{
+        "source_name": "so-tay.md",
+        "heading": "Thủ tục xin cấp bảng điểm",
+        "section_path": "Sổ tay > Thủ tục > Thủ tục xin cấp bảng điểm",
+        "text": "## Thủ tục xin cấp bảng điểm\n\n1. Nộp đơn.\n2) Đóng lệ phí.\n\na) Bản sao.\nb. Ảnh.",
+    }])[0]
+
+    assert citation["article"] is None
+    assert citation["clauses"] == []
+    assert citation["points"] == []
+    assert citation["locator"] == "Thủ tục xin cấp bảng điểm"
+
+
+def test_numbered_table_cells_are_not_clauses() -> None:
+    citation = public_citations([{
+        "source_name": "so-tay.md",
+        "heading": "Điều 9. Mức thu",
+        "section_path": "Quy định > Điều 9. Mức thu",
+        "text": "| STT | Nội dung |\n| --- | --- |\n| 1. | Học phí |",
+    }])[0]
+
+    assert citation["clauses"] == []
+    assert citation["locator"] == "Điều 9. Mức thu"
