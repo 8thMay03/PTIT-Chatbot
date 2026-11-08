@@ -81,7 +81,8 @@ Kết quả cần có:
 - Còn lại: AC-02 (gõ IME thật) cần người yêu cầu thao tác; AC-03 phần đổi top_k trong màn Cấu hình admin chưa chạy (cần đăng nhập admin). Xem `verification.md` V-02, V-03.
 - Blocker: không (chờ người yêu cầu kiểm IME thật).
 - Review vòng 2 (`claude-review-fe15`, độc lập với phần triển khai): `approved`; R-04, R-05, R-06 mở, `low`, không bắt buộc.
-- Bước tiếp theo: merge vào `dev` theo yêu cầu người yêu cầu (PR ghi bên dưới); người yêu cầu làm V-02 (+ V-03 bước 3) trên `dev` rồi đóng task. R-04..R-06 xử lý ở lượt sau nếu người yêu cầu muốn.
+- PR: #57 (https://github.com/8thMay03/PTIT-Chatbot/pull/57) (merge vào `dev`).
+- Bước tiếp theo: người yêu cầu làm V-02 (+ V-03 bước 3) trên `dev` rồi đóng task. R-04..R-06 xử lý ở lượt sau nếu người yêu cầu muốn.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 

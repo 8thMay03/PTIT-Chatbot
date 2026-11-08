@@ -85,5 +85,5 @@ Ghi chú working tree: các file backend khác bị đánh dấu `M` trên `dev`
 - Nhánh: `feat/chat-composer-ime-stop` (từ `dev` @ `6be857f`); commit mã `fd5d60b`, hồ sơ task `1fe690d`.
 - File: `backend/app/api/{schemas,routes}.py`, `backend/tests/test_chat_db_lifecycle.py`, `frontend/src/{ChatView.jsx,ChatView.test.jsx}`, `frontend/src/api/{chat.js,chat.test.js}`, `frontend/src/landing/{HeroComposer.jsx,HeroComposer.test.jsx}`, `frontend/src/lib/{keyboard.js,keyboard.test.js}`, `frontend/src/styles/chat.css`.
 - Giao diện ảnh hưởng: `ConversationMessage` thêm `interrupted`, `error{type, request_id}` (cộng thêm, có mặc định); `streamChat` không còn mặc định `top_k`; `onConversationSaved` gọi ở cả `start` và `done`.
-- 2026-11-08T10:13:38+07:00: theo yêu cầu "commit và merge vào dev" của người yêu cầu, push nhánh và merge vào `dev` qua PR (không sửa R-04..R-06, còn mở, `low`).
+- 2026-11-08T10:13:38+07:00: theo yêu cầu "commit và merge vào dev" của người yêu cầu, push nhánh và merge vào `dev` qua PR #57 (https://github.com/8thMay03/PTIT-Chatbot/pull/57) (không sửa R-04..R-06, còn mở, `low`).
 - Người nhận / bước tiếp theo: người yêu cầu làm V-02 trên `dev`; R-04..R-06 nếu muốn sửa thì mở lượt mới; cập nhật Notion FE-15 khi được phép.
