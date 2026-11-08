@@ -14,7 +14,8 @@
 | `ab00217` docs: add RAG-18 confidence gate measurements and threshold report | S-06 |
 | `704f08b` docs: clarify how corpus size still affects bm25_norm_score | sửa sau self-review (R-01) |
 
-- Chờ: quyết định của người dùng về reranker mặc định (xem `MSG-agent-claude-002`), push + PR vào `dev`, cập nhật thẻ Notion RAG-18.
+- PR: [#56](https://github.com/8thMay03/PTIT-Chatbot/pull/56) vào `dev` (mở 2026-11-08 theo yêu cầu người dùng).
+- Chờ: quyết định của người dùng về reranker mặc định (AC-03, `MSG-agent-claude-002`), merge PR, cập nhật thẻ Notion RAG-18.
 
 ## Nhật ký theo nhiệm vụ
 

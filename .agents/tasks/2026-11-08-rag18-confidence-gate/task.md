@@ -64,7 +64,7 @@ Hệ quả: LLM vẫn được gọi với context yếu, tăng nguy cơ bịa h
 
 - Tóm tắt: S-01…S-06 xong trên nhánh `feat/rag18-confidence-gate` (`bcd6cd0..704f08b`, chưa push). Gate mới: AND trên `bm25_norm ≥ 0.25`, cosine ≥ 0.37 (`text-embedding-3-small`), cross-encoder ≥ −1.65 (chỉ khi provider `cross-encoder`). Báo cáo `documents/rag-eval/rag-18/`. Self-review `approved`.
 - Blocker: không có blocker kỹ thuật. AC-04 đã được người dùng xác nhận tính gate-only; còn chờ quyết định về reranker mặc định cho AC-03 (`MSG-agent-claude-002`).
-- Bước tiếp theo: PR vào `dev` đã mở theo yêu cầu người dùng; chờ quyết định AC-03 và merge, sau đó cập nhật thẻ Notion và chuyển `done`.
+- Bước tiếp theo: PR [#56](https://github.com/8thMay03/PTIT-Chatbot/pull/56) vào `dev` đã mở theo yêu cầu người dùng; chờ quyết định AC-03 và merge, sau đó cập nhật thẻ Notion và chuyển `done`.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
