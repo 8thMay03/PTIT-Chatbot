@@ -35,8 +35,15 @@ def _citation_metadata(context: dict) -> dict:
     section_path = str(context.get("section_path") or "").strip()
     heading = str(context.get("heading") or "").strip()
     text = str(context.get("evidence_text") or context.get("text") or "")
-    units = extract_legal_units(heading, section_path, text)
-    article, clauses, points = units.article, units.clauses, units.points
+    if "legal_clauses" in context:
+        # Tính lúc chunking, có Khoản kế thừa từ chunk trước (RAG-22).
+        article = context.get("legal_article") or None
+        clauses = [str(value) for value in context.get("legal_clauses") or []]
+        points = [str(value) for value in context.get("legal_points") or []]
+    else:
+        # Chunk cũ chưa backfill: cùng quy tắc nhưng không biết Khoản đang mở.
+        units = extract_legal_units(heading, section_path, text)
+        article, clauses, points = units.article, units.clauses, units.points
     locator = _build_locator(article, clauses, points, heading, section_path)
     return {
         "citation_id": 0,

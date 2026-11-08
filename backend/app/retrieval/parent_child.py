@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.ingestion.legal_units import LEGAL_METADATA_KEYS, copy_legal_metadata
+
 
 def collapse_parent_results(results: list[dict], top_k: int) -> list[dict]:
     """Group child hits by parent and expose parent text with child evidence."""
@@ -44,6 +46,10 @@ def collapse_parent_results(results: list[dict], top_k: int) -> list[dict]:
             entry["chunk_index"] = result.get("chunk_index")
             entry["child_index"] = result.get("child_index")
             entry["evidence_text"] = str(result.get("text") or "")
+            # Điều/Khoản/Điểm đi theo child bằng chứng, cùng lúc với evidence_text.
+            for key in LEGAL_METADATA_KEYS:
+                entry.pop(key, None)
+            copy_legal_metadata(result, entry)
             entry["_best_child_score"] = score
 
     output = list(grouped.values())

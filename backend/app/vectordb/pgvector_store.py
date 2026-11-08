@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Chunk
 from app.db.session import SessionLocal
+from app.ingestion.legal_units import copy_legal_metadata
 
 
 class PgVectorStore:
@@ -209,4 +210,4 @@ def _format_chunk_context(chunk: Chunk, score: float) -> dict[str, Any]:
                 "chunk_type": metadata.get("chunk_type", "child"),
             }
         )
-    return context
+    return copy_legal_metadata(metadata, context)

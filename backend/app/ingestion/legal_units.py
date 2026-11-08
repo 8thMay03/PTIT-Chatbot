@@ -24,6 +24,9 @@ _BODY_ARTICLE_RE = re.compile(r"^\s*(?:[-*]\s+)?(?:\*\*|__)?\s*Điều\s+\d+[a-z
 _MARKDOWN_HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s")
 _HTML_TABLE_START_RE = re.compile(r"<table\b", re.IGNORECASE)
 _HTML_TABLE_END_RE = re.compile(r"</table\s*>", re.IGNORECASE)
+# Khóa metadata chunk/context. Có khóa ``legal_clauses`` (kể cả rỗng) = giá trị tính lúc
+# chunking; không có = chunk cũ, citation tự tính lại (không kế thừa Khoản).
+LEGAL_METADATA_KEYS = ("legal_article", "legal_clauses", "legal_points")
 
 
 @dataclass(frozen=True)
@@ -92,6 +95,25 @@ def extract_legal_units(
         points=points[:MAX_UNITS],
         last_clause=current,
     )
+
+
+def legal_metadata(chunk: object) -> dict:
+    """Khóa ``legal_*`` để ghi vào metadata chunk (Chunk hoặc ParentChildChunk)."""
+
+    return {
+        "legal_article": getattr(chunk, "legal_article", None),
+        "legal_clauses": list(getattr(chunk, "legal_clauses", ())),
+        "legal_points": list(getattr(chunk, "legal_points", ())),
+    }
+
+
+def copy_legal_metadata(metadata: dict, target: dict) -> dict:
+    """Chép các khóa ``legal_*`` có trong ``metadata`` sang ``target``; không có thì bỏ qua."""
+
+    for key in LEGAL_METADATA_KEYS:
+        if key in metadata:
+            target[key] = metadata[key]
+    return target
 
 
 def clean_legal_text(value: str) -> str:

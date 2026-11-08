@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import re
 
 from app.ingestion.cleaner import clean_text
+from app.ingestion.legal_units import LegalUnits, extract_legal_units
 
 _HR_ONLY = re.compile(r"^(\*\s*){3,}$|^(-\s*){3,}$|^(_\s*){3,}$")
 _HTML_TABLE_START = re.compile(r"<table\b", re.IGNORECASE)
@@ -29,6 +30,10 @@ class Chunk:
     heading: str = ""
     heading_level: int | None = None
     section_path: str = ""
+    # Điều/Khoản/Điểm theo cấu trúc (RAG-22); Khoản/Điểm rỗng khi không thuộc Điều.
+    legal_article: str | None = None
+    legal_clauses: tuple[str, ...] = ()
+    legal_points: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -51,6 +56,9 @@ class ParentChildChunk:
     heading: str = ""
     heading_level: int | None = None
     section_path: str = ""
+    legal_article: str | None = None
+    legal_clauses: tuple[str, ...] = ()
+    legal_points: tuple[str, ...] = ()
 
 
 def compose_search_text(document_title: str, section_path: str, text: str) -> str:
@@ -131,6 +139,8 @@ def split_parent_child(
 
         parent_min = min(min_child, parent_budget)
         parent_bodies = _split_body_pieces(body, parent_budget, parent_overlap, min_len=parent_min)
+        # Khoản đang mở chạy qua mọi child của section, kể cả khi section có nhiều parent.
+        open_clause: str | None = None
         for parent_body in parent_bodies:
             parent_text = f"{heading_context}{parent_body}".strip()
             child_budget = child_size - len(heading_context)
@@ -143,9 +153,12 @@ def split_parent_child(
                 child_bodies = [parent_body]
 
             for child_index, child_body in enumerate(child_bodies):
+                child_text = f"{child_context}{child_body}".strip()
+                units = extract_legal_units(section.heading, section.section_path, child_text, open_clause)
+                open_clause = units.last_clause
                 output.append(
                     ParentChildChunk(
-                        text=f"{child_context}{child_body}".strip(),
+                        text=child_text,
                         index=len(output),
                         parent_text=parent_text,
                         parent_index=parent_counter,
@@ -153,6 +166,9 @@ def split_parent_child(
                         heading=section.heading,
                         heading_level=section.heading_level,
                         section_path=section.section_path,
+                        legal_article=units.article,
+                        legal_clauses=tuple(units.clauses),
+                        legal_points=tuple(units.points),
                     )
                 )
             parent_counter += 1
@@ -441,11 +457,16 @@ def _split_section(
         body_chunk_size = chunk_size
 
     pieces = _split_body_pieces(body, body_chunk_size, chunk_overlap, min_len=min_chunk_len)
-    return [
-        _build_chunk(f"{heading_context}{piece}".strip(), section, start_index + offset)
-        for offset, piece in enumerate(pieces)
-        if piece.strip()
-    ]
+    chunks: list[Chunk] = []
+    open_clause: str | None = None
+    for offset, piece in enumerate(pieces):
+        if not piece.strip():
+            continue
+        text = f"{heading_context}{piece}".strip()
+        units = extract_legal_units(section.heading, section.section_path, text, open_clause)
+        open_clause = units.last_clause
+        chunks.append(_build_chunk(text, section, start_index + offset, units))
+    return chunks
 
 
 def _separate_heading(section: Section) -> tuple[str, str]:
@@ -1258,14 +1279,17 @@ def _tail_at_word_boundary(text: str, overlap: int) -> str:
     return text[start:]
 
 
-def _build_chunk(text: str, section: Section, index: int) -> Chunk:
-    """Create a Chunk with text content and inherited section metadata."""
+def _build_chunk(text: str, section: Section, index: int, units: LegalUnits) -> Chunk:
+    """Create a Chunk with text content, inherited section metadata and legal units."""
     return Chunk(
         text=text,
         index=index,
         heading=section.heading,
         heading_level=section.heading_level,
         section_path=section.section_path,
+        legal_article=units.article,
+        legal_clauses=tuple(units.clauses),
+        legal_points=tuple(units.points),
     )
 
 
