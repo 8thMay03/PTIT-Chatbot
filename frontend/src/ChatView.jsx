@@ -3,6 +3,7 @@ import {
   ArrowDown,
   BookOpen,
   Check,
+  CircleAlert,
   Copy,
   GraduationCap,
   Lightbulb,
@@ -13,9 +14,10 @@ import {
   Square,
   WifiOff,
 } from "lucide-react";
-import { chatApi, conversationsApi, describeError, isAbortError } from "./api";
+import { ApiError, chatApi, conversationsApi, describeError, fieldErrors, isAbortError } from "./api";
 import MarkdownView, { preloadMarkdownView } from "./components/LazyMarkdownView";
 import ReasoningPanel from "./components/ReasoningPanel";
+import { isSubmitEnter } from "./lib/keyboard";
 import SplitWords from "./lib/motion/SplitWords";
 
 const SUGGESTIONS = [
@@ -76,6 +78,54 @@ function describeChatError(error, overrides = {}) {
   return describeError(error, { ...CHAT_ERROR_CONTEXT, ...overrides });
 }
 
+/**
+ * Giới hạn độ dài câu hỏi, khớp mặc định `CHAT_MESSAGE_MAX_CHARS` của backend.
+ * Backend vẫn quyết định: nếu env đổi, 422 `message_too_long` hiện thông điệp của
+ * server (đã gồm số tối đa thật). JS đếm theo UTF-16 còn Python đếm code point nên
+ * emoji tính 2 ở client: client chặn sớm hơn, không bao giờ muộn hơn.
+ */
+const CHAT_MESSAGE_MAX_CHARS = 2000;
+// Chỉ hiện bộ đếm khi đã gần giới hạn.
+const CHAT_COUNTER_FROM = 1600;
+
+/**
+ * Lỗi HTTP (mọi mã) hoặc mạng/timeout trước event `start`: backend chưa lưu gì
+ * (pha mở lượt chat ghi câu hỏi trong cùng một commit), nên UI gỡ cặp tin tạm.
+ */
+function isRejectedBeforeStart(error) {
+  return error instanceof ApiError && ["http", "network", "timeout"].includes(error.code);
+}
+
+/** Thông báo ở khung nhập cho lượt bị từ chối trước khi lưu. */
+function describeRejectedSend(error) {
+  if (error.status === 413) {
+    return {
+      title: "Câu hỏi quá dài",
+      detail: `Rút gọn câu hỏi (tối đa ${CHAT_MESSAGE_MAX_CHARS} ký tự) rồi gửi lại.`,
+    };
+  }
+  if (error.status === 422) {
+    // Lỗi theo trường của FastAPI: bỏ tiền tố "message:" mà `extractDetail` ghép vào.
+    return { title: "Chưa gửi được câu hỏi", detail: fieldErrors(error).message || error.detail };
+  }
+  // 429 gồm "gửi quá nhiều" và "câu trả lời trước vẫn đang được tạo": dùng thông
+  // điệp của backend, không dùng tiêu đề mặc định về nhà cung cấp LLM.
+  return describeChatError(error, { rateLimitTitle: "Chưa gửi được câu hỏi" });
+}
+
+/** Lỗi đã lưu của một câu trả lời (`error` trong chi tiết hội thoại). */
+function describeRestoredError(error) {
+  const detail =
+    error.type === "llm_stream"
+      ? "Mô hình bị gián đoạn khi đang trả lời. Thử gửi lại câu hỏi."
+      : "Hệ thống gặp lỗi khi tạo câu trả lời này. Thử gửi lại câu hỏi.";
+  return {
+    kind: "restored",
+    title: "Câu trả lời bị gián đoạn",
+    detail: error.request_id ? `${detail} Mã tham chiếu: ${error.request_id}` : detail,
+  };
+}
+
 // Renderer Markdown là chunk riêng: tải song song ngay khi module chat được nạp.
 preloadMarkdownView().catch(() => {});
 
@@ -94,13 +144,14 @@ const ChatView = forwardRef(function ChatView(
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [atBottom, setAtBottom] = useState(true);
   const [liveStatus, setLiveStatus] = useState("");
+  // Lượt bị từ chối trước khi lưu (429/422/413, mất mạng): báo ngay tại khung nhập.
+  const [composerAlert, setComposerAlert] = useState(null);
 
   const messagesRef = useRef(null);
   const textareaRef = useRef(null);
   const abortRef = useRef(null);
   const conversationAbortRef = useRef(null);
   const bottomRef = useRef(null);
-  const lastQuestionRef = useRef("");
 
   // Chỉ hiện màn chào khi chưa có hội thoại nào được mở: một hội thoại cũ chỉ
   // gồm đúng một tin nhắn vẫn là hội thoại thật, không phải trạng thái ban đầu.
@@ -162,6 +213,7 @@ const ChatView = forwardRef(function ChatView(
       },
     ]);
     setInput("");
+    setComposerAlert(null);
     setHighlightedSource(null);
     setAtBottom(true);
   }, [loading]);
@@ -177,16 +229,24 @@ const ChatView = forwardRef(function ChatView(
       setMessages([{ role: "assistant", content: "", sources: [], streaming: true }]);
       try {
         const payload = await conversationsApi.get(id, { signal: controller.signal });
-        const restored = (payload.messages ?? []).map((message, index) => ({
-          role: message.role,
-          enterDelay: Math.min(index, RESTORE_STAGGER_MAX) * RESTORE_STAGGER_MS,
-          content: message.content,
-          sources: message.sources ?? [],
-          // Reasoning/steps lưu trong metadata: mở lại hội thoại vẫn xem được.
-          reasoning: message.reasoning ?? "",
-          steps: message.steps ?? [],
-          reasoningOpen: false,
-        }));
+        const restored = (payload.messages ?? []).map((message, index) => {
+          const item = {
+            role: message.role,
+            enterDelay: Math.min(index, RESTORE_STAGGER_MAX) * RESTORE_STAGGER_MS,
+            content: message.content,
+            sources: message.sources ?? [],
+            // Reasoning/steps lưu trong metadata: mở lại hội thoại vẫn xem được.
+            reasoning: message.reasoning ?? "",
+            steps: message.steps ?? [],
+            reasoningOpen: false,
+            stopped: message.interrupted === true,
+          };
+          // Hiện như lúc lỗi trực tiếp: bubble lỗi thay cho phần text dở dang.
+          if (message.error) {
+            return { ...item, content: "", sources: [], error: describeRestoredError(message.error) };
+          }
+          return item;
+        });
         setMessages(restored.length ? restored : [{ role: "assistant", content: GREETING, sources: [] }]);
         setConversationId(id);
         setAtBottom(true);
@@ -276,10 +336,11 @@ const ChatView = forwardRef(function ChatView(
   async function sendMessage(event, overrideText) {
     event?.preventDefault();
     const text = (overrideText ?? input).trim();
-    if (!text || loading) return;
+    if (!text || loading || text.length > CHAT_MESSAGE_MAX_CHARS) return;
 
-    setInput("");
-    lastQuestionRef.current = text;
+    // Câu từ gợi ý/Thử lại không lấy từ ô nhập: giữ nguyên chữ người dùng đang gõ.
+    if (overrideText === undefined) setInput("");
+    setComposerAlert(null);
     setAtBottom(true);
     setMessages((current) => [
       ...current,
@@ -299,16 +360,21 @@ const ChatView = forwardRef(function ChatView(
 
     const controller = new AbortController();
     abortRef.current = controller;
+    let started = false;
 
     try {
+      // Không gửi top_k: server dùng mặc định admin cấu hình.
       for await (const eventData of chatApi.streamChat({
         message: text,
         conversationId,
-        topK: 4,
         signal: controller.signal,
       })) {
         if (eventData.type === "start") {
+          started = true;
           setConversationId(eventData.conversation_id);
+          // Server đã tạo hội thoại và lưu câu hỏi: đưa lên sidebar ngay, kể cả
+          // khi lượt này bị dừng hoặc lỗi sau đó.
+          onConversationSaved?.(eventData.conversation_id);
         } else if (eventData.type === "step") {
           appendStep(eventData);
           if (STEP_STATUS_TEXT[eventData.step]) {
@@ -350,6 +416,16 @@ const ChatView = forwardRef(function ChatView(
       }
     } catch (error) {
       if (isAbortError(error)) return;
+      if (!started && isRejectedBeforeStart(error)) {
+        // Server chưa lưu lượt này: gỡ cặp tin tạm, trả câu hỏi về ô nhập (không đè
+        // chữ người dùng đã gõ tiếp) và báo lỗi tại khung nhập.
+        const described = describeRejectedSend(error);
+        setMessages((current) => current.slice(0, -2));
+        setInput((current) => (current.trim() ? current : text));
+        setComposerAlert(described);
+        setLiveStatus(`Lỗi: ${described.title}`);
+        return;
+      }
       failLastMessage(error);
     } finally {
       setLoading(false);
@@ -357,18 +433,25 @@ const ChatView = forwardRef(function ChatView(
     }
   }
 
-  function retryLastQuestion() {
-    if (!lastQuestionRef.current || loading) return;
-    // Bỏ cặp câu hỏi + câu trả lời lỗi rồi hỏi lại, tránh nhân đôi câu hỏi trong lịch sử.
-    setMessages((current) => current.slice(0, -2));
-    sendMessage(null, lastQuestionRef.current);
+  /** Câu hỏi của người dùng ngay trước tin trả lời ở `index`. */
+  function questionBefore(index) {
+    const previous = messages[index - 1];
+    return previous?.role === "user" ? previous.content : "";
+  }
+
+  function retryQuestion(index) {
+    const question = questionBefore(index);
+    if (!question || loading) return;
+    // Server đã lưu cặp hỏi–đáp lỗi: giữ nguyên cặp đó và gửi lại như một lượt mới,
+    // để UI khớp với hội thoại khi mở lại.
+    sendMessage(null, question);
   }
 
   function stopStreaming() {
     abortRef.current?.abort();
     setMessages((current) =>
       current.map((message, index) =>
-        index === current.length - 1 ? { ...message, streaming: false } : message
+        index === current.length - 1 ? { ...message, streaming: false, stopped: true } : message
       )
     );
     setLoading(false);
@@ -386,11 +469,16 @@ const ChatView = forwardRef(function ChatView(
   }
 
   function onKeyDown(event) {
-    if (event.key === "Enter" && !event.shiftKey) {
+    // Enter chốt chữ IME không bị chặn: bộ gõ cần nó để xác nhận chữ đang soạn.
+    if (isSubmitEnter(event)) {
       event.preventDefault();
       sendMessage(event);
     }
   }
+
+  const questionLength = input.trim().length;
+  const tooLong = questionLength > CHAT_MESSAGE_MAX_CHARS;
+  const showCounter = questionLength >= CHAT_COUNTER_FROM;
 
   function onMessageClick(event) {
     const chip = event.target.closest(".citation-chip");
@@ -516,15 +604,17 @@ const ChatView = forwardRef(function ChatView(
                         <div className="chat-error-body">
                           <strong>{message.error.title}</strong>
                           <p>{message.error.detail}</p>
-                          <button
-                            type="button"
-                            className="chat-retry-btn"
-                            onClick={retryLastQuestion}
-                            disabled={loading}
-                          >
-                            <RotateCcw size={13} />
-                            Thử lại
-                          </button>
+                          {questionBefore(index) && (
+                            <button
+                              type="button"
+                              className="chat-retry-btn"
+                              onClick={() => retryQuestion(index)}
+                              disabled={loading}
+                            >
+                              <RotateCcw size={13} />
+                              Thử lại
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -546,10 +636,13 @@ const ChatView = forwardRef(function ChatView(
                       />
                       {message.streaming && <span className="typing-cursor" aria-hidden="true" />}
                     </div>
+                  ) : message.stopped ? (
+                    <div className="bubble is-stopped">Đã dừng trước khi có câu trả lời.</div>
                   ) : null}
 
                   {!message.streaming && message.content && (
-                    <div className="bubble-actions">
+                    <div className={`bubble-actions ${message.stopped ? "is-pinned" : ""}`.trim()}>
+                      {message.stopped && <span className="message-status">Đã dừng</span>}
                       <button
                         className={`copy-btn ${copiedIndex === index ? "copied" : ""}`}
                         onClick={() => copyMessage(index, message.content)}
@@ -615,6 +708,15 @@ const ChatView = forwardRef(function ChatView(
       )}
 
       <div className="composer-shell">
+        {composerAlert && (
+          <div className="composer-alert" role="alert">
+            <CircleAlert size={16} aria-hidden="true" />
+            <div>
+              <strong>{composerAlert.title}</strong>
+              <p>{composerAlert.detail}</p>
+            </div>
+          </div>
+        )}
         <form className={`composer ${loading ? "is-busy" : ""}`.trim()} onSubmit={sendMessage}>
           <span className="composer-glow" aria-hidden="true" />
           <label className="sr-only" htmlFor="chat-input">
@@ -624,10 +726,15 @@ const ChatView = forwardRef(function ChatView(
             id="chat-input"
             ref={textareaRef}
             value={input}
-            onChange={(event) => setInput(event.target.value)}
+            onChange={(event) => {
+              setInput(event.target.value);
+              setComposerAlert(null);
+            }}
             onKeyDown={onKeyDown}
             placeholder="Hỏi về học phí, quy chế, kế hoạch đào tạo..."
             rows={1}
+            aria-invalid={tooLong || undefined}
+            aria-describedby={showCounter ? "chat-input-counter" : undefined}
           />
           {loading ? (
             <button
@@ -644,7 +751,7 @@ const ChatView = forwardRef(function ChatView(
               type="submit"
               className="send-btn"
               data-pulse
-              disabled={!input.trim()}
+              disabled={!questionLength || tooLong}
               aria-label="Gửi câu hỏi"
               title="Gửi"
             >
@@ -653,6 +760,19 @@ const ChatView = forwardRef(function ChatView(
           )}
         </form>
         <p className="composer-hint">
+          {showCounter && (
+            <>
+              <span
+                id="chat-input-counter"
+                className={`composer-counter ${tooLong ? "is-over" : ""}`.trim()}
+              >
+                {tooLong
+                  ? `${questionLength}/${CHAT_MESSAGE_MAX_CHARS} ký tự · Rút gọn câu hỏi để gửi`
+                  : `${questionLength}/${CHAT_MESSAGE_MAX_CHARS} ký tự`}
+              </span>
+              {" · "}
+            </>
+          )}
           Enter để gửi · Shift + Enter để xuống dòng · Trả lời có thể chưa hoàn toàn chính xác
         </p>
       </div>

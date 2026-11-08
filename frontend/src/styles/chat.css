@@ -310,6 +310,29 @@
   background: var(--success-subtle);
 }
 
+/* Tin bị dừng: nhãn trạng thái luôn hiện, không chờ hover. */
+.bubble-actions.is-pinned {
+  opacity: 1;
+}
+.message-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+/* Dừng trước khi có chữ: bong bóng mờ, không phải lỗi. */
+.bubble.is-stopped {
+  border-style: dashed;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
 /* Loading bubble */
 .bubble.loading {
   display: flex;
@@ -731,6 +754,42 @@
   text-align: center;
   font-size: 11.5px;
   color: var(--text-faint);
+}
+
+.composer-counter {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.composer-counter.is-over {
+  color: var(--danger-text);
+  font-weight: 600;
+}
+
+/* Lượt bị từ chối trước khi lưu (429/422/413, mất mạng): báo ngay trên khung nhập. */
+.composer-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 820px;
+  margin: 0 auto 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius);
+  background: var(--warning-subtle);
+  color: var(--warning-text);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.composer-alert svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.composer-alert strong {
+  display: block;
+}
+.composer-alert p {
+  margin: 0;
+  color: var(--text-secondary);
 }
 
 @keyframes spin {

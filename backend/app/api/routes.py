@@ -35,6 +35,7 @@ from app.api.schemas import (
     ConversationItem,
     ConversationListResponse,
     ConversationMessage,
+    ConversationMessageError,
     CreateModelProfileRequest,
     DatasetCreateRequest,
     DatasetDeleteResponse,
@@ -78,6 +79,7 @@ from app.core.config import (
 from app.core.config_crypto import SecretEncryptionUnavailable, is_secret_encryption_configured
 from app.core.config_store import apply_config_update, get_config_store_session, reset_config as reset_stored_config
 from app.db import check_db_health, get_session, get_session_factory
+from app.db.models import Message
 from app.db.repositories import (
     DatasetConflict,
     DatasetNotFound,
@@ -1678,6 +1680,33 @@ def list_conversation_history(
     )
 
 
+def _conversation_message(message: Message) -> ConversationMessage:
+    """Một tin đã lưu -> ``ConversationMessage``; metadata thiếu/sai kiểu dùng mặc định."""
+    # Citation/reasoning/steps được lưu trong metadata lúc sinh câu trả lời; hội
+    # thoại cũ (trước khi có các trường này) trả về rỗng.
+    metadata = message.message_metadata or {}
+    raw_error = metadata.get("error")
+    error = None
+    if isinstance(raw_error, dict) and isinstance(raw_error.get("type"), str):
+        request_id = raw_error.get("request_id")
+        # Chỉ trả loại lỗi và mã tham chiếu; `error_class` là chi tiết nội bộ.
+        error = ConversationMessageError(
+            type=raw_error["type"],
+            request_id=request_id if isinstance(request_id, str) else None,
+        )
+    return ConversationMessage(
+        id=message.id,
+        role=message.role,
+        content=message.content,
+        sources=metadata.get("sources", []) or [],
+        reasoning=metadata.get("reasoning"),
+        steps=metadata.get("steps", []) or [],
+        interrupted=metadata.get("interrupted") is True,
+        error=error,
+        created_at=message.created_at,
+    )
+
+
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
 def get_conversation_detail(
     conversation_id: str,
@@ -1698,20 +1727,7 @@ def get_conversation_detail(
         message_count=len(messages),
         created_at=conversation.created_at,
         updated_at=conversation.updated_at,
-        messages=[
-            ConversationMessage(
-                id=message.id,
-                role=message.role,
-                content=message.content,
-                # Citation được lưu trong metadata lúc sinh câu trả lời; hội thoại
-                # cũ (trước khi có trường này) sẽ trả về danh sách rỗng.
-                sources=(message.message_metadata or {}).get("sources", []) or [],
-                reasoning=(message.message_metadata or {}).get("reasoning"),
-                steps=(message.message_metadata or {}).get("steps", []) or [],
-                created_at=message.created_at,
-            )
-            for message in messages
-        ],
+        messages=[_conversation_message(message) for message in messages],
     )
 
 
@@ -1797,16 +1813,5 @@ def admin_get_conversation(
         created_at=conversation.created_at,
         updated_at=conversation.updated_at,
         owner=conversation.user_id,
-        messages=[
-            ConversationMessage(
-                id=message.id,
-                role=message.role,
-                content=message.content,
-                sources=(message.message_metadata or {}).get("sources", []) or [],
-                reasoning=(message.message_metadata or {}).get("reasoning"),
-                steps=(message.message_metadata or {}).get("steps", []) or [],
-                created_at=message.created_at,
-            )
-            for message in messages
-        ],
+        messages=[_conversation_message(message) for message in messages],
     )
