@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session, undefer
 
 from app.core.config import settings
 from app.db.models import Chunk, Document
+from app.db.repositories import ChunkRecord
 from app.ingestion.pipeline import _chunk_records, _ParsedDocument
 
 
@@ -59,6 +60,22 @@ class RefreshReport:
         return [item for item in self.documents if item.skipped_reason]
 
 
+def rechunk_matching_db(document: Document, rows: list[Chunk]) -> tuple[list[ChunkRecord], str]:
+    """Chia lại ``parsed_text`` bằng ``_chunk_records``; trả ``(records, "")`` khi tập id
+    chunk và ``text`` từng chunk khớp DB, ngược lại ``([], lý do bỏ qua)``."""
+    parsed = _ParsedDocument.from_model(document)
+    if parsed.text is None:
+        return [], "chưa có parsed_text"
+    records, _ = _chunk_records(parsed.id, parsed.source_path, parsed.title, parsed.text)
+    by_id = {row.id: row for row in rows}
+    if {record.id for record in records} != set(by_id):
+        return [], f"tập chunk id lệch DB ({len(records)} tính lại / {len(rows)} trong DB)"
+    mismatched = [record.id for record in records if by_id[record.id].text != record.text]
+    if mismatched:
+        return [], f"{len(mismatched)} chunk có text lệch DB (vd. {mismatched[0]})"
+    return records, ""
+
+
 def plan_refresh(session: Session) -> RefreshReport:
     """Tính ``search_text`` mới cho mọi chunk của tài liệu có ``parsed_text``."""
     report = RefreshReport()
@@ -69,21 +86,10 @@ def plan_refresh(session: Session) -> RefreshReport:
         rows = session.scalars(select(Chunk).where(Chunk.document_id == document.id)).all()
         item = DocumentRefresh(document.id, document.title or "", len(rows))
         report.documents.append(item)
-        parsed = _ParsedDocument.from_model(document)
-        if parsed.text is None:
-            item.skipped_reason = "chưa có parsed_text"
+        records, item.skipped_reason = rechunk_matching_db(document, rows)
+        if item.skipped_reason:
             continue
-        records, _ = _chunk_records(parsed.id, parsed.source_path, parsed.title, parsed.text)
         by_id = {row.id: row for row in rows}
-        if {record.id for record in records} != set(by_id):
-            item.skipped_reason = (
-                f"tập chunk id lệch DB ({len(records)} tính lại / {len(rows)} trong DB)"
-            )
-            continue
-        mismatched = [record.id for record in records if by_id[record.id].text != record.text]
-        if mismatched:
-            item.skipped_reason = f"{len(mismatched)} chunk có text lệch DB (vd. {mismatched[0]})"
-            continue
         for record in records:
             old = by_id[record.id].search_text or ""
             item.old_lengths.append(len(old))
