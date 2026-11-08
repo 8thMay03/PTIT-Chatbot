@@ -19,6 +19,7 @@ Ví dụ::
 from __future__ import annotations
 
 import argparse
+import sys
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -119,6 +120,9 @@ def main(
     argv: list[str] | None = None, session_factory: Callable[[], Session] | None = None
 ) -> int:
     args = parse_args(argv)
+    # Console Windows mặc định cp1252 không in được tiếng Việt khi stdout bị chuyển hướng.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     if session_factory is None:
         from app.db.session import SessionLocal
 
