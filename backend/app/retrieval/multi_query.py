@@ -21,12 +21,16 @@ def fuse_multi_query_results(
                     "query_hits": 0,
                     "vector_score": None,
                     "bm25_score": None,
+                    "bm25_norm_score": None,
                 },
             )
             entry["score"] += 1.0 / (rank_constant + rank)
             entry["query_hits"] += 1
             entry["vector_score"] = _maximum(entry["vector_score"], result.get("vector_score"))
             entry["bm25_score"] = _maximum(entry["bm25_score"], result.get("bm25_score"))
+            entry["bm25_norm_score"] = _maximum(
+                entry["bm25_norm_score"], result.get("bm25_norm_score")
+            )
             if float(result.get("score") or 0) > float(entry["result"].get("score") or 0):
                 entry["result"] = result.copy()
 
@@ -40,6 +44,7 @@ def fuse_multi_query_results(
         result["query_hits"] = entry["query_hits"]
         result["vector_score"] = entry["vector_score"]
         result["bm25_score"] = entry["bm25_score"]
+        result["bm25_norm_score"] = entry["bm25_norm_score"]
         output.append(result)
     return output
 

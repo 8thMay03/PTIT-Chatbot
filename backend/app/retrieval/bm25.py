@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from threading import RLock
 
@@ -61,10 +62,12 @@ class BM25Search:
             ]
             ranked.sort(key=lambda item: (-item[1], item[0].get("chunk_index", 0)))
 
+            upper_bound = _score_upper_bound(self._scorer, query_terms)
             results: list[dict] = []
             for chunk, score in ranked[:top_k]:
                 result = chunk.copy()
                 result["score"] = score
+                result["bm25_norm_score"] = normalize_bm25_score(score, upper_bound)
                 results.append(result)
             return results
 
@@ -141,6 +144,32 @@ def rank_bm25(query: str, documents: list[str], top_k: int) -> list[tuple[int, f
     ranked = [(index, float(score)) for index, score in enumerate(scores) if score > 0]
     ranked.sort(key=lambda item: (-item[1], item[0]))
     return ranked[:top_k]
+
+
+def normalize_bm25_score(score: float, upper_bound: float) -> float:
+    """Đưa điểm BM25 thô về [0, 1] bằng cận trên lý thuyết của chính query."""
+    if upper_bound <= 0:
+        return 0.0
+    return max(0.0, min(1.0, float(score) / upper_bound))
+
+
+def _score_upper_bound(scorer: BM25Okapi, query_terms: list[str]) -> float:
+    """Cận trên BM25 Okapi của query: Σ idf(t)·(k1 + 1) khi tf → ∞ ở mọi term.
+
+    Cộng theo từng token kể cả token lặp, đúng như ``BM25Okapi.get_scores``, nên
+    điểm thô không bao giờ vượt cận này. Term không có trong kho được tính với
+    idf của df = 1: query nhắc tới thứ kho không có thì điểm chuẩn hóa thấp, thay
+    vì được bỏ qua như trong điểm thô. Điểm chuẩn hóa vì vậy chủ yếu đo mức độ chunk
+    phủ các term của query (có trọng số idf); độ dài query và kích thước kho vẫn ảnh
+    hưởng qua tỉ lệ idf giữa các term nhưng ít hơn nhiều so với điểm thô.
+    """
+    # Cùng công thức và sàn epsilon như BM25Okapi._calc_idf để kho rất nhỏ không ra idf âm.
+    unseen_idf = max(
+        math.log(scorer.corpus_size - 1 + 0.5) - math.log(1 + 0.5),
+        scorer.epsilon * scorer.average_idf,
+    )
+    total_idf = sum(scorer.idf.get(term, unseen_idf) for term in query_terms)
+    return total_idf * (scorer.k1 + 1)
 
 
 def _tokenize(text: str) -> list[str]:

@@ -134,6 +134,136 @@ Index: 1203 chunk / 749 parent (fingerprint `620d26fd0e0c…`), chi phí re-embe
   LỤC"), 0 chunk cắt giữa từ (trước: 143), 0 chunk < 120 ký tự ngoài section ngắn thật
   (trước: 59). `check_chunks --db --strict` sạch.
 
+## RAG-18 — confidence gate hiệu chỉnh theo phân bố điểm (2026-11-08)
+
+Báo cáo: [`rag-18/`](rag-18/) — mỗi cấu hình một JSON (từng câu: scope, tín hiệu top-1,
+rank trúng, quyết định gate cũ/mới, top-3 context) và một `.txt` (percentile, histogram,
+bảng quét ngưỡng). Script: [`backend/scripts/eval_confidence.py`](../../backend/scripts/eval_confidence.py);
+bộ câu không có đáp án: [`backend/tests/fixtures/ptit_no_answer_56.json`](../../backend/tests/fixtures/ptit_no_answer_56.json)
+(56 câu: 22 `in_domain_missing`, 20 `near_miss`, 14 `out_of_domain`; 51 câu lọt scope guardrail).
+
+```powershell
+cd backend
+python -m scripts.eval_confidence --sweep --output ..\documents\rag-eval\rag-18\local_env.json
+python -m scripts.eval_confidence --set multi_query_enabled=true --set reranker_enabled=true `
+  --set reranker_provider=cross-encoder --set hybrid_vector_weight=0.65 --sweep `
+  --output ..\documents\rag-eval\rag-18\example_cross_encoder.json
+```
+
+Điều kiện đo: index 1 tài liệu (Sổ tay D26, LlamaParse agentic, 1010 chunk, fingerprint
+`d33ac7329944…`), embedding `text-embedding-3-small`, top_k 4, query rewrite/multi-query theo
+luật (không LLM). Dataset sha256: `ptit_rag_300` `af2a7a06d823…`, `ptit_ragas_100`
+`fa9d2d64f404…`, `ptit_no_answer_56` `2b49e309aa71…`. Commit `4289a134074d` (working tree
+`dirty` chỉ do các file stat/CRLF có sẵn trên `dev`, không có thay đổi nội dung).
+
+| Báo cáo | Cấu hình |
+|---|---|
+| `local_env` | `.env` local: multi-query tắt, reranker tắt, hybrid vector 0.80 |
+| `example_heuristic` | núm retrieval của `.env.example`: multi-query bật, reranker `heuristic`, hybrid 0.65 |
+| `example_cross_encoder` | như trên nhưng reranker `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` |
+
+**Cách đọc số.** *Gate-only*: gate áp lên mọi câu, bỏ qua scope guardrail; với câu không có
+đáp án chỉ tính 51 câu lọt scope. *E2E*: câu bị scope chặn cũng tính là từ chối. Scope
+guardrail hiện tại đã chặn **14.7% câu `ptit_rag_300`** trước khi tới gate (câu không chứa từ
+khóa miền, ví dụ "Phó Bí thư Đoàn trường là ai?", "Số điện thoại liên hệ cơ sở TP. Hồ Chí Minh
+là gì?") — đây là từ chối nhầm sẵn có của scope guardrail (RAG-19), không do gate.
+
+### Phân bố tín hiệu top-1 (p5 / p50 / p95, `example_cross_encoder`)
+
+| Nhóm | vector (cosine) | BM25 thô | `bm25_norm` | cross-encoder |
+|---|---|---|---|---|
+| `ptit_rag_300` (300) | 0.504 / 0.613 / 0.708 | 14.6 / 33.1 / 49.9 | 0.310 / 0.510 / 0.720 | −1.34 / 3.92 / 9.04 |
+| `ptit_ragas_100` (100) | 0.501 / 0.620 / 0.713 | 18.0 / 30.2 / 49.1 | 0.301 / 0.477 / 0.716 | −1.41 / 3.66 / 9.17 |
+| không có đáp án (56) | 0.358 / 0.507 / 0.600 | 9.4 / 19.8 / 37.0 | 0.114 / 0.271 / 0.462 | −4.54 / −2.23 / 1.39 |
+
+- **Cosine gần như không phân tách**: p95 câu không có đáp án (0.60) cao hơn p5 câu có đáp án
+  (0.50); ngưỡng cũ 0.30 thấp hơn mọi câu đã đo nên gate cũ **không từ chối câu nào**.
+- **BM25 thô** chồng lấn lớn và phụ thuộc kích thước kho/độ dài query.
+- **`bm25_norm`** (điểm thô / cận trên lý thuyết Σ idf·(k1+1) của chính query; term không có
+  trong kho tính với idf của df = 1) tách tốt hơn rõ rệt; biến thể bỏ term ngoài kho khỏi mẫu
+  số kém hơn (từ chối đúng 0.47 so với 0.59 ở cùng ngân sách) nên đã bị loại.
+- **Cross-encoder** là tín hiệu tách tốt nhất; `rerank_score` của reranker `heuristic` là
+  min-max trong danh sách ứng viên (top-1 luôn ≈ 1) nên không dùng làm ngưỡng.
+
+### Quét ngưỡng (từ chối nhầm `ptit_rag_300` gate-only ≤ 5%, tối đa từ chối đúng)
+
+Từ chối đúng gate-only trên 51 câu không có đáp án lọt scope; ngưỡng tối ưu riêng cho từng
+cấu hình (chi tiết, biên Pareto và ±10% trong JSON `summary.sweep`).
+
+| Luật | `local_env` | `example_heuristic` | `example_cross_encoder` |
+|---|---:|---:|---:|
+| gate cũ: vector ≥ 0.30 OR BM25 thô ≥ 2.0 | 0.000 | 0.000 | 0.000 |
+| vector OR BM25 thô (ngưỡng tối ưu) | 0.490 | 0.431 | 0.510 |
+| chỉ vector | 0.333 | 0.333 | 0.412 |
+| chỉ `bm25_norm` | 0.588 | 0.588 | 0.627 |
+| vector OR `bm25_norm` | 0.647 | 0.686 | 0.725 |
+| 0.5·vector + 0.5·`bm25_norm` | 0.647 | 0.647 | 0.725 |
+| chỉ cross-encoder | — | — | 0.706 |
+| **cross-encoder AND `bm25_norm`** (`rerank_and_norm`) | — | — | **0.882** (−1.55 / 0.26) |
+
+Không luật nào trên tín hiệu heuristic vượt ~0.69: các câu `near_miss` (chủ đề có trong Sổ
+tay nhưng chi tiết thì không, ví dụ lệ phí phúc khảo, giá KTX) giống câu có đáp án về cả từ
+khóa lẫn ngữ nghĩa. Cross-encoder đọc cặp (câu hỏi, đoạn) nên tách được phần lớn các câu này.
+
+### Gate được chọn
+
+Gate đạt khi **mọi tín hiệu đã hiệu chỉnh** đều vượt ngưỡng (`app/generation/confidence.py`):
+
+| Tín hiệu | Ngưỡng | Khi nào dùng |
+|---|---|---|
+| `bm25_norm` | ≥ **0.25** (`RETRIEVAL_MIN_BM25_NORM_SCORE`) | luôn dùng |
+| cosine | ≥ **0.37** với `text-embedding-3-small` (bảng theo model, `RETRIEVAL_MIN_VECTOR_SCORE` ghi đè) | model có trong bảng hoặc có ghi đè; model khác thì bỏ tín hiệu + log cảnh báo |
+| cross-encoder | ≥ **−1.65** với `mmarco-mMiniLMv2-L12-H384-v1` (bảng theo model, `RETRIEVAL_MIN_RERANK_SCORE` ghi đè) | chỉ khi reranker bật và provider `cross-encoder` |
+
+Kết quả gate thật (không mô phỏng), chạy lại bằng `eval_confidence` sau khi cài:
+
+| Cấu hình | Từ chối đúng gate-only | Từ chối đúng e2e | Từ chối nhầm `rag_300` gate / e2e | `rag_300` nhóm hit@4 | Từ chối nhầm `ragas_100` |
+|---|---:|---:|---:|---:|---:|
+| `example_cross_encoder` | **0.824** | **0.839** | **0.040** / 0.173 | 0.011 | 0.040 |
+| `local_env` | 0.588 | 0.625 | 0.050 / 0.180 | 0.024 | 0.060 |
+| `example_heuristic` | 0.373 | 0.429 | 0.013 / 0.157 | 0.000 | 0.020 |
+
+Theo nhóm (`example_cross_encoder`, gate-only): `in_domain_missing` 0.818, `near_miss` 0.800,
+`out_of_domain` 0.889. 9 câu không có đáp án còn lọt gate, chủ yếu `near_miss`.
+
+Lý do chọn và các phương án bị loại:
+
+- **cross-encoder −1.65 / `bm25_norm` 0.25 thay vì điểm tối ưu −1.55 / 0.26**: điểm tối ưu nằm
+  sát biên (cross-encoder ×0.9 = −1.395 → 5.3% từ chối nhầm; `bm25_norm` ×1.1 = 0.286 → 6.3%).
+  Quanh điểm chọn (±10% từng ngưỡng, có sàn cosine): cross-encoder −1.485 → 0.863 / 4.7%,
+  −1.815 → 0.745 / 3.3%; `bm25_norm` 0.225 → 0.745 / 4.0%, 0.275 → 0.843 / **5.3%**. Ba trong
+  bốn điểm lân cận giữ ≤ 5%; phía nới `bm25_norm` chạm biên, nên không nên tăng ngưỡng này.
+- **`bm25_norm` 0.25 một ngưỡng cho mọi cấu hình**: giữ từ chối nhầm `rag_300` ≤ 5% ở cả ba
+  cấu hình. Multi-query đẩy `bm25_norm` lên (biến thể query ngắn hơn, lấy max) nên với reranker
+  heuristic ngưỡng 0.25 khá dễ dãi (0.373); ngưỡng riêng 0.31 cho cấu hình đó chỉ đạt 0.588 —
+  vẫn dưới 0.80, nên không tách thêm cấu hình ngưỡng.
+- **Cosine chỉ là sàn an toàn (0.37)**: thấp hơn mọi câu có đáp án đã đo (min 0.385); đưa sàn
+  lên 0.40 / 0.42 không từ chối thêm câu nào mà tăng từ chối nhầm (4.0% → 4.3% / 4.7% ở
+  cross-encoder).
+- **Không dùng tổng có trọng số**: không vượt AND, lại trộn cosine (phụ thuộc model) với
+  `bm25_norm` nên không suy biến được khi model chưa hiệu chỉnh.
+
+### Kiểm tra liên quan
+
+- `bm25_norm_score` không đổi thứ hạng: `eval_retrieval --mode full` và `--mode hybrid` trên
+  `ptit_rag_300`, commit nền `bcd6cd0` so với `4289a13`: 0/300 câu khác top-10 (chunk và điểm),
+  hit@1/4/10, MRR giống hệt (full 0.617/0.823/0.887/0.709).
+- Chi phí cross-encoder: lần đo 456 câu mất 104 s so với 48 s của heuristic (CPU, cùng máy) —
+  khoảng +0.12 s mỗi câu hỏi; lần đầu tải model ~470 MB.
+
+### Giới hạn
+
+- **AC-03 (≥ 80% từ chối đúng) chỉ đạt khi dùng reranker cross-encoder.** `.env.example` vẫn để
+  `RERANKER_PROVIDER=heuristic`; đổi mặc định là quyết định triển khai (dung lượng model,
+  độ trễ CPU) chưa thực hiện trong RAG-18.
+- Reranker cross-encoder lỗi thì `Reranker` âm thầm quay về heuristic; khi đó `rerank_score`
+  nằm trong [0, 1] nên luôn vượt −1.65 — gate suy biến thành `bm25_norm` + cosine (an toàn về
+  phía trả lời, không từ chối nhầm thêm).
+- Tập không có đáp án nhỏ (56 câu, 51 lọt scope): mỗi câu ≈ 2 điểm phần trăm. Ngưỡng gắn với
+  kho hiện tại (1 tài liệu); thêm tài liệu, đổi chunking/parser hoặc embedding/reranker thì đo lại.
+- Scope guardrail chặn 14.7% câu `ptit_rag_300` (e2e từ chối nhầm 17.3% với cross-encoder);
+  xử lý ở RAG-19.
+
 ## Hạn chế đã biết
 
 - Dataset chưa có metadata `question_type` / `source` nên các nhóm

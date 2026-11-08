@@ -2,7 +2,7 @@ import time
 from collections.abc import Iterator
 
 from app.core.config import settings
-from app.generation.confidence import has_strong_context
+from app.generation.confidence import assess_context, thresholds_from_settings
 from app.guardrails import (
     OUT_OF_SCOPE_ANSWER,
     check_scope,
@@ -37,6 +37,7 @@ DEBUG_CHUNK_FIELDS = (
     "score",
     "vector_score",
     "bm25_score",
+    "bm25_norm_score",
     "rrf_score",
     "rerank_score",
     "query_hits",
@@ -231,11 +232,9 @@ class RagChain:
             for rank, context in enumerate(contexts, start=1)
         ]
         yield step_event("rerank", {"selected_count": len(contexts), "enabled": settings.reranker_enabled})
-        strong_context = has_strong_context(
-            contexts,
-            min_vector_score=settings.retrieval_min_vector_score,
-            min_bm25_score=settings.retrieval_min_bm25_score,
-        )
+        thresholds = thresholds_from_settings()
+        decision = assess_context(contexts, thresholds)
+        strong_context = decision.strong
         retrieval_debug = {
             "original_query": question,
             "rewritten_query": rewritten_query,
@@ -246,6 +245,11 @@ class RagChain:
             "retrieved_chunks": retrieved_chunks,
             "selected_chunks": selected_chunks,
             "strong_context": strong_context,
+            "confidence": {
+                "reason": decision.reason,
+                "signals": decision.signals,
+                "thresholds": thresholds.as_dict(),
+            },
             "guardrail": {"allowed": True, "reason": scope_reason},
             "unsafe_contexts_removed": unsafe_context_count,
         }

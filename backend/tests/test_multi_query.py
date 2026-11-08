@@ -18,10 +18,10 @@ def test_multi_query_fusion_promotes_chunks_found_by_multiple_queries() -> None:
     result_sets = [
         [
             {"chunk_id": "only-first", "score": 0.9, "vector_score": 0.8},
-            {"chunk_id": "shared", "score": 0.8, "bm25_score": 4.0},
+            {"chunk_id": "shared", "score": 0.8, "bm25_score": 4.0, "bm25_norm_score": 0.3},
         ],
         [
-            {"chunk_id": "shared", "score": 0.7, "vector_score": 0.7},
+            {"chunk_id": "shared", "score": 0.7, "vector_score": 0.7, "bm25_norm_score": 0.45},
             {"chunk_id": "only-second", "score": 0.6, "bm25_score": 3.0},
         ],
     ]
@@ -32,6 +32,7 @@ def test_multi_query_fusion_promotes_chunks_found_by_multiple_queries() -> None:
     assert results[0]["query_hits"] == 2
     assert results[0]["vector_score"] == 0.7
     assert results[0]["bm25_score"] == 4.0
+    assert results[0]["bm25_norm_score"] == 0.45
 
 
 def test_multi_query_with_llm_provider(monkeypatch) -> None:
