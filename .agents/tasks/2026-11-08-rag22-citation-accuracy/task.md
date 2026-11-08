@@ -77,7 +77,7 @@ Chunker (`backend/app/ingestion/chunker.py`, RAG-06) đã chia parent theo Đi�
 
 - Tóm tắt: đã triển khai S-01…S-07 trên nhánh `feat/rag22-citation-accuracy` (`4ce8bad`…`c4bcd78` + commit báo cáo/task); index local đã backfill `legal_*`. Verification V-01…V-06 `passed`; review `self_review` `approved`, R-01 (high) đã sửa, R-02/R-03 (low) hoãn.
 - Blocker: không có.
-- Bước tiếp theo: người dùng quyết định có review độc lập không; push nhánh, mở PR vào `dev`; sau merge chạy `python -m scripts.refresh_legal_metadata --apply` trên môi trường khác và khởi động lại backend; cập nhật thẻ Notion RAG-22; coordinator chuyển `done`.
+- Bước tiếp theo: PR #58 vào `dev` đã mở (https://github.com/8thMay03/PTIT-Chatbot/pull/58), chờ người dùng review/merge; sau merge chạy `python -m scripts.refresh_legal_metadata --apply` trên môi trường khác và khởi động lại backend; cập nhật thẻ Notion RAG-22; coordinator chuyển `done`.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 

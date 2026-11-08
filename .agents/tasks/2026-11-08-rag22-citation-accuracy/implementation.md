@@ -85,7 +85,7 @@ Không có (một agent).
 
 - Từ / đến: `agent-claude` / reviewer (ưu tiên reviewer độc lập do người dùng chỉ định).
 - Đã hoàn tất: S-01…S-07.
-- File/branch/commit: nhánh `feat/rag22-citation-accuracy`, `4ce8bad..HEAD` (bảng ở trên); push và mở PR vào `dev` theo yêu cầu người dùng `2026-11-08`.
+- File/branch/commit: nhánh `feat/rag22-citation-accuracy`, `4ce8bad..HEAD` (bảng ở trên); push và mở PR #58 vào `dev` (https://github.com/8thMay03/PTIT-Chatbot/pull/58) theo yêu cầu người dùng.
 - Kiểm chứng: `verification.md` V-01…V-06 đều `passed`.
 - Review: `review.md` — `self_review`, kết luận `approved`; chưa có review độc lập.
 - Hạn chế / còn lại: giới hạn ghi trong README mục RAG-22 và `review.md`; môi trường khác cần chạy `refresh_legal_metadata --apply` và khởi động lại backend; thẻ Notion RAG-22 chưa cập nhật.
