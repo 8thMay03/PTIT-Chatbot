@@ -124,3 +124,63 @@ def test_extract_article_scans_only_first_lines() -> None:
     text = "\n".join(["Dòng."] * 8 + ["Điều 9. Muộn"])
 
     assert extract_article("", "", text) is None
+
+
+def test_inline_clause_continues_open_clause_sequence() -> None:
+    # Bản LlamaParse hay gộp các Khoản vào một đoạn.
+    units = extract_legal_units(
+        "Điều 16. Đồ án",
+        "Điều 16. Đồ án",
+        "## Điều 16. Đồ án\n\nphải tự chịu trách nhiệm khi bảo vệ. 5. Hai tuần trước khi bảo vệ, sinh viên nộp.",
+        open_clause="4",
+    )
+
+    assert units.clauses == ["4", "5"]
+    assert units.last_clause == "5"
+
+
+def test_inline_clauses_after_a_line_start_clause() -> None:
+    units = extract_legal_units("Điều 6", "Điều 6", "1. Chương trình đào tạo. 2. Chương trình thể hiện rõ; 3. Đề cương.")
+
+    assert units.clauses == ["1", "2", "3"]
+    assert units.last_clause == "3"
+
+
+def test_out_of_sequence_inline_number_drops_open_clause() -> None:
+    units = extract_legal_units(
+        "Điều 6", "Điều 6", "đủ điều kiện xét. 7. Sinh viên đạt yêu cầu khi đủ điểm.", open_clause="2"
+    )
+
+    # Nội dung đầu vẫn thuộc Khoản 2, nhưng sau "7." không còn chắc Khoản nào đang mở.
+    assert units.clauses == ["2"]
+    assert units.last_clause is None
+    # "điểm 10." không đứng sau dấu kết câu nên không phải dấu Khoản.
+    assert extract_legal_units("Điều 6", "", "theo thang điểm 10. Sinh viên.", open_clause="2").last_clause == "2"
+
+
+def test_inline_number_followed_by_lowercase_is_not_a_clause() -> None:
+    units = extract_legal_units("Điều 6", "Điều 6", "1. Mức điểm tối thiểu là 5. và các trường hợp khác.")
+
+    assert units.clauses == ["1"]
+    assert units.last_clause == "1"
+
+
+def test_continuation_before_line_start_clause_inherits_open_clause() -> None:
+    units = extract_legal_units(
+        "Điều 6", "Điều 6", "tiếp nối nội dung Khoản trước.\n\n3. Khoản kế tiếp.", open_clause="2"
+    )
+
+    assert units.clauses == ["2", "3"]
+
+
+def test_restarted_numbering_does_not_inherit_open_clause() -> None:
+    # Dòng tiêu đề không phải heading rồi đánh số lại từ 1: không phải phần tiếp của Khoản 4.
+    units = extract_legal_units(
+        "Điều 5",
+        "Điều 5",
+        "Điều kiện hoàn thành chương trình đào tạo\n1. Chương trình có nhiều PLO.\n2. Mỗi PLO được đo.",
+        open_clause="4",
+    )
+
+    assert units.clauses == ["1", "2"]
+    assert units.last_clause == "2"

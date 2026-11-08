@@ -26,6 +26,11 @@ def test_classify_change_categories() -> None:
         classify_change(_row("a", "Điều 5", ["3"], ["a"]), _row("a", "Điều 5", ["2", "3"], ["a"]))
         == "added_inherited_clause"
     )
+    assert (
+        classify_change(_row("a", "Điều 5", ["1"], ["a"]), _row("a", "Điều 5", ["1", "2", "3"], ["a"]))
+        == "added_inline_clause"
+    )
+    assert classify_change(_row("a", "Điều 5", ["3"]), _row("a", "Điều 5", ["2", "3", "4"])) == "added_inline_clause"
     # Mất Khoản trong Điều, đổi Điều, hoặc thêm Điều đều là "other".
     assert classify_change(_row("a", "Điều 5", ["1", "2"]), _row("a", "Điều 5", ["1"])) == "other"
     assert classify_change(_row("a", "Điều 5"), _row("a", "Điều 6")) == "other"
@@ -63,9 +68,15 @@ def test_diff_dumps_pairs_by_case_and_chunk() -> None:
         "unchanged": 1,
         "removed_non_article": 2,
         "added_inherited_clause": 0,
+        "added_inline_clause": 0,
         "other": 1,
     }
-    assert diff["unique_changed_chunks"] == {"removed_non_article": 1, "added_inherited_clause": 0, "other": 1}
+    assert diff["unique_changed_chunks"] == {
+        "removed_non_article": 1,
+        "added_inherited_clause": 0,
+        "added_inline_clause": 0,
+        "other": 1,
+    }
     assert [(item["id"], item["chunk_id"]) for item in diff["ac05_violations"]] == [("q1", "c2")]
     assert diff["order_changed_cases"] == ["q1"]
     assert diff["unmatched"] == [{"id": "q3", "reason": "case_missing_after"}]

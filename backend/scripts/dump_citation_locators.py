@@ -18,6 +18,8 @@ Phân loại khi so sánh (ghép theo ``id`` câu + ``chunk_id``):
 - ``removed_non_article``: không có Điều ở cả hai bản, bản sau bỏ Khoản/Điểm.
 - ``added_inherited_clause``: cùng Điều và Điểm, bản sau thêm đúng một Khoản ở đầu
   (Khoản đang mở từ chunk trước) còn lại giữ nguyên.
+- ``added_inline_clause``: cùng Điều và Điểm, bản sau giữ mọi Khoản cũ và thêm Khoản
+  khác (Khoản giữa dòng, có thể kèm Khoản kế thừa).
 - ``other``: mọi thay đổi khác, cần giải thích từng trường hợp.
 """
 
@@ -45,7 +47,7 @@ from scripts.eval_retrieval import (
 
 SCHEMA_VERSION = 1
 DEFAULT_TOP_K = 10
-CATEGORIES = ("unchanged", "removed_non_article", "added_inherited_clause", "other")
+CATEGORIES = ("unchanged", "removed_non_article", "added_inherited_clause", "added_inline_clause", "other")
 
 
 # ---------------------------------------------------------------------------
@@ -96,6 +98,8 @@ def classify_change(before: dict, after: dict) -> str:
         and clauses_a[0] not in clauses_b
     ):
         return "added_inherited_clause"
+    if article_b and article_a == article_b and points_a == points_b and set(clauses_b) < set(clauses_a):
+        return "added_inline_clause"
     return "other"
 
 

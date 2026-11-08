@@ -4,6 +4,10 @@ Khoản/Điểm chỉ có nghĩa bên trong một Điều: danh sách ``1.``/``a
 Điều (các bước thủ tục, danh mục trong Sổ tay) không phải Khoản/Điểm. Chunker gọi hàm
 này lần lượt cho các chunk của cùng một section và truyền ``last_clause`` sang chunk kế
 tiếp, để chunk bắt đầu giữa Khoản (chỉ chứa ``b)``, ``c)``) vẫn biết mình thuộc Khoản nào.
+
+Khoản là dòng bắt đầu bằng ``N.``, hoặc ``N.`` giữa dòng sau dấu kết câu và trước chữ hoa
+khi N đúng là số kế tiếp (bản parse hay gộp nhiều Khoản vào một đoạn). Điểm là dòng bắt
+đầu bằng ``a)``/``a.``. Dòng bảng (markdown/HTML) và heading markdown bị bỏ qua.
 """
 
 from __future__ import annotations
@@ -20,6 +24,8 @@ _MARKER_PREFIX = r"^\s*(?:[-*]\s*)?(?:\*\*)?"
 _CLAUSE_RE = re.compile(_MARKER_PREFIX + r"(\d{1,2})\.\s+")
 _POINT_RE = re.compile(_MARKER_PREFIX + r"([a-zđ])[.)]\s+")
 # Dòng mở một Điều mới trong thân (ví dụ "**Điều 7.** ..." không phải heading markdown).
+# Khoản giữa dòng: sau dấu kết câu, số rồi chữ hoa ("... Hội đồng. 5. Hai tuần ...").
+_INLINE_CLAUSE_RE = re.compile(r"(?<=[.;:!?])\s+(\d{1,2})\.\s+(?=(\S))")
 _BODY_ARTICLE_RE = re.compile(r"^\s*(?:[-*]\s+)?(?:\*\*|__)?\s*Điều\s+\d+[a-zA-Z]?\b", re.IGNORECASE)
 _MARKDOWN_HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s")
 _HTML_TABLE_START_RE = re.compile(r"<table\b", re.IGNORECASE)
@@ -56,9 +62,11 @@ def extract_legal_units(
 ) -> LegalUnits:
     """Điều/Khoản/Điểm của ``text``; không có Điều thì không có Khoản/Điểm.
 
-    ``open_clause`` là Khoản đang mở ở cuối chunk trước của cùng section. Nó được tính
-    là Khoản của ``text`` khi dấu mốc đầu tiên trong text là một Điểm, hoặc text không
-    có dấu mốc nào (đoạn tiếp nối của Khoản đó).
+    ``open_clause`` là Khoản đang mở ở cuối chunk trước của cùng section; nó là Khoản
+    của ``text`` khi text có nội dung (đoạn văn hoặc Điểm) đứng trước dấu Khoản đầu tiên.
+    Khoản giữa dòng ("... Hội đồng. 5. Hai tuần ...", bản parse hay gộp các Khoản vào một
+    đoạn) chỉ được nhận khi đúng số kế tiếp Khoản đang mở; số khác thì không còn biết
+    Khoản đang mở nên không kế thừa tiếp, thay vì gắn nhầm Khoản.
     """
 
     article = extract_article(heading, section_path, text)
@@ -68,27 +76,33 @@ def extract_legal_units(
     clauses: list[str] = []
     points: list[str] = []
     current = open_clause
-    first_marker: str | None = None
-    for line in _body_lines(text):
-        if _BODY_ARTICLE_RE.match(line):
-            first_marker = first_marker or "article"
-            current = None
+    pending_inherit = open_clause is not None
+    inherited = first_clause_seen = False
+    for kind, value in _marker_events(text):
+        if kind == "article":
+            current, pending_inherit = None, False
             continue
-        clause = _CLAUSE_RE.match(line)
-        if clause:
-            first_marker = first_marker or "clause"
-            current = clause.group(1)
-            _append_unique(clauses, current)
-            continue
-        point = _POINT_RE.match(line)
-        if point:
-            if first_marker is None and open_clause:
+        if kind in ("text", "point"):
+            if pending_inherit:
                 _append_unique(clauses, open_clause)
-            first_marker = first_marker or "point"
-            _append_unique(points, point.group(1).casefold())
+                pending_inherit, inherited = False, True
+            if kind == "point":
+                _append_unique(points, value)
+            continue
+        if not first_clause_seen:
+            first_clause_seen = True
+            # Đánh số bắt đầu lại (dấu Khoản đầu tiên không lớn hơn Khoản kế thừa): phần
+            # đứng trước là một mục khác, không phải phần tiếp của Khoản đang mở.
+            if inherited and int(value) <= int(open_clause):
+                clauses.remove(open_clause)
+                current = None
+        pending_inherit = False
+        if kind == "inline_clause" and int(value) != int(current or 0) + 1:
+            current = None
+        else:
+            current = value
+            _append_unique(clauses, value)
 
-    if first_marker is None and open_clause:
-        clauses = [open_clause]
     return LegalUnits(
         article=article,
         clauses=clauses[:MAX_UNITS],
@@ -120,6 +134,29 @@ def clean_legal_text(value: str) -> str:
     value = re.sub(r"<[^>]+>", " ", value)
     value = re.sub(r"[#*_`]+", "", value)
     return re.sub(r"\s+", " ", value).strip()
+
+
+def _marker_events(text: str) -> list[tuple[str, str]]:
+    """Dãy dấu mốc theo thứ tự: ``article``, ``clause``, ``inline_clause``, ``point``, ``text``."""
+
+    events: list[tuple[str, str]] = []
+    for line in _body_lines(text):
+        if _BODY_ARTICLE_RE.match(line):
+            events.append(("article", ""))
+            continue
+        clause = _CLAUSE_RE.match(line)
+        point = None if clause else _POINT_RE.match(line)
+        if clause:
+            events.append(("clause", clause.group(1)))
+        elif point:
+            events.append(("point", point.group(1).casefold()))
+        else:
+            events.append(("text", ""))
+        rest = (clause or point).end() if clause or point else 0
+        for inline in _INLINE_CLAUSE_RE.finditer(line, rest):
+            if inline.group(2).isupper():
+                events.append(("inline_clause", inline.group(1)))
+    return events
 
 
 def _body_lines(text: str) -> list[str]:
