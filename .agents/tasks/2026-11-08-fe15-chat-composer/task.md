@@ -5,7 +5,7 @@
 - Coordinator: `claude-fe15`
 - Người yêu cầu: `8thMay03`
 - Tạo lúc: `2026-11-08T09:11:50+07:00`
-- Cập nhật lúc: `2026-11-08T09:40:00+07:00`
+- Cập nhật lúc: `2026-11-08T10:13:38+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -80,9 +80,11 @@ Kết quả cần có:
 - Tóm tắt: đã triển khai S-01..S-04 trên nhánh `feat/chat-composer-ime-stop` (từ `dev` @ `6be857f`), áp dụng đề xuất mặc định Q-01..Q-05. pytest, vitest, build pass; kiểm tra trình duyệt trên compose dev đạt cho AC-03 (body), AC-04, AC-06. Self-review `approved`.
 - Còn lại: AC-02 (gõ IME thật) cần người yêu cầu thao tác; AC-03 phần đổi top_k trong màn Cấu hình admin chưa chạy (cần đăng nhập admin). Xem `verification.md` V-02, V-03.
 - Blocker: không (chờ người yêu cầu kiểm IME thật).
-- Bước tiếp theo: người yêu cầu làm V-02 (+ V-03 bước 3); sau đó push nhánh, mở PR vào `dev`, đóng task.
+- Review vòng 2 (`claude-review-fe15`, độc lập với phần triển khai): `approved`; R-04, R-05, R-06 mở, `low`, không bắt buộc.
+- Bước tiếp theo: merge vào `dev` theo yêu cầu người yêu cầu (PR ghi bên dưới); người yêu cầu làm V-02 (+ V-03 bước 3) trên `dev` rồi đóng task. R-04..R-06 xử lý ở lượt sau nếu người yêu cầu muốn.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
 - 2026-11-08T09:11:50+07:00 — claude-fe15: tạo task `draft` từ Notion FE-15, dựa trên `dev` @ `6be857f`. Gộp các nhận xét hoãn lại chuyển cho FE: BE-11 R-01, R-07 và BE-10 R-02. Regenerate phía server và đếm ngược `Retry-After` để ngoài phạm vi.
 - 2026-11-08T09:40:00+07:00 — claude-fe15: người yêu cầu giao "triển khai task fe15" mà không chốt khác → áp dụng đề xuất mặc định Q-01..Q-05 (hằng số 2000 ở frontend; cho sửa backend nhỏ; nhãn "Đã dừng"; Thử lại không xoá cặp lỗi; macOS `not_run`). Chuyển `in_progress` rồi `in_review` sau khi triển khai/kiểm chứng. Điều chỉnh nhỏ so với plan: mọi lỗi HTTP trước `start` (không chỉ 413/422/429) được coi là "bị từ chối trước khi lưu" — xem implementation D-01.
+- 2026-11-08T10:13:38+07:00 — claude-fe15: người yêu cầu yêu cầu "commit và merge vào dev" khi V-02 (IME thật) chưa chạy và review vòng 2 còn R-04..R-06 (`low`, không bắt buộc). Merge theo yêu cầu, không sửa thêm mã (sửa sẽ đưa review về `pending`). Task giữ `in_review` tới khi có kết quả V-02; R-04..R-06 để mở, theo dõi sau.
