@@ -1,6 +1,7 @@
 from app.generation.llm import _extractive_answer, _normalize_answer_citations
 from app.guardrails import OUT_OF_SCOPE_ANSWER
 from app.generation.prompts import SYSTEM_PROMPT, build_context_prompt
+from app.generation.refusal import NO_CONTEXT_ANSWER
 
 
 def _contexts() -> list[dict]:
@@ -41,8 +42,21 @@ def test_extractive_answer_includes_citations() -> None:
 def test_answer_citations_are_limited_to_provided_sources() -> None:
     answer = _normalize_answer_citations("Thông tin học phí [9].", _contexts())
 
-    assert "[9]" not in answer
-    assert answer.endswith("[1]")
+    # RAG-22: bỏ số citation bịa, không tự gắn [1] thay thế.
+    assert answer == "Thông tin học phí."
+
+
+def test_valid_citations_are_kept_and_none_are_added() -> None:
+    assert _normalize_answer_citations("Học phí [1] và lệ phí [3].", _contexts()) == "Học phí [1] và lệ phí."
+    partial = "Học phí đóng theo kỳ. Tài liệu chưa đề cập mức phạt khi đóng trễ."
+    assert _normalize_answer_citations(partial, _contexts()) == partial
+
+
+def test_context_prompt_states_both_refusal_sentences() -> None:
+    prompt = build_context_prompt("Học phí thế nào?", _contexts())
+
+    assert f"thông tin để trả lời: {NO_CONTEXT_ANSWER}" in prompt
+    assert f"Câu từ chối ngoài phạm vi: {OUT_OF_SCOPE_ANSWER}" in prompt
 
 
 def test_prompt_separates_conversation_memory_from_document_context() -> None:

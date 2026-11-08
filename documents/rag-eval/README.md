@@ -264,6 +264,65 @@ Lý do chọn và các phương án bị loại:
 - Scope guardrail chặn 14.7% câu `ptit_rag_300` (e2e từ chối nhầm 17.3% với cross-encoder);
   xử lý ở RAG-19.
 
+## RAG-22 — locator Điều/Khoản/Điểm theo cấu trúc (2026-11-08)
+
+Báo cáo: [`rag-22/`](rag-22/) — `locators_before_*.json` (commit nền `e6981f149f0a`, index
+chưa backfill), `locators_after_*.json` (commit `c4bcd781e27d`, index đã chạy
+`refresh_legal_metadata --apply`), `locator_diff_*.json` (ghép theo câu + `chunk_id`, phân loại
+từng thay đổi). Script: [`backend/scripts/dump_citation_locators.py`](../../backend/scripts/dump_citation_locators.py).
+
+```powershell
+cd backend
+python -m scripts.dump_citation_locators --dataset tests/fixtures/ptit_rag_300.json `
+  --out documents/rag-eval/rag-22/locators_after_rag_300.json
+python -m scripts.dump_citation_locators --diff documents/rag-eval/rag-22/locators_before_rag_300.json `
+  documents/rag-eval/rag-22/locators_after_rag_300.json --out documents/rag-eval/rag-22/locator_diff_rag_300.json
+```
+
+Điều kiện đo: pipeline `full` của `eval_retrieval` (`.env` local: multi-query tắt, reranker tắt,
+hybrid vector 0.80), top-10 context mỗi câu, embedding `text-embedding-3-small` từ cache (0 lần
+gọi API). Index 1 tài liệu (Sổ tay D26, LlamaParse agentic, 1010 chunk), fingerprint
+`d33ac7329944…` ở cả hai lần chụp (backfill chỉ ghi metadata). Dataset sha256: `ptit_rag_300`
+`af2a7a06d823…`, `ptit_ragas_100` `fa9d2d64f404…`. Working tree `dirty` chỉ do các file
+stat/CRLF có sẵn trên `dev`.
+
+| Phân loại (cặp câu × context) | `ptit_rag_300` (3000) | `ptit_ragas_100` (1000) | chunk khác nhau |
+|---|---|---|---|
+| `unchanged` | 2308 | 771 | — |
+| `removed_non_article` — bỏ Khoản/Điểm ở mục không thuộc Điều | 56 | 8 | 11 |
+| `added_inherited_clause` — thêm Khoản đang mở từ chunk trước | 286 | 80 | 64 |
+| `added_inline_clause` — thêm Khoản giữa dòng (có thể kèm Khoản kế thừa) | 350 | 141 | 55 |
+| `other` | 0 | 0 | 0 |
+
+Điều kiện AC-05 (citation có Điều ở bản trước giữ nguyên Điều, không mất Khoản nào): **0 vi
+phạm** ở cả hai bộ. Số context có Điều không đổi (2003/3000 và 747/1000); có Khoản tăng 1045 →
+1363 và 390 → 508; Khoản/Điểm nằm ngoài Điều 56 → 0 và 8 → 0.
+
+Ví dụ: `II. BAN GIÁM ĐỐC HỌC VIỆN — Khoản 1, 2, 3, 4` → `II. BAN GIÁM ĐỐC HỌC VIỆN` (danh sách
+liên hệ, không phải Khoản); `Điều 20. Nghĩa vụ của sinh viên` → `… — Khoản 5` (child bắt đầu
+giữa Khoản 5); `Điều 13. Quản lý học phí — Khoản 1` → `… — Khoản 1, 2, 3` (bản parse gộp Khoản
+2, 3 vào cùng đoạn với Khoản 1).
+
+Kiểm tay đối chiếu `parsed_text`: lượt đầu (15 mẫu) phát hiện Khoản kế thừa sai khi bản parse
+gộp nhiều Khoản vào một đoạn ("… Hội đồng. 5. Hai tuần …" bị gắn Khoản 1) và một chunk đánh số
+lại từ 1 sau dòng tiêu đề không phải heading — đã sửa ở `c4bcd78`. Lượt sau (12 mẫu ngẫu nhiên,
+seed 22) đúng cả 12; một số chunk vẫn thiếu Khoản giữa dòng khi số không liên tục (ví dụ "7."
+rồi "9."), khi đó Khoản đang mở bị bỏ thay vì đoán.
+
+**Vận hành.** Index tạo trước RAG-22 chưa có khóa `legal_*`; citation vẫn đúng quy tắc mới
+nhưng không biết Khoản kế thừa. Chạy `python -m scripts.refresh_legal_metadata` (dry-run) rồi
+`--apply` trên mỗi môi trường, sau đó khởi động lại backend để BM25 dựng lại snapshot. Script
+chỉ ghi khi tập id và `text` chunk khớp DB; tài liệu lệch phải chunk lại.
+
+### Giới hạn
+
+- Khoản giữa dòng chỉ nhận khi đúng số kế tiếp, sau dấu kết câu và trước chữ hoa; danh sách
+  đánh số `1.` bên trong một Điều nhưng không phải Khoản (phụ lục, danh mục) vẫn bị coi là Khoản.
+- Khoản dạng `1)` không còn được nhận (0 lần trong Điều trên index hiện tại).
+- Hai chunk trùng nội dung (`parent-186`/`parent-191`, cùng text và embedding) đổi chỗ trong
+  top-10 của một câu giữa các lần chụp do Postgres phá hòa theo thứ tự vật lý sau `UPDATE`;
+  không ảnh hưởng ghép cặp (theo `chunk_id`).
+
 ## Hạn chế đã biết
 
 - Dataset chưa có metadata `question_type` / `source` nên các nhóm

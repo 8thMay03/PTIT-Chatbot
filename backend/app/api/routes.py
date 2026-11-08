@@ -118,6 +118,7 @@ from app.generation.llm import (
     stream_answer_deltas_with_llm,
 )
 from app.generation.rag_chain import rag_chain
+from app.generation.refusal import NO_CONTEXT_ANSWER, is_refusal
 from app.guardrails import OUT_OF_SCOPE_ANSWER, filter_safe_history
 from app.ingestion import ingestion_pipeline
 from app.ingestion.jobs import ParseJob, ParseJobConflict, parse_jobs
@@ -1448,7 +1449,7 @@ def _iter_chat_stream_events(
     elif retrieval["strong_context"]:
         stream = stream_answer_deltas_with_llm(request.message, contexts, history=turn.history, budget=budget)
     else:
-        stream = iter([StreamDelta(kind=CONTENT_DELTA, text="Chưa tìm thấy thông tin này trong tài liệu.")])
+        stream = iter([StreamDelta(kind=CONTENT_DELTA, text=NO_CONTEXT_ANSWER)])
 
     try:
         for delta in stream:
@@ -1484,6 +1485,17 @@ def _iter_chat_stream_events(
     }
     state.steps_log.append(generate_step)
 
+    raw_answer = "".join(state.deltas)
+    if stream_error is not None:
+        # Phần text nửa vời không phải câu trả lời hoàn chỉnh: bỏ qua chuẩn hóa trích dẫn.
+        answer = raw_answer.strip()
+    else:
+        answer = _normalize_answer_citations(raw_answer, contexts) if contexts else raw_answer
+        if is_refusal(answer):
+            # Câu từ chối không kèm nguồn (RAG-22); contexts vẫn lưu để debug.
+            sources = []
+            state.sources = sources
+
     reasoning_text = "".join(state.reasoning_parts)
     assistant_metadata: dict[str, Any] = {
         "sources": _serialize_sources(sources),
@@ -1493,14 +1505,6 @@ def _iter_chat_stream_events(
         assistant_metadata["reasoning"] = reasoning_text
     if stream_error is not None:
         assistant_metadata["error"] = _chat_error_metadata("llm_stream", turn, stream_error)
-
-    raw_answer = "".join(state.deltas)
-    if stream_error is not None:
-        # Phần text nửa vời không phải câu trả lời hoàn chỉnh: bỏ qua chuẩn
-        # hóa trích dẫn (thuộc tính này có thể tự nối thêm "[1]" cho ảo).
-        answer = raw_answer.strip()
-    else:
-        answer = _normalize_answer_citations(raw_answer, contexts) if contexts else raw_answer
     # Lưu trước event kết thúc: client nhận `done`/`error` là hội thoại đã có câu trả lời.
     state.saved = True
     _save_chat_answer_logged(

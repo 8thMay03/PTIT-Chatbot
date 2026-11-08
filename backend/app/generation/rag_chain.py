@@ -13,11 +13,10 @@ from app.generation.llm import answer_with_llm
 from app.generation.citations import public_citations
 from app.generation.multi_query import VietnameseMultiQueryGenerator
 from app.generation.query_rewriter import VietnameseQueryRewriter
+from app.generation.refusal import NO_CONTEXT_ANSWER, is_refusal
 from app.retrieval import Retriever, retriever
 from app.retrieval.multi_query import fuse_multi_query_results
 from app.retrieval.reranker import Reranker
-
-NO_CONTEXT_ANSWER = "Chưa tìm thấy thông tin này trong tài liệu."
 
 DEBUG_CHUNK_FIELDS = (
     "chunk_id",
@@ -105,9 +104,10 @@ class RagChain:
         answer = answer_with_llm(
             question, result["contexts"], history=safe_history, provider=provider, budget=budget
         )
+        # Câu từ chối không kèm nguồn: khối "nguồn" dưới câu từ chối là trích dẫn giả.
         return {
             "answer": answer,
-            "sources": public_citations(result["contexts"]),
+            "sources": [] if is_refusal(answer) else public_citations(result["contexts"]),
             "contexts": result["contexts"],
             "retrieval_debug": result["retrieval_debug"],
         }

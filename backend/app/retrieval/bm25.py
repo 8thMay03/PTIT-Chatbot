@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from app.db.models import Chunk
 from app.db.session import SessionLocal
+from app.ingestion.legal_units import copy_legal_metadata
 
 
 _cache_generation = 0
@@ -109,26 +110,25 @@ class BM25Search:
         snapshots: list[dict] = []
         for chunk, dataset_id in rows:
             metadata = chunk.chunk_metadata or {}
-            snapshots.append(
-                {
-                    "source": metadata.get("source", ""),
-                    "source_name": metadata.get("source_name", ""),
-                    "document_id": chunk.document_id,
-                    "dataset_id": dataset_id,
-                    "chunk_id": chunk.id,
-                    "heading": metadata.get("heading", ""),
-                    "heading_level": metadata.get("heading_level"),
-                    "section_path": metadata.get("section_path", ""),
-                    "chunk_index": chunk.chunk_index,
-                    "text": chunk.text,
-                    "search_text": chunk.search_text or chunk.text,
-                    "parent_id": metadata.get("parent_id", chunk.id),
-                    "parent_index": metadata.get("parent_index", chunk.chunk_index),
-                    "child_index": metadata.get("child_index", 0),
-                    "parent_text": metadata.get("parent_text", chunk.text),
-                    "chunk_type": metadata.get("chunk_type", "child"),
-                }
-            )
+            snapshot = {
+                "source": metadata.get("source", ""),
+                "source_name": metadata.get("source_name", ""),
+                "document_id": chunk.document_id,
+                "dataset_id": dataset_id,
+                "chunk_id": chunk.id,
+                "heading": metadata.get("heading", ""),
+                "heading_level": metadata.get("heading_level"),
+                "section_path": metadata.get("section_path", ""),
+                "chunk_index": chunk.chunk_index,
+                "text": chunk.text,
+                "search_text": chunk.search_text or chunk.text,
+                "parent_id": metadata.get("parent_id", chunk.id),
+                "parent_index": metadata.get("parent_index", chunk.chunk_index),
+                "child_index": metadata.get("child_index", 0),
+                "parent_text": metadata.get("parent_text", chunk.text),
+                "chunk_type": metadata.get("chunk_type", "child"),
+            }
+            snapshots.append(copy_legal_metadata(metadata, snapshot))
         return snapshots
 
 
