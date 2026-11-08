@@ -17,6 +17,7 @@ import {
 import { ApiError, chatApi, conversationsApi, describeError, fieldErrors, isAbortError } from "./api";
 import MarkdownView, { preloadMarkdownView } from "./components/LazyMarkdownView";
 import ReasoningPanel from "./components/ReasoningPanel";
+import { sourcesLabel } from "./lib/citations";
 import { isSubmitEnter } from "./lib/keyboard";
 import SplitWords from "./lib/motion/SplitWords";
 
@@ -657,7 +658,7 @@ const ChatView = forwardRef(function ChatView(
                     <div className="message-sources">
                       <span className="sources-label">
                         <BookOpen size={13} />
-                        Nguồn trích dẫn
+                        {sourcesLabel(message.content, message.sources)}
                       </span>
                       <div className="source-chips">
                         {message.sources.map((source, sourceIndex) => (

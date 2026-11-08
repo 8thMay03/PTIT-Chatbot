@@ -388,6 +388,43 @@ describe("ChatView", () => {
     });
   });
 
+  describe("nhãn khối nguồn (RAG-22)", () => {
+    const SOURCES = [
+      { citation_id: 1, source_name: "so-tay.md", heading: "Học phí", section_path: "Sổ tay > Học phí", locator: "Học phí" },
+    ];
+
+    async function answerWith(answer, sources) {
+      const { streams } = createBackend();
+      await ask("Học phí?");
+      const stream = await waitFor(() => streams[0]);
+      await stream.send({ type: "start", conversation_id: "c-1" });
+      await stream.send({ type: "delta", content: answer });
+      await stream.send({ type: "done", answer, sources, conversation_id: "c-1", steps: [] });
+      await stream.close();
+    }
+
+    it("có chip [n] hợp lệ: Nguồn trích dẫn", async () => {
+      await answerWith("Học phí thu theo học kỳ [1].", SOURCES);
+
+      const label = await waitFor(() => container.querySelector(".sources-label"));
+      expect(label.textContent).toBe("Nguồn trích dẫn");
+    });
+
+    it("không có [n] hoặc [n] không có trong sources: Nguồn liên quan", async () => {
+      await answerWith("Tài liệu chưa đề cập mức phạt [4].", SOURCES);
+
+      const label = await waitFor(() => container.querySelector(".sources-label"));
+      expect(label.textContent).toBe("Nguồn liên quan");
+    });
+
+    it("câu từ chối không kèm sources thì không hiện khối nguồn", async () => {
+      await answerWith("Chưa tìm thấy thông tin này trong tài liệu.", []);
+
+      await waitFor(() => container.textContent.includes("Chưa tìm thấy thông tin này"));
+      expect(container.querySelector(".message-sources")).toBeNull();
+    });
+  });
+
   describe("bộ đếm ký tự (AC-06)", () => {
     it("hiện n/2000 khi gần giới hạn; vượt thì khoá nút gửi và Enter", () => {
       const { fetchMock } = createBackend();
