@@ -1,7 +1,7 @@
 # Verification: 2026-11-08-rag18-confidence-gate
 
 - Verifier: `agent-claude`.
-- Trạng thái tổng: `passed` cho AC-01, AC-02, AC-05, AC-06; AC-03 `passed` có điều kiện (chỉ với reranker cross-encoder); AC-04 `passed` theo cách đo gate-only (e2e không đạt do scope guardrail) — chờ người dùng xác nhận (`MSG-agent-claude-002`).
+- Trạng thái tổng: `passed` cho AC-01, AC-02, AC-05, AC-06; AC-03 `passed` có điều kiện (chỉ với reranker cross-encoder) — chờ quyết định reranker mặc định (`MSG-agent-claude-002`); AC-04 `passed` (gate-only, người dùng xác nhận).
 - Bản được kiểm tra: nhánh `feat/rag18-confidence-gate`, commit `704f08b` (số đo ở commit `4289a13`; `704f08b` chỉ đổi docstring).
 - Môi trường: Windows 11, Python 3.11 `backend/.venv`, Postgres local (1 tài liệu Sổ tay D26 — LlamaParse agentic, 1010 chunk, fingerprint `d33ac7329944…`), embedding OpenAI `text-embedding-3-small` qua cache `backend/storage/eval/embedding_cache.json`, `sentence-transformers` 5.6.0 cho cross-encoder; Node/Vitest cho frontend.
 
@@ -63,7 +63,7 @@
 | `local_env` | **0.050** / 0.180 | 0.024 / 0.168 | 0.060 / 0.060 | 0.039 / 0.039 |
 | `example_heuristic` | **0.013** / 0.157 | 0.000 / 0.160 | 0.020 / 0.020 | 0.000 / 0.000 |
 
-- Trạng thái: `passed` theo gate-only ở cả ba cấu hình. Theo e2e không đạt vì scope guardrail đã chặn 14.7% câu `ptit_rag_300` trước gate (gate cũ cũng e2e 0.147) — cần người dùng xác nhận cách hiểu.
+- Trạng thái: `passed` (gate-only, người dùng xác nhận đây là cách đo AC-04 ngày 2026-11-08). E2E 0.173 do scope guardrail đã chặn 14.7% câu `ptit_rag_300` trước gate (gate cũ cũng e2e 0.147) — theo dõi ở RAG-19.
 - Bằng chứng: `summary.gate.false_refusal` / `false_refusal_e2e`, `summary.scope_pass` trong JSON.
 
 ### V-05 — AC-05

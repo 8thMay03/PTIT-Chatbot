@@ -5,7 +5,7 @@
 - Coordinator: `agent-claude`
 - Người yêu cầu: `user` (thẻ Notion [RAG-18](https://app.notion.com/p/40f334d296eb81f4838cf5ab79d4fbec), ưu tiên P0, nguồn: rà soát toàn hệ thống 2026-11-05)
 - Tạo lúc: `2026-11-08T00:15:00+07:00`
-- Cập nhật lúc: `2026-11-08T00:49:19+07:00`
+- Cập nhật lúc: `2026-11-08T09:08:55+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -43,7 +43,7 @@ Hệ quả: LLM vẫn được gọi với context yếu, tăng nguy cơ bịa h
 - [x] AC-01: Có fixture ≥ 50 câu không có đáp án (`answerable: false`), mỗi câu có `category` và `why_unanswerable`; được kiểm là không có đáp án trong kho đang index (ghi cách kiểm). Ít nhất 70% số câu lọt qua scope guardrail hiện tại (`check_scope`) để thực sự kiểm được gate. Có test lint schema/trùng lặp.
 - [x] AC-02: Báo cáo phân bố điểm top-1 (vector, BM25 thô, BM25 chuẩn hóa, rerank) cho câu có đáp án và câu không có đáp án, bảng quét ngưỡng và ngưỡng được chọn kèm lý do; lưu trong `documents/rag-eval/rag-18/` (JSON + mục README), ghi embedding model, reranker provider, fingerprint kho, dataset sha256, git commit.
 - [ ] AC-03 (đạt với reranker cross-encoder 0.824 gate-only / 0.839 e2e; chưa đạt với heuristic mặc định 0.373 — chờ người dùng): Trên tập không có đáp án: tỉ lệ từ chối ≥ 80% (báo cáo cả số gate-only và end-to-end gồm scope guardrail; tiêu chí áp cho end-to-end, gate-only phải ≥ 80% trên các câu lọt scope guardrail).
-- [ ] AC-04 (gate-only 4.0% với cross-encoder, ≤ 5% ở cả 3 cấu hình; e2e 17.3% do scope guardrail chặn 14.7% trước gate — chờ người dùng xác nhận cách hiểu): Trên golden set `ptit_rag_300.json`: từ chối nhầm ≤ 5% trên toàn bộ câu; báo cáo thêm tỉ lệ trên `ptit_ragas_100.json` và tỉ lệ trên nhóm câu retrieval trúng hit@4.
+- [x] AC-04 (đo gate-only theo xác nhận của người dùng 2026-11-08: 4.0% với cross-encoder, ≤ 5% ở cả 3 cấu hình; e2e 17.3% do scope guardrail, theo dõi ở RAG-19): Trên golden set `ptit_rag_300.json`: từ chối nhầm ≤ 5% trên toàn bộ câu; báo cáo thêm tỉ lệ trên `ptit_ragas_100.json` và tỉ lệ trên nhóm câu retrieval trúng hit@4.
 - [x] AC-05: Unit test cho gate mới (đạt/không đạt theo từng tín hiệu, thiếu tín hiệu, context rỗng, model chưa hiệu chỉnh) và cho BM25 chuẩn hóa (nằm trong [0, 1], không phụ thuộc kích thước kho theo cách của điểm thô); `python -m pytest` toàn bộ backend xanh.
 - [x] AC-06: `.env.example` và cấu hình cập nhật ngưỡng mới; ngưỡng vector ghi theo embedding model; API `/config` giữ tương thích ngược (các test `test_config_api.py`, `test_config_persistence.py` và test frontend liên quan vẫn xanh) và giá trị BM25 thô đã lưu không làm gate từ chối mọi câu.
 
@@ -63,10 +63,11 @@ Hệ quả: LLM vẫn được gọi với context yếu, tăng nguy cơ bịa h
 ## Trạng thái hiện tại
 
 - Tóm tắt: S-01…S-06 xong trên nhánh `feat/rag18-confidence-gate` (`bcd6cd0..704f08b`, chưa push). Gate mới: AND trên `bm25_norm ≥ 0.25`, cosine ≥ 0.37 (`text-embedding-3-small`), cross-encoder ≥ −1.65 (chỉ khi provider `cross-encoder`). Báo cáo `documents/rag-eval/rag-18/`. Self-review `approved`.
-- Blocker: không có blocker kỹ thuật. Chờ người dùng quyết định theo `MSG-agent-claude-002` (reranker mặc định cho AC-03; cách hiểu e2e/gate-only của AC-04).
-- Bước tiếp theo: người dùng trả lời; coordinator push, mở PR vào `dev`, cập nhật thẻ Notion, chuyển `done` nếu tiêu chí được chấp nhận.
+- Blocker: không có blocker kỹ thuật. AC-04 đã được người dùng xác nhận tính gate-only; còn chờ quyết định về reranker mặc định cho AC-03 (`MSG-agent-claude-002`).
+- Bước tiếp theo: PR vào `dev` đã mở theo yêu cầu người dùng; chờ quyết định AC-03 và merge, sau đó cập nhật thẻ Notion và chuyển `done`.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
 - 2026-11-08T00:15:00+07:00 — agent-claude: tạo task từ thẻ Notion RAG-18, trạng thái `ready`. Bổ sung so với thẻ: (1) yêu cầu ≥ 70% câu không có đáp án lọt scope guardrail, để tỉ lệ từ chối không bị scope guardrail "làm hộ"; (2) giữ tương thích ngược `min_bm25_score` vì runtime config có thể đã lưu giá trị thang thô; (3) chỉ dùng `rerank_score` khi provider cho điểm tuyệt đối; (4) UI admin để ngoài phạm vi.
 - 2026-11-08T00:49:19+07:00 — agent-claude: chuyển `in_review`. Quyết định phạm vi: (1) đo AC-04 theo gate-only (gate áp lên mọi câu), báo cáo e2e bên cạnh, vì scope guardrail (RAG-19, ngoài phạm vi) đã chặn 14.7% câu `ptit_rag_300` trước gate; (2) theo plan S-04, heuristic không đạt AC-03 nên đã đo và hiệu chỉnh cross-encoder; không đổi `RERANKER_PROVIDER` mặc định (thay đổi reranker nằm ngoài phạm vi) — hỏi người dùng (`MSG-agent-claude-002`); (3) fixture đặt tên `ptit_no_answer_56.json` (56 câu) thay cho `ptit_no_answer_50.json`; (4) sửa thêm fixture giả trong 3 file test chat/LLM ngoài danh sách S-05 vì hợp đồng gate mới cần `bm25_norm_score`.
+- 2026-11-08T09:08:55+07:00 — user: xác nhận AC-04 tính gate-only (gate áp lên mọi câu); yêu cầu push và mở PR. AC-03 (reranker mặc định) chưa có quyết định.

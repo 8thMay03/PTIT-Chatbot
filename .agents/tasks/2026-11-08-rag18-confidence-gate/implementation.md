@@ -111,3 +111,13 @@
 - Hạn chế / còn lại: AC-03 có điều kiện (cross-encoder); cách hiểu AC-04; push/PR; cập nhật Notion.
 - Bước tiếp theo: người dùng trả lời `MSG-agent-claude-002`; sau đó push, mở PR vào `dev`, chuyển task `done`.
 - Phản hồi nhận bàn giao: (chờ).
+
+### MSG-user-001
+
+- Lúc: `2026-11-08T09:08:55+07:00`.
+- Từ: `user`; đến: `agent-claude`.
+- Nhiệm vụ: `AC-04`.
+- Loại: `reply`.
+- Tham chiếu: `MSG-agent-claude-002`.
+- Nội dung: "AC-04 gate-only is fine, push and open the PR". Câu hỏi về reranker mặc định (AC-03) chưa được trả lời.
+- Hành động mong muốn: push nhánh, mở PR vào `dev` (đã làm).
