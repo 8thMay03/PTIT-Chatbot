@@ -22,6 +22,7 @@ import OriginalDocumentViewer, {
 } from "./components/OriginalDocumentViewer";
 import { EMPTY, formatDate, formatSize } from "./lib/format";
 import { canEditMarkdown, documentStatus, needsChunking, NO_MARKDOWN_HINT } from "./lib/documentStatus";
+import { createChunkLocator } from "./lib/chunkLocator";
 import MarkdownView from "./components/MarkdownView";
 import MarkdownEditorView from "./components/MarkdownEditorView";
 import ParseProgress from "./components/ParseProgress";
@@ -44,88 +45,6 @@ const DOC_VIEW_MODES = [
   },
   { key: "markdown", label: "Markdown", title: "Văn bản đã parse, dùng để chia đoạn" },
 ];
-
-function cleanMarkdown(s) {
-  return s
-    .replace(/^[#*>\-\|\s]+/, "")
-    .replace(/[#*>\-\|\s]+$/, "")
-    .replace(/\*\*|__|\*|_|`|<[^>]+>/g, "")
-    .trim();
-}
-
-function extractChunkSnippets(chunkText) {
-  if (!chunkText) return [];
-  const rawLines = chunkText.split(/\r?\n/);
-  const snippets = [];
-  for (const raw of rawLines) {
-    const clean = cleanMarkdown(raw);
-    if (clean.length >= 3) {
-      snippets.push(clean);
-    }
-  }
-  if (snippets.length === 0) {
-    const t = cleanMarkdown(chunkText);
-    if (t) snippets.push(t.slice(0, 40));
-  }
-  return snippets;
-}
-
-function findMatchingElements(chunkText, chunkIndex, totalChunks, elements) {
-  const snippets = extractChunkSnippets(chunkText);
-  if (snippets.length === 0 || elements.length === 0) return [];
-
-  // Ưu tiên đoạn dài nhất để neo đúng khối văn bản đặc trưng
-  const anchorCandidates = [...snippets].sort((a, b) => b.length - a.length);
-  const approxRatio = totalChunks > 0 ? (chunkIndex ?? 0) / totalChunks : 0;
-  const expectedIdx = Math.floor(approxRatio * elements.length);
-
-  let anchorElIdx = -1;
-  for (const cand of anchorCandidates.slice(0, 5)) {
-    let best = -1;
-    let minDiff = Infinity;
-    for (let i = 0; i < elements.length; i++) {
-      const elText = elements[i].textContent;
-      if (!elText) continue;
-      if (elText.includes(cand) || (cand.length >= 8 && cand.includes(elText))) {
-        const diff = Math.abs(i - expectedIdx);
-        if (diff < minDiff) {
-          minDiff = diff;
-          best = i;
-        }
-      }
-    }
-    if (best !== -1) {
-      anchorElIdx = best;
-      break;
-    }
-  }
-
-  // Nếu không khớp từ khóa nào, dùng vị trí ước lượng theo tỷ lệ văn bản
-  if (anchorElIdx === -1) {
-    const fallback = Math.min(elements.length - 1, Math.max(0, expectedIdx));
-    return [fallback];
-  }
-
-  const matchedIndices = new Set();
-  matchedIndices.add(anchorElIdx);
-
-  // Mở rộng lân cận để lấy toàn bộ các khối thuộc đoạn này
-  const windowStart = Math.max(0, anchorElIdx - 10);
-  const windowEnd = Math.min(elements.length - 1, anchorElIdx + 25);
-
-  for (let i = windowStart; i <= windowEnd; i++) {
-    const elText = elements[i].textContent;
-    if (!elText) continue;
-    for (const snip of snippets) {
-      if (snip.length >= 4 && (elText.includes(snip) || (elText.length >= 6 && snip.includes(elText)))) {
-        matchedIndices.add(i);
-        break;
-      }
-    }
-  }
-
-  return Array.from(matchedIndices).sort((a, b) => a - b);
-}
 
 /** Màn chi tiết, mở khi bấm vào một tài liệu trong danh sách kho. */
 export default function DocumentView({ documentId, onBack, backLabel, busy: pipelineBusy, parseJob, chunkingDocId, onParse, onChunk }) {
@@ -156,6 +75,8 @@ export default function DocumentView({ documentId, onBack, backLabel, busy: pipe
   const hoverTimerRef = useRef(null);
   const docContentRef = useRef(null);
   const currentHighlightedElsRef = useRef([]);
+  // Chỉ mục chữ của bản render, lập lại khi nội dung tài liệu đổi.
+  const chunkLocatorRef = useRef({ view: null, content: null, locator: null });
 
   // ---- Thông tin tài liệu ----
   const detailQuery = useQuery({
@@ -252,9 +173,11 @@ export default function DocumentView({ documentId, onBack, backLabel, busy: pipe
   const isSearching = Boolean(searchTerm);
   const visibleTotal = isSearching ? searchResults?.length ?? 0 : chunkTotal;
   const totalPages = Math.max(1, Math.ceil(visibleTotal / pageSize));
-  const visibleChunks = isSearching
-    ? (searchResults ?? []).slice((page - 1) * pageSize, page * pageSize)
-    : chunks;
+  // Giữ nguyên mảng giữa các lần render: bộ định vị nhớ kết quả theo danh sách này.
+  const visibleChunks = useMemo(
+    () => (isSearching ? (searchResults ?? []).slice((page - 1) * pageSize, page * pageSize) : chunks),
+    [isSearching, searchResults, page, pageSize, chunks]
+  );
   const busy = chunksLoading || loadingAll;
 
   const highlightAndScrollToChunk = useCallback(
@@ -275,18 +198,19 @@ export default function DocumentView({ documentId, onBack, backLabel, busy: pipe
       const renderedView = container.querySelector(".doc-markdown-rendered-view");
       if (!renderedView) return;
 
-      const allElements = Array.from(
-        renderedView.querySelectorAll(
-          ".doc-p, .doc-h1, .doc-h2, .doc-h3, .doc-h4, .doc-h5, .doc-h6, li, tr, .doc-blockquote, .doc-table-wrapper"
-        )
-      );
-      if (allElements.length === 0) return;
+      const cached = chunkLocatorRef.current;
+      if (!cached.locator || cached.view !== renderedView || cached.content !== renderedDocContent) {
+        chunkLocatorRef.current = {
+          view: renderedView,
+          content: renderedDocContent,
+          locator: createChunkLocator(renderedView),
+        };
+      }
 
-      const total = isSearching ? searchResults?.length ?? 0 : chunkTotal;
-      const matchedIndices = findMatchingElements(chunk.text, chunk.chunk_index, total, allElements);
-      if (matchedIndices.length === 0) return;
-
-      const matchedElements = matchedIndices.map((idx) => allElements[idx]).filter(Boolean);
+      const position = visibleChunks.findIndex((c) => c.id === chunk.id);
+      // Ước lượng theo tỷ lệ cần tổng số đoạn của cả tài liệu, kể cả khi đang tìm kiếm.
+      const total = isSearching ? allChunks?.length ?? 0 : chunkTotal;
+      const matchedElements = chunkLocatorRef.current.locator.locate(visibleChunks, position, total);
       if (matchedElements.length === 0) return;
 
       matchedElements.forEach((el) => {
@@ -307,7 +231,7 @@ export default function DocumentView({ documentId, onBack, backLabel, busy: pipe
         });
       }
     },
-    [isSearching, searchResults, chunkTotal]
+    [isSearching, allChunks, chunkTotal, visibleChunks, renderedDocContent]
   );
 
   const handleChunkHover = useCallback(
