@@ -38,9 +38,9 @@ Nguyên nhân:
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: đã sửa và kiểm chứng bằng test tự động; chưa commit, chưa kiểm tra thủ công trên trình duyệt.
+- Tóm tắt: đã sửa và kiểm chứng bằng test tự động; commit `801e6bd`, PR #61 vào `dev` (https://github.com/8thMay03/PTIT-Chatbot/pull/61); chưa kiểm tra thủ công trên trình duyệt.
 - Blocker: không có.
-- Bước tiếp theo: người dùng xác nhận trên trình duyệt; commit và mở PR vào `dev`.
+- Bước tiếp theo: người dùng xác nhận trên trình duyệt và merge PR #61.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 

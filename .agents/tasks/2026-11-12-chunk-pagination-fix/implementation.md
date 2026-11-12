@@ -2,7 +2,7 @@
 
 ## Tổng quan triển khai
 
-Nhánh `feat/chunk-pagination-fix` (tách từ `dev` tại `149dd98`). Đã sửa trong working tree, chưa commit.
+Nhánh `feat/chunk-pagination-fix` (tách từ `dev` tại `149dd98`). Commit `801e6bd`, PR #61 vào `dev`.
 
 ## Nhật ký theo nhiệm vụ
 
@@ -14,7 +14,7 @@ Nhánh `feat/chunk-pagination-fix` (tách từ `dev` tại `149dd98`). Đã sử
   - Effect kẹp trang chỉ chạy khi đã biết tổng thật (`totalKnown`: `chunksQuery.isSuccess`, hoặc `searchResults != null` khi đang tìm).
   - Effect debounce tìm kiếm bỏ qua khi từ khóa đã trim không đổi, nên không còn `setPage(1)` lúc mở màn; thay ref `searchTimer` bằng timer cục bộ.
   - Thêm `DocumentView.pagination.test.jsx` mô phỏng API chậm 20ms, tài liệu 45 đoạn.
-- File thay đổi: `frontend/src/DocumentView.jsx`, `frontend/src/DocumentView.pagination.test.jsx`; commit: chưa commit.
+- File thay đổi: `frontend/src/DocumentView.jsx`, `frontend/src/DocumentView.pagination.test.jsx`; commit: `801e6bd`.
 - Quyết định/giao diện ảnh hưởng nhiệm vụ khác: không có.
 - Kiểm tra đã chạy: xem `verification.md` V-01, V-02.
 - Còn lại/blocker: chưa kiểm tra thủ công trên trình duyệt.
@@ -29,9 +29,9 @@ Nhánh `feat/chunk-pagination-fix` (tách từ `dev` tại `149dd98`). Đã sử
 
 - Từ / đến: `claude-code` / người dùng.
 - Đã hoàn tất: sửa hai nguyên nhân và thêm test hồi quy.
-- File/branch/commit/patch: `feat/chunk-pagination-fix`, chưa commit.
+- File/branch/commit/patch: `feat/chunk-pagination-fix`, commit `801e6bd`, PR #61.
 - Kiểm chứng: V-01, V-02 `passed`.
 - Review: `self_review` `approved`, không có R-* mở.
 - Hạn chế / còn lại: chưa kiểm tra thủ công trên trình duyệt.
-- Bước tiếp theo: người dùng kiểm tra trên trình duyệt, commit, mở PR vào `dev`; cân nhắc xóa nhánh cũ `feat/fix-chunk-pagination`.
+- Bước tiếp theo: người dùng kiểm tra trên trình duyệt và merge PR #61; cân nhắc xóa nhánh cũ `feat/fix-chunk-pagination`.
 - Phản hồi nhận bàn giao: chờ người dùng.
