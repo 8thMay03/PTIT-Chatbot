@@ -42,7 +42,7 @@ Người dùng quyết định giữ mục lục để trả lời được câu
 
 - Tóm tắt: đã triển khai, test xanh, index local đã chunk lại, eval không thụt lùi. Mới có self-review.
 - Blocker: không có.
-- Bước tiếp theo: người dùng xem PR/diff; reviewer độc lập (nếu có) review trước khi merge vào `dev`.
+- Bước tiếp theo: review PR #59 (https://github.com/8thMay03/PTIT-Chatbot/pull/59) trước khi merge vào `dev`.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 

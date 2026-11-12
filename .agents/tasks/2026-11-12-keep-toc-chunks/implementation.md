@@ -47,9 +47,9 @@ Không có (một agent).
 
 - Từ / đến: `claude-code` / người dùng.
 - Đã hoàn tất: S-01, S-02, S-03.
-- File/branch/commit/patch: nhánh `feat/keep-toc-chunks`; commit xem `git log`. Thay đổi file PDF trong `data/` (xóa ở `data/`, thêm ở `data/raw/`) là của người dùng, không nằm trong commit.
+- File/branch/commit/patch: nhánh `feat/keep-toc-chunks`, PR #59 (https://github.com/8thMay03/PTIT-Chatbot/pull/59); commit xem `git log`. Thay đổi file PDF trong `data/` (xóa ở `data/`, thêm ở `data/raw/`) là của người dùng, không nằm trong commit.
 - Kiểm chứng: `verification.md` V-01…V-05 đạt.
 - Review: `review.md` self_review `approved`, không có R-* bắt buộc.
 - Hạn chế / còn lại: container `backend` mount `./backend/app`, `./backend/scripts` và chạy `uvicorn --reload`, nên đã chạy code mới (log WatchFiles reload, `is_toc_heading` có trong container) — không cần build lại image. Container chạy theo nhánh đang checkout: về `dev` trước khi merge thì chunk lại sẽ bỏ mục lục.
-- Bước tiếp theo: người dùng review, mở PR vào `dev`.
+- Bước tiếp theo: review và merge PR #59 vào `dev`.
 - Phản hồi nhận bàn giao: <chờ người dùng>.
