@@ -157,8 +157,6 @@ export default function DocumentView({ documentId, onBack, backLabel, busy: pipe
   const docContentRef = useRef(null);
   const currentHighlightedElsRef = useRef([]);
 
-  const searchTimer = useRef(null);
-
   // ---- Thông tin tài liệu ----
   const detailQuery = useQuery({
     queryKey: queryKeys.document(documentId),
@@ -183,6 +181,10 @@ export default function DocumentView({ documentId, onBack, backLabel, busy: pipe
     queryFn: ({ signal }) =>
       documentsApi.chunks(documentId, { offset, limit: pageSize, signal }),
     enabled: Boolean(documentId) && !searchTerm,
+    // Giữ trang cũ trong lúc tải trang mới (cùng tài liệu). Nếu không, total
+    // tạm về 0 → totalPages = 1 và effect kẹp trang kéo người dùng về trang 1.
+    placeholderData: (prev, prevQuery) =>
+      prevQuery?.queryKey?.[2] === documentId ? prev : undefined,
   });
   const chunks = chunksQuery.data?.chunks ?? [];
   const chunkTotal = chunksQuery.data?.total ?? 0;
@@ -219,14 +221,17 @@ export default function DocumentView({ documentId, onBack, backLabel, busy: pipe
   }, [docViewMode]);
 
   // Gõ tới đâu tìm tới đó sẽ gọi API liên tục — chờ người dùng ngừng gõ 350ms.
+  // Chỉ về trang 1 khi từ khóa thật sự đổi; nếu không, lượt chạy lúc mở màn
+  // sẽ kéo người dùng vừa bấm chuyển trang quay lại trang đầu.
   useEffect(() => {
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => {
-      setSearchTerm(searchInput.trim());
+    const term = searchInput.trim();
+    if (term === searchTerm) return undefined;
+    const timer = setTimeout(() => {
+      setSearchTerm(term);
       setPage(1);
     }, 350);
-    return () => clearTimeout(searchTimer.current);
-  }, [searchInput]);
+    return () => clearTimeout(timer);
+  }, [searchInput, searchTerm]);
 
   // Đổi tài liệu thì quay về trang đầu; dữ liệu trang cũ đã được query cache tách riêng.
   useEffect(() => {
@@ -341,9 +346,11 @@ export default function DocumentView({ documentId, onBack, backLabel, busy: pipe
     };
   }, []);
 
+  // Chỉ kẹp số trang khi đã biết tổng thật; lúc đang tải, total chưa đáng tin.
+  const totalKnown = isSearching ? searchResults != null : chunksQuery.isSuccess;
   useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+    if (totalKnown && page > totalPages) setPage(totalPages);
+  }, [page, totalPages, totalKnown]);
 
   function toggleSelectChunk(id) {
     setSelectedChunkIds((prev) => {
