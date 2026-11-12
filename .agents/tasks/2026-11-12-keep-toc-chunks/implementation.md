@@ -50,6 +50,6 @@ Không có (một agent).
 - File/branch/commit/patch: nhánh `feat/keep-toc-chunks`; commit xem `git log`. Thay đổi file PDF trong `data/` (xóa ở `data/`, thêm ở `data/raw/`) là của người dùng, không nằm trong commit.
 - Kiểm chứng: `verification.md` V-01…V-05 đạt.
 - Review: `review.md` self_review `approved`, không có R-* bắt buộc.
-- Hạn chế / còn lại: container `backend` đang chạy code cũ; lần chunk lại qua UI tiếp theo sẽ lại bỏ mục lục cho tới khi build lại image từ nhánh này.
-- Bước tiếp theo: người dùng review, mở PR vào `dev`, rebuild container sau khi merge.
+- Hạn chế / còn lại: container `backend` mount `./backend/app`, `./backend/scripts` và chạy `uvicorn --reload`, nên đã chạy code mới (log WatchFiles reload, `is_toc_heading` có trong container) — không cần build lại image. Container chạy theo nhánh đang checkout: về `dev` trước khi merge thì chunk lại sẽ bỏ mục lục.
+- Bước tiếp theo: người dùng review, mở PR vào `dev`.
 - Phản hồi nhận bàn giao: <chờ người dùng>.

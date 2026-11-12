@@ -68,7 +68,7 @@
 
 - `test_clean_text_keeps_every_pipe_line_on_d26_toc` bị skip vì `data/datasets/` không có file `.md` D26; hành vi tương ứng đã kiểm trên `parsed_text` từ DB (V-01).
 - Chưa có baseline `ptit_rag_300` trên index cũ; chưa đo chế độ `vector`/`full`.
-- Chưa kiểm tra end-to-end qua chat UI (container backend đang chạy code cũ).
+- Chưa kiểm tra end-to-end qua chat UI (container backend đã tự reload code mới qua volume mount).
 
 ## Kết luận
 
