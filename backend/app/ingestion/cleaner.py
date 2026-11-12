@@ -2,13 +2,19 @@
 
 ``clean_text`` drops lines that are layout artifacts rather than content:
 
-- table-of-contents entries (dot leaders, glued bold page numbers, "MỤC LỤC" body);
+- stray table-of-contents entries (dot leaders, glued bold page numbers) outside
+  a "MỤC LỤC" section;
 - the national title/motto and the "Hà Nội, ngày … tháng … năm …" dateline;
 - freestanding page numbers ("- 3 -", "12");
 - signature blocks (signer role, "(đã ký)", the signer name, "Nơi nhận" lists).
 
 Lines inside Markdown/HTML tables and fenced code blocks are never touched:
 tables are handled by the chunker and code must stay verbatim.
+
+The "MỤC LỤC" section itself is kept so questions about the document outline
+("Sổ tay gồm những phần nào?", "… ở trang mấy?") can be answered: entries are
+rewritten to "Tiêu đề (trang N)" and a compact two-column TOC table gets a
+"Mục | Trang" header so each chunked piece keeps a meaningful header.
 """
 
 import re
@@ -34,7 +40,14 @@ _TOC_LINE_LIKE = re.compile(
     r"(?:\.{4,}(?:\s*\d{0,4})?|\.{2,}\s*\d{1,4}|…{2,}\s*\d{1,4})\s*$"
     r"|\*\*\s*\d{1,3}\s*\*\*\s*$"
     r"|\s\d{1,3}\s*$"
+    r"|\(trang\s+\d{1,4}\)\s*$"
 )
+# Leader + optional page number at the end of a TOC entry, captured for rewriting.
+_TOC_ENTRY_TAIL = re.compile(
+    r"\s*(?:\.{2,}|…{2,}|(?:\.\s+){3,}\.?)\s*(\d{1,4})?\s*$"
+)
+_BOLD_PAGE_TAIL = re.compile(r"\s*\*\*\s*(\d{1,3})\s*\*\*\s*$")
+_TOC_TABLE_HEADER = ["|Mục|Trang|", "|-|-|"]
 # Whole-line bold ending in a bolded page number: "**PHẦN III: …** **24**"
 _BOLD_PAGE_SUFFIX = re.compile(r"\*\*\s*\d{1,3}\s*\*\*\s*$")
 # Freestanding page numbers: "- 3 -", "— 12 —", "7"
@@ -79,8 +92,8 @@ _DISTRIBUTION_MARKER = re.compile(r"\(\s*[a-zđ]{1,4}\s*/\s*[a-zđ]{1,4}\s*\)|^l
 _PERSON_NAME = re.compile(r"^[A-ZÀ-Ỹ][a-zà-ỹ]+(?:\s+[A-ZÀ-Ỹ][a-zà-ỹ]+){1,5}\.?$")
 # Studocu watermark stamped on scanned PDFs ("lOMoARcPSD|40036395").
 _WATERMARK = re.compile(r"^lOMoARcPSD\|?\d*\s*$", re.IGNORECASE)
-# A TOC section swallows everything below it — entries come as dot leaders,
-# bare page numbers or even Markdown tables, so line rules cannot catch them all.
+# A TOC section reaches every TOC-shaped line below it — entries come as dot
+# leaders, bare page numbers or even Markdown tables.
 _TOC_HEADING = re.compile(r"^m[ụu]c\s*l[ụu]c\s*:?\s*$", re.IGNORECASE)
 _ANY_HEADING = re.compile(r"^\s{0,3}#{1,6}\s+\S")
 
@@ -119,7 +132,7 @@ def _drop_noise_lines(lines: list[str]) -> list[str]:
             index += 1
             continue
         if in_toc_section:
-            # The whole "MỤC LỤC" section is noise, tables included; it ends at
+            # The "MỤC LỤC" section is kept, its entries normalized; it ends at
             # a heading or at the first line that no longer reads like a TOC
             # entry (real content often follows without an intervening heading).
             if _ANY_HEADING.match(stripped) and not _TOC_HEADING.match(_ATX_PREFIX.sub("", stripped)):
@@ -130,22 +143,26 @@ def _drop_noise_lines(lines: list[str]) -> list[str]:
             if stripped.startswith("|") or _HTML_TABLE_START.search(stripped):
                 run, end = _peek_table_run(lines, index)
                 if _is_toc_like_table(run):
+                    kept.extend(_with_toc_table_header(run))
                     index = end
                     continue
                 # Bảng dữ liệu thật ngay sau "MỤC LỤC": kết thúc section mục
-                # lục tại đây và giữ bảng; dòng hiện tại xử lý tiếp bên dưới.
+                # lục tại đây; bảng được giữ theo luật bảng bên dưới.
                 in_toc_section = False
             else:
                 title = _ATX_PREFIX.sub("", stripped)
                 plain = title.strip("*_ ").strip()
-                if plain and not _TOC_LINE_LIKE.search(plain):
+                # ``plain`` mất "**" quanh số trang đậm nên kiểm tra cả ``title``.
+                if plain and not (_TOC_LINE_LIKE.search(plain) or _TOC_LINE_LIKE.search(title)):
                     in_toc_section = False
                     # Fall through to the normal rules for this line.
                 else:
+                    kept.append(_normalize_toc_entry(line) if plain else line)
                     index += 1
                     continue
         if _TOC_HEADING.match(_ATX_PREFIX.sub("", stripped)):
             in_toc_section = True
+            kept.append(line)
             index += 1
             continue
         if in_table:
@@ -231,6 +248,37 @@ def _is_toc_like_table(run: list[str]) -> bool:
         return True
     hits = sum(1 for cell in lasts if _TOC_PAGE_CELL.fullmatch(cell))
     return hits / len(lasts) > 0.5
+
+
+def _with_toc_table_header(run: list[str]) -> list[str]:
+    """Thêm header "Mục | Trang" cho bảng mục lục 2 cột mà hàng đầu là một entry.
+
+    LlamaParse đặt entry đầu tiên ("|Lời nói đầu|3|") vào vị trí header; chunker
+    lặp header ở mọi phần bảng, nên giữ nguyên sẽ khiến entry đó xuất hiện như
+    tên cột. Hai bảng mục lục ngắt trang cùng nhận header này nên chunker ghép lại.
+    """
+    if len(run) < 2 or not run[0].strip().startswith("|") or not _is_delimiter_row(run[1]):
+        return run
+    cells = [cell.strip() for cell in run[0].strip().strip("|").split("|")]
+    if len(cells) != 2 or not _TOC_PAGE_CELL.fullmatch(cells[-1]):
+        return run
+    return [*_TOC_TABLE_HEADER, run[0], *run[2:]]
+
+
+def _normalize_toc_entry(line: str) -> str:
+    """"Lời nói đầu ...... 3" / "**PHẦN I** **5**" → "… (trang N)"; dòng khác giữ nguyên."""
+    for tail in (_TOC_ENTRY_TAIL, _BOLD_PAGE_TAIL):
+        match = tail.search(line)
+        if match and match.start() > 0:
+            head = line[: match.start()].rstrip()
+            page = match.group(1)
+            return f"{head} (trang {page})" if page else head
+    return line
+
+
+def is_toc_heading(heading: str) -> bool:
+    """True khi tiêu đề section là "MỤC LỤC" (dùng để gắn cờ chunk mục lục)."""
+    return bool(_TOC_HEADING.match(_ATX_PREFIX.sub("", heading.strip()).strip("*_ ")))
 
 
 def _table_last_cells(run: list[str]) -> list[str]:

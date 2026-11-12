@@ -102,10 +102,11 @@ def check_short_chunk(ref: str, text: str, parent_text: str, min_chars: int) -> 
 
 
 def check_noise_chunk(ref: str, text: str) -> Finding | None:
-    """AC-03: index không còn chunk mục lục/quốc hiệu/chữ ký/số trang.
+    """AC-03 (RAG-06): index không còn chunk quốc hiệu/chữ ký/số trang/entry mục lục lạc.
 
     Hai đường phát hiện: từng dòng khớp mẫu nhiễu, hoặc chunk mà cleaner sẽ
-    cắt bỏ một phần nội dung (section "MỤC LỤC" còn sót là trường hợp điển hình).
+    cắt bỏ một phần nội dung. Section "MỤC LỤC" được giữ (entry đã chuẩn hóa
+    thành "… (trang N)") nên chunk mục lục không bị coi là nhiễu.
     """
     for line in text.splitlines():
         stripped = line.strip()
