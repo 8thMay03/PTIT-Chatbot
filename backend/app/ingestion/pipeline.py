@@ -53,7 +53,7 @@ from app.ingestion.chunker import (
     table_row_search_index,
     table_search_body,
 )
-from app.ingestion.cleaner import clean_text
+from app.ingestion.cleaner import clean_text, is_toc_heading
 from app.ingestion.legal_units import legal_metadata
 from app.ingestion.loaders import SourceDocument, load_documents
 from app.ingestion.uploads import (
@@ -822,6 +822,7 @@ def _chunk_records(
             "child_index": child_index,
             "parent_text": parent_text,
             "chunk_type": "child",
+            "is_toc": is_toc_heading(chunk.heading),
             **legal_metadata(chunk),
         }
         chunk_records.append(

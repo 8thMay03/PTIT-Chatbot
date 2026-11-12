@@ -717,3 +717,17 @@ def test_chunk_records_search_text_unchanged_without_tables():
         assert record.search_text == compose_search_text(
             "Học phí", record.metadata["section_path"], record.text
         )
+
+
+def test_chunk_records_flag_toc_chunks_and_serialize_toc_rows():
+    text = (
+        "# MỤC LỤC\n\n|Lời nói đầu|3|\n|-|-|\n|Giới thiệu|6|\n|Lịch sử phát triển|8|\n\n"
+        "# LỜI NÓI ĐẦU\n\nCác bạn tân sinh viên thân mến, chào mừng các bạn đến với Học viện."
+    )
+
+    records, _payload = _chunk_records("doc1", "data/so-tay.md", "Sổ tay", text)
+
+    toc = [record for record in records if record.metadata["is_toc"]]
+    assert toc and all(record.metadata["heading"] == "MỤC LỤC" for record in toc)
+    assert "Mục: Lịch sử phát triển" in toc[0].search_text
+    assert not any(record.metadata["is_toc"] for record in records if record.metadata["heading"] == "LỜI NÓI ĐẦU")

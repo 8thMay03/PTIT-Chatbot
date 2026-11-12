@@ -79,7 +79,8 @@ def handbook_body() -> str:
     if not path.is_file():
         pytest.skip(f"Thiếu bản converted Sổ tay D26 tại '{path}' (backend/storage/ bị gitignore).")
     text = path.read_text(encoding="utf-8")
-    # Bỏ bảng mục lục đầu sổ tay: chunker đã lọc bảng này nên không tính.
+    # Bỏ bảng mục lục đầu sổ tay: mục lục chỉ liệt kê tên mục, không chứa câu
+    # trả lời, nên không tính khi đo độ đặc hiệu của expected_terms.
     marker = "## LỜI NÓI ĐẦU"
     assert marker in text
     return normalize_text(text[text.index(marker):])

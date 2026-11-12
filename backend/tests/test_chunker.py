@@ -933,11 +933,12 @@ def test_html_table_without_thead_has_no_missing_header() -> None:
 
 
 # ---------------------------------------------------------------------------
-# S-05: cleaner giữ bảng dữ liệu sau "MỤC LỤC", vẫn lọc bảng mục lục
+# Mục lục được giữ (task 2026-11-12-keep-toc-chunks); bảng dữ liệu sau
+# "MỤC LỤC" kết thúc section mục lục (S-05 của table-chunking-coverage).
 # ---------------------------------------------------------------------------
 
 
-def test_clean_text_drops_compact_toc_table() -> None:
+def test_clean_text_keeps_compact_toc_table_with_synthetic_header() -> None:
     text = "\n".join(
         [
             "# MỤC LỤC",
@@ -955,11 +956,48 @@ def test_clean_text_drops_compact_toc_table() -> None:
 
     cleaned = clean_text(text)
 
-    assert "MỤC LỤC" not in cleaned
-    assert "Lời nói đầu" not in cleaned
-    assert "PHẦN I" not in cleaned
+    assert "# MỤC LỤC\n\n|Mục|Trang|\n|-|-|\n|Lời nói đầu|3|\n|**PHẦN I: TỔNG QUAN**|**5**|" in cleaned
     assert "# LỜI NÓI ĐẦU" in cleaned
     assert "Nội dung thật." in cleaned
+
+
+def test_clean_text_keeps_toc_table_header_when_already_real() -> None:
+    text = "# MỤC LỤC\n\n| Nội dung | Trang |\n|---|---|\n| Học phí | 12 |\n| Bảo hiểm | 15 |"
+
+    cleaned = clean_text(text)
+
+    assert "|Mục|Trang|" not in cleaned
+    assert "| Nội dung | Trang |\n|---|---|\n| Học phí | 12 |" in cleaned
+
+
+def test_toc_tables_split_by_page_break_chunk_with_shared_header() -> None:
+    entries = [f"|Kế hoạch và tiến trình học tập chuẩn Ngành số {n} khóa 2026|{n + 30}|" for n in range(40)]
+    text = "\n".join(
+        [
+            "# MỤC LỤC",
+            "",
+            entries[0],
+            "|-|-|",
+            *entries[1:20],
+            "",
+            entries[20],
+            "|-|-|",
+            *entries[21:],
+            "",
+            "# LỜI NÓI ĐẦU",
+            "",
+            "Các bạn tân sinh viên thân mến! " * 10,
+        ]
+    )
+
+    chunks = split_parent_child(text, parent_size=2048, parent_overlap=0, child_size=1024, child_overlap=0)
+    toc = [chunk for chunk in chunks if chunk.heading == "MỤC LỤC"]
+
+    assert len(toc) > 1
+    assert all(chunk.text.startswith("# MỤC LỤC\n\n|Mục|Trang|\n|-|-|\n") for chunk in toc)
+    joined = "\n".join(chunk.text for chunk in toc)
+    assert all(entry in joined for entry in entries)
+    assert find_table_coverage_issues(clean_text(text), [chunk.text for chunk in chunks]) == []
 
 
 def test_clean_text_keeps_data_table_after_toc_heading() -> None:
@@ -982,13 +1020,13 @@ def test_clean_text_keeps_data_table_after_toc_heading() -> None:
 
     cleaned = clean_text(text)
 
-    assert "Lời nói đầu" not in cleaned
+    assert "|Mục|Trang|\n|-|-|\n|Lời nói đầu|3|" in cleaned
     assert "|BM Toán|TS. Lê Văn Ngọc|Trưởng bộ môn|" in cleaned
     assert "|BM Vật lý|TS. Lê Thị Minh Thanh|Trưởng bộ môn|" in cleaned
     assert "Đoạn văn sau bảng dữ liệu." in cleaned
 
 
-def test_clean_text_drops_toc_like_html_table_keeps_data_html_table() -> None:
+def test_clean_text_keeps_toc_like_html_table_and_data_html_table() -> None:
     toc_table = "\n".join(
         [
             "# MỤC LỤC",
@@ -1013,7 +1051,7 @@ def test_clean_text_drops_toc_like_html_table_keeps_data_html_table() -> None:
 
     cleaned = clean_text(toc_table)
 
-    assert "Lời nói đầu" not in cleaned
+    assert "<tr><td>Lời nói đầu</td><td>3</td></tr>" in cleaned
     assert "BM Toán" in cleaned
     assert "Đoạn văn sau bảng." in cleaned
 
@@ -1036,12 +1074,12 @@ def test_clean_text_truncated_toc_table_does_not_swallow_rest() -> None:
 
     cleaned = clean_text(text)
 
-    assert "Lời nói đầu" not in cleaned
+    assert "<tr><td>Lời nói đầu</td><td>3</td></tr>" in cleaned
     assert "# PHẦN I" in cleaned
     assert "Nội dung thật sau bảng cụt." in cleaned
 
 
-def test_clean_text_drops_same_pipe_count_on_d26_toc() -> None:
+def test_clean_text_keeps_every_pipe_line_on_d26_toc() -> None:
     from app.core.config import settings
 
     candidates = list(Path(settings.documents_path).rglob("*.md"))
@@ -1055,14 +1093,11 @@ def test_clean_text_drops_same_pipe_count_on_d26_toc() -> None:
     before = sum(1 for line in raw_lines if line.strip().startswith("|"))
     after = sum(1 for line in cleaned_lines if line.strip().startswith("|"))
 
-    # Bảng mục lục D26 vẫn bị lọc như trước: 87 dòng `|` bị bỏ (báo cáo điều
-    # tra ghi 85 vì đếm theo nội dung duy nhất — hai dòng `|-|-|` trong mục
-    # lục trùng nội dung với bảng ở phần khác nên phép đếm đó bỏ sót).
-    assert before - after == 87
-    kept = cleaned_lines
-    for number, line in enumerate(raw_lines, start=1):
-        if line.strip().startswith("|") and line not in kept:
-            assert number <= 130, (number, line[:80])
+    # Mục lục D26 được giữ nguyên: không dòng `|` nào bị bỏ; hai bảng mục lục
+    # (ngắt trang) mỗi bảng được thêm header "|Mục|Trang|" + dòng phân cách.
+    assert after - before == 4
+    kept = set(cleaned_lines)
+    assert all(line in kept for line in raw_lines if line.strip().startswith("|"))
 
 
 # ---------------------------------------------------------------------------
@@ -1070,17 +1105,33 @@ def test_clean_text_drops_same_pipe_count_on_d26_toc() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_clean_text_drops_toc_dot_leader_entries() -> None:
+def test_clean_text_rewrites_toc_dot_leader_entries() -> None:
     text = "# MỤC LỤC\n\nLời nói đầu ............ 3\nHọc phí .............. 12\n\nNội dung thật."
 
     cleaned = clean_text(text)
 
-    assert "Lời nói đầu" not in cleaned
-    assert "Học phí ......" not in cleaned
+    assert "# MỤC LỤC\n\nLời nói đầu (trang 3)\nHọc phí (trang 12)" in cleaned
+    assert "......" not in cleaned
     assert "Nội dung thật." in cleaned
 
 
-def test_clean_text_drops_whole_toc_section_including_tables() -> None:
+def test_clean_text_rewrites_bold_page_toc_entries_inside_toc_only() -> None:
+    entry = "**PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO** **24**"
+
+    assert "**PHẦN III: CHƯƠNG TRÌNH VÀ KẾ HOẠCH ĐÀO TẠO** (trang 24)" in clean_text(f"# MỤC LỤC\n\n{entry}")
+    # Ngoài section "MỤC LỤC", entry lạc vẫn là nhiễu như trước.
+    assert "PHẦN III" not in clean_text(f"{entry}\n\nNội dung.")
+
+
+def test_clean_text_toc_rewrite_is_idempotent() -> None:
+    text = "# MỤC LỤC\n\nLời nói đầu ............ 3\n**PHẦN I** **5**\nĐiều 1. Học phí 5\n\n# PHẦN I\n\nNội dung."
+
+    once = clean_text(text)
+
+    assert clean_text(once) == once
+
+
+def test_clean_text_keeps_whole_toc_section_including_tables() -> None:
     text = "\n".join(
         [
             "# MỤC LỤC",
@@ -1099,9 +1150,9 @@ def test_clean_text_drops_whole_toc_section_including_tables() -> None:
 
     cleaned = clean_text(text)
 
-    assert "MỤC LỤC" not in cleaned
-    assert "Điều 1. Học phí" not in cleaned
-    assert "| Học phí | 12 |" not in cleaned
+    assert "# MỤC LỤC" in cleaned
+    assert "Điều 1. Học phí 5" in cleaned
+    assert "| Học phí | 12 |" in cleaned
     assert "# PHẦN I: TỔNG QUAN" in cleaned
     assert "Nội dung thật." in cleaned
 
