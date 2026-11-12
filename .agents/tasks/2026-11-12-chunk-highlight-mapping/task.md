@@ -5,7 +5,7 @@
 - Coordinator: `claude-code`
 - Người yêu cầu: người dùng (8thMay03): "việc map giữa chunk với vị trí của chunk trên tài liệu gốc đôi khi không chính xác, hãy kiểm chứng lại, checkout ra nhánh mới rồi fix"
 - Tạo lúc: `2026-11-12T23:58:00+07:00`
-- Cập nhật lúc: `2026-11-12T23:58:00+07:00`
+- Cập nhật lúc: `2026-11-13T00:05:00+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -47,9 +47,9 @@ Nguyên nhân:
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: đã sửa, kiểm chứng bằng đánh giá trên dữ liệu thật và test tự động; chưa kiểm tra thủ công trên trình duyệt (extension Chrome không kết nối).
+- Tóm tắt: commit `dc205de`, PR #62 vào `dev` (https://github.com/8thMay03/PTIT-Chatbot/pull/62); đã sửa, kiểm chứng bằng đánh giá trên dữ liệu thật và test tự động; chưa kiểm tra thủ công trên trình duyệt (extension Chrome không kết nối).
 - Blocker: không có.
-- Bước tiếp theo: người dùng kiểm tra trên trình duyệt, tạo PR vào `dev`.
+- Bước tiếp theo: người dùng kiểm tra trên trình duyệt và merge PR #62.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 

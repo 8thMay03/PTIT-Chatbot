@@ -2,7 +2,7 @@
 
 ## Tổng quan triển khai
 
-Nhánh `feat/chunk-highlight-mapping` (tách từ `dev` tại `20e1b92`).
+Nhánh `feat/chunk-highlight-mapping` (tách từ `dev` tại `20e1b92`). Commit `dc205de`, PR #62 vào `dev` (https://github.com/8thMay03/PTIT-Chatbot/pull/62).
 
 ## Nhật ký theo nhiệm vụ
 
@@ -31,9 +31,9 @@ Nhánh `feat/chunk-highlight-mapping` (tách từ `dev` tại `20e1b92`).
 
 - Từ / đến: `claude-code` / người dùng.
 - Đã hoàn tất: S-01.
-- File/branch/commit/patch: nhánh `feat/chunk-highlight-mapping`; commit xem `git log`. Thay đổi file PDF trong `data/` (xóa ở `data/`, thêm ở `data/raw/`) là của người dùng, không nằm trong commit.
+- File/branch/commit/patch: nhánh `feat/chunk-highlight-mapping`, commit `dc205de`, PR #62. Thay đổi file PDF trong `data/` (xóa ở `data/`, thêm ở `data/raw/`) là của người dùng, không nằm trong commit.
 - Kiểm chứng: V-01…V-03 `passed`.
 - Review: `self_review` `approved`.
 - Hạn chế / còn lại: chưa kiểm tra trên trình duyệt; giới hạn đã biết ghi trong `review.md`.
-- Bước tiếp theo: người dùng kiểm tra trên trình duyệt (container frontend chạy Vite dev theo nhánh đang checkout) rồi tạo PR vào `dev`.
+- Bước tiếp theo: người dùng kiểm tra trên trình duyệt (container frontend chạy Vite dev theo nhánh đang checkout) rồi merge PR #62.
 - Phản hồi nhận bàn giao: chờ người dùng.
