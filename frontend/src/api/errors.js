@@ -66,10 +66,33 @@ function abortError() {
 }
 
 /**
+ * Câu chữ cho trang sinh viên: không nhắc chi tiết kỹ thuật (server, biến môi
+ * trường, log), chỉ nói việc người dùng làm được. Trang quản trị giữ mặc định.
+ */
+const STUDENT_FOLLOW_UP = "Nếu lỗi lặp lại, hãy báo quản trị viên.";
+
+export const STUDENT_ERROR_CONTEXT = Object.freeze({
+  networkDetail:
+    "Kiểm tra kết nối mạng của bạn rồi thử lại. Nếu mạng vẫn ổn, hệ thống có thể đang bảo trì; hãy thử lại sau ít phút.",
+  timeoutDetail: `Hệ thống đang phản hồi chậm. Vui lòng thử lại sau ít phút. ${STUDENT_FOLLOW_UP}`,
+  notFoundTitle: "Dịch vụ tạm thời không khả dụng",
+  notFoundDetail: `Vui lòng thử lại sau ít phút. ${STUDENT_FOLLOW_UP}`,
+  serverDetail: `Hệ thống đang gặp sự cố tạm thời. Vui lòng thử lại sau ít phút. ${STUDENT_FOLLOW_UP}`,
+  rateLimitTitle: "Hệ thống đang quá tải",
+  rateLimitDetail: "Có quá nhiều yêu cầu trong lúc này. Vui lòng chờ ít phút rồi thử lại.",
+  fallbackDetail: `Đã có lỗi ngoài dự kiến. Vui lòng thử lại. ${STUDENT_FOLLOW_UP}`,
+  showRawMessage: false,
+});
+
+/**
  * Phân loại một lỗi thành tiêu đề + mô tả dùng chung cho toast và màn lỗi.
  *
  * Các màn hình có thể đổi câu chữ theo ngữ cảnh bằng `options`, nhưng cách phân
  * loại (mất mạng, timeout, 4xx, 5xx, 429) chỉ nằm ở đây.
+ *
+ * `networkDetail`/`timeoutDetail` thay câu do lớp client tạo khi được truyền;
+ * `showRawMessage: false` dùng `fallbackDetail` thay cho `message` của lỗi không
+ * phải `ApiError` (thường là thông điệp kỹ thuật của trình duyệt).
  */
 export function describeError(error, options = {}) {
   const {
@@ -82,6 +105,9 @@ export function describeError(error, options = {}) {
     rateLimitTitle = "Vượt quá giới hạn gọi mô hình",
     rateLimitDetail = "Nhà cung cấp LLM đang chặn tạm thời. Thử lại sau ít phút.",
     unauthorizedTitle = "Cần đăng nhập quản trị",
+    networkDetail,
+    timeoutDetail,
+    showRawMessage = true,
   } = options;
 
   if (isAbortError(error)) {
@@ -97,14 +123,14 @@ export function describeError(error, options = {}) {
       return {
         kind: "timeout",
         title: "Máy chủ phản hồi quá lâu",
-        detail: error.detail,
+        detail: timeoutDetail ?? error.detail,
       };
     }
     if (error.code === "network") {
       return {
         kind: "network",
         title: "Không kết nối được máy chủ",
-        detail: error.detail || NETWORK_DETAIL,
+        detail: networkDetail ?? (error.detail || NETWORK_DETAIL),
       };
     }
     if (error.status === 401) {
@@ -166,14 +192,14 @@ export function describeError(error, options = {}) {
     return {
       kind: "network",
       title: "Không kết nối được máy chủ",
-      detail: NETWORK_DETAIL,
+      detail: networkDetail ?? NETWORK_DETAIL,
     };
   }
 
   return {
     kind: "unknown",
     title: fallbackTitle,
-    detail: error?.message || fallbackDetail,
+    detail: (showRawMessage && error?.message) || fallbackDetail,
   };
 }
 

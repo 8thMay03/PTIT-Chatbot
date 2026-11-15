@@ -7,6 +7,7 @@ export {
   isTimeoutError,
   fieldErrors,
   isUnauthorized,
+  STUDENT_ERROR_CONTEXT,
 } from "./errors";
 export { queryClient, queryKeys } from "./queryClient";
 export * as adminApi from "./admin";

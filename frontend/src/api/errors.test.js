@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiError, describeError, fieldErrors, isUnauthorized } from "./errors";
+import { ApiError, describeError, fieldErrors, isUnauthorized, STUDENT_ERROR_CONTEXT } from "./errors";
 
 describe("describeError", () => {
   it("giữ chi tiết backend khi 5xx để người dùng biết nguyên nhân", () => {
@@ -46,6 +46,36 @@ describe("describeError", () => {
 
     expect(described.kind).toBe("rate_limit");
     expect(described.detail).toContain("Thử lại sau ít phút");
+  });
+});
+
+describe("describeError với ngữ cảnh sinh viên", () => {
+  const network = new ApiError({ status: 0, code: "network", detail: "Kiểm tra server FastAPI." });
+  const timeout = new ApiError({ status: 0, code: "timeout", detail: "Quá 30 giây." });
+  const raw = new Error("Backend stream parse failed");
+
+  it("mặc định giữ detail do client tạo và message gốc", () => {
+    expect(describeError(network).detail).toBe("Kiểm tra server FastAPI.");
+    expect(describeError(timeout).detail).toBe("Quá 30 giây.");
+    expect(describeError(raw).detail).toBe("Backend stream parse failed");
+  });
+
+  it("networkDetail/timeoutDetail thay detail của client; showRawMessage false ẩn message gốc", () => {
+    expect(describeError(network, STUDENT_ERROR_CONTEXT).detail).toBe(STUDENT_ERROR_CONTEXT.networkDetail);
+    expect(describeError(new TypeError("Failed to fetch"), STUDENT_ERROR_CONTEXT).detail).toBe(
+      STUDENT_ERROR_CONTEXT.networkDetail
+    );
+    expect(describeError(timeout, STUDENT_ERROR_CONTEXT).detail).toBe(STUDENT_ERROR_CONTEXT.timeoutDetail);
+    expect(describeError(raw, STUDENT_ERROR_CONTEXT).detail).toBe(STUDENT_ERROR_CONTEXT.fallbackDetail);
+  });
+
+  it("5xx vẫn nối detail của backend (giữ mã tham chiếu)", () => {
+    const described = describeError(
+      new ApiError({ status: 500, detail: "Hệ thống đang bận. (Mã: ab12)" }),
+      STUDENT_ERROR_CONTEXT
+    );
+    expect(described.detail).toContain(STUDENT_ERROR_CONTEXT.serverDetail);
+    expect(described.detail).toContain("(Mã: ab12)");
   });
 });
 

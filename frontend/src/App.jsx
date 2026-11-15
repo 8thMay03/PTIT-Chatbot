@@ -24,7 +24,7 @@ import {
 import useChatMotion from "./lib/motion/useChatMotion";
 import { useSidebar } from "./lib/useSidebar";
 import { useTheme } from "./lib/theme";
-import { queryKeys } from "./api";
+import { queryKeys, STUDENT_ERROR_CONTEXT } from "./api";
 
 const REPO_URL = "https://github.com/8thMay03/PTIT-Chatbot";
 
@@ -201,7 +201,11 @@ export default function App() {
             </button>
           </nav>
           <div className="sidebar-chat-area">
-            <ConversationList activeId={activeConversationId} onOpen={openConversation} />
+            <ConversationList
+              activeId={activeConversationId}
+              onOpen={openConversation}
+              errorContext={STUDENT_ERROR_CONTEXT}
+            />
           </div>
           <div className="sidebar-footer">
             <GuestHint />
@@ -257,6 +261,7 @@ export default function App() {
             onNewChat={startNewChat}
             headerActions={<UserMenu onLoggedOut={handleLoggedOut} />}
             initialInput={prefillQuestion}
+            errorContext={STUDENT_ERROR_CONTEXT}
           />
         </div>
       </main>

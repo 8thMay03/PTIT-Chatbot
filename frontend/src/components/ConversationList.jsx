@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Loader2, MessageSquare, Pencil, Trash2, X } from "lucide-react";
+import { Check, Loader2, MessageSquare, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { conversationsApi, describeError, errorMessage, queryKeys } from "../api";
 import Modal from "./Modal";
 import { useToast } from "./Toast";
@@ -25,7 +25,11 @@ function groupByRecency(conversations) {
   ].filter((group) => group.items.length > 0);
 }
 
-export default function ConversationList({ activeId, onOpen }) {
+/**
+ * `errorContext`: câu chữ lỗi theo trang (cùng khoá với options của `describeError`),
+ * ví dụ `STUDENT_ERROR_CONTEXT`; không truyền thì giữ gợi ý kỹ thuật mặc định.
+ */
+export default function ConversationList({ activeId, onOpen, errorContext }) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const conversationsQuery = useQuery({
@@ -38,6 +42,7 @@ export default function ConversationList({ activeId, onOpen }) {
     ? describeError(conversationsQuery.error, {
         fallbackTitle: "Không tải được lịch sử hội thoại",
         fallbackDetail: "Không tải được lịch sử hội thoại.",
+        ...errorContext,
       })
     : null;
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -116,9 +121,24 @@ export default function ConversationList({ activeId, onOpen }) {
           ))}
         </div>
       ) : describedError ? (
-        <p className="conv-empty">
-          {describedError.title}. {describedError.detail}
-        </p>
+        <div className="conv-error">
+          <p className="conv-empty">
+            {describedError.title}. {describedError.detail}
+          </p>
+          <button
+            type="button"
+            className="conv-retry-btn"
+            onClick={() => conversationsQuery.refetch()}
+            disabled={conversationsQuery.isFetching}
+          >
+            {conversationsQuery.isFetching ? (
+              <Loader2 size={13} className="spin" aria-hidden="true" />
+            ) : (
+              <RotateCcw size={13} aria-hidden="true" />
+            )}
+            {conversationsQuery.isFetching ? "Đang thử lại..." : "Thử lại"}
+          </button>
+        </div>
       ) : conversations.length === 0 ? (
         <p className="conv-empty">Chưa có hội thoại nào được lưu. Hãy đặt câu hỏi đầu tiên.</p>
       ) : (
