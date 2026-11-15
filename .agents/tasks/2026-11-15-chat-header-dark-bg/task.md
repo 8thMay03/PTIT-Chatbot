@@ -45,7 +45,7 @@ Kết quả cần có: nền header lấy từ token ngữ nghĩa có giá trị
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: S-01 đã triển khai trên `feat/chat-header-dark-bg`; V-01..V-04 `passed`; self_review `approved`. Chờ người yêu cầu duyệt/merge PR.
+- Tóm tắt: S-01 đã triển khai trên `feat/chat-header-dark-bg`; V-01..V-04 `passed`; self_review `approved`. Chờ người yêu cầu duyệt/merge PR [#63](https://github.com/8thMay03/PTIT-Chatbot/pull/63).
 - Blocker: không có.
 - Bước tiếp theo: người yêu cầu review PR vào `dev`; sau khi merge, coordinator chuyển task sang `done`.
 

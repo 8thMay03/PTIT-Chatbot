@@ -30,4 +30,4 @@ Chưa có thông báo.
 
 ## Bàn giao
 
-- `2026-11-15T18:23:00+07:00` — claude-code → người yêu cầu (`8thMay03`): S-01 xong, V-01..V-04 `passed`, self_review `approved`. Bằng chứng trong `evidence/`. Bước tiếp: review và merge PR `feat/chat-header-dark-bg` → `dev`.
+- `2026-11-15T18:23:00+07:00` — claude-code → người yêu cầu (`8thMay03`): S-01 xong, V-01..V-04 `passed`, self_review `approved`. Bằng chứng trong `evidence/`. Bước tiếp: review và merge PR [#63](https://github.com/8thMay03/PTIT-Chatbot/pull/63) (`feat/chat-header-dark-bg` → `dev`).
