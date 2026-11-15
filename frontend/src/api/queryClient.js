@@ -17,6 +17,7 @@ export const queryKeys = {
   auth: ["auth"],
   authMe: ["auth", "me"],
   config: ["config"],
+  health: ["health"],
   modelProfiles: ["model-profiles"],
   documents: ["documents"],
   datasets: ["datasets"],

@@ -26,16 +26,34 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
   font-size: 15px;
   font-weight: 600;
 }
 
 .chat-header .status-dot {
+  flex-shrink: 0;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--success);
   box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.18);
+}
+
+/* Trạng thái máy chủ theo /api/health; nhãn chữ đi kèm nên không chỉ dựa vào màu. */
+.chat-header .status-dot.is-checking {
+  background: var(--text-muted);
+  box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.2);
+}
+
+.chat-header .status-dot.is-degraded {
+  background: var(--warning);
+  box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.2);
+}
+
+.chat-header .status-dot.is-offline {
+  background: var(--danger);
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.18);
 }
 
 .header-actions {
