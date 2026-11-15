@@ -303,6 +303,13 @@
   opacity: 1;
 }
 
+/* Thiết bị không hover: không có cách làm lộ nút, nên luôn hiện. */
+@media (hover: none) {
+  .conv-actions {
+    opacity: 1;
+  }
+}
+
 .conv-icon-btn {
   display: grid;
   place-items: center;

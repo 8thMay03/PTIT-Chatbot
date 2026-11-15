@@ -1,0 +1,40 @@
+{
+ "desktop_hover_none_query": false,
+ "desktop_idle_bubble": [
+  "0",
+  "0",
+  "0",
+  "1"
+ ],
+ "desktop_idle_conv": [
+  "0"
+ ],
+ "desktop_hover_bubble": [
+  "0",
+  "1",
+  "0",
+  "1"
+ ],
+ "desktop_hover_conv": [
+  "1"
+ ],
+ "keyboard_active_is_copy": true,
+ "keyboard_focus_visible": true,
+ "keyboard_outline": "solid 2px rgb(151, 38, 53)",
+ "keyboard_bubble": [
+  "0",
+  "1",
+  "0",
+  "1"
+ ],
+ "touch_hover_none_query": true,
+ "touch_bubble": [
+  "1",
+  "1",
+  "1",
+  "1"
+ ],
+ "touch_conv": [
+  "1"
+ ]
+}
