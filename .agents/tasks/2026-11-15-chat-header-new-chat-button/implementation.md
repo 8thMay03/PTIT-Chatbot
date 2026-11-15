@@ -18,7 +18,7 @@ Nhánh `feat/chat-header-new-chat-button` (tách từ `dev` tại `65a957b`). Co
 - File thay đổi: 6 file trên; commit `cdf8bdb`.
 - Quyết định/giao diện ảnh hưởng nhiệm vụ khác: prop mới `onNewChat?: () => void` của `ChatView` (theo hợp đồng trong `plan.md`). Task `2026-11-15-chat-status-indicator` và `2026-11-15-student-error-copy` cùng sửa `ChatView.jsx`/`App.jsx`/`AdminShell.jsx` cần dựa trên bản này; xung đột dự kiến nhỏ (khối header và props của `ChatView`).
 - Kiểm tra đã chạy: xem `verification.md` (vitest toàn bộ 230/230, build pass; hai test AC-01 được xác nhận thất bại khi bỏ prop `onNewChat`).
-- Còn lại/blocker: không có. Chưa push/PR — chờ người yêu cầu.
+- Còn lại/blocker: không có. Đã push nhánh và mở PR #64 vào `dev`: https://github.com/8thMay03/PTIT-Chatbot/pull/64.
 
 ## Trao đổi giữa agents
 
@@ -29,5 +29,6 @@ Chưa có thông báo (một agent làm mọi vai trò).
 - Từ `claude-code` (S-01) tới người yêu cầu `8thMay03`, `2026-11-15T18:35:00+07:00`.
 - Nhánh `feat/chat-header-new-chat-button`, commit `cdf8bdb` (kèm commit ghi nhật ký task).
 - Kiểm tra: `npm test` 34 file / 230 test pass; `npm run build` pass.
-- Chưa làm: kiểm tra thủ công trên trình duyệt với backend thật; push nhánh và mở PR.
-- Bước tiếp theo: người yêu cầu duyệt rồi push/mở PR vào `dev`.
+- PR: #64 (https://github.com/8thMay03/PTIT-Chatbot/pull/64), base `dev`.
+- Chưa làm: kiểm tra thủ công trên trình duyệt với backend thật.
+- Bước tiếp theo: người yêu cầu review và merge PR #64.

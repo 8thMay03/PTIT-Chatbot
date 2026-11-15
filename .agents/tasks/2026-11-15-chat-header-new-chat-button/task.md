@@ -56,7 +56,7 @@ Kết quả cần có: chỉ một hành vi "cuộc trò chuyện mới", do tra
 
 - Tóm tắt: S-01 xong trên nhánh `feat/chat-header-new-chat-button` (commit `cdf8bdb`); `AC-01`..`AC-05` có bằng chứng test tự động; self-review `approved`.
 - Blocker: không có.
-- Bước tiếp theo: người yêu cầu quyết định push nhánh và mở PR vào `dev`. Kiểm tra thủ công trên trình duyệt với backend thật chưa chạy (xem `verification.md`).
+- Bước tiếp theo: người yêu cầu review và merge PR #64 (https://github.com/8thMay03/PTIT-Chatbot/pull/64). Kiểm tra thủ công trên trình duyệt với backend thật chưa chạy (xem `verification.md`).
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 

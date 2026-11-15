@@ -37,4 +37,4 @@
 - Nhận xét bắt buộc còn mở: không có.
 - Nhận xét hoãn lại: R-01 (low).
 - Phần chưa review / giới hạn: chưa xem trực quan trên trình duyệt với backend thật.
-- Bước tiếp theo: push nhánh và mở PR khi người yêu cầu đồng ý.
+- Bước tiếp theo: merge PR #64 sau khi người yêu cầu duyệt.
