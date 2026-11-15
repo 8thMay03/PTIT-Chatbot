@@ -14,7 +14,17 @@ import {
   SquarePen,
   WifiOff,
 } from "lucide-react";
-import { ApiError, chatApi, conversationsApi, describeError, fieldErrors, isAbortError } from "./api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ApiError,
+  chatApi,
+  conversationsApi,
+  describeError,
+  fieldErrors,
+  healthApi,
+  isAbortError,
+  queryKeys,
+} from "./api";
 import MarkdownView, { preloadMarkdownView } from "./components/LazyMarkdownView";
 import ReasoningPanel from "./components/ReasoningPanel";
 import { sourcesLabel } from "./lib/citations";
@@ -97,6 +107,38 @@ function isRejectedBeforeStart(error) {
   return error instanceof ApiError && ["http", "network", "timeout"].includes(error.code);
 }
 
+/**
+ * Lỗi cho thấy có thể mất kết nối máy chủ: mạng/timeout, 5xx (proxy không tới được
+ * backend), hoặc stream bị cắt giữa chừng (`reader.read()` ném `TypeError`).
+ */
+function isConnectivityError(error) {
+  if (error instanceof TypeError) return true;
+  return (
+    error instanceof ApiError &&
+    (error.code === "network" || error.code === "timeout" || error.status >= 500)
+  );
+}
+
+// Kiểm tra máy chủ mỗi 60 giây khi tab đang mở, và mỗi khi cửa sổ được focus lại.
+const HEALTH_POLL_MS = 60_000;
+
+/** Nhãn và kiểu chấm trạng thái trên header; chữ đổi theo trạng thái, không chỉ màu. */
+const HEADER_STATUS = {
+  busy: { label: "Đang trả lời...", dotClass: "is-busy" },
+  checking: { label: "Đang kiểm tra kết nối...", dotClass: "is-checking" },
+  ready: { label: "Sẵn sàng hỗ trợ", dotClass: "" },
+  degraded: { label: "Đang hạn chế, câu trả lời có thể chậm hoặc lỗi", dotClass: "is-degraded" },
+  offline: { label: "Mất kết nối máy chủ", dotClass: "is-offline" },
+};
+
+function headerStatusKey(loading, health) {
+  if (loading) return "busy";
+  // Lỗi mới nhất thắng dữ liệu cũ: lần kiểm tra gần nhất thất bại là mất kết nối.
+  if (health.isError) return "offline";
+  if (!health.data) return "checking";
+  return health.data.status === "ok" ? "ready" : "degraded";
+}
+
 /** Thông báo ở khung nhập cho lượt bị từ chối trước khi lưu. */
 function describeRejectedSend(error) {
   if (error.status === 413) {
@@ -153,6 +195,16 @@ const ChatView = forwardRef(function ChatView(
   const abortRef = useRef(null);
   const conversationAbortRef = useRef(null);
   const bottomRef = useRef(null);
+
+  const queryClient = useQueryClient();
+  const health = useQuery({
+    queryKey: queryKeys.health,
+    queryFn: ({ signal }) => healthApi.get({ signal }),
+    staleTime: 0,
+    refetchInterval: HEALTH_POLL_MS,
+    refetchOnWindowFocus: true,
+  });
+  const headerStatus = HEADER_STATUS[headerStatusKey(loading, health)];
 
   // Chỉ hiện màn chào khi chưa có hội thoại nào được mở: một hội thoại cũ chỉ
   // gồm đúng một tin nhắn vẫn là hội thoại thật, không phải trạng thái ban đầu.
@@ -417,6 +469,10 @@ const ChatView = forwardRef(function ChatView(
       }
     } catch (error) {
       if (isAbortError(error)) return;
+      // Kiểm tra lại máy chủ ngay, không chờ chu kỳ 60 giây.
+      if (isConnectivityError(error)) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.health });
+      }
       if (!started && isRejectedBeforeStart(error)) {
         // Server chưa lưu lượt này: gỡ cặp tin tạm, trả câu hỏi về ô nhập (không đè
         // chữ người dùng đã gõ tiếp) và báo lỗi tại khung nhập.
@@ -495,9 +551,9 @@ const ChatView = forwardRef(function ChatView(
   return (
     <section className="chat" hidden={hidden} aria-hidden={hidden}>
       <header className="chat-header">
-        <div className="title">
-          <span className={`status-dot ${loading ? "is-busy" : ""}`.trim()} />
-          <span>{loading ? "Đang trả lời..." : "Sẵn sàng hỗ trợ"}</span>
+        <div className="title" role="status" aria-live="polite">
+          <span className={`status-dot ${headerStatus.dotClass}`.trim()} aria-hidden="true" />
+          <span>{headerStatus.label}</span>
         </div>
         <div className="header-actions">
           {headerActions}

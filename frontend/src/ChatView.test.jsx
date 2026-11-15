@@ -1,5 +1,6 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
+import { QueryClient, QueryClientProvider, focusManager } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ChatView from "./ChatView";
 
@@ -52,13 +53,17 @@ function streamResponse(stream) {
   return Promise.resolve({ ok: true, status: 200, headers: { get: () => "application/x-ndjson" }, body: stream.body });
 }
 
+const healthOk = () => jsonResponse({ status: "ok", database: "ok", database_type: "sqlite", embedding: "ready" });
+
 /**
  * Backend giả: `chat/stream` trả stream điều khiển được (hoặc `chatResponse(body)` nếu
- * test đặt), `conversations/<id>` trả `conversations[id]`.
+ * test đặt), `conversations/<id>` trả `conversations[id]`, `health` trả `health()`.
+ * `fetchMock` chỉ ghi các request khác `health`; `healthCalls` đếm riêng.
  */
-function createBackend({ chatResponse, conversations = {} } = {}) {
+function createBackend({ chatResponse, conversations = {}, health = healthOk } = {}) {
   const streams = [];
   const chatBodies = [];
+  const healthCalls = { count: 0 };
   const fetchMock = vi.fn((url, options = {}) => {
     const path = new URL(String(url), "http://localhost").pathname.replace(/^\/api\//, "");
     if (path === "chat/stream") {
@@ -73,8 +78,14 @@ function createBackend({ chatResponse, conversations = {} } = {}) {
     if (match && conversations[match[1]]) return jsonResponse(conversations[match[1]]);
     return jsonResponse({ detail: "Không có" }, 404);
   });
-  vi.stubGlobal("fetch", fetchMock);
-  return { fetchMock, streams, chatBodies };
+  vi.stubGlobal("fetch", (url, options) => {
+    if (new URL(String(url), "http://localhost").pathname === "/api/health") {
+      healthCalls.count += 1;
+      return health();
+    }
+    return fetchMock(url, options);
+  });
+  return { fetchMock, streams, chatBodies, healthCalls };
 }
 
 async function waitFor(check, timeout = 1500) {
@@ -134,6 +145,11 @@ describe("ChatView", () => {
   let root;
   let chatRef;
   let onConversationSaved;
+  let queryClient;
+
+  function renderChat(element) {
+    act(() => root.render(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>));
+  }
 
   function textarea() {
     return container.querySelector("#chat-input");
@@ -163,12 +179,17 @@ describe("ChatView", () => {
     root = createRoot(container);
     chatRef = React.createRef();
     onConversationSaved = vi.fn();
-    act(() => root.render(<ChatView ref={chatRef} onConversationSaved={onConversationSaved} />));
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    // Health lúc mount trả ok; test nào cần backend khác tự gọi createBackend sau đó.
+    createBackend();
+    renderChat(<ChatView ref={chatRef} onConversationSaved={onConversationSaved} />);
   });
 
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    queryClient.clear();
+    focusManager.setFocused(undefined);
     vi.unstubAllGlobals();
   });
 
@@ -459,7 +480,7 @@ describe("ChatView", () => {
         conversations: { "c-1": { id: "c-1", messages: [{ role: "user", content: "Câu cũ" }] } },
       });
       const onNewChat = vi.fn();
-      act(() => root.render(<ChatView ref={chatRef} onNewChat={onNewChat} />));
+      renderChat(<ChatView ref={chatRef} onNewChat={onNewChat} />);
       await act(async () => {
         await chatRef.current.loadConversation("c-1");
       });
@@ -499,6 +520,95 @@ describe("ChatView", () => {
       await stream.send({ type: "done", answer: "Trả lời", sources: [], conversation_id: "c-1", steps: [] });
       await stream.close();
       await waitFor(() => !headerNewChat().disabled);
+    });
+  });
+
+  describe("trạng thái máy chủ trên header", () => {
+    function headerStatus() {
+      return container.querySelector(".chat-header .title");
+    }
+
+    function headerDot() {
+      return container.querySelector(".chat-header .status-dot");
+    }
+
+    /** Cửa sổ được focus lại: TanStack Query kiểm tra lại health ngay. */
+    async function refocusWindow() {
+      await act(async () => {
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    }
+
+    it("ok: Sẵn sàng hỗ trợ, chấm xanh, vùng role=status (AC-03, AC-05)", async () => {
+      await waitFor(() => headerStatus().textContent === "Sẵn sàng hỗ trợ");
+      expect(headerStatus().getAttribute("role")).toBe("status");
+      expect(headerStatus().getAttribute("aria-live")).toBe("polite");
+      expect(headerDot().className).toBe("status-dot");
+    });
+
+    it("degraded: nhãn hạn chế, chấm cảnh báo (AC-02)", async () => {
+      await waitFor(() => headerStatus().textContent === "Sẵn sàng hỗ trợ");
+      createBackend({ health: () => jsonResponse({ status: "degraded", database: "ok", embedding: "unconfigured" }) });
+
+      await refocusWindow();
+
+      await waitFor(() => headerStatus().textContent === "Đang hạn chế, câu trả lời có thể chậm hoặc lỗi");
+      expect(headerDot().classList.contains("is-degraded")).toBe(true);
+    });
+
+    it.each([
+      ["lỗi mạng", () => Promise.reject(new TypeError("Failed to fetch"))],
+      ["503", () => jsonResponse({ detail: "Service Unavailable" }, 503)],
+    ])("%s khi focus lại: Mất kết nối máy chủ, chấm đỏ; có lại thì về sẵn sàng (AC-01)", async (_, health) => {
+      await waitFor(() => headerStatus().textContent === "Sẵn sàng hỗ trợ");
+      createBackend({ health });
+
+      await refocusWindow();
+
+      await waitFor(() => headerStatus().textContent === "Mất kết nối máy chủ");
+      expect(headerDot().classList.contains("is-offline")).toBe(true);
+
+      createBackend();
+      await refocusWindow();
+      await waitFor(() => headerStatus().textContent === "Sẵn sàng hỗ trợ");
+    });
+
+    it("đang stream: Đang trả lời... rồi về trạng thái máy chủ (AC-03)", async () => {
+      const { streams } = createBackend();
+      await ask("Học phí?");
+      const stream = await waitFor(() => streams[0]);
+      expect(headerStatus().textContent).toBe("Đang trả lời...");
+      expect(headerDot().classList.contains("is-busy")).toBe(true);
+
+      await stream.send({ type: "start", conversation_id: "c-1" });
+      await stream.send({ type: "done", answer: "Trả lời", sources: [], conversation_id: "c-1", steps: [] });
+      await stream.close();
+      await waitFor(() => headerStatus().textContent === "Sẵn sàng hỗ trợ");
+    });
+
+    it("stream lỗi mạng: kiểm tra lại health ngay, header báo mất kết nối (AC-04)", async () => {
+      await waitFor(() => headerStatus().textContent === "Sẵn sàng hỗ trợ");
+      const { healthCalls } = createBackend({
+        chatResponse: () => Promise.reject(new TypeError("Failed to fetch")),
+        health: () => Promise.reject(new TypeError("Failed to fetch")),
+      });
+
+      await ask("Học phí?");
+
+      await waitFor(() => healthCalls.count === 1);
+      await waitFor(() => headerStatus().textContent === "Mất kết nối máy chủ");
+    });
+
+    it("lỗi 4xx của chat không làm kiểm tra lại health", async () => {
+      await waitFor(() => headerStatus().textContent === "Sẵn sàng hỗ trợ");
+      const { healthCalls } = createBackend({ chatResponse: () => jsonResponse({ detail: "Bận" }, 429) });
+
+      await ask("Học phí?");
+
+      await waitFor(() => container.querySelector(".composer-alert"));
+      expect(healthCalls.count).toBe(0);
     });
   });
 });

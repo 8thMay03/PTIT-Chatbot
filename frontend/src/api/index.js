@@ -16,4 +16,5 @@ export * as configApi from "./config";
 export * as conversationsApi from "./conversations";
 export * as datasetsApi from "./datasets";
 export * as documentsApi from "./documents";
+export * as healthApi from "./health";
 export * as modelProfilesApi from "./modelProfiles";

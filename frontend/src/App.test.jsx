@@ -102,7 +102,7 @@ describe("App sinh viên", () => {
     expect(container.querySelector('a[href^="/admin"]')).toBeNull();
 
     const urls = fetch.mock.calls.map(([url]) => String(url));
-    expect(urls.every((url) => /\/api\/(conversations|auth\/me)/.test(url))).toBe(true);
+    expect(urls.every((url) => /\/api\/(conversations|auth\/me|health)/.test(url))).toBe(true);
   });
 
   it("chuyển động: link sang trang khác qua pixel transition, màn chào giữ nguyên chữ", async () => {
