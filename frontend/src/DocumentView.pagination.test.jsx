@@ -115,4 +115,35 @@ describe("DocumentView chunk pagination", () => {
     expect(container.textContent).toContain("Đoạn số 44");
     expect(chunkOffsets).toEqual(expect.arrayContaining([0, 20, 40]));
   });
+
+  it("renders chunk cards without placeholder select or enable controls", async () => {
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ToastProvider>
+            <DocumentView documentId="doc-1" onBack={() => {}} />
+          </ToastProvider>
+        </QueryClientProvider>
+      );
+    });
+    await act(async () => {
+      await wait(200);
+    });
+
+    const chunkColumn = container.querySelector(".doc-view-right-col");
+    const cards = chunkColumn.querySelectorAll(".chunk-card-item");
+    expect(cards).toHaveLength(20);
+    // Backend chưa lưu bật/tắt hay dùng lựa chọn đoạn, nên không được hiện điều khiển giả.
+    expect(chunkColumn.querySelector('[role="switch"]')).toBeNull();
+    expect(chunkColumn.querySelector('input[type="checkbox"]')).toBeNull();
+    expect(chunkColumn.textContent).not.toContain("Chọn tất cả");
+    expect(chunkColumn.textContent).not.toContain("Văn bản");
+
+    // Bấm vào thẻ vẫn đánh dấu đoạn đang định vị.
+    await act(async () => {
+      cards[1].click();
+    });
+    expect(cards[1].classList.contains("is-hovered-target")).toBe(true);
+    expect(cards[0].classList.contains("is-hovered-target")).toBe(false);
+  });
 });
