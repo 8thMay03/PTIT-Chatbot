@@ -237,6 +237,58 @@ describe("App sinh viên", () => {
     expect(fetch.mock.calls.some(([url, options]) => String(url).includes("/auth/logout") && options?.method === "POST")).toBe(true);
   });
 
+  it("nút header Cuộc trò chuyện mới bỏ đánh dấu hội thoại đang mở trên sidebar", async () => {
+    fetch.mockImplementation((url) => {
+      const path = new URL(String(url), "http://localhost").pathname;
+      if (path.endsWith("/auth/me")) {
+        return jsonResponse({ authenticated: false, user: null, registration_enabled: true });
+      }
+      if (path.endsWith("/conversations/conv-cu")) {
+        return jsonResponse({
+          id: "conv-cu",
+          messages: [
+            { role: "user", content: "Học phí bao nhiêu?" },
+            { role: "assistant", content: "Học phí theo tín chỉ.", sources: [] },
+          ],
+        });
+      }
+      return jsonResponse({
+        total: 1,
+        conversations: [
+          {
+            id: "conv-cu",
+            title: "Hội thoại cũ",
+            message_count: 2,
+            created_at: "2026-11-01T00:00:00Z",
+            updated_at: "2026-11-01T00:00:00Z",
+          },
+        ],
+      });
+    });
+    await renderApp();
+
+    const sidebarNewChat = () => container.querySelector('.sidebar-nav button[aria-label="Cuộc trò chuyện mới"]');
+    const headerNewChat = container.querySelector('.chat-header button[aria-label="Cuộc trò chuyện mới"]');
+    expect(headerNewChat.title).toBe("Cuộc trò chuyện mới");
+
+    const openButton = await waitFor(() => container.querySelector(".conv-open-btn"));
+    await act(async () => {
+      openButton.click();
+    });
+    await waitFor(() => container.textContent.includes("Học phí theo tín chỉ."));
+    expect(container.querySelector(".conv-item.active")).not.toBeNull();
+    expect(sidebarNewChat().classList.contains("active")).toBe(false);
+    expect(container.querySelector(".welcome")).toBeNull();
+
+    await act(async () => {
+      headerNewChat.click();
+    });
+
+    await waitFor(() => container.querySelector(".welcome"));
+    expect(container.querySelector(".conv-item.active")).toBeNull();
+    expect(sidebarNewChat().classList.contains("active")).toBe(true);
+  });
+
   it("/chat?q= điền sẵn câu hỏi vào ô nhập, không tự gửi và xoá q khỏi URL", async () => {
     window.history.replaceState(null, "", `/chat?q=${encodeURIComponent("Điều kiện tốt nghiệp?")}`);
     await renderApp();

@@ -286,6 +286,7 @@ export default function AdminShell({ onLogout, loggingOut = false, inert = false
           hidden={view !== "chat"}
           onLoadingChange={setChatLoading}
           onConversationSaved={handleConversationSaved}
+          onNewChat={startNewChat}
         />
         {view === "documents" && (
           <DatasetsPage datasetId={datasetId} onOpenDataset={openDataset} onBackToList={backToList} />

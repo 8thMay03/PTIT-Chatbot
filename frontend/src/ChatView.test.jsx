@@ -448,4 +448,57 @@ describe("ChatView", () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
   });
+
+  describe("nút Cuộc trò chuyện mới trên header", () => {
+    function headerNewChat() {
+      return container.querySelector('.chat-header button[aria-label="Cuộc trò chuyện mới"]');
+    }
+
+    it("có onNewChat: gọi handler của trang cha, không tự reset", async () => {
+      createBackend({
+        conversations: { "c-1": { id: "c-1", messages: [{ role: "user", content: "Câu cũ" }] } },
+      });
+      const onNewChat = vi.fn();
+      act(() => root.render(<ChatView ref={chatRef} onNewChat={onNewChat} />));
+      await act(async () => {
+        await chatRef.current.loadConversation("c-1");
+      });
+      expect(userRows()).toEqual(["Câu cũ"]);
+
+      click(headerNewChat());
+
+      expect(onNewChat).toHaveBeenCalledTimes(1);
+      expect(userRows()).toEqual(["Câu cũ"]);
+    });
+
+    it("không có onNewChat: tự reset về màn chào (AC-04)", async () => {
+      createBackend({
+        conversations: { "c-1": { id: "c-1", messages: [{ role: "user", content: "Câu cũ" }] } },
+      });
+      await act(async () => {
+        await chatRef.current.loadConversation("c-1");
+      });
+      expect(container.querySelector(".welcome")).toBeNull();
+
+      click(headerNewChat());
+
+      expect(container.querySelector(".welcome")).not.toBeNull();
+      expect(userRows()).toEqual([]);
+    });
+
+    it("bị khoá khi đang trả lời (AC-03)", async () => {
+      const { streams } = createBackend();
+      expect(headerNewChat().title).toBe("Cuộc trò chuyện mới");
+      expect(headerNewChat().disabled).toBe(false);
+
+      await ask("Học phí?");
+      const stream = await waitFor(() => streams[0]);
+      expect(headerNewChat().disabled).toBe(true);
+
+      await stream.send({ type: "start", conversation_id: "c-1" });
+      await stream.send({ type: "done", answer: "Trả lời", sources: [], conversation_id: "c-1", steps: [] });
+      await stream.close();
+      await waitFor(() => !headerNewChat().disabled);
+    });
+  });
 });
