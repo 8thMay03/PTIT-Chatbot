@@ -28,3 +28,4 @@ Chưa có thông báo.
 ## Bàn giao
 
 - Từ claude-code tới người yêu cầu (`2026-11-15T19:36:34+07:00`): S-01 xong trên nhánh `feat/confirm-bulk-pipeline-actions`. Việc cần làm: xem ba modal trên `/admin#documents` (chỉ mở rồi bấm Hủy), push nhánh, mở PR vào `dev`.
+- `2026-11-15T20:56:43+07:00` — claude-code: đã push nhánh và mở PR #66 vào `dev` (https://github.com/8thMay03/PTIT-Chatbot/pull/66) theo yêu cầu người dùng. Chờ người yêu cầu review/merge.

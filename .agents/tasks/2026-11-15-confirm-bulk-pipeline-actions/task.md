@@ -53,7 +53,7 @@ Kết quả cần có: cả ba thao tác mở hộp xác nhận (`frontend/src/c
 
 - Tóm tắt: S-01 đã triển khai trên `feat/confirm-bulk-pipeline-actions`; vitest và build pass; self_review `approved`. Chưa kiểm tra thủ công trên trình duyệt (extension Chrome không kết nối).
 - Blocker: không có.
-- Bước tiếp theo: người yêu cầu xem ba modal trên `/admin#documents` (chỉ mở rồi Hủy), push nhánh và mở PR vào `dev`; đóng task `done` sau khi merge.
+- Bước tiếp theo: người yêu cầu xem ba modal trên `/admin#documents` (chỉ mở rồi Hủy), rồi review/merge PR #66 (https://github.com/8thMay03/PTIT-Chatbot/pull/66) vào `dev`; đóng task `done` sau khi merge.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
