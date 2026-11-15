@@ -43,8 +43,14 @@ function baseConfig() {
     },
     guardrails: {
       scope_enabled: true,
-      min_vector_score: 0.3,
+      min_vector_score: 0.37,
       min_bm25_score: 2.0,
+      min_bm25_norm_score: 0.25,
+      min_rerank_score: null,
+      vector_threshold_source: "calibrated",
+      calibrated_min_vector_score: 0.37,
+      rerank_threshold_source: "not_applicable",
+      calibrated_min_rerank_score: -1.65,
     },
     embedding: { provider: "openai", model: "text-embedding-3-small" },
     available_providers: { llm: [], embedding: [], reranker: [] },
@@ -176,8 +182,8 @@ describe("cache cấu hình giữa ConfigView và ModelsView", () => {
     await click(rerankerSwitch);
     expect(rerankerSwitch.getAttribute("aria-checked")).toBe("false");
 
-    const saveButton = [...container.querySelectorAll("button")].find(
-      (item) => item.textContent.trim() === "Lưu cấu hình"
+    const saveButton = [...container.querySelectorAll(".save-bar button")].find(
+      (item) => item.textContent.trim() === "Lưu"
     );
     expect(saveButton.disabled).toBe(false);
     await click(saveButton);
@@ -236,9 +242,9 @@ describe("cache cấu hình giữa ConfigView và ModelsView", () => {
       container.querySelector('input[aria-label="Giá trị Temperature"]')
     );
     await changeInput(temperature, "0.7");
-    expect(container.querySelector(".unsaved-badge")).not.toBeNull();
+    expect(container.querySelector(".save-bar")).not.toBeNull();
 
-    await click(container.querySelector(".btn-outline-reset"));
+    await click(container.querySelector(".config-danger-btn"));
     const confirmReset = await waitFor(() => {
       const button = [...container.querySelectorAll("button")].find(
         (item) => item.textContent.trim() === "Khôi phục"
@@ -248,7 +254,7 @@ describe("cache cấu hình giữa ConfigView và ModelsView", () => {
     await click(confirmReset);
 
     await waitFor(() => temperature.value === "0");
-    await waitFor(() => !container.querySelector(".unsaved-badge"));
+    await waitFor(() => !container.querySelector(".save-bar"));
 
     // Sau reset, sửa tiếp rồi nhận cập nhật từ tab Mô hình: bản nháp phải được giữ.
     await changeInput(temperature, "0.7");
