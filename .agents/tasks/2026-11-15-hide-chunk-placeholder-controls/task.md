@@ -55,7 +55,7 @@ Kết quả cần có: màn chi tiết tài liệu không hiển thị điều k
 
 - Tóm tắt: S-01 đã triển khai trên nhánh `feat/hide-chunk-placeholder-controls` theo đề xuất mặc định Q-01, Q-02. Kiểm tra tự động đạt; self_review `approved`.
 - Blocker: không có.
-- Bước tiếp theo: xem trực quan thẻ đoạn trên trình duyệt (phần thủ công của AC-02 chưa chạy), push và mở PR vào `dev`, rồi đóng task.
+- Bước tiếp theo: xem trực quan thẻ đoạn trên trình duyệt (phần thủ công của AC-02 chưa chạy), merge PR #68 (https://github.com/8thMay03/PTIT-Chatbot/pull/68), rồi đóng task.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
