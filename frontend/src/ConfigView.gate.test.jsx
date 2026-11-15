@@ -245,6 +245,21 @@ describe("ConfigView — ngưỡng tin cậy, thanh lưu, vùng nguy hiểm", ()
       expect(JSON.stringify(putBodies[0])).not.toContain("min_bm25_score");
     });
 
+    it("model chưa hiệu chỉnh: ô rỗng khi đang gõ không tạo thay đổi, nhập số thì thành ghi đè", async () => {
+      await render(baseConfig({ guardrails: UNCALIBRATED }));
+      const input = vectorGroup().querySelector("#cfg-minvec-number");
+
+      await changeInput(input, "");
+      expect(saveBar()).toBeNull();
+
+      await changeInput(input, "0.5");
+      expect(vectorGroup().querySelector(".config-status-badge").textContent).toBe("Ghi đè");
+      expect(buttonByText(vectorGroup(), "Bỏ ghi đè (mô hình chưa hiệu chỉnh nên tín hiệu này sẽ bị bỏ qua)")).toBeTruthy();
+      await click(buttonByText(saveBar(), "Lưu"));
+      await waitFor(() => putBodies.length === 1);
+      expect(putBodies[0]).toEqual({ guardrails: { min_vector_score: 0.5 } });
+    });
+
     it("Dùng giá trị hiệu chỉnh gửi null rồi cập nhật form theo phản hồi", async () => {
       await render(baseConfig({ guardrails: OVERRIDE }));
 

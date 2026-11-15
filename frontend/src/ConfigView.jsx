@@ -37,11 +37,10 @@ function shortModelName(model) {
   return model ? String(model).split("/").pop() : "mô hình hiện tại";
 }
 
+/** Ô số ngưỡng: chuỗi rỗng/dở dang (khi đang gõ) bỏ qua; bỏ ghi đè đi qua link riêng. */
 function parseThreshold(raw, min, max) {
-  if (raw === "") return null;
   const value = parseFloat(raw);
-  if (Number.isNaN(value)) return null;
-  return Math.max(min, Math.min(max, value));
+  return Number.isNaN(value) ? undefined : Math.max(min, Math.min(max, value));
 }
 
 export default function ConfigView() {
@@ -109,6 +108,7 @@ export default function ConfigView() {
    */
   const setThreshold = useCallback(
     (key, value) => {
+      if (value === undefined) return;
       const calibratedValue = calibrated[CONFIG_FIELDS[key].calibratedKey];
       const keepCalibrated =
         savedSnapshot[key] === null &&
