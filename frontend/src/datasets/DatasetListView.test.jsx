@@ -76,15 +76,17 @@ describe("DatasetListView", () => {
     expect(document.body.textContent).toContain("2 chờ chia đoạn");
   });
 
-  function stubApi({ activeJobs }) {
+  function stubApi({ activeJobs, maintenance = () => ({ documents: 3, chunks: 9, skipped: 0, collection: "c" }) }) {
     const calls = [];
     const fetchMock = vi.fn((url, init = {}) => {
       const href = String(url);
       calls.push({ href, method: init.method ?? "GET" });
-      const payload = href.includes("parse-jobs")
-        ? { jobs: activeJobs }
-        : { documents: 3, chunks: 9, skipped: 0, collection: "c" };
-      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(payload) });
+      if (href.includes("parse-jobs")) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ jobs: activeJobs }) });
+      }
+      const result = maintenance(href);
+      if (result && typeof result.then === "function") return result;
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(result) });
     });
     vi.stubGlobal("fetch", fetchMock);
     return calls;
@@ -102,6 +104,25 @@ describe("DatasetListView", () => {
       reindex: items.find((b) => b.textContent.includes("Nạp lại toàn bộ")),
     };
   }
+
+  const flush = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
+  const dialog = () => document.body.querySelector('[role="dialog"]');
+  const dialogButton = (label) =>
+    [...(dialog()?.querySelectorAll("button") ?? [])].find((b) => b.textContent.trim() === label);
+  const maintenancePosts = (calls) =>
+    calls.filter((c) => c.method === "POST" && /\/ingest(\/chunk)?$/.test(c.href));
+
+  async function click(button) {
+    await act(async () => {
+      button.click();
+      await flush();
+    });
+  }
+
+  const TWO_DATASETS = [
+    { id: "a", name: "A", enabled: true, document_count: 4, chunk_count: 10, pending_count: 0 },
+    { id: "b", name: "B", enabled: false, document_count: 3, chunk_count: 6, pending_count: 0 },
+  ];
 
   it("khóa bảo trì toàn kho khi còn job parse nền", async () => {
     stubApi({
@@ -123,12 +144,112 @@ describe("DatasetListView", () => {
     const { rechunk, reindex } = await openMaintenance();
     expect(rechunk.disabled).toBe(false);
     expect(reindex.disabled).toBe(false);
-    await act(async () => {
-      rechunk.click();
-      await new Promise((resolve) => setTimeout(resolve, 20));
+    await click(rechunk);
+    expect(maintenancePosts(calls)).toHaveLength(0);
+    await click(dialogButton("Chia đoạn lại toàn bộ"));
+    const posts = maintenancePosts(calls).map((c) => c.href);
+    expect(posts).toHaveLength(1);
+    expect(posts[0]).toMatch(/ingest\/chunk$/);
+    expect(dialog()).toBeNull();
+    expect(document.body.textContent).toContain("Đã chia đoạn lại 3 tài liệu · 9 đoạn.");
+  });
+
+  it.each([
+    ["rechunk", "Chia đoạn lại toàn bộ kho tài liệu?"],
+    ["reindex", "Nạp lại toàn bộ kho tài liệu?"],
+  ])("mở hộp xác nhận cho %s; Hủy, Esc và bấm nền không gọi API", async (kind, title) => {
+    const calls = stubApi({ activeJobs: [] });
+    await renderList({ datasets: TWO_DATASETS });
+
+    const closers = {
+      cancel: async () => click(dialogButton("Hủy")),
+      escape: async () => {
+        await act(async () => {
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+          await flush();
+        });
+      },
+      backdrop: async () => {
+        await act(async () => {
+          const backdrop = document.body.querySelector(".modal-backdrop");
+          backdrop.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+          await flush();
+        });
+      },
+    };
+
+    for (const close of Object.values(closers)) {
+      const items = await openMaintenance();
+      await click(items[kind]);
+      expect(dialog()).not.toBeNull();
+      expect(dialog().querySelector("h3").textContent).toBe(title);
+      await close();
+      expect(dialog()).toBeNull();
+    }
+    expect(maintenancePosts(calls)).toHaveLength(0);
+  });
+
+  it("nêu phạm vi, việc nhúng lại và thời gian trong hộp xác nhận", async () => {
+    stubApi({ activeJobs: [] });
+    await renderList({ datasets: TWO_DATASETS });
+
+    await click((await openMaintenance()).rechunk);
+    let text = dialog().textContent;
+    expect(text).toContain("toàn bộ 2 dataset (7 tài liệu)");
+    expect(text).toContain("nhúng vector lại");
+    expect(text).toContain("không được parse lại");
+    expect(text).toContain("mất nhiều thời gian");
+    expect(dialog().querySelector(".modal-icon").classList.contains("is-danger")).toBe(false);
+    await click(dialogButton("Hủy"));
+
+    await click((await openMaintenance()).reindex);
+    text = dialog().textContent;
+    expect(text).toContain("parse lại file gốc");
+    expect(text).toContain("toàn bộ 2 dataset (7 tài liệu)");
+    expect(text).toContain("nhúng vector lại");
+    expect(text).toContain("Markdown sửa tay được giữ nguyên");
+    expect(text).toContain("mất nhiều thời gian");
+    expect(dialog().querySelector(".modal-icon").classList.contains("is-danger")).toBe(true);
+    expect(dialogButton("Nạp lại toàn bộ").className).toContain("danger-btn");
+  });
+
+  it("giữ hộp xác nhận và khóa nút trong lúc nạp lại đang chạy", async () => {
+    let resolveIngest;
+    const calls = stubApi({
+      activeJobs: [],
+      maintenance: () =>
+        new Promise((resolve) => {
+          resolveIngest = () =>
+            resolve({
+              ok: true,
+              status: 200,
+              json: () => Promise.resolve({ documents: 7, chunks: 20, skipped: 2, collection: "c" }),
+            });
+        }),
     });
-    const posts = calls.filter((c) => c.method === "POST").map((c) => c.href);
-    expect(posts.some((href) => href.includes("ingest/chunk"))).toBe(true);
+    await renderList({ datasets: TWO_DATASETS });
+    await click((await openMaintenance()).reindex);
+    const confirm = dialogButton("Nạp lại toàn bộ");
+    await click(confirm);
+    expect(resolveIngest).toBeTypeOf("function");
+
+    expect(confirm.disabled).toBe(true);
+    expect(dialogButton("Hủy").disabled).toBe(true);
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      document.body.querySelector(".modal-backdrop").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      confirm.click();
+      await flush();
+    });
+    expect(dialog()).not.toBeNull();
+    expect(maintenancePosts(calls)).toHaveLength(1);
+
+    await act(async () => {
+      resolveIngest();
+      await flush();
+    });
+    expect(dialog()).toBeNull();
+    expect(document.body.textContent).toContain("Bỏ qua 2 tài liệu chưa có bản parse");
   });
 
   it("không chạy bảo trì nếu job nền xuất hiện ngay trước khi bấm", async () => {
@@ -146,11 +267,10 @@ describe("DatasetListView", () => {
     await renderList({ datasets: [{ id: "a", name: "A", enabled: true, document_count: 1, chunk_count: 1, pending_count: 0 }] });
     const { reindex } = await openMaintenance();
     active = [{ id: "job-2", kind: "parse", status: "queued", document_id: "d", created_at: new Date().toISOString() }];
-    await act(async () => {
-      reindex.click();
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    });
+    await click(reindex);
+    await click(dialogButton("Nạp lại toàn bộ"));
     expect(calls.some((c) => c.method === "POST")).toBe(false);
+    expect(dialog()).toBeNull();
     expect(document.body.textContent).toContain("Còn job parse nền đang chạy");
   });
 });

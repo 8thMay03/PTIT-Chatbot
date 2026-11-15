@@ -90,6 +90,7 @@ export default function DatasetView({ dataset, onBack }) {
   const [moveOpen, setMoveOpen] = useState(false);
   const [editDatasetOpen, setEditDatasetOpen] = useState(false);
   const [confirmParseAll, setConfirmParseAll] = useState(false);
+  const [confirmChunkAll, setConfirmChunkAll] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadTarget, setUploadTarget] = useState(null);
   const [uploadProgress, setUploadProgress] = useState("");
@@ -394,6 +395,7 @@ export default function DatasetView({ dataset, onBack }) {
       toast.error(errorMessage(err, "Không chia đoạn lại được dataset."));
     } finally {
       setDatasetChunking(false);
+      setConfirmChunkAll(false);
     }
   }
 
@@ -613,7 +615,7 @@ export default function DatasetView({ dataset, onBack }) {
                 type="button"
                 className="btn-outline-dataset"
                 title="Chia đoạn và nhúng vector lại mọi tài liệu trong dataset này từ bản Markdown đã lưu"
-                onClick={chunkDataset}
+                onClick={() => setConfirmChunkAll(true)}
                 disabled={pipelineBusy || activeParseJobs.length > 0}
               >
                 {datasetChunking ? <Loader2 size={14} className="spin" /> : <Scissors size={14} />}
@@ -1062,6 +1064,35 @@ export default function DatasetView({ dataset, onBack }) {
           setSelectedIds(new Set());
           refreshDocuments();
         }}
+      />
+
+      {/* Chia đoạn lại toàn bộ dataset (xác nhận, không parse lại) */}
+      <Modal
+        open={confirmChunkAll}
+        onClose={() => !datasetChunking && setConfirmChunkAll(false)}
+        title={`Chia đoạn lại dataset “${datasetName}”?`}
+        description={
+          `Sẽ chia đoạn và nhúng vector lại ${dataset?.document_count ?? documents.length} tài liệu trong dataset này ` +
+          "từ bản Markdown đã lưu; file gốc không được parse lại. " +
+          "Thao tác có thể mất nhiều thời gian và kết quả tìm kiếm có thể thay đổi trong lúc chạy."
+        }
+        icon={<AlertTriangle size={20} />}
+        actions={
+          <>
+            <button type="button" className="ghost-btn" onClick={() => setConfirmChunkAll(false)} disabled={datasetChunking}>
+              Hủy
+            </button>
+            <button
+              type="button"
+              className="primary-btn"
+              onClick={chunkDataset}
+              disabled={pipelineBusy || activeParseJobs.length > 0}
+            >
+              {datasetChunking ? <Loader2 size={15} className="spin" /> : <Scissors size={15} />}
+              Chia đoạn lại
+            </button>
+          </>
+        }
       />
 
       {/* Parse lại toàn bộ dataset (xác nhận, giữ Markdown sửa tay) */}
