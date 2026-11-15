@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Loader2, Plus, Search, Settings2, X } from "lucide-react";
+import { AlertTriangle, Loader2, Plus, RefreshCw, Scissors, Search, Settings2, X } from "lucide-react";
 import { datasetsApi, documentsApi, errorMessage, queryKeys } from "../api";
+import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
 import useParseJobs from "../lib/useParseJobs";
 import DatasetCard from "./DatasetCard";
@@ -17,6 +18,8 @@ export default function DatasetListView({ datasets, loading, loadError, onOpen }
   const [deleting, setDeleting] = useState(null);
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [maintBusy, setMaintBusy] = useState(null);
+  // Thao tác bảo trì đang chờ xác nhận: "rechunk" | "reindex" | null.
+  const [pendingMaintenance, setPendingMaintenance] = useState(null);
   // Bảo trì toàn kho ghi đè mọi tài liệu; backend không chặn khi job parse nền
   // (upload/parse) còn chạy nên giao diện phải chờ các job đó xong.
   const { jobs: activeParseJobs, track: trackParseJobs } = useParseJobs();
@@ -65,13 +68,24 @@ export default function DatasetListView({ datasets, loading, loadError, onOpen }
     if (opening) fetchActiveParseJobs();
   }
 
-  async function runMaintenance(kind) {
+  function requestMaintenance(kind) {
     if (maintBusy || backgroundBusy) return;
-    setMaintBusy(kind);
     setMaintenanceOpen(false);
+    setPendingMaintenance(kind);
+  }
+
+  function closeMaintenanceConfirm() {
+    if (!maintBusy) setPendingMaintenance(null);
+  }
+
+  async function runMaintenance() {
+    const kind = pendingMaintenance;
+    if (!kind || maintBusy || backgroundBusy) return;
+    setMaintBusy(kind);
     const active = await fetchActiveParseJobs();
     if (active.length > 0) {
       setMaintBusy(null);
+      setPendingMaintenance(null);
       toast.warning("Còn job parse nền đang chạy; hãy chờ các job đó xong rồi thử lại.");
       return;
     }
@@ -88,8 +102,19 @@ export default function DatasetListView({ datasets, loading, loadError, onOpen }
       toast.error(errorMessage(err, "Không thực hiện được thao tác bảo trì."));
     } finally {
       setMaintBusy(null);
+      setPendingMaintenance(null);
     }
   }
+
+  // Phạm vi hiển thị trong hộp xác nhận; chỉ nêu số tài liệu khi mọi dataset có số liệu.
+  const totalDocuments = datasets.every((d) => typeof d.document_count === "number")
+    ? datasets.reduce((sum, d) => sum + d.document_count, 0)
+    : null;
+  const maintenanceScope =
+    `mọi tài liệu của toàn bộ ${datasets.length} dataset` +
+    (totalDocuments != null ? ` (${totalDocuments} tài liệu)` : "") +
+    ", kể cả dataset đang tắt";
+  const confirmingReindex = pendingMaintenance === "reindex";
 
   return (
     <div className="dataset-wrapper">
@@ -134,7 +159,7 @@ export default function DatasetListView({ datasets, loading, loadError, onOpen }
                     <button
                       type="button"
                       role="menuitem"
-                      onClick={() => runMaintenance("rechunk")}
+                      onClick={() => requestMaintenance("rechunk")}
                       disabled={backgroundBusy}
                       title={
                         backgroundBusy
@@ -147,7 +172,7 @@ export default function DatasetListView({ datasets, loading, loadError, onOpen }
                     <button
                       type="button"
                       role="menuitem"
-                      onClick={() => runMaintenance("reindex")}
+                      onClick={() => requestMaintenance("reindex")}
                       disabled={backgroundBusy}
                       title={
                         backgroundBusy
@@ -235,6 +260,48 @@ export default function DatasetListView({ datasets, loading, loadError, onOpen }
         onClose={() => setDeleting(null)}
         onDeleted={() => { setDeleting(null); refresh(); }}
       />
+      {/* Bảo trì toàn kho: luôn hỏi lại trước khi chạy lại pipeline cho mọi tài liệu. */}
+      <Modal
+        open={Boolean(pendingMaintenance)}
+        onClose={closeMaintenanceConfirm}
+        title={confirmingReindex ? "Nạp lại toàn bộ kho tài liệu?" : "Chia đoạn lại toàn bộ kho tài liệu?"}
+        description={
+          confirmingReindex
+            ? `Sẽ parse lại file gốc của ${maintenanceScope}, rồi chia đoạn và nhúng vector lại. ` +
+              "Tài liệu có Markdown sửa tay được giữ nguyên bản sửa. " +
+              "Thao tác có thể mất nhiều thời gian và kết quả tìm kiếm có thể thay đổi trong lúc chạy."
+            : `Sẽ chia đoạn và nhúng vector lại ${maintenanceScope}, từ bản Markdown đã lưu; file gốc không được parse lại. ` +
+              "Thao tác có thể mất nhiều thời gian và kết quả tìm kiếm có thể thay đổi trong lúc chạy."
+        }
+        icon={<AlertTriangle size={20} />}
+        tone={confirmingReindex ? "danger" : "default"}
+        actions={
+          <>
+            <button type="button" className="ghost-btn" onClick={closeMaintenanceConfirm} disabled={Boolean(maintBusy)}>
+              Hủy
+            </button>
+            <button
+              type="button"
+              className={confirmingReindex ? "danger-btn" : "primary-btn"}
+              onClick={runMaintenance}
+              disabled={Boolean(maintBusy) || backgroundBusy}
+            >
+              {maintBusy ? (
+                <Loader2 size={15} className="spin" />
+              ) : confirmingReindex ? (
+                <RefreshCw size={15} />
+              ) : (
+                <Scissors size={15} />
+              )}
+              {confirmingReindex ? "Nạp lại toàn bộ" : "Chia đoạn lại toàn bộ"}
+            </button>
+          </>
+        }
+      >
+        {backgroundBusy && !maintBusy && (
+          <p role="status">Còn job parse nền đang chạy; hãy chờ các job đó xong rồi thử lại.</p>
+        )}
+      </Modal>
     </div>
   );
 }
