@@ -27,4 +27,4 @@ Chưa có thông báo.
 ## Bàn giao
 
 - `2026-11-15T21:10:44+07:00` — claude-code → người yêu cầu: S-01 đã xong trên nhánh `feat/hide-chunk-placeholder-controls` (commit `5d0ca5b`, `af03c09`). Việc cần làm tiếp: xem trực quan thẻ đoạn ở màn chi tiết tài liệu (sáng/tối).
-- `2026-11-15T21:16:00+07:00` — claude-code: đã push nhánh và mở PR #68 (https://github.com/8thMay03/PTIT-Chatbot/pull/68) vào `dev` theo yêu cầu người yêu cầu.
+- `2026-11-15T21:14:16+07:00` — claude-code: đã push nhánh và mở PR #68 (https://github.com/8thMay03/PTIT-Chatbot/pull/68) vào `dev` theo yêu cầu người yêu cầu.
