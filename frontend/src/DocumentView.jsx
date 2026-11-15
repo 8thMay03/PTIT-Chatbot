@@ -65,10 +65,6 @@ export default function DocumentView({ documentId, onBack, backLabel, busy: pipe
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  // Chọn và bật/tắt từng đoạn: backend chưa lưu trạng thái này, nên cả hai chỉ
-  // tồn tại trong phiên làm việc. Tooltip trên công tắc nói rõ điều đó.
-  const [selectedChunkIds, setSelectedChunkIds] = useState(new Set());
-  const [enabledChunks, setEnabledChunks] = useState({});
 
   // Highlight & auto-scroll khi trỏ chuột vào chunk
   const [hoveredChunkId, setHoveredChunkId] = useState(null);
@@ -275,30 +271,6 @@ export default function DocumentView({ documentId, onBack, backLabel, busy: pipe
   useEffect(() => {
     if (totalKnown && page > totalPages) setPage(totalPages);
   }, [page, totalPages, totalKnown]);
-
-  function toggleSelectChunk(id) {
-    setSelectedChunkIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleSelectAllChunks() {
-    const ids = visibleChunks.map((c) => c.id);
-    setSelectedChunkIds((prev) => {
-      const next = new Set(prev);
-      const allSelected = ids.length > 0 && ids.every((id) => next.has(id));
-      if (allSelected) ids.forEach((id) => next.delete(id));
-      else ids.forEach((id) => next.add(id));
-      return next;
-    });
-  }
-
-  function toggleEnableChunk(id) {
-    setEnabledChunks((prev) => ({ ...prev, [id]: prev[id] === false }));
-  }
 
   async function handleReparse() {
     if (!docDetail) return;
@@ -541,20 +513,6 @@ export default function DocumentView({ documentId, onBack, backLabel, busy: pipe
             </div>
 
             <div className="chunk-result-toolbar">
-              <label className="chunk-select-all-label">
-                <input
-                  type="checkbox"
-                  className="chunk-checkbox"
-                  checked={
-                    visibleChunks.length > 0 &&
-                    visibleChunks.every((c) => selectedChunkIds.has(c.id))
-                  }
-                  onChange={toggleSelectAllChunks}
-                  disabled={visibleChunks.length === 0}
-                />
-                <span>Chọn tất cả</span>
-              </label>
-
               <span className="chunk-count-label">
                 {busy ? "Đang tải..." : `${visibleTotal} đoạn`}
               </span>
@@ -631,44 +589,21 @@ export default function DocumentView({ documentId, onBack, backLabel, busy: pipe
             ) : (
               <div className="chunk-cards-list">
                 {visibleChunks.map((chunk) => {
-                  const isSelected = selectedChunkIds.has(chunk.id);
-                  const isEnabled = enabledChunks[chunk.id] !== false;
                   const isHovered = hoveredChunkId === chunk.id;
                   const label = `Đoạn #${(chunk.chunk_index ?? 0) + 1}`;
 
                   return (
                   <div
                     key={chunk.id}
-                    className={`chunk-card-item ${isSelected ? "selected" : ""} ${isHovered ? "is-hovered-target" : ""}`}
+                    className={`chunk-card-item ${isHovered ? "is-hovered-target" : ""}`}
                     onMouseEnter={() => handleChunkHover(chunk, false)}
                     onClick={() => handleChunkHover(chunk, true)}
                   >
                     <div className="chunk-card-top">
-                      <input
-                        type="checkbox"
-                        className="chunk-checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelectChunk(chunk.id)}
-                        aria-label={`Chọn ${label}`}
-                      />
                       <span className="chunk-index-tag">{label}</span>
                       {chunk.token_count != null && (
                         <span className="chunk-token-tag">{chunk.token_count} token</span>
                       )}
-                      <div className="chunk-card-top-right">
-                        <span className="chunk-type-tag">Văn bản</span>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={isEnabled}
-                          className={`pill-switch ${isEnabled ? "on" : "off"}`}
-                          onClick={() => toggleEnableChunk(chunk.id)}
-                          title={`${isEnabled ? "Đang bật" : "Đang tắt"} — trạng thái này chưa được máy chủ lưu lại`}
-                          aria-label={`Bật/tắt ${label}`}
-                        >
-                          <span className="pill-switch-thumb" />
-                        </button>
-                      </div>
                     </div>
 
                     {chunkMode === "markdown" ? (

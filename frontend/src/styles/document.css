@@ -316,23 +316,11 @@
   border-color: var(--border-strong);
 }
 
-.chunk-card-item.selected {
-  border-color: var(--brand-border);
-  background: var(--brand-subtle);
-}
-
 .chunk-card-item.is-hovered-target {
   border-color: var(--brand);
   background: var(--brand-subtle);
   box-shadow: 0 2px 10px rgba(151, 38, 53, 0.12);
   transform: translateY(-1px);
-}
-
-.chunk-card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
 }
 
 .chunk-card-text {
@@ -544,8 +532,8 @@
 
 /* ==========================================================================
    Nhãn trên thẻ đoạn văn bản
-   Thay cho checkbox chọn và công tắc bật/tắt cũ: backend không có khái niệm
-   bật/tắt từng đoạn, và không có hành động hàng loạt nào để việc chọn có nghĩa.
+   Không có ô chọn hay công tắc bật/tắt: backend không có khái niệm bật/tắt
+   từng đoạn, và không có hành động hàng loạt nào để việc chọn có nghĩa.
    ========================================================================== */
 .chunk-card-top {
   display: flex;
@@ -582,52 +570,6 @@
   font-weight: 600;
   color: var(--text-muted);
   white-space: nowrap;
-}
-
-/* ==========================================================================
-   Chọn và bật/tắt từng đoạn
-   Cũng chỉ tồn tại trong phiên: backend chưa lưu trạng thái theo từng đoạn.
-   ========================================================================== */
-.chunk-select-all-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.chunk-checkbox {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--brand);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.chunk-card-top-right {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-left: auto;
-}
-
-.chunk-type-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 9px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-sunken);
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  font-weight: 600;
-}
-
-.chunk-card-item.selected {
-  border-color: var(--brand-border);
-  background: var(--brand-subtle);
 }
 
 /* ==========================================================================
