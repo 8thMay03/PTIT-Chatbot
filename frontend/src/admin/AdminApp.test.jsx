@@ -210,7 +210,7 @@ describe("AdminApp", () => {
     );
     // Bố cục đầy đủ như trước khi tách app: chat + lịch sử + Dataset + Settings, thêm Đăng xuất.
     expect(labels).toEqual(
-      expect.arrayContaining(["Cuộc trò chuyện mới", "Dataset", "Settings", "Đăng xuất"])
+      expect.arrayContaining(["Cuộc trò chuyện mới", "Dataset", "Cài đặt", "Đăng xuất"])
     );
     expect(container.querySelector(".admin-shell .chat")).not.toBeNull();
     expect(container.querySelector(".admin-shell .sidebar-chat-area")).not.toBeNull();

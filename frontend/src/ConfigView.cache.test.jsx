@@ -162,7 +162,7 @@ describe("cache cấu hình giữa ConfigView và ModelsView", () => {
       return jsonResponse(current);
     });
     vi.stubGlobal("fetch", fetchMock);
-    // Trạng thái reranker nằm ở tab Rerank model.
+    // Trạng thái reranker nằm ở tab Mô hình xếp hạng lại.
     localStorage.setItem("ptit_models_tab", "reranker");
 
     await renderViews(

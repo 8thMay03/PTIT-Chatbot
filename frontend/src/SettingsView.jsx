@@ -19,7 +19,7 @@ export default function SettingsView({
   return (
     <section className="settings-page" aria-labelledby="settings-title">
       <div className="settings-page-heading">
-        <h1 id="settings-title">Settings</h1>
+        <h1 id="settings-title">Cài đặt</h1>
         <p>Quản lý cấu hình RAG, mô hình và giao diện tại một nơi.</p>
       </div>
       <nav className="settings-tabs" aria-label="Danh mục cài đặt">
@@ -64,10 +64,6 @@ export default function SettingsView({
         <h2>Giao diện</h2>
         <p>Chọn chế độ hiển thị phù hợp với bạn.</p>
         <ThemePicker theme={theme} onThemeChange={onThemeChange} />
-        <div className="settings-language">
-          <span>Ngôn ngữ giao diện</span>
-          <strong>Tiếng Việt</strong>
-        </div>
       </div>
     </section>
   );

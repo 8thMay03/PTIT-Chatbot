@@ -153,9 +153,9 @@ describe("ModelsView — kho mô hình ba tab", () => {
 
     const tabs = [...container.querySelectorAll('[role="tab"]')];
     expect(tabs.map((tab) => tab.textContent.replace(/\d+$/, "").trim())).toEqual([
-      "LLM model",
-      "Embedding model",
-      "Rerank model",
+      "Mô hình ngôn ngữ (LLM)",
+      "Mô hình nhúng (Embedding)",
+      "Mô hình xếp hạng lại (Reranker)",
     ]);
     expect(container.querySelector("#mdl-panel-llm").hidden).toBe(false);
     expect(container.querySelector("#mdl-panel-embedding").hidden).toBe(true);
@@ -232,7 +232,7 @@ describe("ModelsView — kho mô hình ba tab", () => {
     );
     await click(confirm);
 
-    await waitFor(() => panel.textContent.includes("Chưa có Rerank model nào"));
+    await waitFor(() => panel.textContent.includes("Chưa có Mô hình xếp hạng lại (Reranker) nào"));
     expect(state.profiles).toEqual([]);
     expect(requestsTo(fetchMock, "/model-profiles/r1", "DELETE")).toHaveLength(1);
   });

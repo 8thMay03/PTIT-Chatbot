@@ -230,11 +230,11 @@ export default function AdminShell({ onLogout, loggingOut = false, inert = false
             type="button"
             className={`sidebar-nav-item ${view === "settings" ? "active" : ""}`}
             aria-current={view === "settings" ? "page" : undefined}
-            title="Settings"
+            title="Cài đặt"
             onClick={() => goTo("settings")}
           >
             <Settings size={18} />
-            <span className="sidebar-nav-label">Settings</span>
+            <span className="sidebar-nav-label">Cài đặt</span>
           </button>
           <button
             type="button"
