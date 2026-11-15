@@ -5,7 +5,7 @@
 - Coordinator: `claude-code`
 - Người yêu cầu: `8thMay03`
 - Tạo lúc: `2026-11-15T11:07:07+07:00`
-- Cập nhật lúc: `2026-11-15T21:05:00+07:00`
+- Cập nhật lúc: `2026-11-15T21:20:00+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -49,7 +49,8 @@ Kết quả cần có: các nút thao tác hiện khi focus bằng bàn phím v�
 
 - Tóm tắt: S-01 xong trên nhánh `feat/copy-btn-touch-keyboard` (commit `3e8922a`); `AC-01`..`AC-04` có bằng chứng `passed`; self_review `approved`.
 - Blocker: không có.
-- Bước tiếp theo: push nhánh, mở PR vào `dev`; đóng task `done` sau khi PR được merge (nếu người yêu cầu muốn review độc lập thì thêm vòng review).
+- PR: [#67](https://github.com/8thMay03/PTIT-Chatbot/pull/67) vào `dev`.
+- Bước tiếp theo: đóng task `done` sau khi PR #67 được merge (nếu người yêu cầu muốn review độc lập thì thêm vòng review).
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 

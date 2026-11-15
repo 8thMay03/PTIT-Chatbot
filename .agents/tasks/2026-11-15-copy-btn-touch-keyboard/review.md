@@ -41,4 +41,4 @@
 - Nhận xét bắt buộc còn mở: không có.
 - Nhận xét hoãn lại: R-01 (`low`).
 - Phần chưa review / giới hạn: chưa thử trên điện thoại thật; đây là self_review, không phải review độc lập.
-- Bước tiếp theo: mở PR vào `dev`.
+- Bước tiếp theo: PR [#67](https://github.com/8thMay03/PTIT-Chatbot/pull/67) đã mở vào `dev`; chờ merge.
