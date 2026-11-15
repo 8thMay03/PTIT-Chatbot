@@ -157,7 +157,7 @@ export default function LandingPage() {
       </a>
 
       <header className="lp-nav">
-        <div className="lp-container lp-nav-inner">
+        <div className={`lp-container lp-nav-inner${session.isAuthenticated ? " is-signed-in" : ""}`}>
           <a className="lp-nav-brand" href="/" aria-label="PTIT Chatbot — Trang chủ">
             <BrandMark />
             <span className="lp-nav-divider" aria-hidden="true" />

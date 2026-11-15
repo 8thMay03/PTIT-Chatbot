@@ -63,6 +63,10 @@
   line-height: 32px;
   letter-spacing: -0.24px;
   white-space: nowrap;
+  /* Thiếu chỗ thì cắt bằng "…" thay vì tràn sang phần tử bên cạnh. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .lp-brand.is-inverted {
@@ -192,14 +196,22 @@
   display: none;
   width: 1px;
   height: 24px;
+  flex-shrink: 0;
   background: var(--lp-border);
 }
 
 .lp-nav-tagline {
   display: none;
+  flex-shrink: 0;
   color: var(--lp-text);
   font-size: 16px;
   white-space: nowrap;
+}
+
+/* Đã đăng nhập: chỗ của dòng "Trợ lý học vụ" nhường cho tên người dùng. */
+.lp-nav-inner.is-signed-in .lp-nav-divider,
+.lp-nav-inner.is-signed-in .lp-nav-tagline {
+  display: none;
 }
 
 .lp-nav-links {
@@ -1474,6 +1486,10 @@
     font-size: 20px;
   }
 
+  .lp-nav-actions .lp-btn-arrow {
+    display: none;
+  }
+
   .lp-btn.is-lg {
     min-height: 56px;
     padding: 0 28px;
@@ -1517,7 +1533,19 @@
   }
 }
 
-@media (min-width: 480px) {
+/*
+ * Các ngưỡng của thanh điều hướng tính theo bề rộng thật của từng phần và chừa
+ * 26px cho trạng thái "viên thuốc" khi cuộn (landing-motion.css), để từ 340px
+ * trở lên tên thương hiệu không phải cắt "…" ở trạng thái nào.
+ */
+@media (max-width: 519px) {
+  /* Avatar + "Vào trò chuyện" dài hơn nút "Đăng ký": chỉ giữ biểu tượng. */
+  .lp-nav-inner.is-signed-in .lp-brand-name {
+    display: none;
+  }
+}
+
+@media (min-width: 600px) {
   .lp-nav-login,
   .lp-nav-actions .lp-theme-toggle {
     display: inline-flex;
@@ -1533,12 +1561,6 @@
     width: min(1280px, calc(100% - 48px));
   }
 
-  .lp-nav-divider,
-  .lp-nav-tagline,
-  .lp-nav-user-name {
-    display: inline-block;
-  }
-
   .lp-card-copy {
     padding: 45px 48px 0;
   }
@@ -1551,6 +1573,14 @@
   .lp-footer-bottom {
     flex-direction: row;
     justify-content: space-between;
+  }
+}
+
+@media (min-width: 768px) {
+  .lp-nav-divider,
+  .lp-nav-tagline,
+  .lp-nav-user-name {
+    display: inline-block;
   }
 }
 
@@ -1680,10 +1710,25 @@
   .lp-nav-links {
     display: flex;
   }
+
+  /* Ba liên kết chiếm chỗ: tạm ẩn phần phụ cho tới khi đủ rộng (1320px). */
+  .lp-nav-divider,
+  .lp-nav-tagline,
+  .lp-nav-user-name {
+    display: none;
+  }
 }
 
 @media (min-width: 1200px) {
   .lp-float-cards {
     display: block;
+  }
+}
+
+@media (min-width: 1320px) {
+  .lp-nav-divider,
+  .lp-nav-tagline,
+  .lp-nav-user-name {
+    display: inline-block;
   }
 }
