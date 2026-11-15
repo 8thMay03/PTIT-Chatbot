@@ -52,4 +52,4 @@ Các điểm đã xác nhận đúng:
 - Nhận xét bắt buộc còn mở: không có.
 - Nhận xét hoãn lại: R-01, R-02 (đều `low`, không bắt buộc).
 - Phần chưa review / giới hạn: chưa có review độc lập; chưa kiểm tra bằng Narrator.
-- Bước tiếp theo: người yêu cầu duyệt, push và mở PR.
+- Bước tiếp theo: merge PR #65 sau khi người yêu cầu duyệt.

@@ -88,4 +88,4 @@ Cách dựng trạng thái lỗi mà không tắt backend thật của người 
 
 - Tiêu chí đã đạt: `AC-01`..`AC-06`.
 - Tiêu chí chưa đạt/chưa xác minh: không có tiêu chí bắt buộc nào chưa đạt; các phần thủ công còn thiếu ghi ở trên.
-- Đề xuất: người yêu cầu duyệt, push và mở PR.
+- Đề xuất: người yêu cầu review và merge PR #65.

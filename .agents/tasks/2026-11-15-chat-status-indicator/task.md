@@ -54,7 +54,7 @@ Kết quả cần có: nhãn và màu chấm trên header phản ánh đúng tr�
 
 - Tóm tắt: S-01 xong trên nhánh `feat/chat-status-indicator`; header hiện năm trạng thái (sẵn sàng, hạn chế, mất kết nối, đang trả lời, và đang kiểm tra lúc chưa có kết quả đầu tiên) từ `/api/health`. Kiểm chứng `passed`, self-review `approved`.
 - Blocker: không có.
-- Bước tiếp theo: người yêu cầu duyệt, push và mở PR. Chưa nghe bằng Narrator; chưa đo chu kỳ 60 giây trên trình duyệt (xem `verification.md`).
+- Bước tiếp theo: người yêu cầu review và merge PR #65 (https://github.com/8thMay03/PTIT-Chatbot/pull/65). Chưa nghe bằng Narrator; chưa đo chu kỳ 60 giây trên trình duyệt (xem `verification.md`).
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 

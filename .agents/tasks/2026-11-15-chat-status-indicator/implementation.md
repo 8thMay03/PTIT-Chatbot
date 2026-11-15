@@ -36,7 +36,7 @@ Chưa có thông báo (một agent kiêm các vai trò).
 ## Bàn giao
 
 - Nhiệm vụ: S-01 hoàn tất.
-- Nhánh/commit: `feat/chat-status-indicator`, commit trên `5fc10c2` (xem `git log`).
+- Nhánh/commit: `feat/chat-status-indicator`, commit `b433adf` (mã) và `356ce8f` (nhật ký) trên `5fc10c2`; PR #65 (https://github.com/8thMay03/PTIT-Chatbot/pull/65).
 - Kiểm tra: `npm test` 34 file / 237 test pass; `npm run build` pass; `npm run check:bundle` đạt (gzip 83.92 kB / mốc 128.41 kB).
-- Chưa làm: chưa push/PR; chưa nghe bằng Narrator; chưa quan sát chu kỳ 60 giây thật trên trình duyệt (chỉ kiểm tra cấu hình và luồng focus).
-- Người nhận: người yêu cầu `8thMay03`, để duyệt và quyết định push/PR.
+- Chưa làm: chưa nghe bằng Narrator; chưa quan sát chu kỳ 60 giây thật trên trình duyệt (chỉ kiểm tra cấu hình và luồng focus).
+- Người nhận: người yêu cầu `8thMay03`, để review và merge PR #65.
