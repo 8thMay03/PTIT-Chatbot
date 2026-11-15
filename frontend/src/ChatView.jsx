@@ -7,11 +7,11 @@ import {
   Copy,
   GraduationCap,
   Lightbulb,
-  RefreshCw,
   RotateCcw,
   Send,
   Sparkles,
   Square,
+  SquarePen,
   WifiOff,
 } from "lucide-react";
 import { ApiError, chatApi, conversationsApi, describeError, fieldErrors, isAbortError } from "./api";
@@ -131,7 +131,7 @@ function describeRestoredError(error) {
 preloadMarkdownView().catch(() => {});
 
 const ChatView = forwardRef(function ChatView(
-  { hidden, onLoadingChange, onConversationSaved, headerActions, initialInput = "" },
+  { hidden, onLoadingChange, onConversationSaved, onNewChat, headerActions, initialInput = "" },
   ref
 ) {
   const [messages, setMessages] = useState([
@@ -502,13 +502,14 @@ const ChatView = forwardRef(function ChatView(
         <div className="header-actions">
           {headerActions}
           <button
+            type="button"
             className="icon-btn"
-            onClick={resetConversation}
+            onClick={onNewChat ?? resetConversation}
             disabled={loading}
-            aria-label="Bắt đầu cuộc trò chuyện mới"
+            aria-label="Cuộc trò chuyện mới"
             title="Cuộc trò chuyện mới"
           >
-            <RefreshCw size={17} />
+            <SquarePen size={17} aria-hidden="true" />
           </button>
         </div>
       </header>

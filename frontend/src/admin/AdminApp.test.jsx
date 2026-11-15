@@ -60,7 +60,7 @@ function baseConfig() {
  * Backend giả: phiên admin là một biến; route quản trị trả 401 khi chưa đăng nhập,
  * đúng như `require_admin` phía server.
  */
-function createBackend({ authenticated = false, configured = true } = {}) {
+function createBackend({ authenticated = false, configured = true, conversations = [], conversationDetails = {} } = {}) {
   const state = { authenticated, configured };
   const fetchMock = vi.fn((url, options = {}) => {
     const path = new URL(String(url), "http://localhost").pathname.replace(/^\/api\//, "");
@@ -90,7 +90,9 @@ function createBackend({ authenticated = false, configured = true } = {}) {
       return response({ authenticated: false, configured: true });
     }
     // Route công khai theo phiên ptit_sid, không bao giờ 401 (như backend thật).
-    if (path === "conversations") return response({ total: 0, conversations: [] });
+    if (path === "conversations") return response({ total: conversations.length, conversations });
+    const detail = path.match(/^conversations\/(.+)$/);
+    if (detail && conversationDetails[detail[1]]) return response(conversationDetails[detail[1]]);
     if (!state.authenticated) return response({ detail: "Cần đăng nhập quản trị." }, 401);
     if (path === "config") return response(baseConfig());
     if (path === "model-profiles") {
@@ -221,6 +223,53 @@ describe("AdminApp", () => {
     expect(container.querySelector(".admin-shell")).toBeNull();
     expect(backend.state.authenticated).toBe(false);
     expect(queryClient.getQueryData(["config"])).toBeUndefined();
+  });
+
+  it("nút header Cuộc trò chuyện mới bỏ đánh dấu hội thoại đang mở trên sidebar", async () => {
+    window.history.replaceState(null, "", "/admin#chat");
+    const backend = createBackend({
+      authenticated: true,
+      conversations: [
+        {
+          id: "conv-cu",
+          title: "Hội thoại cũ",
+          message_count: 2,
+          created_at: "2026-11-01T00:00:00Z",
+          updated_at: "2026-11-01T00:00:00Z",
+        },
+      ],
+      conversationDetails: {
+        "conv-cu": {
+          id: "conv-cu",
+          messages: [
+            { role: "user", content: "Học phí bao nhiêu?" },
+            { role: "assistant", content: "Học phí theo tín chỉ.", sources: [] },
+          ],
+        },
+      },
+    });
+    await renderAdmin(backend);
+
+    const shell = await waitFor(() => container.querySelector(".admin-shell"));
+    const sidebarNewChat = () => shell.querySelector('.sidebar-nav button[aria-label="Cuộc trò chuyện mới"]');
+    const openButton = await waitFor(() => shell.querySelector(".conv-open-btn"));
+    await act(async () => {
+      openButton.click();
+    });
+    await waitFor(() => shell.textContent.includes("Học phí theo tín chỉ."));
+    expect(shell.querySelector(".conv-item.active")).not.toBeNull();
+    expect(sidebarNewChat().classList.contains("active")).toBe(false);
+
+    const historyLength = window.history.length;
+    await act(async () => {
+      shell.querySelector('.chat-header button[aria-label="Cuộc trò chuyện mới"]').click();
+    });
+
+    await waitFor(() => shell.querySelector(".welcome"));
+    expect(shell.querySelector(".conv-item.active")).toBeNull();
+    expect(sidebarNewChat().classList.contains("active")).toBe(true);
+    expect(window.history.length).toBe(historyLength);
+    expect(window.location.hash).toBe("#chat");
   });
 
   it("chưa cấu hình ADMIN_EMAIL/ADMIN_PASSWORD thì báo rõ, không chuyển trang", async () => {

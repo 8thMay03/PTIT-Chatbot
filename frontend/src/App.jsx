@@ -254,6 +254,7 @@ export default function App() {
             ref={chatRef}
             onLoadingChange={setChatLoading}
             onConversationSaved={handleConversationSaved}
+            onNewChat={startNewChat}
             headerActions={<UserMenu onLoggedOut={handleLoggedOut} />}
             initialInput={prefillQuestion}
           />
