@@ -301,8 +301,16 @@
   transition: opacity 0.18s ease;
   padding: 0 2px;
 }
-.bubble-wrap:hover .bubble-actions {
+/* Hiện khi trỏ vào hoặc khi focus bằng bàn phím; thiết bị không hover
+   (điện thoại, máy tính bảng) luôn hiện vì không có cách nào làm lộ nút. */
+.bubble-wrap:hover .bubble-actions,
+.bubble-wrap:focus-within .bubble-actions {
   opacity: 1;
+}
+@media (hover: none) {
+  .bubble-actions {
+    opacity: 1;
+  }
 }
 .copy-btn {
   display: inline-flex;
