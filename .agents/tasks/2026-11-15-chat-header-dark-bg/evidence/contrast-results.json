@@ -1,0 +1,188 @@
+{
+  "light": {
+    "dataTheme": "light",
+    "prefersDark": false,
+    "headerBg": "rgba(255, 255, 255, 0.72)",
+    "headerEffBg": [
+      252,
+      253,
+      253,
+      1
+    ],
+    "backdrop": "blur(10px)",
+    "items": [
+      {
+        "el": "div.title",
+        "text": "Sẵn sàng hỗ trợ",
+        "color": "rgb(15, 23, 42)",
+        "effBg": [
+          252,
+          253,
+          253,
+          1
+        ],
+        "ratio": 17.51
+      },
+      {
+        "el": "span",
+        "text": "Sẵn sàng hỗ trợ",
+        "color": "rgb(15, 23, 42)",
+        "effBg": [
+          252,
+          253,
+          253,
+          1
+        ],
+        "ratio": 17.51
+      },
+      {
+        "el": "a.user-login-btn",
+        "text": "Đăng nhập",
+        "color": "rgb(255, 255, 255)",
+        "effBg": [
+          151,
+          38,
+          53,
+          1
+        ],
+        "ratio": 7.94
+      },
+      {
+        "el": "button.icon-btn",
+        "text": "Bắt đầu cuộc trò chuyện mới",
+        "color": "rgb(91, 104, 120)",
+        "effBg": [
+          255,
+          255,
+          255,
+          1
+        ],
+        "ratio": 5.68
+      }
+    ]
+  },
+  "system-dark": {
+    "dataTheme": null,
+    "prefersDark": true,
+    "headerBg": "rgba(20, 23, 28, 0.72)",
+    "headerEffBg": [
+      18,
+      21,
+      25,
+      1
+    ],
+    "backdrop": "blur(10px)",
+    "items": [
+      {
+        "el": "div.title",
+        "text": "Sẵn sàng hỗ trợ",
+        "color": "rgb(232, 234, 238)",
+        "effBg": [
+          18,
+          21,
+          25,
+          1
+        ],
+        "ratio": 15.22
+      },
+      {
+        "el": "span",
+        "text": "Sẵn sàng hỗ trợ",
+        "color": "rgb(232, 234, 238)",
+        "effBg": [
+          18,
+          21,
+          25,
+          1
+        ],
+        "ratio": 15.22
+      },
+      {
+        "el": "a.user-login-btn",
+        "text": "Đăng nhập",
+        "color": "rgb(255, 255, 255)",
+        "effBg": [
+          197,
+          61,
+          82,
+          1
+        ],
+        "ratio": 5.04
+      },
+      {
+        "el": "button.icon-btn",
+        "text": "Bắt đầu cuộc trò chuyện mới",
+        "color": "rgb(151, 160, 173)",
+        "effBg": [
+          20,
+          23,
+          28,
+          1
+        ],
+        "ratio": 6.8
+      }
+    ]
+  },
+  "manual-dark": {
+    "dataTheme": "dark",
+    "prefersDark": false,
+    "headerBg": "rgba(20, 23, 28, 0.72)",
+    "headerEffBg": [
+      18,
+      21,
+      25,
+      1
+    ],
+    "backdrop": "blur(10px)",
+    "items": [
+      {
+        "el": "div.title",
+        "text": "Sẵn sàng hỗ trợ",
+        "color": "rgb(232, 234, 238)",
+        "effBg": [
+          18,
+          21,
+          25,
+          1
+        ],
+        "ratio": 15.22
+      },
+      {
+        "el": "span",
+        "text": "Sẵn sàng hỗ trợ",
+        "color": "rgb(232, 234, 238)",
+        "effBg": [
+          18,
+          21,
+          25,
+          1
+        ],
+        "ratio": 15.22
+      },
+      {
+        "el": "a.user-login-btn",
+        "text": "Đăng nhập",
+        "color": "rgb(255, 255, 255)",
+        "effBg": [
+          197,
+          61,
+          82,
+          1
+        ],
+        "ratio": 5.04
+      },
+      {
+        "el": "button.icon-btn",
+        "text": "Bắt đầu cuộc trò chuyện mới",
+        "color": "rgb(151, 160, 173)",
+        "effBg": [
+          20,
+          23,
+          28,
+          1
+        ],
+        "ratio": 6.8
+      }
+    ]
+  }
+}

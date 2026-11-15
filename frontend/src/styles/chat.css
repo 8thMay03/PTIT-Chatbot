@@ -18,7 +18,7 @@
   gap: 12px;
   padding: 16px 30px;
   border-bottom: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--surface-glass);
   backdrop-filter: blur(10px);
 }
 
