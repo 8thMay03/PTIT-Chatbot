@@ -37,3 +37,4 @@ Chưa có thông báo.
 ## Bàn giao
 
 - `2026-11-15T21:32:49+07:00` — claude-code → người yêu cầu: S-01 xong trên nhánh `feat/landing-nav-narrow-overlap` (chưa push). Việc cần làm tiếp: xem trực quan bộ ảnh trong `evidence/`, quyết định D-02, rồi push và mở PR vào `dev`.
+- `2026-11-15T21:49:10+07:00` — claude-code: đã push nhánh và mở PR #69 (https://github.com/8thMay03/PTIT-Chatbot/pull/69) vào `dev` theo yêu cầu người yêu cầu.

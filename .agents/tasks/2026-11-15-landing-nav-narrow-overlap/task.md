@@ -47,7 +47,7 @@ Kết quả cần có: thanh điều hướng không chồng chữ và không g�
 
 - Tóm tắt: S-01 đã triển khai trên nhánh `feat/landing-nav-narrow-overlap` (nền `11b7ac4`). Đo tự động 192/192 phép kiểm tra đạt, quét 4px từ 320 đến 1440px không có lỗi; `npm test`, `npm run build` pass; self_review `approved`. Kiểm tra bằng Playwright Chromium với viewport giả lập thay cho DevTools device mode (xem `verification.md`).
 - Blocker: không có.
-- Bước tiếp theo: người yêu cầu xem ảnh trong `evidence/` và xác nhận D-02 (đã đăng nhập thì ẩn "Trợ lý học vụ"), push nhánh, mở PR vào `dev`, merge rồi đóng task.
+- Bước tiếp theo: người yêu cầu xem ảnh trong `evidence/` và xác nhận D-02 (đã đăng nhập thì ẩn "Trợ lý học vụ"), merge PR #69 (https://github.com/8thMay03/PTIT-Chatbot/pull/69), rồi đóng task.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
