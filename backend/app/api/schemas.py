@@ -319,6 +319,9 @@ class GuardrailsConfigPayload(BaseModel):
     min_bm25_norm_score: float = 0.25
     min_rerank_score: float | None = None
     vector_threshold_source: str = "calibrated"
+    calibrated_min_vector_score: float | None = None
+    rerank_threshold_source: str = "not_applicable"
+    calibrated_min_rerank_score: float | None = None
 
 
 class EmbeddingConfigPayload(BaseModel):

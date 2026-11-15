@@ -476,7 +476,7 @@ def _mask_api_key(key: str | None) -> str | None:
 
 def get_runtime_config_dict() -> dict:
     """Return a comprehensive runtime configuration dictionary with masked API keys."""
-    from app.generation.confidence import thresholds_from_settings
+    from app.generation.confidence import RERANK_THRESHOLDS, VECTOR_THRESHOLDS, thresholds_from_settings
 
     gate = thresholds_from_settings()
     provider = settings.llm_provider.lower()
@@ -551,6 +551,10 @@ def get_runtime_config_dict() -> dict:
             "min_bm25_norm_score": gate.min_bm25_norm_score,
             "min_rerank_score": gate.min_rerank_score,
             "vector_threshold_source": gate.vector_source,
+            # Giá trị bảng hiệu chỉnh (None nếu model chưa có): UI dùng cho "Dùng giá trị hiệu chỉnh".
+            "calibrated_min_vector_score": VECTOR_THRESHOLDS.get(gate.embedding_model),
+            "rerank_threshold_source": gate.rerank_source,
+            "calibrated_min_rerank_score": RERANK_THRESHOLDS.get(settings.reranker_model),
         },
         "embedding": {
             "provider": settings.embedding_provider,
@@ -679,9 +683,13 @@ def update_runtime_config(payload: dict) -> dict:
     guardrails = payload.get("guardrails") or {}
     if "scope_enabled" in guardrails and guardrails["scope_enabled"] is not None:
         settings.guardrail_scope_enabled = bool(guardrails["scope_enabled"])
-    if "min_vector_score" in guardrails and guardrails["min_vector_score"] is not None:
-        # UI gửi lại ngưỡng đang hiển thị mỗi lần lưu: trùng ngưỡng hiệu lực (hoặc là mặc
-        # định cũ 0.30) thì không biến nó thành ghi đè, để bảng theo model vẫn áp dụng.
+    # Ngưỡng vector/rerank: không gửi khoá thì giữ nguyên; gửi `null` tường minh thì xoá ghi
+    # đè, trả về giá trị `.env` lúc khởi động (save_overrides xoá dòng trong DB).
+    if "min_vector_score" in guardrails and guardrails["min_vector_score"] is None:
+        settings.retrieval_min_vector_score = _INITIAL_SETTINGS["retrieval_min_vector_score"]
+    elif "min_vector_score" in guardrails:
+        # Client cũ gửi lại ngưỡng đang hiển thị mỗi lần lưu: trùng ngưỡng hiệu lực (hoặc là
+        # mặc định cũ 0.30) thì không biến nó thành ghi đè, để bảng theo model vẫn áp dụng.
         value = float(guardrails["min_vector_score"])
         if effective_vector_override(value) is not None and value != thresholds_from_settings().min_vector_score:
             settings.retrieval_min_vector_score = value
@@ -689,7 +697,9 @@ def update_runtime_config(payload: dict) -> dict:
         settings.retrieval_min_bm25_score = float(guardrails["min_bm25_score"])
     if "min_bm25_norm_score" in guardrails and guardrails["min_bm25_norm_score"] is not None:
         settings.retrieval_min_bm25_norm_score = max(0.0, min(1.0, float(guardrails["min_bm25_norm_score"])))
-    if "min_rerank_score" in guardrails and guardrails["min_rerank_score"] is not None:
+    if "min_rerank_score" in guardrails and guardrails["min_rerank_score"] is None:
+        settings.retrieval_min_rerank_score = _INITIAL_SETTINGS["retrieval_min_rerank_score"]
+    elif "min_rerank_score" in guardrails:
         value = float(guardrails["min_rerank_score"])
         if value != thresholds_from_settings().min_rerank_score:
             settings.retrieval_min_rerank_score = value
