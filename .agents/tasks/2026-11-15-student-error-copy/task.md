@@ -56,7 +56,7 @@ Kết quả cần có: ở trang sinh viên, thông báo lỗi không nhắc chi
 
 - Tóm tắt: S-01 đã triển khai trên nhánh `feat/student-error-copy` (nền `f914187`, commit mã `4a3f1a5`). `npm test` (36 file, 275 test) và `npm run build` pass; self_review `approved`. Chưa chạy được bước thủ công Tab/Enter trong trình duyệt vì extension Chrome không kết nối (xem V-03).
 - Blocker: không có.
-- Bước tiếp theo: người yêu cầu thử thủ công nút "Thử lại" bằng bàn phím (V-03), push nhánh và mở PR vào `dev`, merge rồi đóng task. Cân nhắc tạo task riêng cho R-01 (bubble lỗi mở hội thoại bị màn chào che).
+- Bước tiếp theo: người yêu cầu thử thủ công nút "Thử lại" bằng bàn phím (V-03), merge PR #70 (https://github.com/8thMay03/PTIT-Chatbot/pull/70) vào `dev`, rồi đóng task. Cân nhắc tạo task riêng cho R-01 (bubble lỗi mở hội thoại bị màn chào che).
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 

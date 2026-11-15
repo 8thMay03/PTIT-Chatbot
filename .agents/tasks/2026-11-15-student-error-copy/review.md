@@ -41,4 +41,4 @@
 - Nhận xét bắt buộc còn mở: không có.
 - Nhận xét hoãn lại: R-01, R-02, R-03 (đều `low`, không bắt buộc; lý do ở bảng trên).
 - Phần chưa review / giới hạn: chưa quan sát giao diện và thao tác bàn phím trong trình duyệt thật.
-- Bước tiếp theo: người yêu cầu thử thủ công, push nhánh và mở PR vào `dev`.
+- Bước tiếp theo: người yêu cầu thử thủ công và merge PR #70 (https://github.com/8thMay03/PTIT-Chatbot/pull/70).

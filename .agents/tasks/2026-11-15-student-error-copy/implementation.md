@@ -42,8 +42,8 @@ Chưa có thông báo (một agent làm toàn bộ).
 ## Bàn giao
 
 - Nhiệm vụ đã làm: S-01.
-- Nhánh/commit: `feat/student-error-copy`, mã ở `4a3f1a5`; bản ghi task commit riêng ngay sau đó. Chưa push, chưa mở PR.
+- Nhánh/commit: `feat/student-error-copy`, mã ở `4a3f1a5`; bản ghi task commit riêng ngay sau đó (`f8e09fe`). Đã push và mở PR #70 (https://github.com/8thMay03/PTIT-Chatbot/pull/70) vào `dev`.
 - Giao diện ảnh hưởng: prop tuỳ chọn `errorContext` của `ChatView`/`ConversationList`; export `STUDENT_ERROR_CONTEXT`; option mới của `describeError`.
 - Kiểm tra: xem `verification.md` (V-01..V-05).
 - Chưa xong: thử thủ công bằng bàn phím (V-03, phần thủ công).
-- Người nhận: `8thMay03`. Bước tiếp theo: thử thủ công, push nhánh, mở PR vào `dev`.
+- Người nhận: `8thMay03`. Bước tiếp theo: thử thủ công, review và merge PR #70 (https://github.com/8thMay03/PTIT-Chatbot/pull/70).
