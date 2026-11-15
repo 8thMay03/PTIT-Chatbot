@@ -1,5 +1,6 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import {
+  AlertTriangle,
   ArrowDown,
   BookOpen,
   Check,
@@ -73,7 +74,9 @@ const STEP_STATUS_TEXT = {
 };
 
 /**
- * Ngữ cảnh câu chữ cho màn chat; cách phân loại lỗi nằm trong `api/errors.js`.
+ * Ngữ cảnh câu chữ mặc định cho màn chat (gợi ý kỹ thuật cho trang quản trị); cách
+ * phân loại lỗi nằm trong `api/errors.js`. Trang sinh viên truyền `errorContext`
+ * (ví dụ `STUDENT_ERROR_CONTEXT`) để thay các câu này.
  */
 const CHAT_ERROR_CONTEXT = {
   notFoundTitle: "Không tìm thấy API chat",
@@ -85,8 +88,13 @@ const CHAT_ERROR_CONTEXT = {
     "Có lỗi ngoài dự kiến. Kiểm tra server FastAPI và chắc chắn tài liệu đã được ingest.",
 };
 
-function describeChatError(error, overrides = {}) {
-  return describeError(error, { ...CHAT_ERROR_CONTEXT, ...overrides });
+function describeChatError(error, context, overrides = {}) {
+  return describeError(error, { ...CHAT_ERROR_CONTEXT, ...context, ...overrides });
+}
+
+/** Mất mạng/timeout dùng biểu tượng mất kết nối; lỗi khác dùng biểu tượng cảnh báo. */
+function errorIcon(kind) {
+  return kind === "network" || kind === "timeout" ? WifiOff : AlertTriangle;
 }
 
 /**
@@ -140,7 +148,7 @@ function headerStatusKey(loading, health) {
 }
 
 /** Thông báo ở khung nhập cho lượt bị từ chối trước khi lưu. */
-function describeRejectedSend(error) {
+function describeRejectedSend(error, context) {
   if (error.status === 413) {
     return {
       title: "Câu hỏi quá dài",
@@ -153,7 +161,7 @@ function describeRejectedSend(error) {
   }
   // 429 gồm "gửi quá nhiều" và "câu trả lời trước vẫn đang được tạo": dùng thông
   // điệp của backend, không dùng tiêu đề mặc định về nhà cung cấp LLM.
-  return describeChatError(error, { rateLimitTitle: "Chưa gửi được câu hỏi" });
+  return describeChatError(error, context, { rateLimitTitle: "Chưa gửi được câu hỏi" });
 }
 
 /** Lỗi đã lưu của một câu trả lời (`error` trong chi tiết hội thoại). */
@@ -173,7 +181,15 @@ function describeRestoredError(error) {
 preloadMarkdownView().catch(() => {});
 
 const ChatView = forwardRef(function ChatView(
-  { hidden, onLoadingChange, onConversationSaved, onNewChat, headerActions, initialInput = "" },
+  {
+    hidden,
+    onLoadingChange,
+    onConversationSaved,
+    onNewChat,
+    headerActions,
+    initialInput = "",
+    errorContext,
+  },
   ref
 ) {
   const [messages, setMessages] = useState([
@@ -311,7 +327,7 @@ const ChatView = forwardRef(function ChatView(
             role: "assistant",
             content: "",
             sources: [],
-            error: describeChatError(error, {
+            error: describeChatError(error, errorContext, {
               fallbackTitle: "Không mở được hội thoại",
               fallbackDetail: "Không mở được hội thoại này.",
               notFoundTitle: "Không tìm thấy hội thoại",
@@ -325,7 +341,7 @@ const ChatView = forwardRef(function ChatView(
         }
       }
     },
-    [loading]
+    [loading, errorContext]
   );
 
   useImperativeHandle(ref, () => ({
@@ -375,7 +391,7 @@ const ChatView = forwardRef(function ChatView(
   }
 
   function failLastMessage(error, describedOverride) {
-    const described = describedOverride ?? describeChatError(error);
+    const described = describedOverride ?? describeChatError(error, errorContext);
     setMessages((current) =>
       current.map((message, index) =>
         index === current.length - 1
@@ -476,7 +492,7 @@ const ChatView = forwardRef(function ChatView(
       if (!started && isRejectedBeforeStart(error)) {
         // Server chưa lưu lượt này: gỡ cặp tin tạm, trả câu hỏi về ô nhập (không đè
         // chữ người dùng đã gõ tiếp) và báo lỗi tại khung nhập.
-        const described = describeRejectedSend(error);
+        const described = describeRejectedSend(error, errorContext);
         setMessages((current) => current.slice(0, -2));
         setInput((current) => (current.trim() ? current : text));
         setComposerAlert(described);
@@ -626,6 +642,7 @@ const ChatView = forwardRef(function ChatView(
             // sau đó panel suy luận thay chỗ, thông tin hơn ba dấu chấm.
             const showTypingPlaceholder =
               message.role === "assistant" && message.streaming && !message.content && !hasReasoning;
+            const ErrorIcon = message.error ? errorIcon(message.error.kind) : null;
 
             return (
               <div
@@ -657,7 +674,7 @@ const ChatView = forwardRef(function ChatView(
                     <div className="bubble is-error" role="alert">
                       <div className="chat-error">
                         <span className="chat-error-icon">
-                          <WifiOff size={18} />
+                          <ErrorIcon size={18} aria-hidden="true" />
                         </span>
                         <div className="chat-error-body">
                           <strong>{message.error.title}</strong>

@@ -364,6 +364,38 @@
   color: rgba(255, 255, 255, 0.55);
 }
 
+.conv-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.conv-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.conv-retry-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--on-solid);
+}
+
+.conv-retry-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .conv-loading {
   display: flex;
   flex-direction: column;
