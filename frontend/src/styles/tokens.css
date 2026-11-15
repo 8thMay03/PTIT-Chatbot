@@ -147,6 +147,7 @@
   --surface-sunken: var(--gray-100);
   --surface-sunken-strong: var(--gray-200);
   --surface-overlay: var(--gray-0);
+  --surface-glass: rgba(255, 255, 255, 0.72); /* nền kính mờ, đi kèm backdrop-filter */
   --scrim: rgba(15, 23, 42, 0.45);
 
   /* Chữ */
@@ -285,6 +286,7 @@
     --surface-sunken: var(--dark-200);
     --surface-sunken-strong: var(--dark-300);
     --surface-overlay: var(--dark-100);
+    --surface-glass: rgba(20, 23, 28, 0.72); /* --dark-50 @ 72% */
     --scrim: rgba(0, 0, 0, 0.65);
 
     --text: #e8eaee;
@@ -396,6 +398,7 @@
   --surface-sunken: var(--dark-200);
   --surface-sunken-strong: var(--dark-300);
   --surface-overlay: var(--dark-100);
+  --surface-glass: rgba(20, 23, 28, 0.72); /* --dark-50 @ 72% */
   --scrim: rgba(0, 0, 0, 0.65);
 
   --text: #e8eaee;
