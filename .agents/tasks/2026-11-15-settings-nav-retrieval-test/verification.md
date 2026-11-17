@@ -3,8 +3,8 @@
 - Verifier: `claude-agent`.
 - Trạng thái tổng: `passed` (chạy lại `2026-11-17T21:27:01+07:00` sau sửa R-04).
 - Bản được kiểm tra: nhánh `feat/settings-nav-retrieval-test`, commit `7e38924`
-  (tách từ `dev` `08f90bb`); lần chạy lại `2026-11-17T21:22:14+07:00` trên working tree `f69d4a0` + bản sửa
-  R-03/R-06 chưa commit.
+  (tách từ `dev` `08f90bb`); các lần chạy lại `2026-11-17T21:22:14+07:00` và `2026-11-17T21:27:01+07:00`
+  trên working tree có bản sửa R-03/R-04/R-06, nay là commit `6cc36b7` (cùng nội dung các file đã kiểm tra).
 - Môi trường: Windows 11; Node 24.14.0 (Vitest 3.2.7, Vite 5.4.21); Python 3.11.5
   trong `backend/.venv`; Chromium 1234 qua `playwright-core` 1.57.0, API giả lập
   (`/api/**`), dev server Vite `127.0.0.1:5173`.

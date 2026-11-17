@@ -1,11 +1,11 @@
 # Task: Cài đặt quản trị — danh mục dọc theo pipeline và bảng "Thử với câu hỏi"
 
 - ID: `2026-11-15-settings-nav-retrieval-test`
-- Trạng thái: `in_review`
+- Trạng thái: `done`
 - Coordinator: `claude-agent`
 - Người yêu cầu: người dùng ("tạo task cải thiện đi", sau tài liệu nghiên cứu màn Cài đặt)
 - Tạo lúc: `2026-11-15T23:42:56+07:00`
-- Cập nhật lúc: `2026-11-17T21:27:01+07:00`
+- Cập nhật lúc: `2026-11-17T21:38:29+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -136,12 +136,12 @@ Mockup tham chiếu: `docs/design/mockups/settings-proposed.html` khung A.
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: đã triển khai trên nhánh `feat/settings-nav-retrieval-test` (commit `7e38924`). R-03, R-04,
-  R-06 đã sửa trong working tree, chưa commit. `AC-01` … `AC-07` đạt; review vòng 5 `approved`
-  (`self_review`).
+- Tóm tắt: đã triển khai trên nhánh `feat/settings-nav-retrieval-test` (commit `7e38924`); bản sửa
+  R-03, R-04, R-06 ở commit `6cc36b7`. `AC-01` … `AC-07` đạt (`verification.md` `passed`); review vòng 5
+  `approved` (`self_review`) trên `6cc36b7`.
 - Blocker: không có.
-- Bước tiếp theo: commit bản sửa khi người dùng yêu cầu, rồi chuyển `done`. Người dùng quyết định
-  R-07/R-08 (không bắt buộc).
+- Bước tiếp theo: mở PR vào `dev` khi người dùng yêu cầu. Nhận xét không bắt buộc còn mở: R-05;
+  R-07/R-08 chờ người dùng quyết định.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
@@ -157,3 +157,5 @@ Mockup tham chiếu: `docs/design/mockups/settings-proposed.html` khung A.
   vẫn chưa đạt; giữ `in_progress`.
 - `2026-11-17T21:27:01+07:00` — `claude-agent`: sửa R-04 (chưa commit); `AC-01` đạt lại, review vòng 5 `approved`.
   Chuyển `in_review`, chờ commit trước khi `done`.
+- `2026-11-17T21:38:29+07:00` — `claude-agent`: người dùng yêu cầu commit và đóng task. Commit bản sửa `6cc36b7`; review
+  `approved` vẫn hiệu lực vì commit chỉ gồm các file đã review. Chuyển trạng thái `done`.

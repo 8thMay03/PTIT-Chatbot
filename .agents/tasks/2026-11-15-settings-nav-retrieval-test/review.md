@@ -4,9 +4,9 @@
 - Hình thức: `self_review` (chỉ một agent trong phiên; vòng 3 do phiên mới thực hiện,
   không dựa vào kết luận các vòng trước).
 - Trạng thái: `approved`.
-- Bản được review: nhánh `feat/settings-nav-retrieval-test`, working tree trên `f69d4a0` có
-  bản sửa R-03/R-04/R-06 chưa commit (mã nguồn gốc như `7e38924`; tách từ `dev` `08f90bb`).
-- Cập nhật lúc: `2026-11-17T21:27:01+07:00`.
+- Bản được review: nhánh `feat/settings-nav-retrieval-test`, commit `6cc36b7` (bản sửa R-03/R-04/R-06
+  trên `f69d4a0`; mã nguồn gốc `7e38924`; tách từ `dev` `08f90bb`).
+- Cập nhật lúc: `2026-11-17T21:38:29+07:00`.
 
 ## Phạm vi và cơ sở đánh giá
 
@@ -170,15 +170,17 @@
     Listener được gỡ khi unmount hoặc đổi `loading`, và frame đang chờ được huỷ.
   - Đối chiếu V-01 (Chromium: bốn mục bấm và cuộn tay đều đúng) và V-07 (350/350, build, bundle).
   - R-04 → `resolved`. Không còn nhận xét bắt buộc. Kết luận `approved`.
+- `2026-11-17T21:38:29+07:00` — ghi nhận commit `6cc36b7`: `git diff --name-only f69d4a0 6cc36b7` chỉ gồm đúng chín file
+  frontend đã review ở vòng 5 (cùng bốn file task). Không có thay đổi mã mới, giữ `approved`.
 
 ## Kết luận
 
-- Kết luận: `approved` (vòng 5, `self_review`, working tree trên `f69d4a0` + bản sửa chưa commit).
+- Kết luận: `approved` (vòng 5, `self_review`, commit `6cc36b7`).
 - Nhận xét bắt buộc còn mở: không.
 - Nhận xét đã xử lý: `R-03`, `R-04`, `R-06`.
 - Nhận xét không bắt buộc còn mở: `R-05`, `R-07`, `R-08`. `R-07` và `R-08` cần người dùng quyết định.
 - Nhận xét hoãn lại: `R-01`, `R-02` (không bắt buộc, đã có hướng theo dõi).
 - Phần chưa review / giới hạn: không chạy `POST /retrieval/test` với backend thật và dữ
   liệu thật; không kiểm tra trình duyệt ngoài Chromium.
-- Bước tiếp theo: commit bản sửa khi người dùng yêu cầu. Nếu commit chỉ gồm đúng các file đã
-  review thì giữ `approved`, chỉ cập nhật mã commit.
+- Bước tiếp theo: mở PR vào `dev` khi người dùng yêu cầu. R-05/R-07/R-08 theo dõi ngoài task này
+  (không bắt buộc).

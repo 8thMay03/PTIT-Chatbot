@@ -87,7 +87,7 @@
 - `backend/app/api/routes.py`: `GET`/`PUT`/`POST /config/reset` trả `updated_at`.
 - Không cần migration Alembic: dùng dòng mới trong bảng `app_config_overrides` sẵn có.
 
-### Sửa sau review vòng 3 — R-03, R-06 (`done`, chưa commit)
+### Sửa sau review vòng 3 — R-03, R-06 (`done`, commit `6cc36b7`)
 
 - R-03 (bấm mục không cuộn khi route không đổi):
   - `frontend/src/SettingsView.jsx`: thêm bộ đếm `scrollRequest`, tăng mỗi lần
@@ -106,7 +106,7 @@
   - `frontend/src/lib/gateDecision.js`: sửa comment `DEFAULT_GATE_THRESHOLDS` (chỉ tín hiệu
     từ khóa; vector/rerank `null`).
 
-### Sửa sau review vòng 4 — R-04 (`done`, chưa commit)
+### Sửa sau review vòng 4 — R-04 (`done`, commit `6cc36b7`)
 
 - Mới `frontend/src/settings/scrollSpy.js`: hàm thuần `pickActiveSection`. Mục đang xem là mục
   cuối cùng có tiêu đề đã qua vạch 64 px tính từ đỉnh khung cuộn; cuộn tới đáy (và khung cuộn
@@ -140,9 +140,9 @@
 ## Bàn giao
 
 - Nhiệm vụ đã làm: S-01 … S-05.
-- File/commit: nhánh `feat/settings-nav-retrieval-test`, commit `7e38924`; ảnh trong
-  `docs/design/assets/settings-nav-retrieval-test/`. Bản sửa R-03/R-04/R-06 nằm trong working
-  tree, chưa commit (người dùng chưa yêu cầu commit).
+- File/commit: nhánh `feat/settings-nav-retrieval-test`, commit `7e38924` (triển khai) và `6cc36b7`
+  (`fix: scroll and highlight settings sections on every nav click`, sửa R-03/R-04/R-06); ảnh trong
+  `docs/design/assets/settings-nav-retrieval-test/`.
 - Hợp đồng ảnh hưởng agent khác:
   - `readAdminRoute`/`adminRouteHash` dùng `section` thay cho `tab`.
   - `FullConfigResponse.updated_at` là chuỗi ISO 8601 có múi giờ hoặc `null`.
