@@ -1,11 +1,11 @@
 # Task: Cài đặt quản trị — ngưỡng tin cậy đúng gate RAG-18 và thanh lưu theo ngữ cảnh
 
 - ID: `2026-11-15-settings-gate-savebar`
-- Trạng thái: `in_review`
+- Trạng thái: `done`
 - Coordinator: `claude-agent`
 - Người yêu cầu: người dùng ("tạo task cải thiện đi", sau tài liệu nghiên cứu màn Cài đặt)
 - Tạo lúc: `2026-11-15T23:42:56+07:00`
-- Cập nhật lúc: `2026-11-17T20:05:35+07:00`
+- Cập nhật lúc: `2026-11-17T20:15:42+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -100,10 +100,11 @@ làm ở task này).
 ## Trạng thái hiện tại
 
 - Tóm tắt: S-01 … S-05 xong trên `feat/settings-gate-savebar` (tới `415afe3`); `AC-01` … `AC-07` có bằng chứng
-  `passed` trong `verification.md`; `review.md` `approved` (self_review), còn 4 nhận xét `low` hoãn lại.
+  `passed` trong `verification.md`; `review.md` `approved` (self_review, xác nhận lại vòng 3), còn 7 nhận xét `low`
+  hoãn lại. PR #71 vào `dev`: https://github.com/8thMay03/PTIT-Chatbot/pull/71 (chưa merge).
 - Blocker: không có.
-- Bước tiếp theo: chờ người dùng đồng ý push nhánh và mở PR vào `dev`; sau khi có PR, coordinator ghi số PR và chuyển
-  `done`.
+- Bước tiếp theo: người dùng review/merge PR #71; sau đó task `2026-11-15-settings-nav-retrieval-test` bắt đầu từ `dev`
+  mới (kèm theo dõi R-07, R-08, R-09).
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
@@ -113,3 +114,6 @@ làm ở task này).
   chọn trong `guardrails` (quyết định D-1, `implementation.md`).
 - `2026-11-17T20:05:35+07:00` — `claude-agent`: chụp lại hai ảnh `before-*-gate.png` bị trùng với ảnh `-top` (bằng
   chứng AC-07, xem `verification.md`); mã nguồn không đổi, review vẫn hiệu lực. Vẫn `in_review`, chờ push/PR.
+- `2026-11-17T20:15:42+07:00` — `claude-agent`: review vòng 3 giữ `approved` (thêm R-07 … R-09, `low`); người dùng yêu
+  cầu commit và mở PR → push nhánh, mở PR #71 vào `dev`; chuyển `done` theo điều kiện hoàn tất (mọi `AC-*` `passed`,
+  review `approved`, không blocker).

@@ -95,4 +95,6 @@ Không có (một agent).
   `lib/configDraft.js`; `SaveBar` sẵn để dùng cho form một cột; ngưỡng nháp là ghi đè (`null` = hiệu chỉnh), giá trị
   hiệu lực = `values.minVectorScore ?? calibrated.vector`.
 - Kiểm tra: `npm test` 303/303, `npm run build` OK, `python -m pytest` 1346 passed / 24 skipped.
-- Chưa làm: chưa push, chưa mở PR vào `dev` — chờ người dùng đồng ý.
+- ~~Chưa làm: chưa push, chưa mở PR vào `dev` — chờ người dùng đồng ý.~~ `2026-11-17T20:15:42+07:00`: đã push nhánh
+  và mở PR #71 vào `dev` (https://github.com/8thMay03/PTIT-Chatbot/pull/71) theo yêu cầu người dùng; chưa merge.
+- Việc theo dõi cho task `2026-11-15-settings-nav-retrieval-test`: R-07, R-08, R-09 (và R-01) trong `review.md`.
