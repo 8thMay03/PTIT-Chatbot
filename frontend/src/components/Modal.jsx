@@ -28,6 +28,7 @@ export default function Modal({
   actions,
   labelledBy,
   closeOnBackdrop = true,
+  className = "",
 }) {
   const dialogRef = useRef(null);
   const previouslyFocused = useRef(null);
@@ -113,7 +114,7 @@ export default function Modal({
     >
       <div
         ref={dialogRef}
-        className="modal"
+        className={`modal ${className}`.trim()}
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy ?? titleId}

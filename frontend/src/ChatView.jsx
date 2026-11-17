@@ -29,7 +29,7 @@ import {
 import MarkdownView, { preloadMarkdownView } from "./components/LazyMarkdownView";
 import ReasoningPanel from "./components/ReasoningPanel";
 import { sourcesLabel } from "./lib/citations";
-import { isSubmitEnter } from "./lib/keyboard";
+import { isApplePlatform, isSubmitKey } from "./lib/keyboard";
 import SplitWords from "./lib/motion/SplitWords";
 
 const SUGGESTIONS = [
@@ -189,6 +189,8 @@ const ChatView = forwardRef(function ChatView(
     headerActions,
     initialInput = "",
     errorContext,
+    enterToSend = true,
+    keepReasoningOpen = false,
   },
   ref
 ) {
@@ -211,6 +213,9 @@ const ChatView = forwardRef(function ChatView(
   const abortRef = useRef(null);
   const conversationAbortRef = useRef(null);
   const bottomRef = useRef(null);
+  // Đọc trong các hàm stream (đóng gói lúc gửi) để đổi tùy chọn giữa lượt vẫn có hiệu lực.
+  const keepReasoningOpenRef = useRef(keepReasoningOpen);
+  keepReasoningOpenRef.current = keepReasoningOpen;
 
   const queryClient = useQueryClient();
   const health = useQuery({
@@ -356,8 +361,9 @@ const ChatView = forwardRef(function ChatView(
         if (index !== current.length - 1) return message;
         const next = { ...message, content: message.content + content };
         // Phần câu trả lời bắt đầu stream: tự thu gọn panel suy luận đúng một
-        // lần để người dùng tập trung vào câu trả lời; vẫn mở lại được.
-        if (!next.reasoningAutoCollapsed) {
+        // lần để người dùng tập trung vào câu trả lời; vẫn mở lại được. Tùy chọn
+        // "Giữ mở quá trình suy luận" bỏ bước thu gọn này.
+        if (!next.reasoningAutoCollapsed && !keepReasoningOpenRef.current) {
           next.reasoningOpen = false;
           next.reasoningAutoCollapsed = true;
         }
@@ -543,7 +549,7 @@ const ChatView = forwardRef(function ChatView(
 
   function onKeyDown(event) {
     // Enter chốt chữ IME không bị chặn: bộ gõ cần nó để xác nhận chữ đang soạn.
-    if (isSubmitEnter(event)) {
+    if (isSubmitKey(event, { enterToSend })) {
       event.preventDefault();
       sendMessage(event);
     }
@@ -848,7 +854,10 @@ const ChatView = forwardRef(function ChatView(
               {" · "}
             </>
           )}
-          Enter để gửi · Shift + Enter để xuống dòng · Trả lời có thể chưa hoàn toàn chính xác
+          {enterToSend
+            ? "Enter để gửi · Shift + Enter để xuống dòng"
+            : `${isApplePlatform() ? "⌘" : "Ctrl"} + Enter để gửi · Enter để xuống dòng`}
+          {" · Trả lời có thể chưa hoàn toàn chính xác"}
         </p>
       </div>
     </section>

@@ -21,3 +21,8 @@ export function rename(conversationId, title) {
 export function remove(conversationId) {
   return request(`conversations/${conversationId}`, { method: "DELETE" });
 }
+
+/** Xoá mọi hội thoại của phiên hiện tại; trả `{ deleted }`. */
+export function removeAll() {
+  return request("conversations", { method: "DELETE" });
+}

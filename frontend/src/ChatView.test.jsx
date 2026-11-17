@@ -212,6 +212,68 @@ describe("ChatView", () => {
     });
   });
 
+  describe("tùy chọn Gửi bằng Enter (student-settings AC-03)", () => {
+    function hint() {
+      return container.querySelector(".composer-hint").textContent;
+    }
+
+    it("mặc định: Enter gửi, dòng gợi ý nói Enter để gửi", () => {
+      expect(hint()).toContain("Enter để gửi · Shift + Enter để xuống dòng");
+    });
+
+    it("tắt: Enter xuống dòng, Ctrl/Cmd+Enter gửi, Enter chốt chữ IME không gửi", async () => {
+      renderChat(<ChatView ref={chatRef} onConversationSaved={onConversationSaved} enterToSend={false} />);
+      expect(hint()).toContain("Ctrl + Enter để gửi · Enter để xuống dòng");
+      const { fetchMock } = createBackend();
+      typeInto(textarea(), "học phí");
+
+      const plain = pressEnter(textarea());
+      const composing = pressEnter(textarea(), { ctrlKey: true, isComposing: true });
+      expect(fetchMock).not.toHaveBeenCalled();
+      // Enter thường để trình duyệt xuống dòng như bình thường.
+      expect(plain.defaultPrevented).toBe(false);
+      expect(composing.defaultPrevented).toBe(false);
+
+      const submit = pressEnter(textarea(), { ctrlKey: true });
+      expect(submit.defaultPrevented).toBe(true);
+      await waitFor(() => fetchMock.mock.calls.length === 1);
+    });
+
+    it("tắt: Cmd+Enter cũng gửi", async () => {
+      renderChat(<ChatView ref={chatRef} onConversationSaved={onConversationSaved} enterToSend={false} />);
+      const { fetchMock } = createBackend();
+      typeInto(textarea(), "học phí");
+      pressEnter(textarea(), { metaKey: true });
+      await waitFor(() => fetchMock.mock.calls.length === 1);
+    });
+  });
+
+  describe("tùy chọn Giữ mở quá trình suy luận (student-settings AC-03)", () => {
+    async function streamUntilAnswer() {
+      const { streams } = createBackend();
+      await ask("Học phí?");
+      const stream = await waitFor(() => streams[0]);
+      await stream.send({ type: "start", conversation_id: "c-1" });
+      await stream.send({ type: "step", step: "retrieve", status: "done", detail: {}, elapsed_ms: 5 });
+      await stream.send({ type: "reasoning", content: "Tìm điều khoản học phí" });
+      const header = await waitFor(() => container.querySelector(".reasoning-header"));
+      expect(header.getAttribute("aria-expanded")).toBe("true");
+      await stream.send({ type: "delta", content: "Học phí được tính" });
+      return container.querySelector(".reasoning-header");
+    }
+
+    it("mặc định: panel tự thu gọn khi câu trả lời bắt đầu stream", async () => {
+      const header = await streamUntilAnswer();
+      expect(header.getAttribute("aria-expanded")).toBe("false");
+    });
+
+    it("bật: panel vẫn mở khi câu trả lời stream", async () => {
+      renderChat(<ChatView ref={chatRef} onConversationSaved={onConversationSaved} keepReasoningOpen />);
+      const header = await streamUntilAnswer();
+      expect(header.getAttribute("aria-expanded")).toBe("true");
+    });
+  });
+
   describe("gửi tin", () => {
     it("body không có top_k (AC-03)", async () => {
       const { chatBodies } = createBackend();

@@ -763,6 +763,21 @@ def delete_conversation(session: Session, conversation_id: str) -> bool:
     return True
 
 
+def delete_conversations_for_owner(session: Session, owner_key: str) -> int:
+    """Xoá mọi hội thoại (kể cả hội thoại rỗng) của đúng một owner; trả số hội thoại đã xoá.
+
+    Owner rỗng không xoá gì: hội thoại cũ không có ``user_id`` không thuộc phiên nào.
+    Xoá qua ORM từng bản ghi để Message/MessageSource bị xoá theo như ``delete_conversation``.
+    """
+    if not owner_key:
+        return 0
+    conversations = session.scalars(select(Conversation).where(Conversation.user_id == owner_key)).all()
+    for conversation in conversations:
+        session.delete(conversation)
+    session.flush()
+    return len(conversations)
+
+
 # ==========================================
 # Tài khoản người dùng (landing-user-auth)
 # ==========================================
