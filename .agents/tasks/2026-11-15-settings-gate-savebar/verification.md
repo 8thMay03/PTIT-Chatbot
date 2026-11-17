@@ -78,13 +78,20 @@
   giao diện),
   1366×820 và 390×844, sáng và tối, có 2 thay đổi chưa lưu (Top-K 4→6, ngưỡng cosine 0.37→0.40):
   `docs/design/assets/settings-gate-savebar/{before,after}-{desktop,mobile}-{light,dark}-top.png`, cùng các ảnh
-  `*-gate.png` (cuộn tới nhóm ngưỡng) và `after-*-bottom.png` (vùng nguy hiểm).
+  `*-gate.png` (cuộn tới nhóm ngưỡng; hai ảnh `before-*-gate.png` chụp lại ngày `2026-11-17`, xem mục dưới) và
+  `after-*-bottom.png` (vùng nguy hiểm).
 - Trạng thái: `passed`.
 
 ## Lỗi, kiểm tra lại và phần chưa xác minh
 
 - Lần chụp đầu, hai dev server (trước/sau) dùng chung `node_modules/.vite` qua junction nên trang "sau" lỗi
   "Invalid hook call"; chạy lại từng server riêng với `--force` thì bình thường. Không phải lỗi sản phẩm.
+- `2026-11-17T20:05:35+07:00` — kiểm lại bằng chứng ảnh: `before-desktop-light-gate.png` và
+  `before-mobile-dark-gate.png` trùng byte với ảnh `-top` tương ứng (lần chụp đầu không cuộn tới nhóm ngưỡng trên giao
+  diện cũ), nên ảnh "trước" của nhóm ngưỡng thực chất chưa có. Chụp lại hai ảnh này từ `dev` `a57e4b7` (worktree tạm,
+  một dev server, cùng 2 thay đổi Top-K 4→6, cosine 0.37→0.40, cuộn tới thẻ "Ngưỡng tương đồng & kiểm soát an toàn");
+  ảnh mới hiện thanh "Điểm khớp từ khóa BM25 tối thiểu" và câu "Đoạn có điểm dưới 0.40 sẽ bị loại…" của bản cũ.
+  Sau khi chụp lại, 16 ảnh có 16 mã băm khác nhau. Mã nguồn không đổi.
 - Self-review phát hiện R-05 (ô số rỗng khi đang gõ xoá ghi đè) → sửa ở `415afe3`, thêm ca test, chạy lại
   `ConfigView.gate.test.jsx`/`cache`/`configDraft` (30/30) và toàn bộ `npm test` (303/303), `npm run build`.
 - Chưa kiểm với backend thật + Postgres (chỉ SQLite tạm trong test và API giả lập trong ảnh).

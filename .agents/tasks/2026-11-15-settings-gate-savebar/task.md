@@ -5,7 +5,7 @@
 - Coordinator: `claude-agent`
 - Người yêu cầu: người dùng ("tạo task cải thiện đi", sau tài liệu nghiên cứu màn Cài đặt)
 - Tạo lúc: `2026-11-15T23:42:56+07:00`
-- Cập nhật lúc: `2026-11-16T00:06:27+07:00`
+- Cập nhật lúc: `2026-11-17T20:05:35+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -111,3 +111,5 @@ làm ở task này).
   dùng; trạng thái `ready`. Coi yêu cầu "tạo task cải thiện" là trả lời Q-01 (làm giai đoạn 1).
 - `2026-11-16T00:06:27+07:00` — `claude-agent`: triển khai xong, chuyển `in_review` (chờ push/PR). Hợp đồng `/config` bổ sung 3 trường tuỳ
   chọn trong `guardrails` (quyết định D-1, `implementation.md`).
+- `2026-11-17T20:05:35+07:00` — `claude-agent`: chụp lại hai ảnh `before-*-gate.png` bị trùng với ảnh `-top` (bằng
+  chứng AC-07, xem `verification.md`); mã nguồn không đổi, review vẫn hiệu lực. Vẫn `in_review`, chờ push/PR.
