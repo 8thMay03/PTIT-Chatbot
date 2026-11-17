@@ -88,4 +88,4 @@
 - Nhận xét bắt buộc còn mở: không có.
 - Nhận xét hoãn lại: R-01 … R-05 (`low`).
 - Phần chưa review / giới hạn: chưa kiểm trên thiết bị thật và trình đọc màn hình thật.
-- Bước tiếp theo: người dùng duyệt; push nhánh và mở PR vào `dev` khi được đồng ý.
+- Bước tiếp theo: người dùng review PR [#73](https://github.com/8thMay03/PTIT-Chatbot/pull/73).

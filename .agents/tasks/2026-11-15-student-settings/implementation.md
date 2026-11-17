@@ -111,3 +111,4 @@
     đổi API (`onOpenSettings`, `compact`), chỉ `App.jsx` dùng.
   - Ghi chú cho tài liệu nghiên cứu: `docs/design/Settings-Market-Research.md` §10 (chưa commit, thuộc task
     `2026-11-15-settings-market-research`) chưa đánh dấu Q-02/Q-03 đã trả lời; câu trả lời ghi ở `task.md` này.
+- `2026-11-17T22:25:52+07:00` — `claude-agent` → người dùng: theo yêu cầu, đã push `feat/student-settings` và mở PR [#73](https://github.com/8thMay03/PTIT-Chatbot/pull/73) vào `dev`. Bước tiếp: người dùng review/merge PR.

@@ -110,7 +110,8 @@ Mockup tham chiếu: `docs/design/mockups/settings-proposed.html` khung B (deskt
   (5 nhận xét `low` hoãn lại).
 - Quyết định của người dùng (2026-11-17): **Q-02** chân thanh bên; **Q-03** làm cả "Tải lịch sử" và "Xoá toàn bộ".
 - Blocker: không có.
-- Bước tiếp theo: người dùng duyệt; push nhánh và mở PR vào `dev` khi được đồng ý, merge xong chuyển `done`.
+- PR: [#73](https://github.com/8thMay03/PTIT-Chatbot/pull/73) (`feat/student-settings` → `dev`).
+- Bước tiếp theo: người dùng review và merge PR; merge xong coordinator chuyển `done`.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
@@ -118,3 +119,4 @@ Mockup tham chiếu: `docs/design/mockups/settings-proposed.html` khung B (deskt
   sang `2026-11-15-settings-nav-retrieval-test`); trạng thái `ready`, hai phần chờ Q-02/Q-03.
 - `2026-11-17T22:14:33+07:00` — `claude-agent`: người dùng trả lời Q-02 (chân thanh bên), Q-03 (cả hai mục); triển
   khai đủ phạm vi, không mục nào `cancelled`; chuyển `in_review` chờ người dùng duyệt PR.
+- `2026-11-17T22:25:52+07:00` — `claude-agent`: người dùng đồng ý; đã push nhánh và mở PR [#73](https://github.com/8thMay03/PTIT-Chatbot/pull/73) vào `dev`.
