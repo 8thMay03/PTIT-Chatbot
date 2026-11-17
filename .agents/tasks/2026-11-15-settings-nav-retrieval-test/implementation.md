@@ -87,6 +87,39 @@
 - `backend/app/api/routes.py`: `GET`/`PUT`/`POST /config/reset` trả `updated_at`.
 - Không cần migration Alembic: dùng dòng mới trong bảng `app_config_overrides` sẵn có.
 
+### Sửa sau review vòng 3 — R-03, R-06 (`done`, chưa commit)
+
+- R-03 (bấm mục không cuộn khi route không đổi):
+  - `frontend/src/SettingsView.jsx`: thêm bộ đếm `scrollRequest`, tăng mỗi lần
+    `handleSelect` chọn một mục thuộc `ADMIN_ANSWER_SECTIONS`, truyền xuống `ConfigView`.
+  - `frontend/src/ConfigView.jsx`: nhận prop `scrollRequest`; effect cuộn tới anchor phụ
+    thuộc `[activeSection, scrollRequest, loading]`. Deep link/hashchange vẫn cuộn như trước.
+  - `frontend/src/admin/AdminShell.jsx`: `openSettingsSection` chỉ `pushState` khi hash mới
+    khác hash hiện tại. Bấm lại mục đang mở không còn thêm mục lịch sử trùng.
+  - Test mới: `SettingsView.test.jsx` ("bấm Truy xuất khi đang ở #settings…", hai lần bấm
+    liên tiếp đều cuộn); `admin/AdminApp.test.jsx` ("bấm lại mục Settings đang mở…": cuộn
+    lần nữa, `history.length` không tăng). Cả hai test thất bại trên mã cũ và đạt sau khi sửa.
+- R-06 (câu chữ):
+  - `frontend/src/settings/RetrievalTestPanel.jsx`: hai ghi chú ghi rõ "Chạy trên cấu hình đã
+    lưu, riêng Top-K lấy theo bản nháp"; bỏ Top-K khỏi danh sách cần lưu rồi chạy lại, thêm
+    "mở rộng câu hỏi" cho khớp `NEEDS_SAVED_RUN_KEYS`.
+  - `frontend/src/lib/gateDecision.js`: sửa comment `DEFAULT_GATE_THRESHOLDS` (chỉ tín hiệu
+    từ khóa; vector/rerank `null`).
+
+### Sửa sau review vòng 4 — R-04 (`done`, chưa commit)
+
+- Mới `frontend/src/settings/scrollSpy.js`: hàm thuần `pickActiveSection`. Mục đang xem là mục
+  cuối cùng có tiêu đề đã qua vạch 64 px tính từ đỉnh khung cuộn; cuộn tới đáy (và khung cuộn
+  được) thì luôn là mục cuối.
+- `frontend/src/ConfigView.jsx`: bỏ `IntersectionObserver` với dải `-12% … -70%`. Scrollspy giờ
+  nghe sự kiện `scroll` của khung form, gộp theo `requestAnimationFrame`, đo vị trí bốn mục rồi
+  gọi `pickActiveSection`. Chỉ chạy khi có sự kiện cuộn nên lúc mount mục đang xem vẫn theo route.
+- Mới `frontend/src/settings/scrollSpy.test.js` (5 ca, số đo lấy gần form thật ở 1366×820: khung
+  700 px, cuộn tối đa 1235 px, mục cuối cách đỉnh 200 px khi ở đáy).
+- Quyết định: chọn quy tắc "cuộn tới đáy = mục cuối" thay vì khoá scrollspy sau khi bấm. Quy tắc
+  này đúng cả khi người dùng tự cuộn tới đáy, và không cần trạng thái phân biệt cuộn do bấm với
+  cuộn tay.
+
 ## Quyết định
 
 - `#settings` không kèm key là trạng thái hợp lệ: desktop hiện form mặc định
@@ -108,7 +141,8 @@
 
 - Nhiệm vụ đã làm: S-01 … S-05.
 - File/commit: nhánh `feat/settings-nav-retrieval-test`, commit `7e38924`; ảnh trong
-  `docs/design/assets/settings-nav-retrieval-test/`.
+  `docs/design/assets/settings-nav-retrieval-test/`. Bản sửa R-03/R-04/R-06 nằm trong working
+  tree, chưa commit (người dùng chưa yêu cầu commit).
 - Hợp đồng ảnh hưởng agent khác:
   - `readAdminRoute`/`adminRouteHash` dùng `section` thay cho `tab`.
   - `FullConfigResponse.updated_at` là chuỗi ISO 8601 có múi giờ hoặc `null`.

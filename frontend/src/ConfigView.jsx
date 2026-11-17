@@ -15,6 +15,7 @@ import {
   valuesFromConfig,
 } from "./lib/configDraft";
 import { ADMIN_ANSWER_SECTIONS } from "./lib/appRoute";
+import { pickActiveSection } from "./settings/scrollSpy";
 import Modal from "./components/Modal";
 import SaveBar from "./components/SaveBar";
 import { useToast } from "./components/Toast";
@@ -39,7 +40,12 @@ function parseThreshold(raw, min, max) {
  * Ngưỡng tin cậy → Sinh câu trả lời. Các mục là anchor trong cùng một form, dùng
  * chung một thanh lưu.
  */
-export default function ConfigView({ activeSection = "retrieval", onSectionActive, onDraftState }) {
+export default function ConfigView({
+  activeSection = "retrieval",
+  scrollRequest = 0,
+  onSectionActive,
+  onDraftState,
+}) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const scrollRef = useRef(null);
@@ -139,39 +145,54 @@ export default function ConfigView({ activeSection = "retrieval", onSectionActiv
     });
   }, [values, savedSnapshot, calibrated, configQuery.data, changes, dirtySections, onDraftState]);
 
-  // Deep link `#settings/<mục>`: cuộn tới anchor của form sau khi dữ liệu đã render.
+  // Deep link `#settings/<mục>` hoặc bấm mục trong danh mục: cuộn tới anchor của form
+  // sau khi dữ liệu đã render. `scrollRequest` đổi cả khi bấm lại đúng mục đang mở.
   useEffect(() => {
     if (loading) return;
     const node = document.getElementById(`settings-section-${activeSection}`);
     if (node && typeof node.scrollIntoView === "function") {
       node.scrollIntoView({ block: "start" });
     }
-  }, [activeSection, loading]);
+  }, [activeSection, scrollRequest, loading]);
 
-  // Scrollspy: mục đang xem trong nhóm "Hệ thống trả lời". jsdom không có
-  // IntersectionObserver nên bỏ qua; điều hướng bằng bấm mục vẫn đánh dấu đúng.
+  // Scrollspy: mục đang xem trong nhóm "Hệ thống trả lời", tính lại sau mỗi lần cuộn
+  // khung form (gộp theo frame). Chỉ chạy khi có sự kiện cuộn nên lúc mount mục đang
+  // xem vẫn theo route.
   useEffect(() => {
-    if (loading || typeof IntersectionObserver === "undefined") return undefined;
+    if (loading) return undefined;
     const root = scrollRef.current;
     if (!root) return undefined;
-    const nodes = ADMIN_ANSWER_SECTIONS.map((key) =>
-      document.getElementById(`settings-section-${key}`)
-    ).filter(Boolean);
-    if (nodes.length === 0) return undefined;
 
-    const visible = new Map();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          visible.set(entry.target.dataset.settingsSection, entry.isIntersecting);
-        });
-        const next = ADMIN_ANSWER_SECTIONS.find((key) => visible.get(key));
-        if (next) onSectionActive?.(next);
-      },
-      { root, rootMargin: "-12% 0px -70% 0px" }
-    );
-    nodes.forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
+    let frame = null;
+    function update() {
+      frame = null;
+      const keys = [];
+      const offsets = [];
+      const rootTop = root.getBoundingClientRect().top;
+      ADMIN_ANSWER_SECTIONS.forEach((key) => {
+        const node = document.getElementById(`settings-section-${key}`);
+        if (!node) return;
+        keys.push(key);
+        offsets.push(node.getBoundingClientRect().top - rootTop + root.scrollTop);
+      });
+      const next = pickActiveSection({
+        keys,
+        offsets,
+        scrollTop: root.scrollTop,
+        clientHeight: root.clientHeight,
+        scrollHeight: root.scrollHeight,
+      });
+      if (next) onSectionActive?.(next);
+    }
+    function onScroll() {
+      if (frame === null) frame = window.requestAnimationFrame(update);
+    }
+
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      root.removeEventListener("scroll", onScroll);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
   }, [loading, onSectionActive]);
 
   // Cảnh báo khi rời trang mà còn thay đổi chưa lưu

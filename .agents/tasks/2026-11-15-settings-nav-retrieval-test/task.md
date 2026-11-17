@@ -1,11 +1,11 @@
 # Task: Cài đặt quản trị — danh mục dọc theo pipeline và bảng "Thử với câu hỏi"
 
 - ID: `2026-11-15-settings-nav-retrieval-test`
-- Trạng thái: `done`
+- Trạng thái: `in_review`
 - Coordinator: `claude-agent`
 - Người yêu cầu: người dùng ("tạo task cải thiện đi", sau tài liệu nghiên cứu màn Cài đặt)
 - Tạo lúc: `2026-11-15T23:42:56+07:00`
-- Cập nhật lúc: `2026-11-17T21:13:30+07:00`
+- Cập nhật lúc: `2026-11-17T21:27:01+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -136,10 +136,12 @@ Mockup tham chiếu: `docs/design/mockups/settings-proposed.html` khung A.
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: đã triển khai trên nhánh `feat/settings-nav-retrieval-test` (commit `7e38924`); toàn bộ AC đạt,
-  `verification.md` trạng thái `passed`, `review.md` kết luận `approved` (self-review).
+- Tóm tắt: đã triển khai trên nhánh `feat/settings-nav-retrieval-test` (commit `7e38924`). R-03, R-04,
+  R-06 đã sửa trong working tree, chưa commit. `AC-01` … `AC-07` đạt; review vòng 5 `approved`
+  (`self_review`).
 - Blocker: không có.
-- Bước tiếp theo: mở PR vào `dev` khi người dùng yêu cầu; theo dõi R-01/R-02 (không bắt buộc).
+- Bước tiếp theo: commit bản sửa khi người dùng yêu cầu, rồi chuyển `done`. Người dùng quyết định
+  R-07/R-08 (không bắt buộc).
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
@@ -149,3 +151,9 @@ Mockup tham chiếu: `docs/design/mockups/settings-proposed.html` khung A.
   nhánh từ `dev` `08f90bb`, hoàn thành S-01 … S-05; `AC-01` … `AC-07` đạt; chuyển trạng thái `done`.
 - `2026-11-17T21:13:30+07:00` — `claude-agent`: thêm dấu "—" vào dòng mô hình cho đúng câu chữ AC-03; chạy lại toàn
   bộ kiểm tra frontend, `verification.md` và `review.md` xác nhận trên `7e38924`.
+- `2026-11-17T21:18:04+07:00` — `claude-agent`: review vòng 3 phát hiện R-03 (`medium`, bắt buộc;
+  `AC-01` chưa đạt đầy đủ). Chuyển trạng thái `done` → `in_progress`.
+- `2026-11-17T21:22:14+07:00` — `claude-agent`: sửa R-03, R-06 (chưa commit). Chromium tái hiện R-04, nên `AC-01`
+  vẫn chưa đạt; giữ `in_progress`.
+- `2026-11-17T21:27:01+07:00` — `claude-agent`: sửa R-04 (chưa commit); `AC-01` đạt lại, review vòng 5 `approved`.
+  Chuyển `in_review`, chờ commit trước khi `done`.

@@ -158,6 +158,34 @@ describe("SettingsView — danh mục dọc và form theo pipeline", () => {
     );
   });
 
+  it("bấm Truy xuất khi đang ở #settings vẫn cuộn tới mục dù section quy về cùng anchor", async () => {
+    stubFetch();
+    const scrolled = [];
+    const originalScroll = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function scrollIntoView() {
+      scrolled.push(this.id);
+    };
+    try {
+      // Như AdminShell: onSectionChange đổi `section` của route rồi render lại.
+      const onSectionChange = vi.fn((next) => render({ section: next, onSectionChange }));
+      await render({ section: null, onSectionChange });
+      const before = scrolled.filter((id) => id === "settings-section-retrieval").length;
+
+      await click(container.querySelector('[data-settings-nav="retrieval"]'));
+      await waitFor(
+        () => scrolled.filter((id) => id === "settings-section-retrieval").length === before + 1
+      );
+
+      await click(container.querySelector('[data-settings-nav="retrieval"]'));
+      await waitFor(
+        () => scrolled.filter((id) => id === "settings-section-retrieval").length === before + 2
+      );
+      expect(onSectionChange).toHaveBeenCalledTimes(2);
+    } finally {
+      Element.prototype.scrollIntoView = originalScroll;
+    }
+  });
+
   it("mục có thay đổi chưa lưu hiện chấm", async () => {
     stubFetch();
     await render({ section: "retrieval" });

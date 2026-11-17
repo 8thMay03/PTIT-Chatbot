@@ -423,7 +423,8 @@ export default function RetrievalTestPanel({
 
         {!result && !error && (
           <p className="retrieval-test-note">
-            Chạy trên cấu hình đã lưu. Kết quả giữ tối đa {RUN_HISTORY_LIMIT} lần chạy trong phiên
+            Chạy trên cấu hình đã lưu, riêng Top-K lấy theo bản nháp. Kết quả giữ tối đa{" "}
+            {RUN_HISTORY_LIMIT} lần chạy trong phiên
             này để so trước/sau.
           </p>
         )}
@@ -519,8 +520,9 @@ export default function RetrievalTestPanel({
             </section>
 
             <p className="retrieval-test-note">
-              Chạy trên cấu hình đã lưu. Ngưỡng nháp được so tại chỗ với điểm trả về; thay đổi
-              Top-K, tỷ trọng hay xếp hạng lại cần lưu rồi chạy lại.
+              Chạy trên cấu hình đã lưu, riêng Top-K lấy theo bản nháp. Ngưỡng nháp được so tại
+              chỗ với điểm trả về; thay đổi tỷ trọng, mở rộng câu hỏi hay xếp hạng lại cần lưu
+              rồi chạy lại.
             </p>
           </div>
         )}

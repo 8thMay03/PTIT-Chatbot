@@ -39,6 +39,9 @@ export default function SettingsView({
   const [draftState, setDraftState] = useState(EMPTY_DRAFT);
   const [activeKey, setActiveKey] = useState(section ?? "retrieval");
   const [testOpen, setTestOpen] = useState(false);
+  // Tăng mỗi lần bấm một mục anchor: bấm lại đúng mục route đang trỏ (hoặc "Truy
+  // xuất" khi đang ở `#settings`) không đổi `section` nhưng vẫn phải cuộn tới mục.
+  const [scrollRequest, setScrollRequest] = useState(0);
 
   const showAnswer = section === null || ADMIN_ANSWER_SECTIONS.includes(section);
   const showModels = ADMIN_MODEL_SECTIONS.includes(section);
@@ -53,6 +56,7 @@ export default function SettingsView({
   const handleSelect = useCallback(
     (key) => {
       setActiveKey(key);
+      if (ADMIN_ANSWER_SECTIONS.includes(key)) setScrollRequest((count) => count + 1);
       onSectionChange?.(key);
     },
     [onSectionChange]
@@ -130,6 +134,7 @@ export default function SettingsView({
               <div className="settings-panel" id="settings-panel-answer" hidden={!showAnswer}>
                 <ConfigView
                   activeSection={section ?? "retrieval"}
+                  scrollRequest={scrollRequest}
                   onSectionActive={setActiveKey}
                   onDraftState={handleDraftState}
                 />

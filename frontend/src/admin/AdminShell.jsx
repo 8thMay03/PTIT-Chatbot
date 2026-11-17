@@ -116,10 +116,16 @@ export default function AdminShell({ onLogout, loggingOut = false, inert = false
     setRoute(next);
   }, []);
 
-  /** Đổi mục Settings: pushState để nút Back quay lại mục/danh sách trước. */
+  /**
+   * Đổi mục Settings: pushState để nút Back quay lại mục/danh sách trước. Bấm lại
+   * mục đang mở không thêm mục lịch sử trùng hash.
+   */
   const openSettingsSection = useCallback((nextSection) => {
     const next = { view: "settings", section: nextSection, datasetId: null };
-    window.history.pushState(null, "", `#${adminRouteHash(next)}`);
+    const hash = adminRouteHash(next);
+    if (window.location.hash.slice(1) !== hash) {
+      window.history.pushState(null, "", `#${hash}`);
+    }
     setRoute(next);
   }, []);
 

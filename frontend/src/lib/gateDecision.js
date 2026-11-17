@@ -8,7 +8,10 @@
  * `frontend/src/lib/gateDecision.test.js`.
  */
 
-/** Ngưỡng mặc định (mọi tín hiệu bật) khi caller không truyền. */
+/**
+ * Ngưỡng dự phòng khi caller không truyền: chỉ dùng tín hiệu từ khóa; vector và
+ * rerank `null` (không áp dụng) vì ngưỡng của chúng phụ thuộc mô hình.
+ */
 export const DEFAULT_GATE_THRESHOLDS = {
   min_bm25_norm_score: 0.25,
   min_vector_score: null,
