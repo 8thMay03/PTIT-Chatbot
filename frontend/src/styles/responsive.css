@@ -104,10 +104,6 @@
     align-items: stretch;
     gap: var(--space-3);
   }
-
-  .settings-header-actions {
-    justify-content: flex-end;
-  }
 }
 
 /* ==========================================================================
@@ -277,14 +273,6 @@
   .config-toggle-header {
     flex-direction: row;
     gap: var(--space-3);
-  }
-
-  .settings-header-actions {
-    flex-wrap: wrap;
-  }
-
-  .settings-header-actions button {
-    flex: 1;
   }
 
   /* ---- Document: thanh công cụ chunk xuống dòng ---- */

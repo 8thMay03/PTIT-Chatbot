@@ -269,3 +269,66 @@ def test_update_bm25_norm_threshold_and_raw_bm25_stays_accepted(calibrated_gate)
     assert guardrails["min_bm25_score"] == 7.5
     assert guardrails["min_vector_score"] == 0.55
     assert guardrails["vector_threshold_source"] == "override"
+
+
+def test_null_vector_threshold_clears_override(calibrated_gate, monkeypatch) -> None:
+    from app.core.config import _INITIAL_SETTINGS
+    from app.generation.confidence import VECTOR_THRESHOLDS
+
+    monkeypatch.setitem(_INITIAL_SETTINGS, "retrieval_min_vector_score", None)
+    client.put("/api/config", json={"guardrails": {"min_vector_score": 0.55}})
+    assert settings.retrieval_min_vector_score == 0.55
+
+    response = client.put("/api/config", json={"guardrails": {"min_vector_score": None}})
+
+    assert response.status_code == 200
+    guardrails = response.json()["guardrails"]
+    assert settings.retrieval_min_vector_score is None
+    assert guardrails["vector_threshold_source"] == "calibrated"
+    assert guardrails["min_vector_score"] == VECTOR_THRESHOLDS["text-embedding-3-small"]
+    assert guardrails["calibrated_min_vector_score"] == VECTOR_THRESHOLDS["text-embedding-3-small"]
+
+
+def test_null_vector_threshold_on_uncalibrated_model_disables_signal(calibrated_gate, monkeypatch) -> None:
+    from app.core.config import _INITIAL_SETTINGS
+
+    monkeypatch.setitem(_INITIAL_SETTINGS, "retrieval_min_vector_score", None)
+    monkeypatch.setattr(settings, "embedding_model", "unit-test-uncalibrated-embedding")
+    monkeypatch.setattr(settings, "retrieval_min_vector_score", 0.5)
+
+    guardrails = client.put("/api/config", json={"guardrails": {"min_vector_score": None}}).json()["guardrails"]
+
+    assert guardrails["vector_threshold_source"] == "uncalibrated"
+    assert guardrails["min_vector_score"] is None
+    assert guardrails["calibrated_min_vector_score"] is None
+
+
+def test_null_rerank_threshold_clears_override(calibrated_gate, monkeypatch) -> None:
+    from app.core.config import _INITIAL_SETTINGS
+    from app.generation.confidence import RERANK_THRESHOLDS
+
+    model = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+    monkeypatch.setitem(_INITIAL_SETTINGS, "retrieval_min_rerank_score", None)
+    monkeypatch.setattr(settings, "reranker_enabled", True)
+    monkeypatch.setattr(settings, "reranker_provider", "cross-encoder")
+    monkeypatch.setattr(settings, "reranker_model", model)
+    monkeypatch.setattr(settings, "retrieval_min_rerank_score", -0.5)
+    assert client.get("/api/config").json()["guardrails"]["rerank_threshold_source"] == "override"
+
+    guardrails = client.put("/api/config", json={"guardrails": {"min_rerank_score": None}}).json()["guardrails"]
+
+    assert settings.retrieval_min_rerank_score is None
+    assert guardrails["min_rerank_score"] == RERANK_THRESHOLDS[model]
+    assert guardrails["rerank_threshold_source"] == "calibrated"
+
+
+def test_omitted_thresholds_keep_overrides(calibrated_gate, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "retrieval_min_vector_score", 0.55)
+    monkeypatch.setattr(settings, "retrieval_min_rerank_score", -0.5)
+
+    response = client.put("/api/config", json={"retrieval": {"top_k": settings.retrieval_default_top_k}})
+
+    assert response.status_code == 200
+    assert settings.retrieval_min_vector_score == 0.55
+    assert settings.retrieval_min_rerank_score == -0.5
+    assert response.json()["guardrails"]["vector_threshold_source"] == "override"

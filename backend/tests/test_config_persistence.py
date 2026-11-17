@@ -316,3 +316,49 @@ def test_gate_thresholds_persist_without_freezing_echoed_vector_value(
 
     _simulate_restart()
     assert settings.retrieval_min_bm25_norm_score == norm
+
+
+def test_null_threshold_removes_override_row_and_survives_restart(
+    admin_client, config_store_db, monkeypatch
+) -> None:
+    monkeypatch.setitem(_INITIAL_SETTINGS, "retrieval_min_vector_score", None)
+    monkeypatch.setitem(_INITIAL_SETTINGS, "retrieval_min_rerank_score", None)
+    monkeypatch.setattr(settings, "retrieval_min_vector_score", None)
+    monkeypatch.setattr(settings, "retrieval_min_rerank_score", None)
+    monkeypatch.setattr(settings, "embedding_model", "text-embedding-3-small")
+    response = admin_client.put(
+        "/api/config", json={"guardrails": {"min_vector_score": 0.55, "min_rerank_score": -0.5}}
+    )
+    assert response.status_code == 200, response.text
+    rows = _rows(config_store_db)
+    assert rows["retrieval_min_vector_score"].value == 0.55
+    assert rows["retrieval_min_rerank_score"].value == -0.5
+
+    response = admin_client.put(
+        "/api/config", json={"guardrails": {"min_vector_score": None, "min_rerank_score": None}}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["guardrails"]["vector_threshold_source"] == "calibrated"
+    rows = _rows(config_store_db)
+    assert "retrieval_min_vector_score" not in rows
+    assert "retrieval_min_rerank_score" not in rows
+
+    _simulate_restart()
+    assert settings.retrieval_min_vector_score is None
+    assert settings.retrieval_min_rerank_score is None
+
+
+def test_omitted_threshold_keeps_saved_override(admin_client, config_store_db, monkeypatch) -> None:
+    monkeypatch.setitem(_INITIAL_SETTINGS, "retrieval_min_vector_score", None)
+    monkeypatch.setattr(settings, "retrieval_min_vector_score", None)
+    monkeypatch.setattr(settings, "embedding_model", "text-embedding-3-small")
+    admin_client.put("/api/config", json={"guardrails": {"min_vector_score": 0.55}})
+    norm = _different("retrieval_min_bm25_norm_score", 0.4, 0.45)
+
+    response = admin_client.put("/api/config", json={"guardrails": {"min_bm25_norm_score": norm}})
+    assert response.status_code == 200, response.text
+
+    rows = _rows(config_store_db)
+    assert rows["retrieval_min_vector_score"].value == 0.55
+    _simulate_restart()
+    assert settings.retrieval_min_vector_score == 0.55

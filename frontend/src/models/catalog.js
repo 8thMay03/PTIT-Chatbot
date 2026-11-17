@@ -168,7 +168,7 @@ const KEY_RULES = {
 export const KINDS = {
   llm: {
     key: "llm",
-    label: "LLM model",
+    label: "Mô hình ngôn ngữ (LLM)",
     title: "Sinh câu trả lời (LLM)",
     description:
       "Mô hình đọc các đoạn tài liệu tìm được và viết câu trả lời cho sinh viên. Đổi mô hình đang dùng có hiệu lực từ câu hỏi tiếp theo.",
@@ -176,7 +176,7 @@ export const KINDS = {
   },
   embedding: {
     key: "embedding",
-    label: "Embedding model",
+    label: "Mô hình nhúng (Embedding)",
     title: "Nhúng văn bản (Embedding)",
     description:
       "Mô hình biến câu hỏi và các đoạn tài liệu thành vector để tìm theo ngữ nghĩa. Đổi mô hình có hiệu lực sau khi khởi động lại backend và cần nạp lại toàn bộ tài liệu.",
@@ -184,7 +184,7 @@ export const KINDS = {
   },
   reranker: {
     key: "reranker",
-    label: "Rerank model",
+    label: "Mô hình xếp hạng lại (Reranker)",
     title: "Xếp hạng lại (Rerank)",
     description:
       "Sắp xếp lại các đoạn ứng viên theo mức liên quan trước khi đưa vào LLM. Đổi mô hình đang dùng có hiệu lực ngay.",
