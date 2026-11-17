@@ -3,8 +3,9 @@
 - Reviewer: `claude-agent`.
 - Hình thức: `self_review` (cùng agent triển khai; không phải review độc lập).
 - Trạng thái: `approved`.
-- Bản được review: `feat/settings-gate-savebar` tại `415afe3` (diff `a57e4b7..415afe3`).
-- Cập nhật lúc: `2026-11-16T00:06:27+07:00`.
+- Bản được review: `feat/settings-gate-savebar` tại `415afe3` (diff `a57e4b7..415afe3`); vòng 3 đối chiếu tại
+  `5d20891` (mã `backend/`, `frontend/` trùng `415afe3`, chỉ thêm nhật ký task và ảnh).
+- Cập nhật lúc: `2026-11-17T20:11:17+07:00`.
 
 ## Phạm vi và cơ sở đánh giá
 
@@ -73,16 +74,58 @@
 - Mức độ: `low`; bắt buộc: không.
 - Trạng thái: `deferred` — cần API trả danh sách override (gần với D-08), để giai đoạn 2.
 
+### R-07 — Ghi đè ngưỡng rerank bị ẩn khi máy chủ đang tắt reranker
+
+- Vị trí: `backend/app/generation/confidence.py` `thresholds_from_settings` (nhánh `not_applicable`),
+  `frontend/src/lib/configDraft.js` `valuesFromConfig` (`minRerankScore`), `ConfigView.jsx` `rerankApplies`.
+- Vấn đề: khi máy chủ tắt reranker (hoặc provider khác `cross-encoder`), response trả `min_rerank_score: null`,
+  `rerank_threshold_source: "not_applicable"` dù `settings.retrieval_min_rerank_score` vẫn giữ một ghi đè đã lưu. Bật
+  reranker trong bản nháp thì trường rerank hiện huy hiệu "Đã hiệu chỉnh cho <model>" với giá trị bảng hiệu chỉnh và
+  không có link bỏ ghi đè; sau khi lưu, gate thực tế dùng ghi đè ẩn.
+- Tác động: hiển thị sai ngưỡng cho tới khi lưu xong (response sau lưu trả `override` đúng); không xoá được ghi đè ẩn
+  trong cùng lần lưu. Cần đủ ba điều kiện: từng ghi đè rerank, reranker đang tắt, bật lại ở form này.
+- Mức độ: `low`; bắt buộc: không; người xử lý: `claude-agent`.
+- Hướng sửa: backend trả thêm ghi đè thô (ví dụ `min_rerank_score_override`) bất kể có áp dụng hay không, và
+  `valuesFromConfig` đọc trường đó.
+- Trạng thái: `deferred` — gom vào task `2026-11-15-settings-nav-retrieval-test` (cùng sửa nhóm ngưỡng).
+
+### R-08 — Cảnh báo nguồn ngưỡng hiện khi không đọc được `/config`
+
+- Vị trí: `ConfigView.jsx` `uncalibratedWarning`, dòng `gate-rerank-na`; `calibratedFromConfig(undefined)`.
+- Vấn đề: GET `/config` lỗi thì `calibrated` là `{ vector: null, rerank: null }`, form hiện "Chưa hiệu chỉnh cho mô hình
+  hiện tại: chatbot đang bỏ qua tín hiệu này" và "không áp dụng với reranker hiện tại" — khẳng định về trạng thái máy
+  chủ mà giao diện không biết.
+- Tác động: thấp; alert đầu trang đã nói giá trị bên dưới là mặc định giao diện.
+- Mức độ: `low`; bắt buộc: không.
+- Hướng sửa: ẩn huy hiệu/cảnh báo nguồn ngưỡng khi `!configQuery.data`.
+- Trạng thái: `deferred` — cùng hướng theo dõi R-07.
+
+### R-09 — Thanh trượt và ô số ngưỡng lệch nhau
+
+- Vị trí: `ConfigView.jsx` `#cfg-minvec` (0.1–0.8) so với `#cfg-minvec-number` (0–1); `#cfg-minrerank` (−10…10) so với
+  `#cfg-minrerank-number` (−20…20); `parseThreshold`.
+- Vấn đề: ghi đè ngoài khoảng thanh trượt (ví dụ 0.9) làm thanh kẹt ở đầu mút, chạm thanh thì giá trị nhảy về mút.
+  Xoá hết chữ trong ô số thì bản nháp giữ giá trị cũ (đúng D-3) nhưng ô hiện rỗng trong khi thanh lưu vẫn ghi giá trị
+  cũ, tới lần render sau.
+- Mức độ: `low`; bắt buộc: không.
+- Hướng sửa: cùng khoảng cho thanh và ô (hoặc nới thanh theo giá trị hiện tại); khôi phục chữ trong ô khi `blur`.
+- Trạng thái: `deferred`.
+
 ## Lịch sử các vòng review
 
 - Vòng 1 (`026b8d0`): R-01 … R-06 mở; R-05 bắt buộc → `changes_requested`.
 - Vòng 2 (`415afe3`): R-05 `resolved` với bằng chứng; R-04 `resolved` (quyết định ghi nhận); còn lại `deferred`,
   không bắt buộc → `approved`.
+- Vòng 3 (`5d20891`, `2026-11-17T20:11:17+07:00`, phiên làm việc mới, vẫn `self_review`): đọc lại toàn bộ diff
+  `a57e4b7..415afe3` (backend `update_runtime_config` + thứ tự áp `reranker` trước `guardrails`, `exclude_unset` ở
+  route; `configDraft.js`, `SaveBar.jsx`, `ConfigView.jsx`, CSS không có màu cứng), chạy lại `npx vitest run` 303/303
+  (37 file), `npm run build` OK, `python -m pytest` 1346 passed / 24 skipped; xem ảnh `after-desktop-dark-gate.png`,
+  `after-mobile-light-top.png`. Thêm R-07, R-08, R-09 (đều `low`, không bắt buộc, `deferred`). Giữ `approved`.
 
 ## Kết luận
 
-- Kết luận: `approved` (self_review) trên `415afe3`.
+- Kết luận: `approved` (self_review) trên `415afe3`; xác nhận lại ở vòng 3 trên `5d20891`.
 - Nhận xét bắt buộc còn mở: không.
-- Nhận xét hoãn lại: R-01, R-02, R-03, R-06 (đều `low`).
+- Nhận xét hoãn lại: R-01, R-02, R-03, R-06, R-07, R-08, R-09 (đều `low`).
 - Phần chưa review / giới hạn: chưa có review độc lập; chưa kiểm backend thật + Postgres; chưa kiểm trình đọc màn hình.
 - Bước tiếp theo: coordinator push nhánh và mở PR vào `dev` khi người dùng đồng ý.
