@@ -5,7 +5,7 @@
 - Coordinator: `claude-agent`
 - Người yêu cầu: người dùng ("tạo task cải thiện đi", sau tài liệu nghiên cứu màn Cài đặt)
 - Tạo lúc: `2026-11-15T23:42:56+07:00`
-- Cập nhật lúc: `2026-11-17T21:11:00+07:00`
+- Cập nhật lúc: `2026-11-17T21:13:30+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -136,7 +136,7 @@ Mockup tham chiếu: `docs/design/mockups/settings-proposed.html` khung A.
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: đã triển khai trên nhánh `feat/settings-nav-retrieval-test` (commit `7e38867`); toàn bộ AC đạt,
+- Tóm tắt: đã triển khai trên nhánh `feat/settings-nav-retrieval-test` (commit `7e38924`); toàn bộ AC đạt,
   `verification.md` trạng thái `passed`, `review.md` kết luận `approved` (self-review).
 - Blocker: không có.
 - Bước tiếp theo: mở PR vào `dev` khi người dùng yêu cầu; theo dõi R-01/R-02 (không bắt buộc).
@@ -147,3 +147,5 @@ Mockup tham chiếu: `docs/design/mockups/settings-proposed.html` khung A.
   đoạn 3) vì thuộc header bố cục mới và cùng file với task này; trạng thái `ready`, phụ thuộc task giai đoạn 1.
 - `2026-11-17T21:11:00+07:00` — `claude-agent`: xác nhận `2026-11-15-settings-gate-savebar` đã merge qua PR #71; tách
   nhánh từ `dev` `08f90bb`, hoàn thành S-01 … S-05; `AC-01` … `AC-07` đạt; chuyển trạng thái `done`.
+- `2026-11-17T21:13:30+07:00` — `claude-agent`: thêm dấu "—" vào dòng mô hình cho đúng câu chữ AC-03; chạy lại toàn
+  bộ kiểm tra frontend, `verification.md` và `review.md` xác nhận trên `7e38924`.

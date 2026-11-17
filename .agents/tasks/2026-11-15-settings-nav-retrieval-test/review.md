@@ -3,14 +3,14 @@
 - Reviewer: `claude-agent`.
 - Hình thức: `self_review` (chỉ một agent trong phiên).
 - Trạng thái: `approved`.
-- Bản được review: nhánh `feat/settings-nav-retrieval-test`, commit `7e38867`
+- Bản được review: nhánh `feat/settings-nav-retrieval-test`, commit `7e38924`
   (tách từ `dev` `08f90bb`).
-- Cập nhật lúc: `2026-11-17T21:11:00+07:00`.
+- Cập nhật lúc: `2026-11-17T21:13:30+07:00`.
 
 ## Phạm vi và cơ sở đánh giá
 
 - Yêu cầu/tiêu chí: `AC-01` … `AC-07`; `S-01` … `S-05`.
-- File/thay đổi đã đọc: toàn bộ diff `dev..7e38867` (backend config store/route/schema
+- File/thay đổi đã đọc: toàn bộ diff `dev..7e38924` (backend config store/route/schema
   và test; route/SettingsView/SettingsNav/ConfigView/ModelsView/RetrievalTestPanel/
   gateDecision/retrieval API/CSS và test; ảnh chụp).
 - Bằng chứng kiểm chứng: `verification.md` V-01 … V-07, gồm test tự động, đo Chromium
@@ -46,9 +46,13 @@
 
 ## Lịch sử các vòng review
 
-- `2026-11-17T21:11:00+07:00` — vòng 1, `self_review` trên `7e38867`: đối chiếu
-  `AC-01` … `AC-07`, đọc diff và bằng chứng; không có nhận xét bắt buộc. Kết luận
-  `approved`.
+- `2026-11-17T21:11:00+07:00` — vòng 1, `self_review` trên bản `7e38867` (nay là
+  `7e38924` sau khi thêm dấu "—"): đối chiếu `AC-01` … `AC-07`, đọc diff và bằng chứng;
+  không có nhận xét bắt buộc. Kết luận `approved`.
+- `2026-11-17T21:13:30+07:00` — vòng 2, `self_review` trên `7e38924`: chỉ thêm dấu
+  "—" giữa tên mô hình và link "Đổi mô hình →" cho đúng AC-03; đọc lại dòng mô hình,
+  chạy lại `npm test`/`npm run build`/`npm run check:bundle` (đều đạt), không phát sinh
+  nhận xét. Giữ kết luận `approved`.
 
 ## Kết luận
 

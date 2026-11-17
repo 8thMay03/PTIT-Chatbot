@@ -2,12 +2,12 @@
 
 - Verifier: `claude-agent`.
 - Trạng thái tổng: `passed`.
-- Bản được kiểm tra: nhánh `feat/settings-nav-retrieval-test`, commit `7e38867`
+- Bản được kiểm tra: nhánh `feat/settings-nav-retrieval-test`, commit `7e38924`
   (tách từ `dev` `08f90bb`).
 - Môi trường: Windows 11; Node 24.14.0 (Vitest 3.2.7, Vite 5.4.21); Python 3.11.5
   trong `backend/.venv`; Chromium 1234 qua `playwright-core` 1.57.0, API giả lập
   (`/api/**`), dev server Vite `127.0.0.1:5173`.
-- Thời điểm: `2026-11-17T21:10:00+07:00`.
+- Thời điểm: `2026-11-17T21:13:30+07:00`.
 
 ## Kiểm chứng tiêu chí
 
@@ -110,7 +110,8 @@
 
 ### V-07 — AC-07
 
-- Lệnh và kết quả cuối trên commit `7e38867`:
+- Lệnh và kết quả cuối trên commit `7e38924` (chạy lại sau khi thêm dấu "—" vào dòng
+  mô hình):
   - `npm test` (`frontend/`): **42 file, 343/343 test passed**.
   - `npm run build` (`frontend/`): thành công (`✓ built in 2.41s`).
   - `npm run check:bundle` (`frontend/`): **đạt**; JS ban đầu trang chat 84.49 kB gzip,

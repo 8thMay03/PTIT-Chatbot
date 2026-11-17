@@ -4,7 +4,7 @@
 
 - Nhánh `feat/settings-nav-retrieval-test`, tách từ `dev` tại `08f90bb` (sau khi
   `2026-11-15-settings-gate-savebar` merge qua PR #71).
-- Commit triển khai: `7e38867` — `feat: add settings navigation and retrieval test panel`.
+- Commit triển khai: `7e38924` — `feat: add settings navigation and retrieval test panel`.
 - Hoàn thành S-01 … S-04; S-05 ghi bằng chứng trong `verification.md`.
 - Working tree còn thay đổi không liên quan của người dùng:
   `data/Sổ tay sinh viên D26 _1_.pdf` bị xoá và các task/tài liệu nghiên cứu chưa
@@ -107,7 +107,7 @@
 ## Bàn giao
 
 - Nhiệm vụ đã làm: S-01 … S-05.
-- File/commit: nhánh `feat/settings-nav-retrieval-test`, commit `7e38867`; ảnh trong
+- File/commit: nhánh `feat/settings-nav-retrieval-test`, commit `7e38924`; ảnh trong
   `docs/design/assets/settings-nav-retrieval-test/`.
 - Hợp đồng ảnh hưởng agent khác:
   - `readAdminRoute`/`adminRouteHash` dùng `section` thay cho `tab`.
