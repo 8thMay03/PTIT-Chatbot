@@ -182,5 +182,5 @@
 - Nhận xét hoãn lại: `R-01`, `R-02` (không bắt buộc, đã có hướng theo dõi).
 - Phần chưa review / giới hạn: không chạy `POST /retrieval/test` với backend thật và dữ
   liệu thật; không kiểm tra trình duyệt ngoài Chromium.
-- Bước tiếp theo: mở PR vào `dev` khi người dùng yêu cầu. R-05/R-07/R-08 theo dõi ngoài task này
+- Bước tiếp theo: chờ merge PR #72 vào `dev`. R-05/R-07/R-08 theo dõi ngoài task này
   (không bắt buộc).

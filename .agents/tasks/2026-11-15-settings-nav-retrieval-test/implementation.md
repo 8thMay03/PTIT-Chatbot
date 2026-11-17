@@ -148,5 +148,5 @@
   - `FullConfigResponse.updated_at` là chuỗi ISO 8601 có múi giờ hoặc `null`.
   - `SettingsView` nhận `section`, `onSectionChange`, `onBackToList`.
 - Kiểm tra đã chạy: xem `verification.md`.
-- Phần chưa xong: không có trong phạm vi; chưa mở PR (người dùng chưa yêu cầu).
+- Phần chưa xong: không có trong phạm vi. Đã mở PR #72 vào `dev` (https://github.com/8thMay03/PTIT-Chatbot/pull/72).
 - Người nhận: reviewer; bước tiếp theo: review diff nhánh và kết luận.

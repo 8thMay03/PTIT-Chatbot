@@ -5,7 +5,7 @@
 - Coordinator: `claude-agent`
 - Người yêu cầu: người dùng ("tạo task cải thiện đi", sau tài liệu nghiên cứu màn Cài đặt)
 - Tạo lúc: `2026-11-15T23:42:56+07:00`
-- Cập nhật lúc: `2026-11-17T21:38:29+07:00`
+- Cập nhật lúc: `2026-11-17T21:42:33+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -140,7 +140,7 @@ Mockup tham chiếu: `docs/design/mockups/settings-proposed.html` khung A.
   R-03, R-04, R-06 ở commit `6cc36b7`. `AC-01` … `AC-07` đạt (`verification.md` `passed`); review vòng 5
   `approved` (`self_review`) trên `6cc36b7`.
 - Blocker: không có.
-- Bước tiếp theo: mở PR vào `dev` khi người dùng yêu cầu. Nhận xét không bắt buộc còn mở: R-05;
+- Bước tiếp theo: chờ merge PR #72 vào `dev`. Nhận xét không bắt buộc còn mở: R-05;
   R-07/R-08 chờ người dùng quyết định.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
@@ -159,3 +159,5 @@ Mockup tham chiếu: `docs/design/mockups/settings-proposed.html` khung A.
   Chuyển `in_review`, chờ commit trước khi `done`.
 - `2026-11-17T21:38:29+07:00` — `claude-agent`: người dùng yêu cầu commit và đóng task. Commit bản sửa `6cc36b7`; review
   `approved` vẫn hiệu lực vì commit chỉ gồm các file đã review. Chuyển trạng thái `done`.
+- `2026-11-17T21:42:33+07:00` — `claude-agent`: đẩy nhánh và mở PR #72 vào `dev`
+  (https://github.com/8thMay03/PTIT-Chatbot/pull/72).
