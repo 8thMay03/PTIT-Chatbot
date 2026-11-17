@@ -7,7 +7,7 @@ Nhánh: `feat/student-error-copy`, tách từ `dev` tại `f914187` (lúc soạn
 ### S-01 — Tách câu chữ lỗi cho sinh viên và quản trị
 
 - Agent: `claude-code`
-- Trạng thái: `in_review`
+- Trạng thái: `done`
 - Mục tiêu: thêm bộ ngữ cảnh lỗi cho sinh viên (bao gồm thay chuỗi lỗi mạng mặc định), truyền qua prop từ `App.jsx`; admin giữ ngữ cảnh hiện có; thêm nút "Thử lại" ở sidebar; chọn biểu tượng theo `kind` của `describeError`; phục vụ `AC-01`..`AC-05`.
 - Phạm vi file được sửa: `frontend/src/ChatView.jsx` (`CHAT_ERROR_CONTEXT`, bubble lỗi), `frontend/src/App.jsx`, `frontend/src/admin/AdminShell.jsx` (chỉ truyền prop), `frontend/src/components/ConversationList.jsx`, có thể `frontend/src/api/errors.js` (thêm preset, không đổi mặc định), test (`ChatView.test.jsx`, `App.test.jsx` hoặc test mới cho `ConversationList`), CSS nút thử lại nếu cần.
 - Phụ thuộc: không có.

@@ -21,7 +21,7 @@
   - `ConversationList` đặt câu riêng của sidebar trước `errorContext`. `STUDENT_ERROR_CONTEXT` không có `fallbackTitle`, nên tiêu đề "Không tải được lịch sử hội thoại" vẫn còn.
   - `loadConversation` thêm `errorContext` vào deps của `useCallback`. `App` truyền hằng module nên không gây render lại.
   - Mã tham chiếu 5xx vẫn hiện nhờ nhánh "Chi tiết từ máy chủ" (có test).
-- Giao diện: nút thử lại dùng tông trắng mờ giống `.conv-empty`/`.conv-icon-btn` trên nền sidebar; nền sidebar giữ màu thương hiệu ở cả hai chủ đề. Chưa xem bằng mắt trong trình duyệt (xem V-03).
+- Giao diện: nút thử lại dùng tông trắng mờ giống `.conv-empty`/`.conv-icon-btn` trên nền sidebar; nền sidebar giữ màu thương hiệu ở cả hai chủ đề. Vòng 1 chưa xem bằng mắt. Ngày `2026-11-17` đã xem ảnh chụp Chromium ở chủ đề sáng và tối (V-03 lần 2): chữ đọc được, viền focus trắng 2px thấy rõ.
 - Truy cập: nút "Thử lại" là `<button type="button">` có nhãn chữ; biểu tượng `aria-hidden`; nút bị khoá khi đang tải lại để tránh bấm lặp. Biểu tượng bubble lỗi cũng `aria-hidden`; nội dung đọc vẫn nằm trong `role="alert"` như trước.
 - Ngoài phạm vi: `AdminShell.jsx` không đổi. Thông báo ở khung nhập cũng đổi theo ngữ cảnh sinh viên (D-02); đây là điều kiện để AC-01 đúng trên thực tế.
 
@@ -34,11 +34,12 @@
 ## Lịch sử các vòng review
 
 - `2026-11-15T22:00:54+07:00`: vòng 1, self_review: `approved`.
+- `2026-11-17T21:45:48+07:00`: không có thay đổi mã sau vòng 1. PR #70 đã merge vào `dev`, nội dung đúng là `4a3f1a5`. Đối chiếu thêm kết quả thủ công V-03 lần 2 (bàn phím, chủ đề sáng/tối): khớp với đánh giá vòng 1, không có nhận xét mới. Giữ `approved`.
 
 ## Kết luận
 
 - Kết luận: `approved` (self_review).
 - Nhận xét bắt buộc còn mở: không có.
 - Nhận xét hoãn lại: R-01, R-02, R-03 (đều `low`, không bắt buộc; lý do ở bảng trên).
-- Phần chưa review / giới hạn: chưa quan sát giao diện và thao tác bàn phím trong trình duyệt thật.
-- Bước tiếp theo: người yêu cầu thử thủ công và merge PR #70 (https://github.com/8thMay03/PTIT-Chatbot/pull/70).
+- Phần chưa review / giới hạn: đây là self_review, không phải review độc lập. Sidebar `/chat` đã kiểm tra trong trình duyệt thật (V-03 lần 2); bubble lỗi khung chat chỉ có bằng chứng vitest.
+- Bước tiếp theo: không còn. PR #70 đã merge; R-01 nên được theo dõi trong task riêng.

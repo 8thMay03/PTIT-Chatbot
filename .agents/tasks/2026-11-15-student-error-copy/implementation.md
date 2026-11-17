@@ -30,6 +30,10 @@ S-01 đã triển khai trên nhánh `feat/student-error-copy` (tách từ `dev` 
   - D-04: không đổi hành vi 429. Detail của backend (đã viết cho người dùng) vẫn được ưu tiên; câu `rateLimitDetail` của sinh viên chỉ dùng khi không có detail.
 - Kiểm tra đã chạy: `npx vitest run src/errorCopy.test.jsx`, `npx vitest run src/api/errors.test.js`, `npm test`, `npm run build`. Đều pass, chi tiết trong `verification.md`. Đã dùng curl xác nhận proxy Vite trả `500 text/plain` body rỗng khi backend tắt, khớp kịch bản 500 trong test.
 - Còn lại/blocker: kiểm tra thủ công Tab/Enter trong trình duyệt chưa chạy (extension Chrome không kết nối).
+- Cập nhật `2026-11-17T21:45:48+07:00`:
+  - PR #70 đã merge vào `dev` (`2026-11-15T15:36:49Z`).
+  - Đã chạy phần thủ công còn lại trên `dev` @ `589ed56` bằng Chromium (Playwright): Tab tới "Thử lại", nhấn Enter/Space, ở chủ đề sáng và tối. Kết quả pass, xem V-03 lần 2.
+  - Không sửa mã. Chỉ cập nhật năm file task.
 
 ## Phát hiện ngoài phạm vi
 
@@ -45,5 +49,5 @@ Chưa có thông báo (một agent làm toàn bộ).
 - Nhánh/commit: `feat/student-error-copy`, mã ở `4a3f1a5`; bản ghi task commit riêng ngay sau đó (`f8e09fe`). Đã push và mở PR #70 (https://github.com/8thMay03/PTIT-Chatbot/pull/70) vào `dev`.
 - Giao diện ảnh hưởng: prop tuỳ chọn `errorContext` của `ChatView`/`ConversationList`; export `STUDENT_ERROR_CONTEXT`; option mới của `describeError`.
 - Kiểm tra: xem `verification.md` (V-01..V-05).
-- Chưa xong: thử thủ công bằng bàn phím (V-03, phần thủ công).
-- Người nhận: `8thMay03`. Bước tiếp theo: thử thủ công, review và merge PR #70 (https://github.com/8thMay03/PTIT-Chatbot/pull/70).
+- Chưa xong: không còn. Phần thủ công V-03 đã chạy ngày `2026-11-17`; PR #70 đã merge.
+- Người nhận: `8thMay03`. Bước tiếp theo: cân nhắc tạo task riêng cho F-01/R-01.

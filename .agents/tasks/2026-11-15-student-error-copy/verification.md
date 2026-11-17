@@ -1,9 +1,9 @@
 # Verification: 2026-11-15-student-error-copy
 
 - Verifier: `claude-code` (cùng agent triển khai).
-- Trạng thái tổng: `passed` cho phần tự động; phần thủ công của V-03 `not_run`.
-- Bản được kiểm tra: nhánh `feat/student-error-copy`, commit `4a3f1a5`.
-- Môi trường: Windows 11, Node + Vitest (jsdom) trong `frontend/`. Không chạy được trình duyệt thật vì extension Claude in Chrome không kết nối.
+- Trạng thái tổng: `passed` (cả phần tự động và phần thủ công của V-03).
+- Bản được kiểm tra: nhánh `feat/student-error-copy`, commit `4a3f1a5` (V-01..V-05 tự động). Phần thủ công của V-03 chạy lại trên `dev` @ `589ed56`, đã chứa PR #70 (merge lúc `2026-11-15T15:36:49Z`).
+- Môi trường: Windows 11, Node + Vitest (jsdom) trong `frontend/`. Phần thủ công V-03: Chromium 1234 (Playwright) điều khiển bằng `playwright-core` 1.57.0, Vite dev server, mock `/api/**`.
 
 ## Kiểm chứng tiêu chí
 
@@ -40,9 +40,15 @@
 - Lệnh / thao tác: nhóm "nút Thử lại ở sidebar (AC-03)". Lần gọi list đầu lỗi 500, lần sau trả một hội thoại. Test kiểm tra nút, `focus()`, bấm, rồi đếm số lần gọi list. Trang quản trị cũng có nút.
 - Kỳ vọng: nút hiện, focus được, gọi lại query.
 - Kết quả thực tế: tự động pass. Nút là `<button type="button">` không bị khoá, nhận focus (`document.activeElement`). Sau khi bấm, list được gọi lần 2, lỗi biến mất và danh sách hiện "Học phí kỳ 1".
-  - Phần thủ công (Tab/Enter trong trình duyệt): `not_run`, vì extension Chrome không kết nối. Nút là `<button>` gốc nên Enter/Space kích hoạt theo mặc định của trình duyệt, và viền focus theo quy tắc `.sidebar :focus-visible` có sẵn. Hai điều này chưa được quan sát trực tiếp.
-- Trạng thái: `passed` (tự động); thủ công `not_run`.
-- Bằng chứng: như V-01.
+  - Phần thủ công (Tab/Enter trong trình duyệt), lần 1 (`2026-11-15`): `not_run`, vì extension Chrome không kết nối.
+  - Phần thủ công, lần 2 (`claude-code`, `2026-11-17T21:45:48+07:00`, `dev` @ `589ed56`): mở `/chat` trong Chromium thật. Lần gọi `GET /api/conversations` đầu trả `500 text/plain` body rỗng (giống proxy Vite khi backend tắt), lần sau trả một hội thoại "Học phí kỳ 1". Từ cuối trang, nhấn Tab cho tới khi "Thử lại" có focus, rồi nhấn phím. Chạy 4 tổ hợp: chủ đề sáng/tối × Enter/Space.
+- Kết quả phần thủ công lần 2, giống nhau ở cả 4 tổ hợp:
+  - Sidebar hiện "Máy chủ gặp sự cố. Hệ thống đang gặp sự cố tạm thời. Vui lòng thử lại sau ít phút. Nếu lỗi lặp lại, hãy báo quản trị viên." và nút "Thử lại".
+  - Nút nhận focus sau 13 lần Tab, khớp `:focus-visible`, viền `solid 2px rgb(255, 255, 255)`.
+  - Sau Enter hoặc Space, list được gọi lần 2, nút biến mất và danh sách hiện "Học phí kỳ 1".
+  - Ảnh chụp sidebar khi đang focus: viền trắng thấy rõ trên nền thương hiệu ở cả hai chủ đề. Ảnh tối đầu tiên bị mờ, lệch vì chụp khi animation vào trang chưa xong; chụp lại sau 1,5 s thì bình thường.
+- Trạng thái: `passed` (tự động và thủ công).
+- Bằng chứng: như V-01 cho phần tự động. Phần thủ công: script Playwright `retry.cjs` trong scratchpad của phiên (không commit), kết thúc `exit=0`, 4/4 tổ hợp `focused`, `focusVisible`, `recovered` đều `true`, `listCalls = 2`.
 
 ### V-04 — AC-04
 
@@ -70,10 +76,10 @@
 
 - Lần chạy đầu `src/errorCopy.test.jsx`: 6 test "mở hội thoại" thất bại vì bubble lỗi bị màn chào che khi chưa có `conversationId` (F-01 / R-01, lỗi có từ trước). Đã sửa test để mở một lượt chat trước; chạy lại pass.
 - Kiểm tra proxy khi backend tắt: chạy Vite tạm ở cổng 5287 với `VITE_PROXY_TARGET=http://localhost:59999`; `curl /api/conversations` trả `HTTP/1.1 500`, `Content-Type: text/plain`, body rỗng. Sau đó đã dừng tiến trình.
-- Chưa xác minh: thao tác bàn phím và giao diện sáng/tối trong trình duyệt thật.
+- Thao tác bàn phím và giao diện sáng/tối của sidebar `/chat`: đã xác minh trong Chromium ở V-03 lần 2 (`2026-11-17`).
+- Chưa xác minh trong trình duyệt thật: bubble lỗi của khung chat (đã có vitest ở V-01, V-04) và trang `/admin`. Hai phần này không đổi từ lần kiểm tra tự động.
 
 ## Kết luận
 
-- Tiêu chí đã đạt: `AC-01`, `AC-02`, `AC-04`, `AC-05`; `AC-03` đạt phần tự động.
-- Tiêu chí chưa đạt/chưa xác minh: phần thủ công của `AC-03` (Tab/Enter).
-- Đề xuất: người yêu cầu thử nhanh `/chat` khi tắt backend: Tab tới "Thử lại" ở sidebar rồi Enter.
+- Tiêu chí đã đạt: `AC-01`, `AC-02`, `AC-03` (tự động và thủ công), `AC-04`, `AC-05`.
+- Tiêu chí chưa đạt/chưa xác minh: không có.

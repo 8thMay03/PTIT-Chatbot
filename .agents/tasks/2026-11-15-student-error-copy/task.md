@@ -1,11 +1,11 @@
 # Task: Thông báo lỗi hiển thị cho sinh viên đang viết cho lập trình viên
 
 - ID: `2026-11-15-student-error-copy`
-- Trạng thái: `in_review`
+- Trạng thái: `done`
 - Coordinator: `claude-code`
 - Người yêu cầu: `8thMay03`
 - Tạo lúc: `2026-11-15T11:06:17+07:00`
-- Cập nhật lúc: `2026-11-15T22:00:54+07:00`
+- Cập nhật lúc: `2026-11-17T21:45:48+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -54,12 +54,13 @@ Kết quả cần có: ở trang sinh viên, thông báo lỗi không nhắc chi
 
 ## Trạng thái hiện tại
 
-- Tóm tắt: S-01 đã triển khai trên nhánh `feat/student-error-copy` (nền `f914187`, commit mã `4a3f1a5`). `npm test` (36 file, 275 test) và `npm run build` pass; self_review `approved`. Chưa chạy được bước thủ công Tab/Enter trong trình duyệt vì extension Chrome không kết nối (xem V-03).
+- Tóm tắt: S-01 đã triển khai trên nhánh `feat/student-error-copy` (nền `f914187`, commit mã `4a3f1a5`) và merge vào `dev` qua PR #70 (https://github.com/8thMay03/PTIT-Chatbot/pull/70). `npm test` (36 file, 275 test) và `npm run build` pass. Phần thủ công Tab/Enter/Space ở chủ đề sáng và tối đã chạy trong Chromium ngày `2026-11-17` (V-03 lần 2). self_review `approved`.
 - Blocker: không có.
-- Bước tiếp theo: người yêu cầu thử thủ công nút "Thử lại" bằng bàn phím (V-03), merge PR #70 (https://github.com/8thMay03/PTIT-Chatbot/pull/70) vào `dev`, rồi đóng task. Cân nhắc tạo task riêng cho R-01 (bubble lỗi mở hội thoại bị màn chào che).
+- Bước tiếp theo: không còn. Cân nhắc tạo task riêng cho R-01 (bubble lỗi mở hội thoại bị màn chào che).
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
 - 2026-11-15T11:06:17+07:00 — claude-code: tạo task `draft` từ kết quả rà soát giao diện ngày 2026-11-15 theo yêu cầu "với mỗi lỗi hãy tạo 1 task".
 - 2026-11-15T21:59:54+07:00 — claude-code: người yêu cầu giao triển khai; chốt Q-01, Q-02 theo đề xuất mặc định; chuyển `in_progress`, nhận S-01.
 - 2026-11-15T22:00:54+07:00 — claude-code: S-01 xong, kiểm chứng tự động đạt, self_review `approved`; chuyển `in_review`. Phạm vi mở rộng nhỏ: thông báo ở khung nhập (composer alert) cũng dùng ngữ cảnh sinh viên vì phần lớn lỗi 404/5xx/429/mạng trước event `start` hiện ở đó chứ không ở bubble.
+- 2026-11-17T21:45:48+07:00 — claude-code: PR #70 đã merge. Đã chạy phần thủ công còn lại của V-03 trong Chromium và kết quả pass; mọi `AC-*` có bằng chứng; review giữ `approved`. Chuyển `done`.
