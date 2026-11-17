@@ -332,3 +332,50 @@ def test_omitted_thresholds_keep_overrides(calibrated_gate, monkeypatch) -> None
     assert settings.retrieval_min_vector_score == 0.55
     assert settings.retrieval_min_rerank_score == -0.5
     assert response.json()["guardrails"]["vector_threshold_source"] == "override"
+
+
+def test_query_rewrite_toggle_round_trips() -> None:
+    original = settings.query_rewrite_use_llm
+    try:
+        response = client.put("/api/config", json={"retrieval": {"query_rewrite_use_llm": True}})
+        assert response.status_code == 200
+        assert response.json()["retrieval"]["query_rewrite_use_llm"] is True
+        assert client.get("/api/config").json()["retrieval"]["query_rewrite_use_llm"] is True
+        assert settings.query_rewrite_use_llm is True
+    finally:
+        settings.query_rewrite_use_llm = original
+
+
+def test_get_config_updated_at_is_null_then_iso_with_timezone(calibrated_gate, monkeypatch) -> None:
+    from datetime import datetime
+
+    from app.core import config_store
+    from app.core.config import _INITIAL_SETTINGS
+
+    monkeypatch.setitem(_INITIAL_SETTINGS, "retrieval_default_top_k", 4)
+    monkeypatch.setattr(settings, "retrieval_default_top_k", 4)
+    monkeypatch.setattr(config_store, "_now_iso", lambda: "2026-11-17T01:00:00+00:00")
+
+    assert client.get("/api/config").json()["updated_at"] is None
+
+    updated_at = client.put("/api/config", json={"retrieval": {"top_k": 7}}).json()["updated_at"]
+    parsed = datetime.fromisoformat(updated_at)
+    assert parsed.tzinfo is not None
+    assert parsed.isoformat() == "2026-11-17T01:00:00+00:00"
+
+
+def test_reset_config_returns_new_updated_at(calibrated_gate, monkeypatch) -> None:
+    from datetime import datetime
+
+    from app.core import config_store
+    from app.core.config import _INITIAL_SETTINGS
+
+    monkeypatch.setitem(_INITIAL_SETTINGS, "retrieval_default_top_k", 4)
+    monkeypatch.setattr(settings, "retrieval_default_top_k", 4)
+    stamps = iter(["2026-11-17T02:00:00+00:00", "2026-11-17T02:05:00+00:00"])
+    monkeypatch.setattr(config_store, "_now_iso", lambda: next(stamps))
+
+    client.put("/api/config", json={"retrieval": {"top_k": 7}})
+    reset = client.post("/api/config/reset").json()
+
+    assert datetime.fromisoformat(reset["updated_at"]).isoformat() == "2026-11-17T02:05:00+00:00"

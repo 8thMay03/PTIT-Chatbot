@@ -273,16 +273,47 @@ describe("ConfigView — ngưỡng tin cậy, thanh lưu, vùng nguy hiểm", ()
       expect(vectorGroup().querySelector("#cfg-minvec-number").value).toBe("0.37");
       expect(saveBar()).toBeNull();
     });
+
+    it("công tắc Viết lại câu hỏi bằng LLM gửi query_rewrite_use_llm", async () => {
+      await render(baseConfig());
+
+      const toggle = container.querySelector('button[aria-labelledby="cfg-rewrite-label"]');
+      expect(toggle.getAttribute("aria-checked")).toBe("false");
+      await click(toggle);
+      expect(toggle.getAttribute("aria-checked")).toBe("true");
+      await click(buttonByText(saveBar(), "Lưu"));
+      await waitFor(() => putBodies.length === 1);
+
+      expect(putBodies[0]).toEqual({ retrieval: { query_rewrite_use_llm: true } });
+    });
+
+    it("dòng mô hình của Xếp hạng lại và Sinh câu trả lời dẫn tới mục mô hình", async () => {
+      await render(baseConfig({ reranker: { provider: "cross-encoder" } }));
+
+      const links = [...container.querySelectorAll(".config-model-link")].map((link) => [
+        link.textContent.trim(),
+        link.getAttribute("href"),
+      ]);
+      expect(links).toEqual([
+        ["Đổi mô hình →", "#settings/models-reranker"],
+        ["Đổi mô hình →", "#settings/models-llm"],
+      ]);
+    });
   });
 
   describe("thanh lưu và trường đã sửa (AC-04)", () => {
-    it("không có thay đổi thì không có thanh lưu; header không còn nút lưu/mặc định", async () => {
+    it("không có thay đổi thì không có thanh lưu; form không còn header panel riêng", async () => {
       await render(baseConfig());
 
       expect(saveBar()).toBeNull();
-      const header = container.querySelector(".settings-subtabs-header");
-      expect(header.querySelectorAll("button")).toHaveLength(0);
+      expect(container.querySelector(".settings-subtabs-header")).toBeNull();
       expect(container.querySelector(".unsaved-badge")).toBeNull();
+      expect([...container.querySelectorAll(".config-section")].map((node) => node.id)).toEqual([
+        "settings-section-retrieval",
+        "settings-section-reranker",
+        "settings-section-gate",
+        "settings-section-generation",
+      ]);
     });
 
     it("đếm số thay đổi, tóm tắt cũ→mới và đánh dấu từng trường", async () => {

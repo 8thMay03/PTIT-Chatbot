@@ -108,42 +108,65 @@ export function legacyHashToAdmin(hash) {
   const route = String(hash || "").replace(/^#\/?/, "");
   if (!route) return null;
   if (route === "documents") return "/admin#documents";
-  if (route === "config") return "/admin#settings/config";
-  if (route === "models") return "/admin#settings/models";
+  if (route === "config") return "/admin#settings/retrieval";
+  if (route === "models") return "/admin#settings/models-llm";
   if (route === "settings" || route.startsWith("settings/")) {
-    const tab = route.split("/")[1];
+    const tab = route === "settings" ? "retrieval" : route.split("/")[1];
     if (tab === "appearance") return null;
-    return `/admin#settings/${tab === "models" ? "models" : "config"}`;
+    return `/admin#settings/${normalizeSettingsSection(tab)}`;
   }
   return null;
 }
 
-export const ADMIN_SETTINGS_TABS = ["config", "models", "appearance"];
+/**
+ * Mục trong Settings quản trị. Nhóm "Hệ thống trả lời" là một form nhiều anchor
+ * (`retrieval`, `reranker`, `gate`, `generation`); "Mô hình" là ba trang riêng.
+ */
+export const ADMIN_ANSWER_SECTIONS = ["retrieval", "reranker", "gate", "generation"];
+export const ADMIN_MODEL_SECTIONS = ["models-llm", "models-embedding", "models-reranker"];
+export const ADMIN_SETTINGS_SECTIONS = [...ADMIN_ANSWER_SECTIONS, ...ADMIN_MODEL_SECTIONS, "appearance"];
+
+// Hash cũ trước khi tách mục: `config` là cả form RAG, `models` là trang mô hình LLM.
+const SETTINGS_SECTION_ALIASES = { config: "retrieval", models: "models-llm" };
+
+/** Key mục Settings hợp lệ; hash cũ/lạ quy về `retrieval`. */
+export function normalizeSettingsSection(value) {
+  const key = SETTINGS_SECTION_ALIASES[value] ?? value;
+  return ADMIN_SETTINGS_SECTIONS.includes(key) ? key : "retrieval";
+}
+
+/** `models-llm` → `llm`; mục không phải Mô hình → null. */
+export function modelKindForSection(section) {
+  return ADMIN_MODEL_SECTIONS.includes(section) ? section.slice("models-".length) : null;
+}
 
 export const DATASET_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
- * Hash con trong app admin → `{ view, tab, datasetId }`; null nếu hash không hợp lệ.
+ * Hash con trong app admin → `{ view, section, datasetId }`; null nếu hash không hợp lệ.
  *
  * `#chat` → Chat; `#documents` → danh sách dataset; `#documents/<id>` → tài liệu
- * của dataset; `#settings/<tab>` → Settings (tab lạ về `config`).
- * Chấp nhận cả `#config`/`#models` cũ cho link đã lưu trước khi tách app.
+ * của dataset; `#settings` → danh sách mục Settings (mobile) / form mặc định
+ * (desktop); `#settings/<section>` → mục cụ thể. Hash cũ `#config`/`#models` và
+ * `#settings/config`/`#settings/models` vẫn mở đúng mục mới; key lạ về `retrieval`.
  */
 export function readAdminRoute(hash) {
   const route = String(hash || "").replace(/^#\/?/, "");
-  if (route === "chat") return { view: "chat", tab: "config", datasetId: null };
-  if (route === "documents") return { view: "documents", tab: "config", datasetId: null };
+  if (route === "chat") return { view: "chat", section: null, datasetId: null };
+  if (route === "documents") return { view: "documents", section: null, datasetId: null };
   if (route.startsWith("documents/")) {
     const datasetId = route.split("/")[1] || "";
     if (!DATASET_ID_PATTERN.test(datasetId)) return null;
-    return { view: "documents", tab: "config", datasetId };
+    return { view: "documents", section: null, datasetId };
   }
-  if (route === "config" || route === "models") return { view: "settings", tab: route, datasetId: null };
-  if (route === "settings" || route.startsWith("settings/")) {
-    const tab = route.split("/")[1];
+  if (route === "config" || route === "models") {
+    return { view: "settings", section: normalizeSettingsSection(route), datasetId: null };
+  }
+  if (route === "settings") return { view: "settings", section: null, datasetId: null };
+  if (route.startsWith("settings/")) {
     return {
       view: "settings",
-      tab: ADMIN_SETTINGS_TABS.includes(tab) ? tab : "config",
+      section: normalizeSettingsSection(route.split("/")[1]),
       datasetId: null,
     };
   }
@@ -151,8 +174,8 @@ export function readAdminRoute(hash) {
 }
 
 /** Route admin → hash tương ứng (không có dấu `#`). */
-export function adminRouteHash({ view, tab, datasetId }) {
-  if (view === "settings") return `settings/${tab}`;
+export function adminRouteHash({ view, section, datasetId }) {
+  if (view === "settings") return section ? `settings/${section}` : "settings";
   if (view === "documents") return datasetId ? `documents/${datasetId}` : "documents";
   return "chat";
 }

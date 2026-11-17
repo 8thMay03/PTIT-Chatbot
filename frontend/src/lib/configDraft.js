@@ -15,6 +15,7 @@ export const DEFAULTS = {
   multiQueryEnabled: true,
   multiQueryCount: 3,
   multiQueryUseLlm: false,
+  queryRewriteUseLlm: false,
   scopeEnabled: true,
   minVectorScore: null,
   minBm25NormScore: 0.25,
@@ -26,55 +27,97 @@ export const DEFAULTS = {
 const fixed2 = (value) => Number(value).toFixed(2);
 const onOff = (value) => (value ? "Bật" : "Tắt");
 
-/** Thứ tự = thứ tự hiển thị trong tóm tắt thay đổi. `path` là vị trí trong payload PUT. */
+/**
+ * Thứ tự = thứ tự pipeline trong form và trong tóm tắt thay đổi.
+ * `path` là vị trí trong payload PUT; `section` là mục danh mục Settings.
+ */
 export const CONFIG_FIELDS = {
-  temperature: { label: "Độ ngẫu nhiên", path: ["llm", "temperature"], format: fixed2 },
-  llmTimeout: { label: "Thời gian chờ", path: ["llm", "timeout"], format: (v) => `${v}s` },
-  maxRetries: { label: "Số lần thử lại", path: ["llm", "max_retries"], format: (v) => `${v} lần` },
-  rerankerEnabled: { label: "Xếp hạng lại", path: ["reranker", "enabled"], format: onOff },
-  candidateMultiplier: {
-    label: "Hệ số ứng viên",
-    path: ["reranker", "candidate_multiplier"],
-    format: (v) => `${v}×`,
-  },
-  topK: { label: "Top-K", path: ["retrieval", "top_k"], format: String },
+  topK: { label: "Top-K", path: ["retrieval", "top_k"], section: "retrieval", format: String },
   hybridVectorWeight: {
     label: "Tỷ trọng vector",
     path: ["retrieval", "hybrid_vector_weight"],
+    section: "retrieval",
     format: (v) => `${Math.round(Number(v) * 100)}%`,
   },
   multiQueryEnabled: {
     label: "Mở rộng câu hỏi",
     path: ["retrieval", "multi_query_enabled"],
+    section: "retrieval",
     format: onOff,
   },
   multiQueryCount: {
     label: "Số truy vấn phụ",
     path: ["retrieval", "multi_query_count"],
+    section: "retrieval",
     format: String,
   },
   multiQueryUseLlm: {
     label: "Sinh truy vấn phụ bằng LLM",
     path: ["retrieval", "multi_query_use_llm"],
+    section: "retrieval",
     format: onOff,
   },
-  scopeEnabled: { label: "Kiểm soát phạm vi PTIT", path: ["guardrails", "scope_enabled"], format: onOff },
+  queryRewriteUseLlm: {
+    label: "Viết lại câu hỏi bằng LLM",
+    path: ["retrieval", "query_rewrite_use_llm"],
+    section: "retrieval",
+    format: onOff,
+  },
+  rerankerEnabled: {
+    label: "Xếp hạng lại",
+    path: ["reranker", "enabled"],
+    section: "reranker",
+    format: onOff,
+  },
+  candidateMultiplier: {
+    label: "Hệ số ứng viên",
+    path: ["reranker", "candidate_multiplier"],
+    section: "reranker",
+    format: (v) => `${v}×`,
+  },
   minBm25NormScore: {
     label: "Độ khớp từ khóa",
     path: ["guardrails", "min_bm25_norm_score"],
+    section: "gate",
     format: fixed2,
   },
   minVectorScore: {
     label: "Ngưỡng ngữ nghĩa",
     path: ["guardrails", "min_vector_score"],
+    section: "gate",
     format: fixed2,
     calibratedKey: "vector",
   },
   minRerankScore: {
     label: "Điểm xếp hạng lại",
     path: ["guardrails", "min_rerank_score"],
+    section: "gate",
     format: fixed2,
     calibratedKey: "rerank",
+  },
+  scopeEnabled: {
+    label: "Kiểm soát phạm vi PTIT",
+    path: ["guardrails", "scope_enabled"],
+    section: "gate",
+    format: onOff,
+  },
+  temperature: {
+    label: "Độ ngẫu nhiên",
+    path: ["llm", "temperature"],
+    section: "generation",
+    format: fixed2,
+  },
+  llmTimeout: {
+    label: "Thời gian chờ",
+    path: ["llm", "timeout"],
+    section: "generation",
+    format: (v) => `${v}s`,
+  },
+  maxRetries: {
+    label: "Số lần thử lại",
+    path: ["llm", "max_retries"],
+    section: "generation",
+    format: (v) => `${v} lần`,
   },
 };
 
@@ -96,6 +139,7 @@ export function valuesFromConfig(data) {
     multiQueryEnabled: Boolean(data?.retrieval?.multi_query_enabled),
     multiQueryCount: data?.retrieval?.multi_query_count ?? DEFAULTS.multiQueryCount,
     multiQueryUseLlm: Boolean(data?.retrieval?.multi_query_use_llm),
+    queryRewriteUseLlm: Boolean(data?.retrieval?.query_rewrite_use_llm),
     scopeEnabled: Boolean(guardrails.scope_enabled),
     minVectorScore: overrideFrom(guardrails.min_vector_score, guardrails.vector_threshold_source),
     minBm25NormScore: guardrails.min_bm25_norm_score ?? DEFAULTS.minBm25NormScore,
@@ -148,6 +192,15 @@ function sameValue(a, b) {
 
 export function isFieldChanged(values, saved, key) {
   return !sameValue(values[key], saved[key]);
+}
+
+/** Mục Settings có ít nhất một trường khác bản đã lưu (dùng cho chấm trong danh mục). */
+export function listDirtySections(values, saved) {
+  const sections = new Set();
+  Object.entries(CONFIG_FIELDS).forEach(([key, field]) => {
+    if (isFieldChanged(values, saved, key)) sections.add(field.section);
+  });
+  return [...sections];
 }
 
 /** Các trường khác bản đã lưu, theo thứ tự `CONFIG_FIELDS`, kèm chuỗi hiển thị cũ/mới. */

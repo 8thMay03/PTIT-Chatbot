@@ -1,17 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  AlertTriangle,
-  Flame,
-  Gauge,
-  Info,
-  Layers,
-  Loader2,
-  RotateCcw,
-  ShieldCheck,
-  Sliders,
-  Undo2,
-} from "lucide-react";
+import { AlertTriangle, Info, Loader2, RotateCcw, Undo2 } from "lucide-react";
 import { configApi, describeError, errorMessage, queryKeys } from "./api";
 import {
   CONFIG_FIELDS,
@@ -21,9 +10,12 @@ import {
   formatConfigValue,
   isFieldChanged,
   listConfigChanges,
+  listDirtySections,
   mergeConfigDraft,
   valuesFromConfig,
 } from "./lib/configDraft";
+import { ADMIN_ANSWER_SECTIONS } from "./lib/appRoute";
+import { pickActiveSection } from "./settings/scrollSpy";
 import Modal from "./components/Modal";
 import SaveBar from "./components/SaveBar";
 import { useToast } from "./components/Toast";
@@ -43,9 +35,20 @@ function parseThreshold(raw, min, max) {
   return Number.isNaN(value) ? undefined : Math.max(min, Math.min(max, value));
 }
 
-export default function ConfigView() {
+/**
+ * Form "Hệ thống trả lời" một cột theo pipeline: Truy xuất → Xếp hạng lại →
+ * Ngưỡng tin cậy → Sinh câu trả lời. Các mục là anchor trong cùng một form, dùng
+ * chung một thanh lưu.
+ */
+export default function ConfigView({
+  activeSection = "retrieval",
+  scrollRequest = 0,
+  onSectionActive,
+  onDraftState,
+}) {
   const toast = useToast();
   const queryClient = useQueryClient();
+  const scrollRef = useRef(null);
 
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -74,8 +77,8 @@ export default function ConfigView() {
       })
     : null;
 
-  // Cache `/config` dùng chung với tab Mô hình: nhận giá trị mới nhưng giữ lại
-  // đúng những trường người dùng đang sửa dở ở tab này.
+  // Cache `/config` dùng chung với mục Mô hình: nhận giá trị mới nhưng giữ lại
+  // đúng những trường người dùng đang sửa dở ở form này.
   useEffect(() => {
     if (!serverValues) return;
     const previous = previousServerRef.current;
@@ -124,7 +127,73 @@ export default function ConfigView() {
     () => listConfigChanges(values, savedSnapshot, calibrated),
     [values, savedSnapshot, calibrated]
   );
+  const dirtySections = useMemo(
+    () => listDirtySections(values, savedSnapshot),
+    [values, savedSnapshot]
+  );
   const isDirty = changes.length > 0;
+
+  // Danh mục Settings dùng chấm "có thay đổi" và bảng thử dùng bản nháp ngưỡng.
+  useEffect(() => {
+    onDraftState?.({
+      values,
+      saved: savedSnapshot,
+      calibrated,
+      config: configQuery.data ?? null,
+      changedKeys: changes.map((change) => change.key),
+      dirtySections,
+    });
+  }, [values, savedSnapshot, calibrated, configQuery.data, changes, dirtySections, onDraftState]);
+
+  // Deep link `#settings/<mục>` hoặc bấm mục trong danh mục: cuộn tới anchor của form
+  // sau khi dữ liệu đã render. `scrollRequest` đổi cả khi bấm lại đúng mục đang mở.
+  useEffect(() => {
+    if (loading) return;
+    const node = document.getElementById(`settings-section-${activeSection}`);
+    if (node && typeof node.scrollIntoView === "function") {
+      node.scrollIntoView({ block: "start" });
+    }
+  }, [activeSection, scrollRequest, loading]);
+
+  // Scrollspy: mục đang xem trong nhóm "Hệ thống trả lời", tính lại sau mỗi lần cuộn
+  // khung form (gộp theo frame). Chỉ chạy khi có sự kiện cuộn nên lúc mount mục đang
+  // xem vẫn theo route.
+  useEffect(() => {
+    if (loading) return undefined;
+    const root = scrollRef.current;
+    if (!root) return undefined;
+
+    let frame = null;
+    function update() {
+      frame = null;
+      const keys = [];
+      const offsets = [];
+      const rootTop = root.getBoundingClientRect().top;
+      ADMIN_ANSWER_SECTIONS.forEach((key) => {
+        const node = document.getElementById(`settings-section-${key}`);
+        if (!node) return;
+        keys.push(key);
+        offsets.push(node.getBoundingClientRect().top - rootTop + root.scrollTop);
+      });
+      const next = pickActiveSection({
+        keys,
+        offsets,
+        scrollTop: root.scrollTop,
+        clientHeight: root.clientHeight,
+        scrollHeight: root.scrollHeight,
+      });
+      if (next) onSectionActive?.(next);
+    }
+    function onScroll() {
+      if (frame === null) frame = window.requestAnimationFrame(update);
+    }
+
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      root.removeEventListener("scroll", onScroll);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [loading, onSectionActive]);
 
   // Cảnh báo khi rời trang mà còn thay đổi chưa lưu
   useEffect(() => {
@@ -211,9 +280,12 @@ export default function ConfigView() {
   };
 
   const embeddingModel = configQuery.data?.embedding?.model;
+  const llmModel = configQuery.data?.llm?.model;
   const rerankerProvider = configQuery.data?.reranker?.provider;
   const rerankerModel = configQuery.data?.reranker?.model;
   const rerankApplies = values.rerankerEnabled && rerankerProvider === "cross-encoder";
+  const rerankerModelLabel =
+    rerankerProvider === "heuristic" ? "Heuristic" : shortModelName(rerankerModel);
 
   const vectorOverride = values.minVectorScore;
   const vectorShown = vectorOverride ?? calibrated.vector;
@@ -248,223 +320,31 @@ export default function ConfigView() {
 
   return (
     <div className="config-page-wrapper">
-      <div className="settings-subtabs-header">
-        <div className="config-header-title-box">
-          <div className="config-header-icon-box">
-            <Sliders size={18} />
+      <div className="config-view-container" ref={scrollRef}>
+        {configError && (
+          <div className="inline-alert is-warning config-error-alert" role="alert">
+            <AlertTriangle size={16} />
+            <span>
+              {configError.title}. {configError.detail}
+              {!configQuery.data &&
+                " Các giá trị bên dưới là mặc định của giao diện, KHÔNG phải cấu hình đang chạy."}
+            </span>
           </div>
-          <div>
-            <h2 className="config-main-title">Cấu hình hệ thống &amp; tham số RAG</h2>
-            <p className="config-main-desc">
-              Tinh chỉnh truy xuất, xếp hạng lại, ngưỡng tin cậy và mô hình sinh. Áp dụng cho mọi sinh viên sau khi lưu.
-            </p>
-          </div>
-        </div>
-      </div>
+        )}
 
-      {configError && (
-        <div className="inline-alert is-warning" role="alert" style={{ margin: "0 24px 16px" }}>
-          <AlertTriangle size={16} />
-          <span>
-            {configError.title}. {configError.detail}
-            {!configQuery.data &&
-              " Các giá trị bên dưới là mặc định của giao diện, KHÔNG phải cấu hình đang chạy."}
-          </span>
-        </div>
-      )}
-
-      <div className="config-view-container">
-        <div className="config-two-col-grid">
-          {/* -------------------- Cột trái -------------------- */}
-          <div className="config-col-left">
-            <section className="config-panel-card">
-              <div className="config-card-header">
-                <div className="config-card-icon">
-                  <Flame size={17} />
-                </div>
-                <div>
-                  <h3 className="config-card-title">Tham số mô hình sinh (LLM)</h3>
-                  <p className="config-card-subtitle">Độ sáng tạo, thời gian chờ và số lần thử lại</p>
-                </div>
-              </div>
-
-              <div className="config-card-body">
-                <div className={`config-field-group${changedClass("temperature")}`}>
-                  <div className="config-label-row">
-                    <label className="config-field-label" htmlFor="cfg-temperature">
-                      <span>Độ ngẫu nhiên (Temperature)</span>
-                      <span className="config-badge-val">{Number(temperature).toFixed(2)}</span>
-                    </label>
-                    {changeMark("temperature")}
-                  </div>
-                  <span className="config-hint-text">
-                    {temperature === 0
-                      ? "0: bám sát quy chế, phù hợp hỏi đáp quy định. Mặc định 0."
-                      : temperature < 0.5
-                      ? "Thấp: ổn định, bám sát ngữ cảnh. Mặc định 0."
-                      : "Cao: diễn đạt tự do hơn nhưng dễ lệch khỏi tài liệu. Mặc định 0."}
-                  </span>
-                  <div className="slider-with-number">
-                    <input
-                      id="cfg-temperature"
-                      type="range"
-                      min="0"
-                      max="1.5"
-                      step="0.05"
-                      className="custom-range-slider"
-                      value={temperature}
-                      onChange={(e) => set("temperature", parseFloat(e.target.value))}
-                    />
-                    <input
-                      type="number"
-                      min="0"
-                      max="1.5"
-                      step="0.05"
-                      className="number-input-box"
-                      aria-label="Giá trị Temperature"
-                      value={temperature}
-                      onChange={(e) =>
-                        set("temperature", Math.max(0, Math.min(1.5, parseFloat(e.target.value) || 0)))
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className={`config-field-group${changedClass("llmTimeout")}`}>
-                  <div className="config-label-row">
-                    <label className="config-field-label" htmlFor="cfg-timeout">
-                      <span>Thời gian chờ tối đa</span>
-                      <span className="config-badge-val">{llmTimeout}s</span>
-                    </label>
-                    {changeMark("llmTimeout")}
-                  </div>
-                  <span className="config-hint-text">Tự ngắt khi gọi mô hình quá lâu. Mặc định 30 giây.</span>
-                  <div className="slider-with-number">
-                    <input
-                      id="cfg-timeout"
-                      type="range"
-                      min="5"
-                      max="90"
-                      step="5"
-                      className="custom-range-slider"
-                      value={llmTimeout}
-                      onChange={(e) => set("llmTimeout", parseInt(e.target.value, 10))}
-                    />
-                    <input
-                      type="number"
-                      min="5"
-                      max="90"
-                      className="number-input-box"
-                      aria-label="Thời gian chờ tối đa, tính bằng giây"
-                      value={llmTimeout}
-                      onChange={(e) => set("llmTimeout", parseInt(e.target.value, 10) || 30)}
-                    />
-                  </div>
-                </div>
-
-                <fieldset className={`config-field-group${changedClass("maxRetries")}`}>
-                  <legend className="config-label-row">
-                    <span className="config-field-label">
-                      <span>Số lần thử lại khi lỗi mạng</span>
-                      <span className="config-badge-val">{maxRetries} lần</span>
-                    </span>
-                    {changeMark("maxRetries")}
-                  </legend>
-                  <div className="pill-selector-group">
-                    {[0, 1, 2, 3, 5].map((val) => (
-                      <button
-                        key={val}
-                        type="button"
-                        className={`pill-sel-btn ${maxRetries === val ? "active" : ""}`}
-                        aria-pressed={maxRetries === val}
-                        onClick={() => set("maxRetries", val)}
-                      >
-                        {val} lần
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
-              </div>
-            </section>
-
-            <section className="config-panel-card">
-              <div className="config-card-header">
-                <div className="config-card-icon">
-                  <Gauge size={17} />
-                </div>
-                <div>
-                  <h3 className="config-card-title">Xếp hạng lại (Reranker)</h3>
-                  <p className="config-card-subtitle">
-                    Sắp xếp lại các đoạn ứng viên theo độ liên quan trước khi đưa vào mô hình
-                  </p>
-                </div>
-              </div>
-
-              <div className="config-card-body">
-                <div className={`config-field-group${changedClass("rerankerEnabled")}`}>
-                  <div className="config-toggle-header">
-                    <div>
-                      <span className="config-toggle-title" id="cfg-reranker-label">
-                        Bật xếp hạng lại
-                      </span>
-                      <p className="config-toggle-desc">
-                        Dùng mô hình xếp hạng đang chọn ở tab Mô hình để xếp lại danh sách đoạn
-                      </p>
-                      {changeMark("rerankerEnabled")}
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={values.rerankerEnabled}
-                      aria-labelledby="cfg-reranker-label"
-                      className={`pill-switch ${values.rerankerEnabled ? "on" : "off"}`}
-                      onClick={() => set("rerankerEnabled", !values.rerankerEnabled)}
-                    >
-                      <span className="pill-switch-thumb" />
-                    </button>
-                  </div>
-                </div>
-
-                {values.rerankerEnabled && (
-                  <div className="sub-settings-panel">
-                    <div className={`sub-setting-row${changedClass("candidateMultiplier")}`}>
-                      <div className="config-label-row">
-                        <label htmlFor="cfg-candidate">
-                          Hệ số ứng viên sơ bộ: <strong>{values.candidateMultiplier}×</strong> (lấy{" "}
-                          {topK * values.candidateMultiplier} đoạn trước khi xếp lại)
-                        </label>
-                        {changeMark("candidateMultiplier")}
-                      </div>
-                      <input
-                        id="cfg-candidate"
-                        type="range"
-                        min="1"
-                        max="8"
-                        step="1"
-                        className="custom-range-slider compact"
-                        value={values.candidateMultiplier}
-                        onChange={(e) => set("candidateMultiplier", parseInt(e.target.value, 10))}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
-
-          {/* -------------------- Cột phải -------------------- */}
-          <div className="config-col-right">
-            <section className="config-panel-card">
-              <div className="config-card-header">
-                <div className="config-card-icon">
-                  <Layers size={17} />
-                </div>
-                <div>
-                  <h3 className="config-card-title">Truy xuất &amp; tìm kiếm</h3>
-                  <p className="config-card-subtitle">Số đoạn nạp vào prompt và tỷ trọng tìm kiếm lai</p>
-                </div>
-              </div>
-
+        <div className="config-form-column">
+          {/* -------------------- Truy xuất -------------------- */}
+          <section
+            className="config-section"
+            id="settings-section-retrieval"
+            data-settings-section="retrieval"
+            aria-labelledby="settings-section-retrieval-title"
+          >
+            <h2 className="config-section-title" id="settings-section-retrieval-title">
+              Truy xuất
+            </h2>
+            <p className="config-section-desc">Cách tìm các đoạn tài liệu liên quan tới câu hỏi.</p>
+            <div className="config-panel-card">
               <div className="config-card-body">
                 <div className={`config-field-group${changedClass("topK")}`}>
                   <div className="config-label-row">
@@ -492,6 +372,7 @@ export default function ConfigView() {
                       type="number"
                       min="1"
                       max="10"
+                      step="1"
                       className="number-input-box"
                       aria-label="Số đoạn nạp vào LLM"
                       value={topK}
@@ -603,26 +484,129 @@ export default function ConfigView() {
                     </div>
                   )}
                 </div>
-              </div>
-            </section>
 
-            <section className="config-panel-card" aria-labelledby="cfg-gate-title">
-              <div className="config-card-header">
-                <div className="config-card-icon">
-                  <ShieldCheck size={17} />
-                </div>
-                <div>
-                  <h3 className="config-card-title" id="cfg-gate-title">Ngưỡng tin cậy</h3>
-                  <p className="config-card-subtitle">Quyết định khi nào chatbot từ chối vì không đủ căn cứ</p>
+                <div className={`config-field-group bordered-group${changedClass("queryRewriteUseLlm")}`}>
+                  <div className="config-toggle-header">
+                    <div>
+                      <span className="config-toggle-title" id="cfg-rewrite-label">
+                        Viết lại câu hỏi bằng LLM
+                      </span>
+                      <p className="config-toggle-desc">
+                        Dùng mô hình ngôn ngữ để viết lại câu hỏi trước khi tìm kiếm. Tắt để tiết kiệm chi phí.
+                      </p>
+                      {changeMark("queryRewriteUseLlm")}
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={values.queryRewriteUseLlm}
+                      aria-labelledby="cfg-rewrite-label"
+                      className={`pill-switch ${values.queryRewriteUseLlm ? "on" : "off"}`}
+                      onClick={() => set("queryRewriteUseLlm", !values.queryRewriteUseLlm)}
+                    >
+                      <span className="pill-switch-thumb" />
+                    </button>
+                  </div>
                 </div>
               </div>
+            </div>
+          </section>
 
+          {/* -------------------- Xếp hạng lại -------------------- */}
+          <section
+            className="config-section"
+            id="settings-section-reranker"
+            data-settings-section="reranker"
+            aria-labelledby="settings-section-reranker-title"
+          >
+            <h2 className="config-section-title" id="settings-section-reranker-title">
+              Xếp hạng lại
+            </h2>
+            <p className="config-section-desc">
+              Sắp xếp lại các đoạn ứng viên theo độ liên quan trước khi đưa vào mô hình.
+            </p>
+            <div className="config-panel-card">
+              <div className="config-card-body">
+                <div className={`config-field-group${changedClass("rerankerEnabled")}`}>
+                  <div className="config-toggle-header">
+                    <div>
+                      <span className="config-toggle-title" id="cfg-reranker-label">
+                        Bật xếp hạng lại
+                      </span>
+                      <p className="config-toggle-desc">
+                        Dùng mô hình xếp hạng đang chọn để xếp lại danh sách đoạn
+                      </p>
+                      {changeMark("rerankerEnabled")}
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={values.rerankerEnabled}
+                      aria-labelledby="cfg-reranker-label"
+                      className={`pill-switch ${values.rerankerEnabled ? "on" : "off"}`}
+                      onClick={() => set("rerankerEnabled", !values.rerankerEnabled)}
+                    >
+                      <span className="pill-switch-thumb" />
+                    </button>
+                  </div>
+                </div>
+
+                <p className="config-model-line">
+                  Mô hình: <strong>{rerankerModelLabel}</strong>
+                  <span aria-hidden="true">—</span>
+                  <a className="config-model-link" href="#settings/models-reranker">
+                    Đổi mô hình →
+                  </a>
+                </p>
+
+                {values.rerankerEnabled && (
+                  <div className="sub-settings-panel">
+                    <div className={`sub-setting-row${changedClass("candidateMultiplier")}`}>
+                      <div className="config-label-row">
+                        <label htmlFor="cfg-candidate">
+                          Hệ số ứng viên sơ bộ: <strong>{values.candidateMultiplier}×</strong> (lấy{" "}
+                          {topK * values.candidateMultiplier} đoạn trước khi xếp lại)
+                        </label>
+                        {changeMark("candidateMultiplier")}
+                      </div>
+                      <input
+                        id="cfg-candidate"
+                        type="range"
+                        min="1"
+                        max="8"
+                        step="1"
+                        className="custom-range-slider compact"
+                        value={values.candidateMultiplier}
+                        onChange={(e) => set("candidateMultiplier", parseInt(e.target.value, 10))}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* -------------------- Ngưỡng tin cậy -------------------- */}
+          <section
+            className="config-section"
+            id="settings-section-gate"
+            data-settings-section="gate"
+            aria-labelledby="settings-section-gate-title"
+          >
+            <h2 className="config-section-title" id="settings-section-gate-title">
+              Ngưỡng tin cậy
+            </h2>
+            <p className="config-section-desc">
+              Quyết định khi nào chatbot từ chối vì không đủ căn cứ.
+            </p>
+            <div className="config-panel-card">
               <div className="config-card-body">
                 <div className="config-gate-callout">
                   <Info size={15} aria-hidden="true" />
                   <p>
                     Chatbot so <strong>đoạn khớp nhất</strong> với từng ngưỡng dưới đây. Trượt bất kỳ ngưỡng nào thì
-                    trả lời <strong>“{NO_CONTEXT_ANSWER}”</strong> và không gọi mô hình.
+                    trả lời <strong>“{NO_CONTEXT_ANSWER}”</strong> và không gọi mô hình. Dùng bảng{" "}
+                    <strong>Thử với câu hỏi</strong> bên phải để xem ảnh hưởng trước khi lưu.
                   </p>
                 </div>
 
@@ -783,28 +767,151 @@ export default function ConfigView() {
                   </div>
                 </div>
               </div>
-            </section>
-          </div>
-        </div>
+            </div>
+          </section>
 
-        <section className="config-danger-zone" aria-labelledby="cfg-danger-title">
-          <div>
-            <h3 id="cfg-danger-title">Vùng nguy hiểm</h3>
-            <p>
-              Khôi phục mặc định xoá toàn bộ cấu hình RAG đã lưu trên máy chủ, đưa mọi tham số về giá trị ban đầu.
-              Không thể hoàn tác.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="config-danger-btn"
-            onClick={() => setResetOpen(true)}
-            disabled={resetting || saving}
+          {/* -------------------- Sinh câu trả lời -------------------- */}
+          <section
+            className="config-section"
+            id="settings-section-generation"
+            data-settings-section="generation"
+            aria-labelledby="settings-section-generation-title"
           >
-            <RotateCcw size={14} />
-            <span>Khôi phục mặc định…</span>
-          </button>
-        </section>
+            <h2 className="config-section-title" id="settings-section-generation-title">
+              Sinh câu trả lời
+            </h2>
+            <p className="config-section-desc">
+              Độ ngẫu nhiên, thời gian chờ và số lần thử lại của mô hình ngôn ngữ.
+            </p>
+            <div className="config-panel-card">
+              <div className="config-card-body">
+                <p className="config-model-line">
+                  Mô hình: <strong>{shortModelName(llmModel)}</strong>
+                  <span aria-hidden="true">—</span>
+                  <a className="config-model-link" href="#settings/models-llm">
+                    Đổi mô hình →
+                  </a>
+                </p>
+
+                <div className={`config-field-group${changedClass("temperature")}`}>
+                  <div className="config-label-row">
+                    <label className="config-field-label" htmlFor="cfg-temperature">
+                      <span>Độ ngẫu nhiên (Temperature)</span>
+                      <span className="config-badge-val">{Number(temperature).toFixed(2)}</span>
+                    </label>
+                    {changeMark("temperature")}
+                  </div>
+                  <span className="config-hint-text">
+                    {temperature === 0
+                      ? "0: bám sát quy chế, phù hợp hỏi đáp quy định. Mặc định 0."
+                      : temperature < 0.5
+                      ? "Thấp: ổn định, bám sát ngữ cảnh. Mặc định 0."
+                      : "Cao: diễn đạt tự do hơn nhưng dễ lệch khỏi tài liệu. Mặc định 0."}
+                  </span>
+                  <div className="slider-with-number">
+                    <input
+                      id="cfg-temperature"
+                      type="range"
+                      min="0"
+                      max="1.5"
+                      step="0.05"
+                      className="custom-range-slider"
+                      value={temperature}
+                      onChange={(e) => set("temperature", parseFloat(e.target.value))}
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      max="1.5"
+                      step="0.05"
+                      className="number-input-box"
+                      aria-label="Giá trị Temperature"
+                      value={temperature}
+                      onChange={(e) =>
+                        set("temperature", Math.max(0, Math.min(1.5, parseFloat(e.target.value) || 0)))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className={`config-field-group${changedClass("llmTimeout")}`}>
+                  <div className="config-label-row">
+                    <label className="config-field-label" htmlFor="cfg-timeout">
+                      <span>Thời gian chờ tối đa</span>
+                      <span className="config-badge-val">{llmTimeout}s</span>
+                    </label>
+                    {changeMark("llmTimeout")}
+                  </div>
+                  <span className="config-hint-text">Tự ngắt khi gọi mô hình quá lâu. Mặc định 30 giây.</span>
+                  <div className="slider-with-number">
+                    <input
+                      id="cfg-timeout"
+                      type="range"
+                      min="5"
+                      max="90"
+                      step="5"
+                      className="custom-range-slider"
+                      value={llmTimeout}
+                      onChange={(e) => set("llmTimeout", parseInt(e.target.value, 10))}
+                    />
+                    <input
+                      type="number"
+                      min="5"
+                      max="90"
+                      step="5"
+                      className="number-input-box"
+                      aria-label="Thời gian chờ tối đa, tính bằng giây"
+                      value={llmTimeout}
+                      onChange={(e) => set("llmTimeout", parseInt(e.target.value, 10) || 30)}
+                    />
+                  </div>
+                </div>
+
+                <fieldset className={`config-field-group${changedClass("maxRetries")}`}>
+                  <legend className="config-label-row">
+                    <span className="config-field-label">
+                      <span>Số lần thử lại khi lỗi mạng</span>
+                      <span className="config-badge-val">{maxRetries} lần</span>
+                    </span>
+                    {changeMark("maxRetries")}
+                  </legend>
+                  <div className="pill-selector-group">
+                    {[0, 1, 2, 3, 5].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        className={`pill-sel-btn ${maxRetries === val ? "active" : ""}`}
+                        aria-pressed={maxRetries === val}
+                        onClick={() => set("maxRetries", val)}
+                      >
+                        {val} lần
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              </div>
+            </div>
+          </section>
+
+          <section className="config-danger-zone" aria-labelledby="cfg-danger-title">
+            <div>
+              <h3 id="cfg-danger-title">Vùng nguy hiểm</h3>
+              <p>
+                Khôi phục mặc định xoá toàn bộ cấu hình RAG đã lưu trên máy chủ, đưa mọi tham số về giá trị ban đầu.
+                Không thể hoàn tác.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="config-danger-btn"
+              onClick={() => setResetOpen(true)}
+              disabled={resetting || saving}
+            >
+              <RotateCcw size={14} />
+              <span>Khôi phục mặc định…</span>
+            </button>
+          </section>
+        </div>
       </div>
 
       <SaveBar

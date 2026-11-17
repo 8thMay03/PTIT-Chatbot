@@ -225,6 +225,38 @@ describe("AdminApp", () => {
     expect(queryClient.getQueryData(["config"])).toBeUndefined();
   });
 
+  it("bấm lại mục Settings đang mở vẫn cuộn tới mục và không thêm lịch sử trùng hash", async () => {
+    const backend = createBackend({ authenticated: true });
+    const scrolled = [];
+    const originalScroll = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function scrollIntoView() {
+      scrolled.push(this.id);
+    };
+    try {
+      await renderAdmin(backend);
+      const gateItem = await waitFor(() => container.querySelector('[data-settings-nav="gate"]'));
+      await waitFor(() => container.querySelector("#settings-section-gate"));
+
+      const lengthBefore = window.history.length;
+      await act(async () => {
+        gateItem.click();
+      });
+      expect(window.location.hash).toBe("#settings/gate");
+      expect(window.history.length).toBe(lengthBefore + 1);
+      const gateScrolls = scrolled.filter((id) => id === "settings-section-gate").length;
+      expect(gateScrolls).toBeGreaterThan(0);
+
+      await act(async () => {
+        gateItem.click();
+      });
+      expect(window.location.hash).toBe("#settings/gate");
+      expect(window.history.length).toBe(lengthBefore + 1);
+      expect(scrolled.filter((id) => id === "settings-section-gate").length).toBe(gateScrolls + 1);
+    } finally {
+      Element.prototype.scrollIntoView = originalScroll;
+    }
+  });
+
   it("nút header Cuộc trò chuyện mới bỏ đánh dấu hội thoại đang mở trên sidebar", async () => {
     window.history.replaceState(null, "", "/admin#chat");
     const backend = createBackend({
@@ -285,7 +317,7 @@ describe("AdminApp", () => {
     const backend = createBackend({ authenticated: true });
     await renderAdmin(backend);
 
-    const panel = await waitFor(() => container.querySelector("#settings-panel-config"));
+    const panel = await waitFor(() => container.querySelector("#settings-panel-answer"));
     const temperature = await waitFor(() =>
       container.querySelector('input[aria-label="Giá trị Temperature"]')
     );
@@ -301,19 +333,19 @@ describe("AdminApp", () => {
     expect(dialog.textContent).toContain("Phiên đăng nhập đã hết hạn");
     expect(container.querySelector(".admin-shell").hasAttribute("inert")).toBe(true);
     // Form Settings vẫn là cùng node DOM, bản nháp còn nguyên.
-    expect(container.querySelector("#settings-panel-config")).toBe(panel);
+    expect(container.querySelector("#settings-panel-answer")).toBe(panel);
     expect(temperature.value).toBe("0.7");
 
     await submitLogin(dialog, PASSWORD, "khac@ptit.edu.vn");
     const alert = await waitFor(() => dialog.querySelector('[role="alert"]'));
     expect(alert.textContent).toContain("Email hoặc mật khẩu không đúng.");
-    expect(container.querySelector("#settings-panel-config")).toBe(panel);
+    expect(container.querySelector("#settings-panel-answer")).toBe(panel);
 
     await submitLogin(dialog, PASSWORD);
     expect(backend.state.lastLogin).toEqual({ email: EMAIL, password: PASSWORD });
     await waitFor(() => !container.querySelector('[role="dialog"]'));
     expect(container.querySelector(".admin-shell").hasAttribute("inert")).toBe(false);
-    expect(container.querySelector("#settings-panel-config")).toBe(panel);
+    expect(container.querySelector("#settings-panel-answer")).toBe(panel);
     expect(container.querySelector('input[aria-label="Giá trị Temperature"]').value).toBe("0.7");
   });
 });

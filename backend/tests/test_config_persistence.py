@@ -49,8 +49,19 @@ def no_encryption_key(monkeypatch) -> None:
 
 
 def _rows(session_factory) -> dict[str, AppConfigOverride]:
+    """Các dòng override cấu hình; bỏ dòng metadata thời điểm lưu."""
     with session_factory() as session:
-        return {row.key: row for row in session.scalars(select(AppConfigOverride))}
+        return {
+            row.key: row
+            for row in session.scalars(select(AppConfigOverride))
+            if row.key != config_store.SAVED_AT_KEY
+        }
+
+
+def _saved_at(session_factory) -> str | None:
+    with session_factory() as session:
+        row = session.get(AppConfigOverride, config_store.SAVED_AT_KEY)
+        return row.value if row is not None else None
 
 
 def _different(field: str, *candidates):
@@ -112,6 +123,45 @@ def test_reset_clears_saved_config(admin_client, config_store_db) -> None:
     assert response.status_code == 200
     assert _rows(config_store_db) == {}
     assert _simulate_restart() == []
+
+
+# ==========================================
+# Lần lưu gần nhất trên UI (D-08)
+# ==========================================
+def test_updated_at_survives_restart_and_is_not_an_override(
+    admin_client, config_store_db, monkeypatch
+) -> None:
+    monkeypatch.setitem(_INITIAL_SETTINGS, "retrieval_default_top_k", 4)
+    monkeypatch.setattr(settings, "retrieval_default_top_k", 4)
+    monkeypatch.setattr(config_store, "_now_iso", lambda: "2026-11-17T03:00:00+00:00")
+
+    admin_client.put("/api/config", json={"retrieval": {"top_k": 7}})
+    assert _saved_at(config_store_db) == "2026-11-17T03:00:00+00:00"
+
+    applied = _simulate_restart()
+
+    assert applied == ["retrieval_default_top_k"]
+    updated_at = admin_client.get("/api/config").json()["updated_at"]
+    assert updated_at.startswith("2026-11-17T03:00:00")
+
+
+def test_save_that_only_removes_an_override_still_updates_timestamp(
+    admin_client, config_store_db, monkeypatch
+) -> None:
+    monkeypatch.setitem(_INITIAL_SETTINGS, "retrieval_default_top_k", 4)
+    monkeypatch.setattr(settings, "retrieval_default_top_k", 4)
+    stamps = iter(["2026-11-17T04:00:00+00:00", "2026-11-17T04:05:00+00:00"])
+    monkeypatch.setattr(config_store, "_now_iso", lambda: next(stamps))
+
+    admin_client.put("/api/config", json={"retrieval": {"top_k": 7}})
+    assert "retrieval_default_top_k" in _rows(config_store_db)
+
+    response = admin_client.put("/api/config", json={"retrieval": {"top_k": 4}})
+
+    assert response.status_code == 200
+    # Trường về đúng giá trị `.env`: dòng bị xoá, nhưng lần lưu vẫn có dấu thời gian.
+    assert "retrieval_default_top_k" not in _rows(config_store_db)
+    assert _saved_at(config_store_db) == "2026-11-17T04:05:00+00:00"
 
 
 # ==========================================

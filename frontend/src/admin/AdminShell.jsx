@@ -34,11 +34,9 @@ function getInitialRoute() {
   if (fromHash) return fromHash;
   // Hash #documents/<id> không hợp lệ → về danh sách thay vì màn chat.
   if (String(window.location.hash || "").replace(/^#\/?/, "").startsWith("documents")) {
-    return { view: "documents", tab: "config", datasetId: null };
+    return { view: "documents", section: null, datasetId: null };
   }
-  return (
-    readAdminRoute(stored) || { view: "chat", tab: "config", datasetId: null }
-  );
+  return readAdminRoute(stored) || { view: "chat", section: null, datasetId: null };
 }
 
 /**
@@ -55,7 +53,7 @@ export default function AdminShell({ onLogout, loggingOut = false, inert = false
   const { isMobile, isOpen: isSidebarOpen, mobileOpen, setMobileOpen } = sidebar;
   const chatRef = useRef(null);
   const queryClient = useQueryClient();
-  const { view, tab } = route;
+  const { view, section } = route;
   const datasetId = route.datasetId ?? null;
 
   useEffect(() => {
@@ -79,7 +77,7 @@ export default function AdminShell({ onLogout, loggingOut = false, inert = false
       }
       // Hash #documents/<id> sai định dạng → về danh sách.
       if (String(window.location.hash || "").replace(/^#\/?/, "").startsWith("documents")) {
-        setRoute({ view: "documents", tab: "config", datasetId: null });
+        setRoute({ view: "documents", section: null, datasetId: null });
       }
     }
     window.addEventListener("hashchange", handleHashChange);
@@ -93,7 +91,9 @@ export default function AdminShell({ onLogout, loggingOut = false, inert = false
 
   const goTo = useCallback(
     (nextView) => {
-      setRoute((current) => ({ ...current, view: nextView, datasetId: null }));
+      // Vào Settings từ thanh bên luôn mở danh sách mục: trên desktop form mặc định
+      // (Truy xuất) hiện ngay, trên mobile là trang danh sách.
+      setRoute({ view: nextView, section: null, datasetId: null });
       setMobileOpen(false);
     },
     [setMobileOpen]
@@ -102,7 +102,7 @@ export default function AdminShell({ onLogout, loggingOut = false, inert = false
   // Vào dataset dùng pushState để nút Back của trình duyệt trở về danh sách.
   const openDataset = useCallback(
     (id) => {
-      const next = { view: "documents", tab: "config", datasetId: id };
+      const next = { view: "documents", section: null, datasetId: id };
       window.history.pushState(null, "", `#${adminRouteHash(next)}`);
       setRoute(next);
       setMobileOpen(false);
@@ -111,8 +111,21 @@ export default function AdminShell({ onLogout, loggingOut = false, inert = false
   );
 
   const backToList = useCallback(() => {
-    const next = { view: "documents", tab: "config", datasetId: null };
+    const next = { view: "documents", section: null, datasetId: null };
     window.history.pushState(null, "", `#${adminRouteHash(next)}`);
+    setRoute(next);
+  }, []);
+
+  /**
+   * Đổi mục Settings: pushState để nút Back quay lại mục/danh sách trước. Bấm lại
+   * mục đang mở không thêm mục lịch sử trùng hash.
+   */
+  const openSettingsSection = useCallback((nextSection) => {
+    const next = { view: "settings", section: nextSection, datasetId: null };
+    const hash = adminRouteHash(next);
+    if (window.location.hash.slice(1) !== hash) {
+      window.history.pushState(null, "", `#${hash}`);
+    }
     setRoute(next);
   }, []);
 
@@ -293,8 +306,9 @@ export default function AdminShell({ onLogout, loggingOut = false, inert = false
         )}
         {view === "settings" && (
           <SettingsView
-            activeTab={tab}
-            onTabChange={(nextTab) => setRoute({ view: "settings", tab: nextTab })}
+            section={section}
+            onSectionChange={openSettingsSection}
+            onBackToList={() => openSettingsSection(null)}
             theme={theme}
             onThemeChange={setTheme}
           />

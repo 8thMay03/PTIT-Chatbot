@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
+from datetime import datetime, timezone
 
 from sqlalchemy import delete, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -106,6 +107,12 @@ RERANKER_PROFILE_FIELDS = ("reranker_provider", "reranker_model")
 # đã bị thu hẹp sau lần lưu.
 _URL_FIELDS = frozenset({"openai_base_url", "openai_compatible_base_url", "azure_openai_endpoint"})
 
+# Dòng metadata ghi lần lưu/khôi phục gần nhất. Không phải trường Settings nên không
+# nằm trong PERSISTED_FIELDS; `load_overrides` bỏ qua và `save_overrides` giữ lại.
+# Cần nguồn riêng vì lần lưu chỉ xoá dòng ghi đè (trường về giá trị `.env`) không để
+# lại `updated_at` trên dòng nào khác.
+SAVED_AT_KEY = "__settings_saved_at__"
+
 
 def get_config_store_session() -> Generator[Session, None, None]:
     """Session cho bảng cấu hình, lấy từ `SessionLocal` của module này.
@@ -115,6 +122,45 @@ def get_config_store_session() -> Generator[Session, None, None]:
     """
     with SessionLocal() as session:
         yield session
+
+
+def _now_iso() -> str:
+    """Thời điểm lưu dạng ISO 8601 có múi giờ (UTC)."""
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _write_saved_at(session: Session, rows: dict[str, AppConfigOverride] | None = None) -> str:
+    """Ghi/cập nhật dòng metadata thời điểm lưu; trả về giá trị vừa ghi."""
+    stamp = _now_iso()
+    if rows is None:
+        rows = {row.key: row for row in session.scalars(select(AppConfigOverride))}
+    row = rows.get(SAVED_AT_KEY)
+    if row is None:
+        session.add(AppConfigOverride(key=SAVED_AT_KEY, value=stamp))
+    else:
+        row.value = stamp
+        row.encrypted_value = None
+    return stamp
+
+
+def read_saved_at(session: Session) -> datetime | None:
+    """Đọc thời điểm lưu/khôi phục gần nhất; ``None`` nếu chưa từng lưu hoặc DB lỗi.
+
+    GET /config vẫn trả cấu hình đang chạy khi bảng cấu hình không đọc được.
+    """
+    try:
+        row = session.get(AppConfigOverride, SAVED_AT_KEY)
+    except SQLAlchemyError as exc:
+        logger.warning("Không đọc được thời điểm lưu cấu hình: %s", exc)
+        return None
+    value = row.value if row is not None else None
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
 
 
 def save_overrides(session: Session) -> None:
@@ -136,6 +182,8 @@ def save_overrides(session: Session) -> None:
 
     rows = {row.key: row for row in session.scalars(select(AppConfigOverride))}
     for key, row in rows.items():
+        if key == SAVED_AT_KEY:
+            continue
         if key not in desired:
             session.delete(row)
     for key, (value, encrypted_value) in desired.items():
@@ -145,6 +193,7 @@ def save_overrides(session: Session) -> None:
         elif row.value != value or row.encrypted_value != encrypted_value:
             row.value = value
             row.encrypted_value = encrypted_value
+    _write_saved_at(session, rows)
     session.commit()
 
 
@@ -179,9 +228,13 @@ def apply_config_update(session: Session, payload: dict) -> dict:
 
 
 def reset_config(session: Session) -> dict:
-    """Xoá mọi override trong DB rồi đưa settings về `.env`. DB lỗi thì không reset gì."""
+    """Xoá mọi override trong DB rồi đưa settings về `.env`. DB lỗi thì không reset gì.
+
+    Dòng metadata vẫn được ghi lại để "Lần lưu gần nhất" phản ánh lần khôi phục này.
+    """
     try:
         session.execute(delete(AppConfigOverride))
+        _write_saved_at(session, {})
         session.commit()
     except SQLAlchemyError:
         session.rollback()
@@ -198,6 +251,9 @@ def load_overrides(session: Session) -> list[str]:
     applied: list[str] = []
     for row in session.scalars(select(AppConfigOverride)):
         key = row.key
+        if key == SAVED_AT_KEY:
+            # Metadata của UI, không phải override cấu hình.
+            continue
         if key not in PERSISTED_FIELDS:
             logger.warning("Bỏ qua cấu hình '%s' trong DB: trường không được phép lưu.", key)
             continue

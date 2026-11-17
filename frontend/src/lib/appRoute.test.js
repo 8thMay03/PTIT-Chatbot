@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ADMIN_SETTINGS_SECTIONS,
   adminRouteHash,
   authPageHref,
   chatPathWithQuestion,
@@ -8,6 +9,7 @@ import {
   isAppearanceHash,
   legacyHashToAdmin,
   legacyRootHashToChat,
+  modelKindForSection,
   readAdminRoute,
   readNextParam,
   readQuestionParam,
@@ -39,13 +41,16 @@ describe("isAdminTarget", () => {
 });
 
 describe("legacyHashToAdmin", () => {
-  it("chuyển hash màn quản trị cũ sang /admin tương ứng", () => {
+  it("chuyển hash màn quản trị cũ sang mục Settings mới", () => {
     expect(legacyHashToAdmin("#documents")).toBe("/admin#documents");
-    expect(legacyHashToAdmin("#config")).toBe("/admin#settings/config");
-    expect(legacyHashToAdmin("#models")).toBe("/admin#settings/models");
-    expect(legacyHashToAdmin("#settings/config")).toBe("/admin#settings/config");
-    expect(legacyHashToAdmin("#settings/models")).toBe("/admin#settings/models");
-    expect(legacyHashToAdmin("#settings")).toBe("/admin#settings/config");
+    expect(legacyHashToAdmin("#config")).toBe("/admin#settings/retrieval");
+    expect(legacyHashToAdmin("#models")).toBe("/admin#settings/models-llm");
+    expect(legacyHashToAdmin("#settings/config")).toBe("/admin#settings/retrieval");
+    expect(legacyHashToAdmin("#settings/models")).toBe("/admin#settings/models-llm");
+    expect(legacyHashToAdmin("#settings")).toBe("/admin#settings/retrieval");
+    expect(legacyHashToAdmin("#settings/gate")).toBe("/admin#settings/gate");
+    expect(legacyHashToAdmin("#settings/models-reranker")).toBe("/admin#settings/models-reranker");
+    expect(legacyHashToAdmin("#settings/khac")).toBe("/admin#settings/retrieval");
     expect(legacyHashToAdmin("#/documents")).toBe("/admin#documents");
   });
 
@@ -66,27 +71,81 @@ describe("isAppearanceHash", () => {
 });
 
 describe("readAdminRoute / adminRouteHash", () => {
-  it("đọc hash con trong app admin, tab lạ về config", () => {
-    expect(readAdminRoute("#documents")).toEqual({ view: "documents", tab: "config", datasetId: null });
-    expect(readAdminRoute("#documents/abc_123")).toEqual({ view: "documents", tab: "config", datasetId: "abc_123" });
+  it("đọc hash con trong app admin, key lạ về retrieval", () => {
+    expect(readAdminRoute("#documents")).toEqual({ view: "documents", section: null, datasetId: null });
+    expect(readAdminRoute("#documents/abc_123")).toEqual({
+      view: "documents",
+      section: null,
+      datasetId: "abc_123",
+    });
     expect(readAdminRoute("#documents/invalid!")).toBeNull();
-    expect(readAdminRoute("#settings/models")).toEqual({ view: "settings", tab: "models", datasetId: null });
-    expect(readAdminRoute("#settings/appearance")).toEqual({
+    for (const section of [
+      "retrieval",
+      "reranker",
+      "gate",
+      "generation",
+      "models-llm",
+      "models-embedding",
+      "models-reranker",
+      "appearance",
+    ]) {
+      expect(readAdminRoute(`#settings/${section}`)).toEqual({
+        view: "settings",
+        section,
+        datasetId: null,
+      });
+    }
+    expect(readAdminRoute("#settings")).toEqual({ view: "settings", section: null, datasetId: null });
+    expect(readAdminRoute("#settings/config")).toEqual({
       view: "settings",
-      tab: "appearance",
+      section: "retrieval",
       datasetId: null,
     });
-    expect(readAdminRoute("#settings/khac")).toEqual({ view: "settings", tab: "config", datasetId: null });
-    expect(readAdminRoute("#models")).toEqual({ view: "settings", tab: "models", datasetId: null });
-    expect(readAdminRoute("#chat")).toEqual({ view: "chat", tab: "config", datasetId: null });
+    expect(readAdminRoute("#settings/models")).toEqual({
+      view: "settings",
+      section: "models-llm",
+      datasetId: null,
+    });
+    expect(readAdminRoute("#settings/khac")).toEqual({
+      view: "settings",
+      section: "retrieval",
+      datasetId: null,
+    });
+    expect(readAdminRoute("#config")).toEqual({
+      view: "settings",
+      section: "retrieval",
+      datasetId: null,
+    });
+    expect(readAdminRoute("#models")).toEqual({
+      view: "settings",
+      section: "models-llm",
+      datasetId: null,
+    });
+    expect(readAdminRoute("#chat")).toEqual({ view: "chat", section: null, datasetId: null });
     expect(readAdminRoute("#main-content")).toBeNull();
     expect(readAdminRoute(null)).toBeNull();
   });
 
   it("route → hash khứ hồi", () => {
-    for (const hash of ["chat", "documents", "documents/abc_123", "settings/config", "settings/models", "settings/appearance"]) {
+    for (const hash of [
+      "chat",
+      "documents",
+      "documents/abc_123",
+      "settings",
+      ...ADMIN_SETTINGS_SECTIONS.map((section) => `settings/${section}`),
+    ]) {
       expect(adminRouteHash(readAdminRoute(`#${hash}`))).toBe(hash);
     }
+  });
+});
+
+describe("modelKindForSection", () => {
+  it("ánh xạ mục Mô hình sang loại trong kho, mục khác là null", () => {
+    expect(modelKindForSection("models-llm")).toBe("llm");
+    expect(modelKindForSection("models-embedding")).toBe("embedding");
+    expect(modelKindForSection("models-reranker")).toBe("reranker");
+    expect(modelKindForSection("retrieval")).toBeNull();
+    expect(modelKindForSection(null)).toBeNull();
   });
 });
 

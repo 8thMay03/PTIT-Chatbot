@@ -113,7 +113,7 @@ function requestsTo(fetchMock, pathPart, method) {
   );
 }
 
-describe("ModelsView — kho mô hình ba tab", () => {
+describe("ModelsView — kho mô hình theo loại", () => {
   let container;
   let root;
   let queryClient;
@@ -133,38 +133,30 @@ describe("ModelsView — kho mô hình ba tab", () => {
     vi.unstubAllGlobals();
   });
 
-  async function render() {
+  async function render(kind = "llm") {
     await act(async () => {
       root.render(
         <QueryClientProvider client={queryClient}>
           <ToastProvider>
-            <ModelsView />
+            <ModelsView kind={kind} />
           </ToastProvider>
         </QueryClientProvider>
       );
     });
-    await waitFor(() => container.querySelector('[role="tablist"]'));
+    await waitFor(() => container.querySelector(`#mdl-panel-${kind}`));
   }
 
-  it("có ba tab con và chuyển panel khi chọn tab", async () => {
+  it("chỉ mở panel của mục Mô hình đang chọn và dọn khoá tab cũ", async () => {
     const { fetchMock } = createFakeServer();
     vi.stubGlobal("fetch", fetchMock);
-    await render();
+    localStorage.setItem("ptit_models_tab", "embedding");
+    await render("reranker");
 
-    const tabs = [...container.querySelectorAll('[role="tab"]')];
-    expect(tabs.map((tab) => tab.textContent.replace(/\d+$/, "").trim())).toEqual([
-      "Mô hình ngôn ngữ (LLM)",
-      "Mô hình nhúng (Embedding)",
-      "Mô hình xếp hạng lại (Reranker)",
-    ]);
-    expect(container.querySelector("#mdl-panel-llm").hidden).toBe(false);
-    expect(container.querySelector("#mdl-panel-embedding").hidden).toBe(true);
-
-    await click(tabs[1]);
-    expect(tabs[1].getAttribute("aria-selected")).toBe("true");
-    expect(container.querySelector("#mdl-panel-embedding").hidden).toBe(false);
+    expect(container.querySelector('[role="tablist"]')).toBeNull();
+    expect(container.querySelector("#mdl-panel-reranker").hidden).toBe(false);
     expect(container.querySelector("#mdl-panel-llm").hidden).toBe(true);
-    expect(localStorage.getItem("ptit_models_tab")).toBe("embedding");
+    expect(container.querySelector("#mdl-panel-embedding").hidden).toBe(true);
+    expect(localStorage.getItem("ptit_models_tab")).toBeNull();
   });
 
   it("thêm LLM vào kho rồi chọn làm mô hình đang dùng", async () => {
@@ -218,8 +210,7 @@ describe("ModelsView — kho mô hình ba tab", () => {
       profiles: [{ id: "r1", kind: "reranker", name: "BGE", provider: "cross-encoder", model: "BAAI/bge-reranker-base" }],
     });
     vi.stubGlobal("fetch", fetchMock);
-    localStorage.setItem("ptit_models_tab", "reranker");
-    await render();
+    await render("reranker");
     const panel = container.querySelector("#mdl-panel-reranker");
     expect(panel.hidden).toBe(false);
     expect(panel.querySelector("#mdl-reranker-active").options[0].textContent).toBe(
@@ -245,8 +236,7 @@ describe("ModelsView — kho mô hình ba tab", () => {
       ],
     });
     vi.stubGlobal("fetch", fetchMock);
-    localStorage.setItem("ptit_models_tab", "embedding");
-    await render();
+    await render("embedding");
     const panel = container.querySelector("#mdl-panel-embedding");
 
     const select = panel.querySelector("#mdl-embedding-active");

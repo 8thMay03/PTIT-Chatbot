@@ -44,7 +44,6 @@
   .chat-header { padding: 14px 16px 14px 62px; }
   .chat { min-height: 0; }
   .doc-view-top-bar { min-height: 38px; padding-left: 44px; }
-  .settings-page-heading { padding-left: 62px; }
 
   .messages {
     padding: var(--space-5) var(--space-4) var(--space-2);
@@ -86,7 +85,6 @@
   }
 
   /* ---- Mọi layout 2 cột xếp chồng ---- */
-  .config-two-col-grid,
   .model-mgmt-layout,
   .doc-view-split-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -99,11 +97,6 @@
     min-height: 380px;
   }
 
-  .settings-subtabs-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-3);
-  }
 }
 
 /* ==========================================================================
