@@ -94,6 +94,7 @@ from app.db.repositories import (
     create_dataset,
     create_user,
     delete_conversation,
+    delete_conversations_for_owner,
     delete_dataset_records,
     ensure_conversation,
     get_conversation,
@@ -158,6 +159,7 @@ PUBLIC_API_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/chat"),
         ("POST", "/api/chat/stream"),
         ("GET", "/api/conversations"),
+        ("DELETE", "/api/conversations"),
         ("GET", "/api/conversations/{conversation_id}"),
         ("PATCH", "/api/conversations/{conversation_id}"),
         ("DELETE", "/api/conversations/{conversation_id}"),
@@ -1760,6 +1762,24 @@ def rename_conversation_title(
     session.commit()
     messages = get_conversation_messages(session, conversation_id)
     return _serialize_conversation(conversation, len(messages))
+
+
+@router.delete("/conversations")
+def remove_all_conversations(
+    response: Response = None,
+    http_request: Request = None,
+    session: Session = Depends(get_session),
+) -> dict[str, int]:
+    """Xoá toàn bộ hội thoại của phiên hiện tại (tài khoản hoặc ẩn danh).
+
+    Owner lấy như ``GET /conversations``: cookie admin không đổi owner, nên admin
+    chỉ xoá được hội thoại của chính trình duyệt đó.
+    """
+    client = auth.get_client_session(http_request, session)
+    client.apply(response)
+    deleted = delete_conversations_for_owner(session, client.owner_key)
+    session.commit()
+    return {"deleted": deleted}
 
 
 @router.delete("/conversations/{conversation_id}")

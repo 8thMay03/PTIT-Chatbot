@@ -8,8 +8,8 @@ const THEMES = [
 ];
 
 /**
- * Bộ chọn chủ đề sáng/tối/hệ thống, dùng chung giữa app sinh viên (nút Giao diện)
- * và tab Giao diện của app admin.
+ * Bộ chọn chủ đề sáng/tối/hệ thống cho tab Giao diện của app admin. App sinh viên
+ * chọn chủ đề trong hộp thoại Cài đặt (`student-settings/StudentSettingsDialog`).
  */
 export default function ThemePicker({ theme, onThemeChange, className = "" }) {
   return (

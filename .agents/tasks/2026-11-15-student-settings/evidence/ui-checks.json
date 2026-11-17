@@ -1,0 +1,67 @@
+{
+  "fontSizes": {
+    "sm": {
+      "bubble": "14px",
+      "citationChip": "9.625px",
+      "sourceName": "10.9375px",
+      "textarea": "13.125px",
+      "sidebarItem": "13px"
+    },
+    "md": {
+      "bubble": "16px",
+      "citationChip": "11px",
+      "sourceName": "12.5px",
+      "textarea": "15px",
+      "sidebarItem": "13px"
+    },
+    "lg": {
+      "bubble": "18px",
+      "citationChip": "12.375px",
+      "sourceName": "14.0625px",
+      "textarea": "16.875px",
+      "sidebarItem": "13px"
+    }
+  },
+  "overflow": {
+    "mobile-lg-light": {
+      "docScrollWidth": 390,
+      "viewport": 390,
+      "messagesOverflow": false
+    },
+    "settings-mobile-light": {
+      "dialogWidth": 390,
+      "bodyScrollWidth": 390,
+      "bodyClientWidth": 390,
+      "sections": 3
+    },
+    "mobile-lg-dark": {
+      "docScrollWidth": 390,
+      "viewport": 390,
+      "messagesOverflow": false
+    },
+    "settings-mobile-dark": {
+      "dialogWidth": 390,
+      "bodyScrollWidth": 390,
+      "bodyClientWidth": 390,
+      "sections": 3
+    }
+  },
+  "keyboard": {
+    "tabOrder": [
+      "button:Đóng cài đặt",
+      "button:Chung",
+      "button:Tài khoản",
+      "button:Dữ liệu & lịch sử",
+      "radio:Sáng",
+      "radio:Vừa",
+      "switch:",
+      "switch:",
+      "button:Đóng cài đặt"
+    ],
+    "fontAfterArrow": "lg",
+    "afterEsc": {
+      "dialogOpen": false,
+      "focused": "Cài đặt"
+    }
+  }
+}

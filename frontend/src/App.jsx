@@ -2,17 +2,15 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Github,
   Menu,
-  Palette,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  Settings,
   Sparkles,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import ChatView from "./ChatView";
 import ConversationList from "./components/ConversationList";
-import Modal from "./components/Modal";
-import ThemePicker from "./components/ThemePicker";
 import { ToastProvider } from "./components/Toast";
 import UserMenu, { GuestHint } from "./components/UserMenu";
 import {
@@ -22,15 +20,18 @@ import {
   readQuestionParam,
 } from "./lib/appRoute";
 import useChatMotion from "./lib/motion/useChatMotion";
+import { usePreferences } from "./lib/preferences";
 import { useSidebar } from "./lib/useSidebar";
 import { useTheme } from "./lib/theme";
 import { queryKeys, STUDENT_ERROR_CONTEXT } from "./api";
+import StudentSettingsDialog from "./student-settings/StudentSettingsDialog";
 
 const REPO_URL = "https://github.com/8thMay03/PTIT-Chatbot";
 
 /**
  * App sinh viên tại `/chat`: chat, lịch sử hội thoại (của tài khoản khi đã đăng
- * nhập, ngược lại của phiên ẩn danh), khối tài khoản và bộ chọn giao diện.
+ * nhập, ngược lại của phiên ẩn danh), khối tài khoản ở chân thanh bên và hộp thoại
+ * Cài đặt (Chung, Tài khoản, Dữ liệu & lịch sử).
  *
  * Không import bất kỳ màn quản trị nào (Dataset/Settings nằm trong chunk
  * `admin/` lazy-load tại `/admin`); hash cũ của các màn đó chuyển sang `/admin`.
@@ -38,12 +39,15 @@ const REPO_URL = "https://github.com/8thMay03/PTIT-Chatbot";
 export default function App() {
   const [chatLoading, setChatLoading] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState(null);
-  const [appearanceOpen, setAppearanceOpen] = useState(() =>
-    isAppearanceHash(window.location.hash)
+  // Mục đang mở của hộp thoại Cài đặt (`general | account | data`), null khi đóng.
+  // Hash cũ `#settings/appearance` mở thẳng mục Chung.
+  const [settingsSection, setSettingsSection] = useState(() =>
+    isAppearanceHash(window.location.hash) ? "general" : null
   );
   // Câu hỏi gửi từ khung soạn ở landing (`/chat?q=`): chỉ điền sẵn vào ô nhập.
   const [prefillQuestion] = useState(() => readQuestionParam(window.location.search));
   const { theme, setTheme } = useTheme();
+  const preferences = usePreferences();
   const sidebar = useSidebar();
   const { isMobile, isOpen: isSidebarOpen, mobileOpen, setMobileOpen } = sidebar;
   const chatRef = useRef(null);
@@ -72,14 +76,14 @@ export default function App() {
         navigateTo(adminTarget);
         return;
       }
-      if (isAppearanceHash(window.location.hash)) setAppearanceOpen(true);
+      if (isAppearanceHash(window.location.hash)) setSettingsSection("general");
     }
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
-  const closeAppearance = useCallback(() => {
-    setAppearanceOpen(false);
+  const closeSettings = useCallback(() => {
+    setSettingsSection(null);
     if (isAppearanceHash(window.location.hash)) {
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
@@ -105,8 +109,9 @@ export default function App() {
     [setMobileOpen]
   );
 
-  // Đăng xuất: cache hội thoại đã bị xoá (useLogout); đưa màn chat về hội thoại mới
-  // để không còn hiện hội thoại của tài khoản.
+  // Đăng xuất (menu tài khoản hoặc Cài đặt): cache hội thoại đã bị xoá (useLogout);
+  // đưa màn chat về hội thoại mới để không còn hiện hội thoại của tài khoản. Xoá
+  // toàn bộ hội thoại trong Cài đặt cũng dùng đường này.
   const handleLoggedOut = useCallback(() => {
     chatRef.current?.reset();
     setActiveConversationId(null);
@@ -209,19 +214,23 @@ export default function App() {
           </div>
           <div className="sidebar-footer">
             <GuestHint />
+            {/* Trên mobile giữ drawer mở: hộp thoại phủ toàn màn hình và khi đóng
+                trả focus về đúng nút trong drawer (drawer đóng thì nút bị inert). */}
             <button
               type="button"
               className="sidebar-nav-item"
-              onClick={() => {
-                setAppearanceOpen(true);
-                setMobileOpen(false);
-              }}
-              title="Giao diện"
+              onClick={() => setSettingsSection("general")}
+              title="Cài đặt"
               aria-haspopup="dialog"
             >
-              <Palette size={18} />
-              <span className="sidebar-nav-label">Giao diện</span>
+              <Settings size={18} />
+              <span className="sidebar-nav-label">Cài đặt</span>
             </button>
+            <UserMenu
+              onLoggedOut={handleLoggedOut}
+              onOpenSettings={setSettingsSection}
+              compact={!isMobile && sidebar.desktopCollapsed}
+            />
             <a
               href={REPO_URL}
               target="_blank"
@@ -259,26 +268,24 @@ export default function App() {
             onLoadingChange={setChatLoading}
             onConversationSaved={handleConversationSaved}
             onNewChat={startNewChat}
-            headerActions={<UserMenu onLoggedOut={handleLoggedOut} />}
             initialInput={prefillQuestion}
             errorContext={STUDENT_ERROR_CONTEXT}
+            enterToSend={preferences.enterToSend}
+            keepReasoningOpen={preferences.keepReasoningOpen}
           />
         </div>
       </main>
 
-      <Modal
-        open={appearanceOpen}
-        onClose={closeAppearance}
-        title="Giao diện"
-        description="Chọn chế độ hiển thị phù hợp với bạn."
-        actions={
-          <button type="button" className="ghost-btn" onClick={closeAppearance}>
-            Đóng
-          </button>
-        }
-      >
-        <ThemePicker theme={theme} onThemeChange={setTheme} className="is-compact" />
-      </Modal>
+      <StudentSettingsDialog
+        open={settingsSection !== null}
+        initialSection={settingsSection ?? "general"}
+        onClose={closeSettings}
+        theme={theme}
+        onThemeChange={setTheme}
+        preferences={preferences}
+        onLoggedOut={handleLoggedOut}
+        onHistoryCleared={handleLoggedOut}
+      />
     </ToastProvider>
   );
 }

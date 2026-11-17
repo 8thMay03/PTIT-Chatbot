@@ -1,0 +1,399 @@
+/* ==========================================================================
+   Hộp thoại Cài đặt của sinh viên (student-settings, D-06)
+   Từ 768px: danh mục trái + nội dung mục đang chọn. Hẹp hơn: toàn màn hình,
+   các nhóm xếp thành một danh sách cuộn.
+   ========================================================================== */
+/* Mở từ drawer thanh bên trên mobile (z-index 45) mà không đóng drawer, để khi
+   đóng hộp thoại focus về đúng nút trong drawer: phủ lên drawer, dưới toast (60). */
+.modal-backdrop:has(> .student-settings) {
+  z-index: 50;
+}
+
+.modal.student-settings {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    "head head"
+    "nav body";
+  width: min(820px, 100%);
+  height: min(600px, calc(100vh - 40px));
+  height: min(600px, calc(100dvh - 40px));
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+}
+
+.ss-head {
+  grid-area: head;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 14px 16px 14px 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ss-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-lg);
+}
+
+.ss-close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.ss-close:hover {
+  background: var(--surface-sunken);
+  color: var(--text);
+}
+
+.ss-nav {
+  grid-area: nav;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 10px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-sunken);
+  overflow-y: auto;
+}
+
+.ss-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ss-nav-item:hover {
+  background: var(--surface-sunken-strong);
+  color: var(--text);
+}
+
+.ss-nav-item.is-active {
+  background: var(--surface);
+  color: var(--brand-text);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.ss-body {
+  grid-area: body;
+  min-height: 0;
+  padding: 6px 24px 24px;
+  overflow-y: auto;
+}
+
+.ss-section:not(.is-active) {
+  display: none;
+}
+
+.ss-section h3 {
+  margin: 14px 0 4px;
+  color: var(--text);
+  font-size: var(--text-md);
+}
+
+/* ---- Dòng tùy chọn ---- */
+.ss-row {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ss-card .ss-row,
+.ss-danger .ss-row {
+  border-bottom: 0;
+}
+
+.ss-row-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+.ss-row-text {
+  min-width: 0;
+}
+
+.ss-row-title {
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.ss-row-desc {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.ss-row-control {
+  flex-shrink: 0;
+}
+
+/* ---- Segmented (radiogroup) ---- */
+.ss-segmented {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--surface-sunken);
+}
+
+.ss-segmented button {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ss-segmented button:hover:not(.is-on) {
+  color: var(--text);
+}
+
+.ss-segmented button.is-on {
+  background: var(--surface);
+  box-shadow: var(--shadow-sm), 0 0 0 1px var(--border);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---- Switch ---- */
+.ss-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease);
+}
+
+.ss-switch span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--gray-0);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+.ss-switch.is-on {
+  background: var(--brand);
+}
+
+.ss-switch.is-on span {
+  transform: translateX(18px);
+}
+
+/* ---- Xem trước cỡ chữ: cùng cỡ với câu trả lời trong bubble ---- */
+.ss-preview {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  color: var(--text);
+  font-size: calc(16px * var(--chat-font-scale));
+  line-height: 1.7;
+}
+
+.ss-preview .citation-chip {
+  cursor: default;
+}
+
+.ss-saved {
+  min-height: 1.4em;
+  margin: 12px 0 0;
+  color: var(--success-text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.ss-saved.is-warning {
+  color: var(--danger-text);
+}
+
+/* ---- Tài khoản / Dữ liệu ---- */
+.ss-card {
+  margin-top: 10px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.ss-account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+}
+
+.ss-account-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ss-account-text > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ss-danger {
+  margin-top: 22px;
+  padding: 12px 16px 4px;
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius);
+}
+
+.ss-danger h4 {
+  margin: 0;
+  color: var(--danger-text);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ss-danger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 8px 14px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--danger-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ss-danger-btn:hover:not(:disabled) {
+  background: var(--danger-subtle);
+}
+
+.ss-danger-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ss-confirm {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--danger-subtle);
+}
+
+.ss-confirm p {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.ss-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* ==========================================================================
+   < 768px: toàn màn hình, các nhóm xếp thành danh sách
+   ========================================================================== */
+@media (max-width: 767px) {
+  .modal.student-settings {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .ss-head {
+    flex-shrink: 0;
+    padding: 10px 10px 10px 16px;
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+
+  .ss-nav {
+    display: none;
+  }
+
+  .ss-body {
+    flex: 1;
+    padding: 0 16px 24px;
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+
+  .ss-section:not(.is-active) {
+    display: block;
+  }
+
+  .ss-section h3 {
+    margin: 22px 0 2px;
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  /* Điều khiển xuống dòng dưới mô tả khi không đủ chỗ (segmented 3 lựa chọn). */
+  .ss-row-main {
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .ss-row-text {
+    flex: 1 1 180px;
+  }
+
+  .ss-account {
+    flex-wrap: wrap;
+  }
+
+  .ss-confirm-actions {
+    flex-direction: column-reverse;
+  }
+
+  .ss-confirm-actions button {
+    width: 100%;
+  }
+}

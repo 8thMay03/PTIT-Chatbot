@@ -119,6 +119,10 @@
   --text-xl: 20px;
   --text-2xl: 26px;
 
+  /* Cỡ chữ vùng chat của sinh viên (câu hỏi, câu trả lời, trích dẫn, ô nhập),
+     đổi theo <html data-font-scale> do lib/preferences.js đặt. */
+  --chat-font-scale: 1;
+
   --duration-fast: 120ms;
   --duration: 180ms;
   --duration-slow: 280ms;
@@ -130,6 +134,14 @@
   /* Trắng thuần: dùng cho chữ/icon nằm TRÊN nền màu đậm (brand, danger...).
      Không đổi theo theme — nếu không, chữ trắng trên nút đỏ sẽ biến mất ở dark mode. */
   --on-solid: #ffffff;
+}
+
+:root[data-font-scale="sm"] {
+  --chat-font-scale: 0.875;
+}
+
+:root[data-font-scale="lg"] {
+  --chat-font-scale: 1.125;
 }
 
 /* --------------------------------------------------------------------------
