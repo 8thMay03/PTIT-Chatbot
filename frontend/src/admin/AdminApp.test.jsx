@@ -285,7 +285,7 @@ describe("AdminApp", () => {
     const backend = createBackend({ authenticated: true });
     await renderAdmin(backend);
 
-    const panel = await waitFor(() => container.querySelector("#settings-panel-config"));
+    const panel = await waitFor(() => container.querySelector("#settings-panel-answer"));
     const temperature = await waitFor(() =>
       container.querySelector('input[aria-label="Giá trị Temperature"]')
     );
@@ -301,19 +301,19 @@ describe("AdminApp", () => {
     expect(dialog.textContent).toContain("Phiên đăng nhập đã hết hạn");
     expect(container.querySelector(".admin-shell").hasAttribute("inert")).toBe(true);
     // Form Settings vẫn là cùng node DOM, bản nháp còn nguyên.
-    expect(container.querySelector("#settings-panel-config")).toBe(panel);
+    expect(container.querySelector("#settings-panel-answer")).toBe(panel);
     expect(temperature.value).toBe("0.7");
 
     await submitLogin(dialog, PASSWORD, "khac@ptit.edu.vn");
     const alert = await waitFor(() => dialog.querySelector('[role="alert"]'));
     expect(alert.textContent).toContain("Email hoặc mật khẩu không đúng.");
-    expect(container.querySelector("#settings-panel-config")).toBe(panel);
+    expect(container.querySelector("#settings-panel-answer")).toBe(panel);
 
     await submitLogin(dialog, PASSWORD);
     expect(backend.state.lastLogin).toEqual({ email: EMAIL, password: PASSWORD });
     await waitFor(() => !container.querySelector('[role="dialog"]'));
     expect(container.querySelector(".admin-shell").hasAttribute("inert")).toBe(false);
-    expect(container.querySelector("#settings-panel-config")).toBe(panel);
+    expect(container.querySelector("#settings-panel-answer")).toBe(panel);
     expect(container.querySelector('input[aria-label="Giá trị Temperature"]').value).toBe("0.7");
   });
 });

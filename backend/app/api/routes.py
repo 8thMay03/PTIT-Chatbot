@@ -77,7 +77,12 @@ from app.core.config import (
     validate_llm_url,
 )
 from app.core.config_crypto import SecretEncryptionUnavailable, is_secret_encryption_configured
-from app.core.config_store import apply_config_update, get_config_store_session, reset_config as reset_stored_config
+from app.core.config_store import (
+    apply_config_update,
+    get_config_store_session,
+    read_saved_at,
+    reset_config as reset_stored_config,
+)
 from app.db import check_db_health, get_session, get_session_factory
 from app.db.models import Message
 from app.db.repositories import (
@@ -382,14 +387,15 @@ def get_current_user(
 
 
 @router.get("/config", response_model=FullConfigResponse, dependencies=[Depends(require_admin)])
-def get_config() -> FullConfigResponse:
-    return _config_response(get_runtime_config_dict())
+def get_config(session: Session = Depends(get_config_store_session)) -> FullConfigResponse:
+    return _config_response(get_runtime_config_dict(), read_saved_at(session))
 
 
-def _config_response(data: dict) -> FullConfigResponse:
+def _config_response(data: dict, updated_at: datetime | None = None) -> FullConfigResponse:
     return FullConfigResponse(
         **data,
         persistence=ConfigPersistenceInfo(secret_encryption_enabled=is_secret_encryption_configured()),
+        updated_at=updated_at,
     )
 
 
@@ -410,7 +416,7 @@ def update_config(
             status_code=503,
             detail="Không lưu được cấu hình vào cơ sở dữ liệu; cấu hình chưa thay đổi.",
         ) from exc
-    return _config_response(updated)
+    return _config_response(updated, read_saved_at(session))
 
 
 @router.post("/config/reset", response_model=FullConfigResponse, dependencies=[Depends(require_admin)])
@@ -423,7 +429,7 @@ def reset_config(session: Session = Depends(get_config_store_session)) -> FullCo
             status_code=503,
             detail="Không xoá được cấu hình đã lưu trong cơ sở dữ liệu; cấu hình chưa thay đổi.",
         ) from exc
-    return _config_response(reset_data)
+    return _config_response(reset_data, read_saved_at(session))
 
 
 @router.post("/config/test-llm", response_model=TestLLMResponse, dependencies=[Depends(require_admin)])

@@ -222,8 +222,8 @@ function ActiveModelCard({ kind, registry, config, profiles, profilesById }) {
             <AlertTriangle size={16} />
             <span>
               Reranker đang tắt nên mô hình được chọn chưa được dùng.{" "}
-              <a className="mdl-inline-link" href="#settings/config">
-                Bật trong Cấu hình RAG <ArrowRight size={13} />
+              <a className="mdl-inline-link" href="#settings/reranker">
+                Bật trong mục Xếp hạng lại <ArrowRight size={13} />
               </a>
             </span>
           </div>

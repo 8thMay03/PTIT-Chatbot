@@ -157,9 +157,10 @@ describe("App sinh viên", () => {
 
     for (const [hash, target] of [
       ["#documents", "/admin#documents"],
-      ["#config", "/admin#settings/config"],
-      ["#models", "/admin#settings/models"],
-      ["#settings/models", "/admin#settings/models"],
+      ["#config", "/admin#settings/retrieval"],
+      ["#models", "/admin#settings/models-llm"],
+      ["#settings/models", "/admin#settings/models-llm"],
+      ["#settings/gate", "/admin#settings/gate"],
     ]) {
       await act(async () => {
         window.history.replaceState(null, "", `/${hash}`);

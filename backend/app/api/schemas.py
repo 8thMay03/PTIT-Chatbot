@@ -348,6 +348,8 @@ class FullConfigResponse(BaseModel):
     embedding: EmbeddingConfigPayload = Field(default_factory=EmbeddingConfigPayload)
     available_providers: AvailableProviders
     persistence: ConfigPersistenceInfo = Field(default_factory=ConfigPersistenceInfo)
+    # Lần lưu/khôi phục mặc định gần nhất (None: chưa từng lưu). Múi giờ do backend ghi.
+    updated_at: datetime | None = None
 
 
 class UpdateLLMConfig(BaseModel):

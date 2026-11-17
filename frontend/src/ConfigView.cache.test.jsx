@@ -152,7 +152,7 @@ describe("cache cấu hình giữa ConfigView và ModelsView", () => {
     });
   }
 
-  it("lưu trạng thái reranker ở tab Cấu hình thì tab Mô hình cập nhật ngay", async () => {
+  it("lưu trạng thái reranker ở form trả lời thì mục Mô hình cập nhật ngay", async () => {
     let current = baseConfig();
     const fetchMock = vi.fn((url, options = {}) => {
       if (String(url).includes("/model-profiles")) return jsonResponse(emptyRegistry());
@@ -162,8 +162,6 @@ describe("cache cấu hình giữa ConfigView và ModelsView", () => {
       return jsonResponse(current);
     });
     vi.stubGlobal("fetch", fetchMock);
-    // Trạng thái reranker nằm ở tab Mô hình xếp hạng lại.
-    localStorage.setItem("ptit_models_tab", "reranker");
 
     await renderViews(
       <>

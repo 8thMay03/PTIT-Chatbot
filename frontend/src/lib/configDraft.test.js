@@ -3,6 +3,7 @@ import {
   buildConfigPayload,
   calibratedFromConfig,
   listConfigChanges,
+  listDirtySections,
   mergeConfigDraft,
   valuesFromConfig,
 } from "./configDraft";
@@ -111,6 +112,25 @@ describe("buildConfigPayload", () => {
       reranker: { enabled: false },
       guardrails: { min_bm25_norm_score: 0.3 },
     });
+  });
+
+  it("gửi công tắc viết lại câu hỏi bằng LLM trong nhóm retrieval", () => {
+    expect(buildConfigPayload({ ...saved, queryRewriteUseLlm: true }, saved)).toEqual({
+      retrieval: { query_rewrite_use_llm: true },
+    });
+  });
+});
+
+describe("listDirtySections", () => {
+  it("gom trường đã đổi theo mục pipeline", () => {
+    const saved = valuesFromConfig(config());
+    expect(listDirtySections(saved, saved)).toEqual([]);
+    expect(
+      listDirtySections(
+        { ...saved, topK: 6, minVectorScore: 0.4, temperature: 0.2 },
+        saved
+      )
+    ).toEqual(["retrieval", "gate", "generation"]);
   });
 });
 
