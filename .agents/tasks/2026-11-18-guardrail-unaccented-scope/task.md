@@ -86,7 +86,7 @@ Kết quả mong muốn:
 
 - Tóm tắt: S-01 … S-04 xong trên `feat/guardrail-unaccented-scope` (`bf5d794`, `848b2de`, `b0fdbe6`, `80438aa`). AC-01 … AC-08 đạt (`verification.md`); review vòng 1 `approved` (`self_review`). S-05: người dùng chọn không sửa tài liệu Chương 2.
 - Blocker: không có.
-- Bước tiếp theo: mở PR vào `dev`. Đề xuất task "chuẩn hóa câu không dấu trước truy xuất" (MSG-agent-backend-002) chờ người dùng quyết định.
+- Bước tiếp theo: chờ merge PR #75 vào `dev`. Đề xuất task "chuẩn hóa câu không dấu trước truy xuất" (MSG-agent-backend-002) chờ người dùng quyết định.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 

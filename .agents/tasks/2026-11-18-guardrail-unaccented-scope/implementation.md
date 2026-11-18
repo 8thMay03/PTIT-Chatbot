@@ -131,3 +131,4 @@ Trả lời MSG-agent-backend-001: "không sửa tài liệu". agent-backend ghi
 
 - `2026-11-18T23:04:16+07:00` — agent-backend: S-01 … S-04 xong trên `feat/guardrail-unaccented-scope` (4 commit ở trên), test backend/frontend đạt (V-08). S-05 chờ người dùng chọn phương án trong MSG-agent-backend-001. Người nhận: user. Bước tiếp theo: sửa tài liệu Chương 2 theo phương án được chọn, cập nhật V-07, review lại, mở PR vào `dev`.
 - `2026-11-18T23:14:34+07:00` — agent-backend: S-05 đóng theo quyết định của người dùng (không sửa Chương 2). Đã ghi V-01 … V-08 và self-review. Bước tiếp theo: commit file task, đẩy nhánh, mở PR vào `dev`.
+- `2026-11-18T23:20:00+07:00` — agent-backend: đẩy nhánh `feat/guardrail-unaccented-scope` (đến `6b6eecb`) và mở PR #75 vào `dev`: https://github.com/8thMay03/PTIT-Chatbot/pull/75.
