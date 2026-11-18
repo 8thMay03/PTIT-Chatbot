@@ -747,10 +747,10 @@ export default function ConfigView({
                   <div className="config-toggle-header">
                     <div>
                       <span className="config-toggle-title" id="cfg-scope-label">
-                        Kiểm soát phạm vi PTIT
+                        Chặn yêu cầu không an toàn
                       </span>
                       <p className="config-toggle-desc">
-                        Từ chối lịch sự khi câu hỏi không liên quan đến Học viện
+                        Từ chối câu chèn lệnh, yêu cầu viết code, sáng tác hoặc làm bài tập
                       </p>
                       {changeMark("scopeEnabled")}
                     </div>

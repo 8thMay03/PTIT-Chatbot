@@ -194,7 +194,7 @@ def test_rag_chain_retrieve_context_with_scope_guardrail_enabled(monkeypatch) ->
     assert result["guardrail_allowed"] is True
     assert result["retrieval_debug"]["guardrail"] == {
         "allowed": True,
-        "reason": "ptit_domain",
+        "reason": "passed",
     }
 
 

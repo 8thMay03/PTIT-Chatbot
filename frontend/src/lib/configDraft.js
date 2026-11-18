@@ -96,7 +96,7 @@ export const CONFIG_FIELDS = {
     calibratedKey: "rerank",
   },
   scopeEnabled: {
-    label: "Kiểm soát phạm vi PTIT",
+    label: "Chặn yêu cầu không an toàn",
     path: ["guardrails", "scope_enabled"],
     section: "gate",
     format: onOff,

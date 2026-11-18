@@ -22,8 +22,6 @@ ANSWERABLE_SETS = ("ptit_rag_300.json", "ptit_ragas_100.json")
 HANDBOOK_NAME = "74650b2536daae9e462a2a074e0d38d72e176796aa198d1ac0dc00ec8633a946.md"
 CASE_ID_RE = re.compile(r"^noans_\d{3}$")
 CATEGORIES = {"in_domain_missing", "near_miss", "out_of_domain"}
-# Câu bị scope guardrail chặn thì không bao giờ tới gate; giữ đủ câu lọt qua để đo gate.
-MIN_SCOPE_PASS_RATE = 0.70
 MIN_CASES = 50
 
 
@@ -65,16 +63,10 @@ def test_questions_are_unique_and_disjoint_from_answerable_sets() -> None:
         assert not overlap, f"Trùng câu hỏi với {name}: {sorted(overlap)}"
 
 
-def test_most_cases_pass_the_scope_guardrail() -> None:
-    passed = sum(check_scope(case["question"]).allowed for case in CASES)
-    assert passed / len(CASES) >= MIN_SCOPE_PASS_RATE
-    # Câu trong miền phải tới được gate: chúng là phần gate phải tự từ chối.
-    blocked_in_domain = [
-        case["id"]
-        for case in CASES
-        if case["category"] != "out_of_domain" and not check_scope(case["question"]).allowed
-    ]
-    assert not blocked_in_domain
+def test_every_case_passes_the_scope_guardrail() -> None:
+    # Guardrail chỉ chặn injection/tác vụ cấm; mọi câu phải tới gate để đo việc từ chối.
+    blocked = [case["id"] for case in CASES if not check_scope(case["question"]).allowed]
+    assert not blocked
 
 
 @pytest.fixture(scope="module")
