@@ -1,0 +1,27 @@
+title Đánh giá câu trả lời
+autonumber
+participant "Sinh viên" as SV
+participant "Khung chat\n(Web/WebView)" as UI
+participant "API hỏi đáp" as API
+participant "API xác thực" as AUTH
+participant "CSDL\n(PostgreSQL + pgvector)" as DB
+
+SV->UI: Chọn hữu ích hoặc không hữu ích dưới câu trả lời
+opt Không hữu ích
+  UI-->SV: Hiện ô góp ý
+  SV->UI: Nhập góp ý
+end
+UI->API: Gửi đánh giá (mã câu trả lời, mức đánh giá, góp ý)
+API->AUTH: Kiểm tra phiên đăng nhập
+AUTH-->API: Sinh viên
+API->DB: Đọc câu trả lời và chủ hội thoại chứa câu trả lời
+DB-->API: Câu trả lời, chủ hội thoại
+API->API: Kiểm tra câu trả lời thuộc hội thoại của sinh viên
+alt Không thuộc hội thoại của sinh viên
+  API-->UI: Báo lỗi: không có quyền đánh giá
+  UI-->SV: Hiển thị lỗi
+else Thuộc hội thoại của sinh viên
+  API->DB: Lưu hoặc cập nhật đánh giá (mỗi sinh viên một đánh giá cho một câu trả lời)
+  API-->UI: Đã ghi nhận
+  UI-->SV: Hiển thị trạng thái đã đánh giá
+end
