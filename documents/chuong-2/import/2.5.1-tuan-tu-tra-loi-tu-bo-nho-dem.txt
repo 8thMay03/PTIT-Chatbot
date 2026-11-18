@@ -1,0 +1,29 @@
+title Hỏi đáp - trả lời từ bộ nhớ đệm
+autonumber
+participant "Sinh viên" as SV
+participant "Khung chat\n(Web/WebView)" as UI
+participant "API hỏi đáp" as API
+participant "API xác thực" as AUTH
+participant "Bộ chuẩn hóa,\nviết lại câu hỏi" as NORM
+participant "Bộ kiểm soát\ncâu trả lời" as GUARD
+participant "Bộ nhớ đệm" as CACHE
+participant "CSDL\n(PostgreSQL + pgvector)" as DB
+
+SV->UI: Nhập câu hỏi hoặc chọn câu hỏi gợi ý
+UI->API: Gửi câu hỏi kèm mã hội thoại
+API->AUTH: Kiểm tra phiên đăng nhập
+AUTH-->API: Sinh viên (mã sinh viên, khóa, ngành)
+API->DB: Đọc lịch sử hội thoại (chưa có thì tạo hội thoại mới; không thuộc sinh viên thì báo lỗi; bỏ các lượt bị từ chối)
+DB-->API: Lịch sử hội thoại
+API->NORM: Chuẩn hóa, viết lại câu hỏi (câu hỏi, lịch sử)
+NORM->NORM: Xử lý câu không dấu, mở rộng từ viết tắt
+NORM->NORM: Viết lại câu hỏi nối tiếp thành câu độc lập
+NORM-->API: Câu hỏi độc lập
+API->GUARD: Kiểm tra phạm vi, chèn lệnh, yêu cầu dữ liệu cá nhân hoặc giao dịch
+GUARD-->API: Hợp lệ
+API->CACHE: Tìm câu trả lời còn hạn theo (câu hỏi độc lập, khóa, ngành); bỏ qua nếu sinh viên chưa có khóa, ngành
+CACHE->CACHE: Tăng số lần dùng
+CACHE-->API: Có: câu trả lời, nguồn trích dẫn, câu hỏi gợi ý
+API-->UI: Trả câu trả lời theo streaming
+UI-->SV: Hiển thị câu trả lời, nguồn trích dẫn, câu hỏi gợi ý
+API->DB: Lưu câu hỏi, câu trả lời, nguồn vào hội thoại (lấy từ bộ nhớ đệm)

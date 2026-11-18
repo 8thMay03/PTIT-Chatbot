@@ -1,0 +1,19 @@
+title Xem phản hồi
+autonumber
+participant "Quản trị viên" as QTV
+participant "Trang quản trị" as ADM
+participant "API quản trị" as APIA
+participant "API xác thực" as AUTH
+participant "CSDL\n(PostgreSQL + pgvector)" as DB
+
+QTV->ADM: Mở mục xem phản hồi
+ADM->APIA: Lấy phản hồi (khoảng thời gian, nhóm tri thức)
+APIA->AUTH: Kiểm tra phiên quản trị
+AUTH-->APIA: Hợp lệ
+APIA->DB: Đọc câu trả lời bị đánh giá không hữu ích
+DB-->APIA: Câu hỏi, câu trả lời, góp ý, nguồn trích dẫn
+APIA->DB: Đọc câu hỏi hệ thống không trả lời được (không đủ căn cứ)
+DB-->APIA: Danh sách câu hỏi
+APIA-->ADM: Danh sách phản hồi
+ADM-->QTV: Hiển thị phản hồi để bổ sung tài liệu
+note over QTV,ADM: Thiếu tài liệu thì nạp bổ sung theo 2.5.4

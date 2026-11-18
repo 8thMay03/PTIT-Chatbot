@@ -1,0 +1,45 @@
+title Nạp tài liệu tri thức
+autonumber
+participant "Quản trị viên" as QTV
+participant "Trang quản trị" as ADM
+participant "API quản trị" as APIA
+participant "API xác thực" as AUTH
+participant "Kho tệp\ntài liệu" as FILES
+participant "Bộ trích xuất\n(OCR)" as EXT
+participant "Bộ chia đoạn" as CHUNK
+participant "Bộ lập chỉ mục" as IDX
+participant "Bộ nhớ đệm" as CACHE
+participant "CSDL\n(PostgreSQL + pgvector)" as DB
+
+QTV->ADM: Chọn tệp; nhập nhóm tri thức, nguồn (có phải văn bản chính thức), ngày ban hành, ngày hết hạn, đối tượng áp dụng
+ADM->APIA: Tải lên tài liệu kèm thông tin
+APIA->AUTH: Kiểm tra phiên quản trị
+AUTH-->APIA: Hợp lệ
+APIA->APIA: Kiểm tra định dạng (PDF, DOCX, bản scan)
+APIA->FILES: Lưu tệp gốc
+FILES-->APIA: Đường dẫn lưu trữ
+APIA->DB: Lưu tài liệu, đối tượng áp dụng (đang xử lý)
+APIA->EXT: Trích xuất nội dung
+EXT->EXT: Nhận dạng ký tự (OCR) nếu là bản scan; giữ tiêu đề, bảng biểu
+EXT-->APIA: Nội dung trích xuất
+APIA->DB: Lưu nội dung trích xuất (bản scan: chờ kiểm tra)
+opt Tài liệu là bản scan
+  APIA-->ADM: Tài liệu chờ kiểm tra
+  note over QTV,APIA: Bất đồng bộ: quản trị viên mở tài liệu chờ kiểm tra vào lúc khác
+  QTV->ADM: Mở tài liệu chờ kiểm tra, sửa và xác nhận nội dung
+  ADM->APIA: Gửi nội dung đã kiểm tra
+  APIA->DB: Lưu nội dung đã kiểm tra (vị trí đoạn tính trên bản này)
+end
+APIA->CHUNK: Chia đoạn (nội dung, thông tin tài liệu)
+CHUNK->CHUNK: Chia theo Chương - Điều - Khoản (và chia cố định cho RAG cơ bản); ghi vị trí đầu, cuối trong nội dung; gắn khóa, ngành, năm học, ngày hết hạn
+CHUNK-->APIA: Danh sách đoạn
+APIA->IDX: Lập chỉ mục (danh sách đoạn)
+IDX->IDX: Tách từ tiếng Việt cho BM25, tạo vector nhúng
+IDX->DB: Lưu đoạn, đối tượng áp dụng của đoạn, văn bản đã tách từ, vector
+IDX-->APIA: Hoàn tất
+APIA->CACHE: Tăng số lần hủy đệm của nhóm, rồi hủy câu trả lời đệm có nguồn cùng nhóm tri thức (QT6)
+CACHE-->APIA: Số câu trả lời đã hủy
+APIA->DB: Cập nhật trạng thái tài liệu: đang hiệu lực
+note over APIA,DB: Hủy bộ nhớ đệm và cập nhật trạng thái trong một giao dịch (khóa nhóm trước, tài liệu sau)
+APIA-->ADM: Kết quả nạp
+ADM-->QTV: Hiển thị tài liệu và các đoạn đã chia

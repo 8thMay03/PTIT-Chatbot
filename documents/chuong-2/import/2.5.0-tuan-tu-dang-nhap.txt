@@ -1,0 +1,34 @@
+title Đăng nhập của sinh viên
+autonumber
+participant "Sinh viên" as SV
+participant "Ứng dụng vỏ\n(WebView)" as SHELL
+participant "Khung chat\n(Web/WebView)" as UI
+participant "API xác thực" as AUTH
+participant "API hỏi đáp" as API
+participant "CSDL\n(PostgreSQL + pgvector)" as DB
+
+alt Mở khung chat trên trình duyệt
+  SV->UI: Nhập mã sinh viên, mật khẩu
+  UI->AUTH: Đăng nhập (mã sinh viên, mật khẩu)
+  AUTH->DB: Tìm tài khoản theo mã sinh viên
+  DB-->AUTH: Tài khoản (mật khẩu băm, khóa, ngành)
+  AUTH->AUTH: Kiểm tra mật khẩu
+else Mở trong ứng dụng vỏ
+  SV->SHELL: Mở mục Hỏi đáp trong ứng dụng của trường
+  SHELL->UI: Mở khung chat trong WebView kèm danh tính (mã sinh viên, họ tên, khóa, ngành)
+  UI->AUTH: Đăng nhập bằng danh tính từ ứng dụng vỏ
+  AUTH->AUTH: Kiểm tra chữ ký của danh tính (mô phỏng)
+end
+alt Không hợp lệ
+  AUTH-->UI: Báo lỗi đăng nhập
+  UI-->SV: Hiển thị lỗi
+else Hợp lệ
+  AUTH->DB: Tạo hoặc cập nhật tài khoản (khi vào từ ứng dụng vỏ), lưu lần đăng nhập gần nhất
+  AUTH-->UI: Phiên đăng nhập (cookie)
+  UI->API: Lấy câu hỏi phổ biến
+  API->DB: Đọc câu hỏi phổ biến đang dùng
+  DB-->API: Danh sách câu hỏi
+  API-->UI: Câu hỏi phổ biến
+  UI-->SV: Mở hội thoại mới, hiển thị câu hỏi gợi ý
+end
+note over UI,AUTH: Quản trị viên đăng nhập trang quản trị bằng tài khoản quản trị, như nhánh trình duyệt

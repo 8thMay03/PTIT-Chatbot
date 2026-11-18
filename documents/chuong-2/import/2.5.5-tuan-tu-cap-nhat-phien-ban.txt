@@ -1,0 +1,40 @@
+title Cập nhật phiên bản tài liệu
+autonumber
+participant "Quản trị viên" as QTV
+participant "Trang quản trị" as ADM
+participant "API quản trị" as APIA
+participant "API xác thực" as AUTH
+participant "Kho tệp\ntài liệu" as FILES
+participant "Bộ lập chỉ mục" as IDX
+participant "Bộ nhớ đệm" as CACHE
+participant "CSDL\n(PostgreSQL + pgvector)" as DB
+
+QTV->ADM: Chọn tài liệu đang hiệu lực, chọn cập nhật phiên bản
+QTV->ADM: Tải văn bản mới; nhập nguồn (có phải văn bản chính thức), ngày ban hành, ngày hết hạn, đối tượng áp dụng
+ADM->APIA: Gửi văn bản mới (mã tài liệu cũ, thông tin văn bản mới)
+APIA->AUTH: Kiểm tra phiên quản trị
+AUTH-->APIA: Hợp lệ
+APIA->DB: Đọc tài liệu cũ
+DB-->APIA: Nhóm tri thức, đối tượng áp dụng, phiên bản, bản thay đang xử lý (nếu có)
+APIA->APIA: So sánh đối tượng áp dụng của văn bản mới với bản cũ
+alt Khác đối tượng áp dụng hoặc đã có bản thay đang xử lý
+  APIA-->ADM: Báo lỗi: chỉ thay văn bản cùng đối tượng áp dụng, mỗi lần một bản thay
+  ADM-->QTV: Hiển thị lỗi
+else Cùng đối tượng áp dụng, chưa có bản thay đang xử lý
+  APIA->APIA: Kiểm tra định dạng (PDF, DOCX, bản scan)
+  APIA->FILES: Lưu tệp gốc
+  FILES-->APIA: Đường dẫn lưu trữ
+  APIA->DB: Lưu bản mới, đối tượng áp dụng (phiên bản + 1, thay thế bản cũ, đang xử lý)
+  APIA->APIA: Trích xuất, lưu nội dung, chia đoạn bản mới như 2.5.4 (bản scan chờ quản trị viên kiểm tra, bất đồng bộ)
+  APIA->IDX: Lập chỉ mục bản mới
+  IDX->DB: Lưu đoạn, đối tượng áp dụng, văn bản đã tách từ, vector của bản mới
+  IDX-->APIA: Hoàn tất
+  note over APIA,DB: Bản mới đang xử lý nên chưa được truy xuất; bản cũ vẫn phục vụ tới khi kích hoạt
+  APIA->CACHE: Tăng số lần hủy đệm của nhóm, rồi hủy câu trả lời đệm có nguồn cùng nhóm tri thức, gồm tài liệu cũ (QT6)
+  CACHE-->APIA: Số câu trả lời đã hủy
+  APIA->DB: Chuyển bản mới sang đang hiệu lực
+  APIA->DB: Chuyển bản cũ sang đã bị thay thế
+  note over APIA,DB: Ba bước kích hoạt trong một giao dịch (khóa nhóm trước, tài liệu sau); lỗi thì hoàn tác, bản cũ vẫn hiệu lực
+  APIA-->ADM: Kết quả cập nhật
+  ADM-->QTV: Hiển thị phiên bản mới
+end

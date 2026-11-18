@@ -1,0 +1,66 @@
+title Hỏi đáp - truy xuất và sinh câu trả lời
+autonumber
+participant "Sinh viên" as SV
+participant "Khung chat\n(Web/WebView)" as UI
+participant "API hỏi đáp" as API
+participant "API xác thực" as AUTH
+participant "Bộ chuẩn hóa,\nviết lại câu hỏi" as NORM
+participant "Bộ kiểm soát\ncâu trả lời" as GUARD
+participant "Bộ nhớ đệm" as CACHE
+participant "Bộ truy xuất lai" as RETR
+participant "Bộ xếp hạng lại\n(cross-encoder)" as RR
+participant "Bộ sinh\ncâu trả lời" as GEN
+participant "Dịch vụ LLM" as LLM
+participant "CSDL\n(PostgreSQL + pgvector)" as DB
+
+SV->UI: Nhập câu hỏi hoặc chọn câu hỏi gợi ý
+UI->API: Gửi câu hỏi kèm mã hội thoại
+API->AUTH: Kiểm tra phiên đăng nhập
+AUTH-->API: Sinh viên (mã sinh viên, khóa, ngành)
+API->DB: Đọc lịch sử hội thoại (chưa có thì tạo hội thoại mới; không thuộc sinh viên thì báo lỗi; bỏ các lượt bị từ chối)
+DB-->API: Lịch sử hội thoại
+API->NORM: Chuẩn hóa, viết lại câu hỏi (câu hỏi, lịch sử)
+NORM->NORM: Xử lý câu không dấu, mở rộng từ viết tắt
+NORM->NORM: Viết lại câu hỏi nối tiếp thành câu độc lập
+NORM-->API: Câu hỏi độc lập
+API->GUARD: Kiểm tra phạm vi, chèn lệnh, yêu cầu dữ liệu cá nhân hoặc giao dịch
+GUARD-->API: Hợp lệ
+API->CACHE: Tìm câu trả lời còn hạn theo (câu hỏi độc lập, khóa, ngành); bỏ qua nếu sinh viên chưa có khóa, ngành
+CACHE-->API: Chưa có
+API->RETR: Truy xuất lai (câu hỏi độc lập, khóa, ngành)
+RETR->DB: Đọc số lần hủy đệm của các nhóm tri thức (trước khi tìm kiếm)
+DB-->RETR: Số lần hủy đệm theo nhóm
+RETR->RETR: Tìm kiếm từ khóa BM25 trên văn bản đã tách từ
+RETR->DB: Tìm kiếm theo vector nhúng
+DB-->RETR: Các đoạn gần nghĩa
+RETR->RETR: Hợp nhất kết quả; bỏ tài liệu hết hạn, bị thay thế, đã xóa; ưu tiên đoạn đúng khóa, ngành và nguồn chính thức
+RETR-->API: Các đoạn ứng viên (kèm nhóm tri thức, số lần hủy đệm đã đọc)
+API->RR: Xếp hạng lại (câu hỏi, các đoạn ứng viên)
+RR-->API: k đoạn liên quan nhất
+API->GUARD: Kiểm tra đủ căn cứ (k đoạn)
+GUARD-->API: Đủ căn cứ
+API->GEN: Sinh câu trả lời (câu hỏi; k đoạn kèm tên văn bản, ngày ban hành, năm học, nhóm tri thức; khóa, ngành)
+GEN->LLM: Gửi yêu cầu: chỉ dùng k đoạn, trích dẫn nguồn, nêu đối tượng áp dụng (chưa rõ thì trình bày theo từng khóa, ngành), khuyến cáo đối chiếu văn bản gốc; lịch thi ghi ngày ban hành, học phí ghi năm học, học vụ ghi đơn vị xử lý
+loop Từng phần câu trả lời
+  LLM-->GEN: Phần câu trả lời
+  GEN-->API: Phần câu trả lời
+  API-->UI: Phần câu trả lời (streaming)
+  UI-->SV: Hiển thị dần
+end
+LLM-->GEN: Trích dẫn, câu hỏi gợi ý
+GEN->GEN: Gắn trích dẫn với đoạn nguồn (văn bản, ngày ban hành, Điều/Khoản)
+GEN->GEN: Kiểm tra có ít nhất một trích dẫn hợp lệ (QT1)
+alt Không có trích dẫn hợp lệ
+  GEN-->API: Không đạt QT1
+  API->DB: Lấy phòng ban theo nhóm tri thức của đoạn điểm cao nhất
+  DB-->API: Tên phòng ban, thông tin liên hệ
+  API-->UI: Lệnh thay câu trả lời đã hiển thị bằng thông báo không đủ căn cứ, kèm phòng ban (QT2)
+  UI-->SV: Thay câu trả lời bằng thông báo
+  API->DB: Lưu câu hỏi, thông báo vào hội thoại (không đủ căn cứ); không lưu bộ nhớ đệm
+else Có trích dẫn hợp lệ
+  GEN-->API: Nguồn trích dẫn, câu hỏi gợi ý
+  API-->UI: Nguồn trích dẫn, câu hỏi gợi ý
+  UI-->SV: Hiển thị nguồn trích dẫn, câu hỏi gợi ý
+  API->DB: Lưu câu hỏi, câu trả lời, nguồn trích dẫn vào hội thoại
+  API->CACHE: Lưu câu trả lời kèm nguồn, hạn dùng theo khóa (câu hỏi độc lập, khóa, ngành) nếu nguồn còn hiệu lực và số lần hủy đệm của nhóm chưa đổi; bỏ qua nếu sinh viên chưa có khóa, ngành
+end

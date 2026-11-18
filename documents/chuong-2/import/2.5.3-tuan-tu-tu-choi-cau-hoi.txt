@@ -1,0 +1,45 @@
+title Hỏi đáp - từ chối câu hỏi
+autonumber
+participant "Sinh viên" as SV
+participant "Khung chat\n(Web/WebView)" as UI
+participant "API hỏi đáp" as API
+participant "API xác thực" as AUTH
+participant "Bộ chuẩn hóa,\nviết lại câu hỏi" as NORM
+participant "Bộ kiểm soát\ncâu trả lời" as GUARD
+participant "Bộ nhớ đệm" as CACHE
+participant "Bộ truy xuất lai" as RETR
+participant "Bộ xếp hạng lại\n(cross-encoder)" as RR
+participant "CSDL\n(PostgreSQL + pgvector)" as DB
+
+SV->UI: Nhập câu hỏi hoặc chọn câu hỏi gợi ý
+UI->API: Gửi câu hỏi kèm mã hội thoại
+API->AUTH: Kiểm tra phiên đăng nhập
+AUTH-->API: Sinh viên (mã sinh viên, khóa, ngành)
+API->DB: Đọc lịch sử hội thoại (chưa có thì tạo hội thoại mới; không thuộc sinh viên thì báo lỗi; bỏ các lượt bị từ chối)
+DB-->API: Lịch sử hội thoại
+API->NORM: Chuẩn hóa, viết lại câu hỏi (câu hỏi, lịch sử)
+NORM->NORM: Xử lý câu không dấu, mở rộng từ viết tắt
+NORM->NORM: Viết lại câu hỏi nối tiếp thành câu độc lập
+NORM-->API: Câu hỏi độc lập
+API->GUARD: Kiểm tra phạm vi, chèn lệnh, yêu cầu dữ liệu cá nhân hoặc giao dịch
+alt Ngoài phạm vi (kể cả dữ liệu cá nhân, giao dịch) hoặc chèn lệnh (QT7)
+  GUARD-->API: Từ chối
+  API->API: Tạo thông báo từ chối, hướng dẫn kênh phù hợp
+else Hợp lệ, bộ nhớ đệm chưa có câu trả lời
+  GUARD-->API: Hợp lệ
+  API->CACHE: Tìm câu trả lời còn hạn theo (câu hỏi độc lập, khóa, ngành); bỏ qua nếu sinh viên chưa có khóa, ngành
+  CACHE-->API: Chưa có
+  API->RETR: Truy xuất lai (câu hỏi độc lập, khóa, ngành)
+  RETR-->API: Các đoạn ứng viên
+  API->RR: Xếp hạng lại
+  RR-->API: k đoạn liên quan nhất
+  API->GUARD: Kiểm tra đủ căn cứ (k đoạn)
+  GUARD-->API: Không đủ căn cứ
+  API->DB: Lấy phòng ban theo nhóm tri thức của đoạn điểm cao nhất (không có đoạn: nhóm mặc định)
+  DB-->API: Tên phòng ban, thông tin liên hệ
+  API->API: Tạo thông báo không đủ thông tin, chỉ phòng ban (QT2)
+end
+API-->UI: Trả thông báo theo streaming
+UI-->SV: Hiển thị thông báo
+API->DB: Lưu câu hỏi, thông báo vào hội thoại (trạng thái từ chối)
+note over API,CACHE: Câu trả lời từ chối không lưu vào bộ nhớ đệm
