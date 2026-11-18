@@ -11,7 +11,7 @@ Thay vì để mô hình trả lời hoàn toàn từ kiến thức có sẵn, c
 - Parent-child chunking để vừa tìm kiếm chính xác vừa giữ đủ ngữ cảnh.
 - Hybrid retrieval kết hợp vector search và BM25.
 - Multi-query, Reciprocal Rank Fusion và reranking kết quả.
-- Guardrail chặn câu hỏi ngoài phạm vi và prompt injection.
+- Guardrail đầu vào chặn prompt injection và tác vụ cấm (viết code, sáng tác, dịch/tóm tắt, giải bài tập), nhận diện cả câu viết không dấu; câu ngoài phạm vi tài liệu do confidence gate và LLM từ chối.
 - Confidence gate từ chối trả lời khi không tìm thấy bằng chứng đủ mạnh.
 - Câu trả lời có citation tới tài liệu, mục, Điều, Khoản hoặc Điểm.
 - Streaming câu trả lời trên giao diện web.
@@ -60,9 +60,9 @@ flowchart LR
 flowchart TD
     U["Người dùng"] --> UI["React Chat UI"]
     UI --> API["FastAPI"]
-    API --> GR{"Scope & Security<br/>Guardrail"}
+    API --> GR{"Security<br/>Guardrail"}
 
-    GR -->|"Ngoài phạm vi"| REFUSE["Câu từ chối cố định"]
+    GR -->|"Chèn lệnh / tác vụ cấm"| REFUSE["Câu từ chối cố định"]
     GR -->|"Hợp lệ"| QR["Query Rewrite & Multi-query"]
 
     QR --> VS["Vector Search (pgvector HNSW)"]
@@ -84,11 +84,11 @@ flowchart TD
 
 Quy trình chính:
 
-1. Guardrail kiểm tra phạm vi PTIT và dấu hiệu prompt injection.
+1. Guardrail chặn prompt injection và tác vụ cấm theo danh sách mẫu (so khớp cả bản không dấu khi câu hỏi viết không dấu). Guardrail không lọc theo từ khóa chủ đề.
 2. Câu hỏi hợp lệ được chuẩn hóa và tạo nhiều truy vấn tìm kiếm.
 3. Vector search và BM25 chạy song song trên kho tài liệu.
 4. Kết quả được hợp nhất bằng RRF và sắp xếp lại bằng reranker.
-5. Confidence gate kiểm tra độ mạnh của context.
+5. Confidence gate kiểm tra độ mạnh của context; câu ngoài phạm vi tài liệu dừng ở đây với câu "không tìm thấy thông tin".
 6. LLM chỉ sử dụng context được cung cấp để trả lời.
 7. Citation được kiểm tra, chuẩn hóa và trả về giao diện theo dạng streaming.
 
@@ -107,7 +107,7 @@ PTIT Chatbot/
 │   │   ├── db/           # PostgreSQL/SQLAlchemy models, repositories, session
 │   │   ├── embeddings/   # Các embedding provider
 │   │   ├── generation/   # RAG chain, prompt, LLM và citation
-│   │   ├── guardrails/   # Scope filter và prompt-injection protection
+│   │   ├── guardrails/   # Danh sách chặn prompt injection và tác vụ cấm
 │   │   ├── ingestion/    # Đọc, làm sạch và chia tài liệu
 │   │   ├── parsers/      # Interface, registry, text, Docling và LlamaParse parser
 │   │   ├── retrieval/    # BM25, hybrid retrieval, RRF và reranker
