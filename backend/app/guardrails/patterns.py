@@ -4,32 +4,11 @@ OUT_OF_SCOPE_ANSWER = (
     "hoặc điều kiện tốt nghiệp."
 )
 
-DOMAIN_TERMS = (
-    "ptit", "học viện", "nhà trường", "sinh viên", "học tập", "khóa học",
-    "học kỳ", "học phần", "môn học", "tín chỉ", "chương trình đào tạo",
-    "chương trình", "đào tạo", "ngành học", "mã ngành", "ngành công nghệ",
-    "ngành an toàn", "ngành marketing", "đăng ký môn", "đăng ký học", "học phí",
-    "lệ phí", "học bổng", "tốt nghiệp", "cảnh báo học", "điểm trung bình",
-    "điểm chữ", "thang điểm", "bảng điểm", "khiếu nại điểm", "cải thiện điểm",
-    "học lại", "xếp loại", "gpa", "cpa", "thi cử", "kỳ thi", "thi hộ",
-    "phúc khảo", "bảo lưu", "thôi học", "nghỉ học", "chuyển ngành", "chuyển trường",
-    "rèn luyện", "kỷ luật", "khen thưởng", "thẻ sinh viên", "ký túc xá", "thư viện",
-    "đoàn thanh niên", "công tác sinh viên", "thủ tục", "giấy xác nhận", "chứng chỉ",
-    "chuẩn đầu ra", "giảng đường", "giảng viên", "giảng dạy", "lớp học", "vào lớp",
-    "khảo thí", "thực tập", "cố vấn học tập", "thời khóa biểu", "lịch học", "lịch thi",
-    "edusoft", "qldt", "s-link", "kế hoạch năm học", "nghỉ tết", "tết nguyên đán",
-    "địa chỉ trường", "cơ sở đào tạo", "phòng đào tạo", "trưởng khoa",
-    "phó trưởng khoa", "chủ nhiệm khoa", "chủ nhiệm bộ môn", "chủ nhiệm viện",
-    "chủ nhiệm phòng", "chủ nhiệm trung tâm",
-)
-
-FOLLOW_UP_PATTERNS = (
-    r"^(?:còn|thế còn|vậy|trường hợp này|trường hợp đó|quy định này|quy định đó|nó)\b",
-    r"^(?:bao nhiêu|khi nào|ở đâu|tại sao|như thế nào|có được không|cần gì)\b",
-)
-
+# Mẫu viết theo văn bản có dấu; bản không dấu được sinh tự động (xem matching.PatternSet).
+# "sinh" bị bỏ khỏi nhóm động từ code_generation và "tạo" không khớp sau "đào" để
+# "tuyển sinh/thí sinh chương trình", "đào tạo chương trình" không bị chặn nhầm.
 BLOCKED_PATTERNS = (
-    ("code_generation", r"\b(?:viết|tạo|sinh|làm)\s+(?:cho\s+(?:tôi|mình|em)\s+)?(?:mã|code|script|chương trình)\b"),
+    ("code_generation", r"\b(?:viết|(?<!đào )tạo|làm)\s+(?:cho\s+(?:tôi|mình|em)\s+)?(?:mã|code|script|chương trình)\b"),
     ("code_generation", r"\b(?:python|javascript|java|c\+\+|html|css|sql)\b.*\b(?:code|mã|script|lập trình)\b"),
     ("creative_request", r"\b(?:viết|sáng tác)\s+(?:một\s+)?(?:bài thơ|truyện|kịch bản|bài hát)\b"),
     ("general_task", r"\b(?:dịch|tóm tắt)\s+(?:đoạn|văn bản|bài viết)\s+(?:này|sau)\b"),
@@ -37,7 +16,7 @@ BLOCKED_PATTERNS = (
 )
 
 PROMPT_INJECTION_PATTERNS = (
-    r"\b(?:bỏ qua|quên đi|phớt lờ|ghi đè|vô hiệu hóa|không tuân theo)\b.{0,120}\b(?:hướng dẫn|chỉ dẫn|prompt|quy tắc|yêu cầu|nội dung phía trên|lệnh trước)\b",
+    r"\b(?:bỏ qua|quên đi|phớt lờ|ghi đè|vô hiệu hóa|không tuân theo)\b.{0,120}\b(?:hướng dẫn|chỉ dẫn|prompt|(?:mọi|tất cả(?: các)?)\s+(?:quy tắc|yêu cầu)|(?:quy tắc|yêu cầu)\s+(?:trước|trên|hệ thống|ban đầu)|nội dung phía trên|lệnh trước)\b",
     r"\b(?:ignore|forget|disregard|override|bypass|do not follow)\b.{0,120}\b(?:previous|prior|above|all|system|developer|instructions?|rules?|prompts?|messages?)\b",
     r"\b(?:hiển thị|tiết lộ|in ra|đọc lại|lặp lại|cho (?:tôi|mình) xem)\b.{0,100}\b(?:system prompt|developer message|chỉ dẫn hệ thống|prompt hệ thống|quy tắc nội bộ|hướng dẫn ẩn)\b",
     r"\b(?:show|reveal|print|repeat|recite|expose|output)\b.{0,100}\b(?:system prompt|developer message|hidden instructions?|internal rules?|initial prompt)\b",
@@ -48,4 +27,22 @@ PROMPT_INJECTION_PATTERNS = (
     r"\b(?:api key|openai_api_key|mật khẩu|password|secret key|biến môi trường|environment variables?)\b.{0,80}\b(?:hiển thị|tiết lộ|đọc|show|reveal|print|output)\b",
     r"\b(?:hiển thị|tiết lộ|đọc|show|reveal|print|output)\b.{0,80}\b(?:api key|openai_api_key|mật khẩu|password|secret key|biến môi trường|environment variables?)\b",
     r"\b(?:decode|giải mã)\b.{0,80}\bbase(?:64|6a)\b.{0,80}\b(?:follow|execute|thực hiện|làm theo)\b",
+)
+
+# Thu hẹp nhánh của bản không dấu khi dạng không dấu trùng từ thông dụng:
+# (đoạn trong mẫu đã bỏ dấu, thay bằng). Mỗi đoạn phải khớp đúng một lần.
+UNACCENTED_BLOCKED_OVERRIDES = (
+    # "làm mã" → "lam ma" = "làm mà"; "viết mã" → "tieng viet ma" = "tiếng Việt mà".
+    (r"(?:viet|(?<!dao )tao|lam)\s+", r"(?:(?<!tieng )viet|(?<!dao )tao)\s+"),
+    # "viết truyện" → "viet truyen" trùng "viết truyền (đơn)" trong quy định kỷ luật.
+    ("|truyen|", "|truyen(?! don)|"),
+)
+
+UNACCENTED_PROMPT_INJECTION_OVERRIDES = (
+    # "quên đi" → "quen di" = "quen (làm gì)".
+    ("bo qua|quen di|", "bo qua|"),
+    # "hãy là" → "hay la" = "hoặc là".
+    ("gia vo la|hay la|", "gia vo la|"),
+    # "\bdan\b" khớp "dân", "hướng dẫn"; chỉ giữ "dan mode".
+    ("|unrestricted|dan|", "|unrestricted|dan mode|"),
 )

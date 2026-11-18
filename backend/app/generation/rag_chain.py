@@ -155,7 +155,7 @@ class RagChain:
         scope_allowed = True
         scope_reason = "disabled"
         if settings.guardrail_scope_enabled:
-            scope = check_scope(question, history)
+            scope = check_scope(question)
             scope_allowed = scope.allowed
             scope_reason = scope.reason
         yield step_event("guardrail", {"allowed": scope_allowed, "reason": scope_reason})
