@@ -324,7 +324,7 @@ describe("ConfigView — ngưỡng tin cậy, thanh lưu, vùng nguy hiểm", ()
       await click(container.querySelector('button[aria-labelledby="cfg-scope-label"]'));
 
       expect(saveBar().textContent).toContain("2 thay đổi chưa lưu");
-      expect(saveBar().textContent).toContain("Top-K 4→6 · Kiểm soát phạm vi PTIT Bật→Tắt");
+      expect(saveBar().textContent).toContain("Top-K 4→6 · Chặn yêu cầu không an toàn Bật→Tắt");
       const topKGroup = container.querySelector("#cfg-topk").closest(".config-field-group");
       expect(topKGroup.classList.contains("is-changed")).toBe(true);
       expect(topKGroup.textContent).toContain("trước: 4");

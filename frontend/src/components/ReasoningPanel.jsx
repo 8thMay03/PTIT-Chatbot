@@ -6,7 +6,7 @@ import { Brain, Check, ChevronDown, Loader2 } from "lucide-react";
  * detail chứa dữ liệu thô từ backend (rewritten_query, candidate_count...).
  */
 const STEP_LABELS = {
-  guardrail: "Kiểm tra phạm vi câu hỏi",
+  guardrail: "Kiểm tra an toàn câu hỏi",
   query_rewrite: "Chuẩn hóa truy vấn",
   multi_query: "Sinh biến thể truy vấn",
   retrieve: "Tìm kiếm trong tài liệu",
@@ -18,7 +18,7 @@ function stepDetailText(step) {
   const detail = step.detail || {};
   switch (step.step) {
     case "guardrail":
-      return detail.allowed === false ? "Ngoài phạm vi" : "Trong phạm vi";
+      return detail.allowed === false ? "Bị chặn" : "Hợp lệ";
     case "query_rewrite":
       return detail.rewritten_query || "";
     case "multi_query":
