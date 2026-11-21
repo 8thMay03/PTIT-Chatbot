@@ -134,6 +134,9 @@
   /* Trắng thuần: dùng cho chữ/icon nằm TRÊN nền màu đậm (brand, danger...).
      Không đổi theo theme — nếu không, chữ trắng trên nút đỏ sẽ biến mất ở dark mode. */
   --on-solid: #ffffff;
+  /* Lớp trắng mờ cho chip/icon nằm trên nền brand đặc (bước đang chọn ở Cài đặt). */
+  --on-solid-soft: rgba(255, 255, 255, 0.16);
+  --shadow-brand: 0 10px 24px rgba(151, 38, 53, 0.24);
 }
 
 :root[data-font-scale="sm"] {

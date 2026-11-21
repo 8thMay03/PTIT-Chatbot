@@ -225,36 +225,27 @@ describe("AdminApp", () => {
     expect(queryClient.getQueryData(["config"])).toBeUndefined();
   });
 
-  it("bấm lại mục Settings đang mở vẫn cuộn tới mục và không thêm lịch sử trùng hash", async () => {
+  it("bấm bước Settings đổi hash, mở form bước đó; bấm lại không thêm lịch sử trùng hash", async () => {
     const backend = createBackend({ authenticated: true });
-    const scrolled = [];
-    const originalScroll = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function scrollIntoView() {
-      scrolled.push(this.id);
-    };
-    try {
-      await renderAdmin(backend);
-      const gateItem = await waitFor(() => container.querySelector('[data-settings-nav="gate"]'));
-      await waitFor(() => container.querySelector("#settings-section-gate"));
+    await renderAdmin(backend);
+    const gateStep = await waitFor(() => container.querySelector('.pipeline-step[data-settings-nav="gate"]'));
+    await waitFor(() => container.querySelector("#settings-section-gate"));
+    expect(container.querySelector("#settings-section-gate").hidden).toBe(true);
 
-      const lengthBefore = window.history.length;
-      await act(async () => {
-        gateItem.click();
-      });
-      expect(window.location.hash).toBe("#settings/gate");
-      expect(window.history.length).toBe(lengthBefore + 1);
-      const gateScrolls = scrolled.filter((id) => id === "settings-section-gate").length;
-      expect(gateScrolls).toBeGreaterThan(0);
+    const lengthBefore = window.history.length;
+    await act(async () => {
+      gateStep.click();
+    });
+    expect(window.location.hash).toBe("#settings/gate");
+    expect(window.history.length).toBe(lengthBefore + 1);
+    expect(container.querySelector("#settings-section-gate").hidden).toBe(false);
+    expect(container.querySelector("#settings-section-retrieval").hidden).toBe(true);
 
-      await act(async () => {
-        gateItem.click();
-      });
-      expect(window.location.hash).toBe("#settings/gate");
-      expect(window.history.length).toBe(lengthBefore + 1);
-      expect(scrolled.filter((id) => id === "settings-section-gate").length).toBe(gateScrolls + 1);
-    } finally {
-      Element.prototype.scrollIntoView = originalScroll;
-    }
+    await act(async () => {
+      gateStep.click();
+    });
+    expect(window.location.hash).toBe("#settings/gate");
+    expect(window.history.length).toBe(lengthBefore + 1);
   });
 
   it("nút header Cuộc trò chuyện mới bỏ đánh dấu hội thoại đang mở trên sidebar", async () => {

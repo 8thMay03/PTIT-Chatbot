@@ -211,7 +211,7 @@ export default function RetrievalTestPanel({
   // Huỷ request đang chạy khi rời màn.
   useEffect(() => () => controllerRef.current?.abort(), []);
 
-  // Drawer (<1280px): Esc đóng, Tab xoay vòng trong panel, trả focus về nút mở.
+  // Ngăn kéo: Esc đóng, Tab xoay vòng trong panel, trả focus về nút mở.
   useEffect(() => {
     if (!open) return undefined;
     previousFocusRef.current = document.activeElement;

@@ -14,8 +14,7 @@ import {
   mergeConfigDraft,
   valuesFromConfig,
 } from "./lib/configDraft";
-import { ADMIN_ANSWER_SECTIONS } from "./lib/appRoute";
-import { pickActiveSection } from "./settings/scrollSpy";
+import { RERANKER_PROVIDER_LABELS, shortModelName } from "./settings/pipelineSummary";
 import Modal from "./components/Modal";
 import SaveBar from "./components/SaveBar";
 import { useToast } from "./components/Toast";
@@ -23,11 +22,6 @@ import { useToast } from "./components/Toast";
 // Mặc định cũ của RETRIEVAL_MIN_VECTOR_SCORE: máy chủ coi như chưa đặt (confidence.py).
 const LEGACY_VECTOR_DEFAULT = 0.3;
 const NO_CONTEXT_ANSWER = "Chưa tìm thấy thông tin này trong tài liệu.";
-const RERANKER_PROVIDER_LABELS = { heuristic: "Heuristic", cohere: "Cohere" };
-
-function shortModelName(model) {
-  return model ? String(model).split("/").pop() : "mô hình hiện tại";
-}
 
 /** Ô số ngưỡng: chuỗi rỗng/dở dang (khi đang gõ) bỏ qua; bỏ ghi đè đi qua link riêng. */
 function parseThreshold(raw, min, max) {
@@ -36,16 +30,13 @@ function parseThreshold(raw, min, max) {
 }
 
 /**
- * Form "Hệ thống trả lời" một cột theo pipeline: Truy xuất → Xếp hạng lại →
- * Ngưỡng tin cậy → Sinh câu trả lời. Các mục là anchor trong cùng một form, dùng
- * chung một thanh lưu.
+ * Form "Hệ thống trả lời" chia theo bước pipeline: Truy xuất → Xếp hạng lại →
+ * Ngưỡng tin cậy → Sinh câu trả lời. Chỉ bước `activeSection` hiển thị; các bước
+ * khác vẫn mounted (ẩn) nên bản nháp và thanh lưu là chung cho cả form.
+ *
+ * `lead` (dải bước) render trong vùng cuộn, phía trên form.
  */
-export default function ConfigView({
-  activeSection = "retrieval",
-  scrollRequest = 0,
-  onSectionActive,
-  onDraftState,
-}) {
+export default function ConfigView({ activeSection = "retrieval", lead = null, onDraftState }) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const scrollRef = useRef(null);
@@ -145,55 +136,11 @@ export default function ConfigView({
     });
   }, [values, savedSnapshot, calibrated, configQuery.data, changes, dirtySections, onDraftState]);
 
-  // Deep link `#settings/<mục>` hoặc bấm mục trong danh mục: cuộn tới anchor của form
-  // sau khi dữ liệu đã render. `scrollRequest` đổi cả khi bấm lại đúng mục đang mở.
+  // Đổi bước: đưa vùng cuộn về đầu để thấy dải bước và đầu form của bước mới.
   useEffect(() => {
     if (loading) return;
-    const node = document.getElementById(`settings-section-${activeSection}`);
-    if (node && typeof node.scrollIntoView === "function") {
-      node.scrollIntoView({ block: "start" });
-    }
-  }, [activeSection, scrollRequest, loading]);
-
-  // Scrollspy: mục đang xem trong nhóm "Hệ thống trả lời", tính lại sau mỗi lần cuộn
-  // khung form (gộp theo frame). Chỉ chạy khi có sự kiện cuộn nên lúc mount mục đang
-  // xem vẫn theo route.
-  useEffect(() => {
-    if (loading) return undefined;
-    const root = scrollRef.current;
-    if (!root) return undefined;
-
-    let frame = null;
-    function update() {
-      frame = null;
-      const keys = [];
-      const offsets = [];
-      const rootTop = root.getBoundingClientRect().top;
-      ADMIN_ANSWER_SECTIONS.forEach((key) => {
-        const node = document.getElementById(`settings-section-${key}`);
-        if (!node) return;
-        keys.push(key);
-        offsets.push(node.getBoundingClientRect().top - rootTop + root.scrollTop);
-      });
-      const next = pickActiveSection({
-        keys,
-        offsets,
-        scrollTop: root.scrollTop,
-        clientHeight: root.clientHeight,
-        scrollHeight: root.scrollHeight,
-      });
-      if (next) onSectionActive?.(next);
-    }
-    function onScroll() {
-      if (frame === null) frame = window.requestAnimationFrame(update);
-    }
-
-    root.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      root.removeEventListener("scroll", onScroll);
-      if (frame !== null) window.cancelAnimationFrame(frame);
-    };
-  }, [loading, onSectionActive]);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [activeSection, loading]);
 
   // Cảnh báo khi rời trang mà còn thay đổi chưa lưu
   useEffect(() => {
@@ -321,6 +268,7 @@ export default function ConfigView({
   return (
     <div className="config-page-wrapper">
       <div className="config-view-container" ref={scrollRef}>
+        {lead}
         {configError && (
           <div className="inline-alert is-warning config-error-alert" role="alert">
             <AlertTriangle size={16} />
@@ -339,11 +287,14 @@ export default function ConfigView({
             id="settings-section-retrieval"
             data-settings-section="retrieval"
             aria-labelledby="settings-section-retrieval-title"
+            hidden={activeSection !== "retrieval"}
           >
-            <h2 className="config-section-title" id="settings-section-retrieval-title">
-              Truy xuất
-            </h2>
-            <p className="config-section-desc">Cách tìm các đoạn tài liệu liên quan tới câu hỏi.</p>
+            <header className="config-section-head">
+              <h2 className="config-section-title" id="settings-section-retrieval-title">
+                Truy xuất
+              </h2>
+              <p className="config-section-desc">Cách tìm các đoạn tài liệu liên quan tới câu hỏi.</p>
+            </header>
             <div className="config-panel-card">
               <div className="config-card-body">
                 <div className={`config-field-group${changedClass("topK")}`}>
@@ -518,13 +469,16 @@ export default function ConfigView({
             id="settings-section-reranker"
             data-settings-section="reranker"
             aria-labelledby="settings-section-reranker-title"
+            hidden={activeSection !== "reranker"}
           >
-            <h2 className="config-section-title" id="settings-section-reranker-title">
-              Xếp hạng lại
-            </h2>
-            <p className="config-section-desc">
-              Sắp xếp lại các đoạn ứng viên theo độ liên quan trước khi đưa vào mô hình.
-            </p>
+            <header className="config-section-head">
+              <h2 className="config-section-title" id="settings-section-reranker-title">
+                Xếp hạng lại
+              </h2>
+              <p className="config-section-desc">
+                Sắp xếp lại các đoạn ứng viên theo độ liên quan trước khi đưa vào mô hình.
+              </p>
+            </header>
             <div className="config-panel-card">
               <div className="config-card-body">
                 <div className={`config-field-group${changedClass("rerankerEnabled")}`}>
@@ -592,21 +546,24 @@ export default function ConfigView({
             id="settings-section-gate"
             data-settings-section="gate"
             aria-labelledby="settings-section-gate-title"
+            hidden={activeSection !== "gate"}
           >
-            <h2 className="config-section-title" id="settings-section-gate-title">
-              Ngưỡng tin cậy
-            </h2>
-            <p className="config-section-desc">
-              Quyết định khi nào chatbot từ chối vì không đủ căn cứ.
-            </p>
+            <header className="config-section-head">
+              <h2 className="config-section-title" id="settings-section-gate-title">
+                Ngưỡng tin cậy
+              </h2>
+              <p className="config-section-desc">
+                Quyết định khi nào chatbot từ chối vì không đủ căn cứ.
+              </p>
+            </header>
             <div className="config-panel-card">
               <div className="config-card-body">
                 <div className="config-gate-callout">
                   <Info size={15} aria-hidden="true" />
                   <p>
                     Chatbot so <strong>đoạn khớp nhất</strong> với từng ngưỡng dưới đây. Trượt bất kỳ ngưỡng nào thì
-                    trả lời <strong>“{NO_CONTEXT_ANSWER}”</strong> và không gọi mô hình. Dùng bảng{" "}
-                    <strong>Thử với câu hỏi</strong> bên phải để xem ảnh hưởng trước khi lưu.
+                    trả lời <strong>“{NO_CONTEXT_ANSWER}”</strong> và không gọi mô hình. Dùng nút{" "}
+                    <strong>Thử với câu hỏi</strong> ở đầu trang để xem ảnh hưởng trước khi lưu.
                   </p>
                 </div>
 
@@ -776,13 +733,16 @@ export default function ConfigView({
             id="settings-section-generation"
             data-settings-section="generation"
             aria-labelledby="settings-section-generation-title"
+            hidden={activeSection !== "generation"}
           >
-            <h2 className="config-section-title" id="settings-section-generation-title">
-              Sinh câu trả lời
-            </h2>
-            <p className="config-section-desc">
-              Độ ngẫu nhiên, thời gian chờ và số lần thử lại của mô hình ngôn ngữ.
-            </p>
+            <header className="config-section-head">
+              <h2 className="config-section-title" id="settings-section-generation-title">
+                Sinh câu trả lời
+              </h2>
+              <p className="config-section-desc">
+                Độ ngẫu nhiên, thời gian chờ và số lần thử lại của mô hình ngôn ngữ.
+              </p>
+            </header>
             <div className="config-panel-card">
               <div className="config-card-body">
                 <p className="config-model-line">
