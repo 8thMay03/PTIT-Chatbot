@@ -333,7 +333,7 @@ class EmbeddingConfigPayload(BaseModel):
 class AvailableProviders(BaseModel):
     llm: list[str] = ["openai", "gemini", "azure", "openai_compatible", "anthropic", "deepseek", "cohere", "qwen"]
     embedding: list[str] = ["openai", "sentence-transformers", "cohere", "gemini"]
-    reranker: list[str] = ["heuristic", "cross-encoder", "cohere"]
+    reranker: list[str] = ["heuristic", "cross-encoder", "rerank_api"]
 
 
 class ConfigPersistenceInfo(BaseModel):
@@ -467,6 +467,15 @@ class ActivateModelProfileRequest(BaseModel):
 
 class TestModelProfileLLMRequest(TestLLMRequest):
     # Không nhập api_key thì dùng khoá đã lưu của profile này.
+    profile_id: str | None = None
+
+
+class TestModelProfileRerankerRequest(BaseModel):
+    provider: str = Field(max_length=50)
+    model: str | None = Field(default=None, max_length=255)
+    base_url: str | None = Field(default=None, max_length=2048)
+    api_key: str | None = Field(default=None, max_length=4096)
+    # Không nhập api_key thì dùng khoá đã lưu của profile reranker này.
     profile_id: str | None = None
 
 

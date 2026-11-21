@@ -159,6 +159,27 @@ def test_cross_encoder_uses_rerank_threshold_only_when_calibrated(gate_settings,
     assert thresholds_from_settings().rerank_source == "not_applicable"
 
 
+def test_rerank_api_uses_override_only_never_cross_encoder_table(gate_settings, caplog) -> None:
+    # Trùng tên mô hình trong RERANK_THRESHOLDS vẫn không dùng: điểm API khác thang đo (D-03).
+    gate_settings.reranker_provider = "rerank_api"
+    with caplog.at_level(logging.WARNING, logger="app.generation.confidence"):
+        uncalibrated = thresholds_from_settings()
+    assert uncalibrated.min_rerank_score is None
+    assert uncalibrated.rerank_source == "uncalibrated"
+    assert any("chưa có ngưỡng hiệu chỉnh" in record.getMessage() for record in caplog.records)
+    # BM25/vector vẫn kiểm tra; điểm rerank bất kỳ không làm gate trượt.
+    assert uncalibrated.min_vector_score is not None
+    contexts = [{"vector_score": 0.6, "bm25_norm_score": 0.4, "rerank_score": -100.0}]
+    assert assess_context(contexts, uncalibrated).strong
+
+    gate_settings.retrieval_min_rerank_score = 0.3
+    override = thresholds_from_settings()
+    assert override.min_rerank_score == 0.3
+    assert override.rerank_source == "override"
+    weak = [{"vector_score": 0.6, "bm25_norm_score": 0.4, "rerank_score": 0.1}]
+    assert assess_context(weak, override).reason == "below_rerank"
+
+
 def test_raw_bm25_threshold_no_longer_affects_gate(gate_settings) -> None:
     # Giá trị BM25 thô đã lưu (2.0 hay cao bất thường) không được làm gate từ chối mọi câu.
     gate_settings.retrieval_min_bm25_score = 1000.0

@@ -36,6 +36,8 @@ def test_get_config_returns_full_structure() -> None:
     assert "gemini" in data["available_providers"]["llm"]
     assert "heuristic" in data["available_providers"]["reranker"]
     assert "cross-encoder" in data["available_providers"]["reranker"]
+    assert "rerank_api" in data["available_providers"]["reranker"]
+    assert "cohere" not in data["available_providers"]["reranker"]
 
 
 def test_update_config_llm_and_toggles() -> None:
@@ -324,6 +326,26 @@ def test_null_rerank_threshold_clears_override(calibrated_gate, monkeypatch) -> 
     assert settings.retrieval_min_rerank_score is None
     assert guardrails["min_rerank_score"] == RERANK_THRESHOLDS[model]
     assert guardrails["rerank_threshold_source"] == "calibrated"
+
+
+def test_rerank_api_gate_ignores_cross_encoder_table(calibrated_gate, monkeypatch) -> None:
+    from app.core.config import _INITIAL_SETTINGS
+
+    # Trùng tên mô hình đã hiệu chỉnh cho cross-encoder vẫn không dùng bảng (D-03).
+    monkeypatch.setitem(_INITIAL_SETTINGS, "retrieval_min_rerank_score", None)
+    monkeypatch.setattr(settings, "reranker_enabled", True)
+    monkeypatch.setattr(settings, "reranker_provider", "rerank_api")
+    monkeypatch.setattr(settings, "reranker_model", "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1")
+    monkeypatch.setattr(settings, "retrieval_min_rerank_score", None)
+
+    guardrails = client.get("/api/config").json()["guardrails"]
+    assert guardrails["rerank_threshold_source"] == "uncalibrated"
+    assert guardrails["min_rerank_score"] is None
+    assert guardrails["calibrated_min_rerank_score"] is None
+
+    guardrails = client.put("/api/config", json={"guardrails": {"min_rerank_score": 0.4}}).json()["guardrails"]
+    assert guardrails["rerank_threshold_source"] == "override"
+    assert guardrails["min_rerank_score"] == 0.4
 
 
 def test_omitted_thresholds_keep_overrides(calibrated_gate, monkeypatch) -> None:

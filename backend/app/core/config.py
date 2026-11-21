@@ -174,6 +174,10 @@ class Settings(BaseSettings):
         default="cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
         alias="RERANKER_MODEL",
     )
+    # Reranker ``rerank_api`` (chuẩn /rerank của Cohere): Base URL tới trước ``/rerank``,
+    # khoá tuỳ chọn. Thường do profile reranker đặt; URL phải qua LLM_BASE_URL_ALLOWLIST.
+    reranker_base_url: str | None = Field(default=None, alias="RERANKER_BASE_URL")
+    reranker_api_key: str | None = Field(default=None, alias="RERANKER_API_KEY")
     reranker_candidate_multiplier: int = Field(default=3, ge=1, alias="RERANKER_CANDIDATE_MULTIPLIER")
     reranker_vector_weight: float = Field(default=0.45, ge=0, alias="RERANKER_VECTOR_WEIGHT")
     reranker_bm25_weight: float = Field(default=0.35, ge=0, alias="RERANKER_BM25_WEIGHT")
@@ -391,7 +395,7 @@ def _default_llm_url_allowlist() -> list[str]:
     vì PUT /config có thể đã đổi giá trị các trường này sau khi khởi động.
     """
     entries = ["https://api.openai.com"]
-    for field in ("openai_base_url", "openai_compatible_base_url", "azure_openai_endpoint"):
+    for field in ("openai_base_url", "openai_compatible_base_url", "azure_openai_endpoint", "reranker_base_url"):
         parsed = _parse_origin(str(_INITIAL_SETTINGS.get(field) or ""))
         if parsed is not None:
             entries.append(_origin_string(*parsed))
@@ -557,7 +561,10 @@ def get_runtime_config_dict() -> dict:
             # Giá trị bảng hiệu chỉnh (None nếu model chưa có): UI dùng cho "Dùng giá trị hiệu chỉnh".
             "calibrated_min_vector_score": VECTOR_THRESHOLDS.get(gate.embedding_model),
             "rerank_threshold_source": gate.rerank_source,
-            "calibrated_min_rerank_score": RERANK_THRESHOLDS.get(settings.reranker_model),
+            # Bảng chỉ hiệu chỉnh cho cross-encoder; điểm Rerank API khác thang đo (D-03).
+            "calibrated_min_rerank_score": (
+                None if settings.reranker_provider == "rerank_api" else RERANK_THRESHOLDS.get(settings.reranker_model)
+            ),
         },
         "embedding": {
             "provider": settings.embedding_provider,
@@ -566,7 +573,7 @@ def get_runtime_config_dict() -> dict:
         "available_providers": {
             "llm": ["openai", "gemini", "azure", "openai_compatible", "anthropic", "deepseek", "cohere", "qwen"],
             "embedding": ["openai", "sentence-transformers", "cohere", "gemini"],
-            "reranker": ["heuristic", "cross-encoder", "cohere"],
+            "reranker": ["heuristic", "cross-encoder", "rerank_api"],
         },
     }
 

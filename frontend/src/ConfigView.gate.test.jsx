@@ -203,6 +203,19 @@ describe("ConfigView — ngưỡng tin cậy, thanh lưu, vùng nguy hiểm", ()
       );
     });
 
+    it("Rerank API: hiện ô ngưỡng rerank để ghi đè, không dùng giá trị hiệu chỉnh của cross-encoder", async () => {
+      await render(
+        baseConfig({
+          reranker: { provider: "rerank_api", model: "rerank-v3.5" },
+          guardrails: { rerank_threshold_source: "uncalibrated", calibrated_min_rerank_score: null },
+        })
+      );
+      const rerank = container.querySelector('[data-testid="gate-rerank"]');
+      expect(rerank.textContent).toContain("relevance_score do Rerank API");
+      expect(rerank.querySelector("#cfg-minrerank-number").value).toBe("");
+      expect(rerank.textContent).not.toContain("-1.65");
+    });
+
     it("cross-encoder bật thì hiện ngưỡng rerank; tắt reranker trong bản nháp thì ẩn", async () => {
       await render(
         baseConfig({

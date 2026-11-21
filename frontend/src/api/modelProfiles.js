@@ -29,6 +29,15 @@ export function activate(kind, profileId) {
   });
 }
 
+/** Gửi một truy vấn mẫu tới `{base_url}/rerank`; máy chủ chờ tối đa 8 giây. */
+export function testReranker(payload) {
+  return request("model-profiles/test-reranker", {
+    method: "POST",
+    body: payload,
+    timeout: 30_000,
+  });
+}
+
 export function testLlm(payload) {
   return request("model-profiles/test-llm", {
     method: "POST",

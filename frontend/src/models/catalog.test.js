@@ -1,14 +1,52 @@
 import { describe, expect, it } from "vitest";
 import {
+  KINDS,
   buildPayload,
+  buildRerankerTestPayload,
   buildTestPayload,
+  canTestConnection,
   draftFromProfile,
   emptyDraft,
   isDraftDirty,
+  keyRule,
+  sendsDocumentsToService,
   validateDraft,
 } from "./catalog";
 
 describe("catalog kho mô hình", () => {
+  it("reranker Rerank API: Base URL + mô hình bắt buộc, khoá tuỳ chọn không dự phòng .env", () => {
+    expect(KINDS.reranker.providers.map((item) => item.key)).toEqual(["cross-encoder", "rerank_api"]);
+    expect(keyRule("reranker", "rerank_api")).toEqual({ envFallback: false });
+    expect(keyRule("reranker", "cross-encoder")).toBeNull();
+    expect(canTestConnection("reranker", "rerank_api")).toBe(true);
+    expect(canTestConnection("reranker", "cross-encoder")).toBe(false);
+    expect(sendsDocumentsToService("reranker", "rerank_api")).toBe(true);
+    expect(sendsDocumentsToService("reranker", "cross-encoder")).toBe(false);
+
+    const empty = { ...emptyDraft("reranker"), provider: "rerank_api" };
+    expect(validateDraft("reranker", empty)).toEqual({ base_url: "Nhập base url.", model: "Nhập mô hình." });
+    expect(validateDraft("reranker", { ...empty, base_url: "api.cohere.com", model: "m" })).toEqual({
+      base_url: "Phải bắt đầu bằng http:// hoặc https://.",
+    });
+
+    const draft = { ...empty, base_url: " https://api.cohere.com/v2 ", model: "rerank-v3.5", apiKey: " rk-x " };
+    expect(buildPayload("reranker", draft)).toEqual({
+      kind: "reranker",
+      name: "rerank-v3.5",
+      provider: "rerank_api",
+      base_url: "https://api.cohere.com/v2",
+      model: "rerank-v3.5",
+      api_key: "rk-x",
+    });
+    expect(buildRerankerTestPayload({ ...draft, apiKey: "" }, "r1")).toEqual({
+      provider: "rerank_api",
+      model: "rerank-v3.5",
+      base_url: "https://api.cohere.com/v2",
+      api_key: null,
+      profile_id: "r1",
+    });
+  });
+
   it("bắt trường bắt buộc, URL và số chiều theo nhà cung cấp", () => {
     const llm = { ...emptyDraft("llm"), provider: "openai_compatible", base_url: "localhost:11434" };
     expect(validateDraft("llm", llm)).toEqual({

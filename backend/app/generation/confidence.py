@@ -7,9 +7,10 @@ trên các context sau rerank:
 - ``vector`` (cosine): thang đo khác nhau giữa các embedding model nên ngưỡng gắn với
   tên model (``VECTOR_THRESHOLDS``). Model chưa hiệu chỉnh và không có ghi đè thì bỏ
   tín hiệu này, kèm cảnh báo, thay vì âm thầm dùng ngưỡng của model khác.
-- ``rerank``: chỉ khi reranker là ``cross-encoder`` (điểm tuyệt đối). Reranker
-  ``heuristic`` chuẩn hóa min-max trong danh sách ứng viên nên top-1 luôn cao, không
-  dùng làm ngưỡng được.
+- ``rerank``: chỉ khi reranker là ``cross-encoder`` hoặc ``rerank_api`` (điểm tuyệt đối).
+  Reranker ``heuristic`` chuẩn hóa min-max trong danh sách ứng viên nên top-1 luôn cao,
+  không dùng làm ngưỡng được. ``RERANK_THRESHOLDS`` chỉ áp cho ``cross-encoder``: điểm
+  của Rerank API khác thang đo, nên provider này chỉ dùng ngưỡng ghi đè.
 
 Ngưỡng chọn từ phân bố điểm đo trên ``ptit_rag_300``/``ptit_ragas_100`` và bộ câu không
 có đáp án ``ptit_no_answer_56`` — xem ``documents/rag-eval/rag-18/``. Kho đổi nhiều thì
@@ -89,15 +90,16 @@ def thresholds_from_settings() -> GateThresholds:
 
     min_rerank: float | None = None
     rerank_source = "not_applicable"
-    if settings.reranker_enabled and settings.reranker_provider == "cross-encoder":
+    provider = settings.reranker_provider
+    if settings.reranker_enabled and provider in ("cross-encoder", "rerank_api"):
         if settings.retrieval_min_rerank_score is not None:
             min_rerank, rerank_source = float(settings.retrieval_min_rerank_score), "override"
-        elif settings.reranker_model in RERANK_THRESHOLDS:
+        elif provider == "cross-encoder" and settings.reranker_model in RERANK_THRESHOLDS:
             min_rerank, rerank_source = RERANK_THRESHOLDS[settings.reranker_model], "calibrated"
         else:
             rerank_source = "uncalibrated"
             _warn_once(
-                f"rerank:{settings.reranker_model}",
+                f"rerank:{provider}:{settings.reranker_model}",
                 "Reranker %r chưa có ngưỡng hiệu chỉnh: confidence gate bỏ tín hiệu rerank. "
                 "Đặt RETRIEVAL_MIN_RERANK_SCORE hoặc chạy scripts.eval_confidence để hiệu chỉnh.",
                 settings.reranker_model,

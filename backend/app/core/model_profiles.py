@@ -51,12 +51,13 @@ _PROVIDER_FIELDS: dict[tuple[str, str], dict[str, bool]] = {
     ("embedding", "openai"): {"model": True, "dimension": True},
     ("embedding", "sentence-transformers"): {"model": True, "dimension": True},
     ("reranker", "cross-encoder"): {"model": True},
+    ("reranker", "rerank_api"): {"base_url": True, "model": True},
 }
 PROVIDERS: dict[str, tuple[str, ...]] = {
     kind: tuple(provider for (k, provider) in _PROVIDER_FIELDS if k == kind) for kind in KINDS
 }
 # Profile được phép có API key (cross-encoder và sentence-transformers chạy cục bộ).
-_KEYED = {("llm", p) for p in PROVIDERS["llm"]} | {("embedding", "openai")}
+_KEYED = {("llm", p) for p in PROVIDERS["llm"]} | {("embedding", "openai"), ("reranker", "rerank_api")}
 _URL_FIELDS = ("base_url", "endpoint")
 _PARAM_FIELDS = ("base_url", "endpoint", "deployment_name", "api_version", "dimension")
 _FIELD_LABELS = {
@@ -304,10 +305,20 @@ def _apply_reranker(row: ModelProfile | None) -> None:
     if row is None:
         settings.reranker_provider = "heuristic"
         settings.reranker_model = _INITIAL_SETTINGS["reranker_model"]
+        settings.reranker_base_url = _INITIAL_SETTINGS["reranker_base_url"]
+        settings.reranker_api_key = _INITIAL_SETTINGS["reranker_api_key"]
         settings.reranker_profile_id = None
         return
+    base_url = (row.params or {}).get("base_url")
+    # Allowlist có thể đã bị thu hẹp sau khi lưu profile.
+    validate_llm_url(base_url)
+    # Không dự phòng bằng RERANKER_API_KEY trong `.env`: không gửi khoá của máy chủ tới
+    # Base URL do admin nhập (D-02). Cross-encoder không có khoá nên luôn là None.
+    key = _profile_key_or_422(row)
     settings.reranker_provider = row.provider
     settings.reranker_model = row.model
+    settings.reranker_base_url = base_url
+    settings.reranker_api_key = key
     settings.reranker_profile_id = row.id
 
 
@@ -447,6 +458,23 @@ def resolve_llm_test_key(session: Session, provider: str, profile_id: str | None
     # Giá trị OpenAICompatibleProvider tự dùng khi không có khoá; trả None thì factory
     # lấy khoá tương thích đang chạy và gửi nó sang máy chủ của profile này.
     return "not-needed"
+
+
+def resolve_reranker_test_key(session: Session, profile_id: str | None, api_key: str | None) -> str | None:
+    """Khoá dùng cho POST /model-profiles/test-reranker: nhập tay > khoá profile reranker > không khoá.
+
+    Không dự phòng khoá `.env` (D-02) và chỉ lấy khoá của profile reranker, để khoá LLM
+    không bị gửi tới dịch vụ xếp hạng lại.
+    """
+    key = _clean(api_key)
+    if key:
+        return key
+    if not profile_id:
+        return None
+    row = _get(session, profile_id)
+    if row.kind != "reranker":
+        raise ConfigValidationError("Cấu hình này không phải mô hình xếp hạng lại.")
+    return _profile_key_or_422(row)
 
 
 # ==========================================
