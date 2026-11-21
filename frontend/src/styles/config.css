@@ -573,95 +573,149 @@ fieldset.config-field-group legend {
 }
 
 /* ==========================================================================
-   SETTINGS — DANH MỤC DỌC VÀ FORM MỘT CỘT THEO PIPELINE
+   SETTINGS — BỐ CỤC "ĐƯỜNG ỐNG TRẢ LỜI"
+   Header và tab nhóm cố định; dải bốn bước và form của bước đang chọn cuộn
+   bên dưới. "Thử với câu hỏi" là ngăn kéo bên phải.
    ========================================================================== */
 .settings-page {
-  height: 100%;
-  min-height: 0;
-  background: var(--surface-soft);
-}
-
-.settings-shell {
-  display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
-  height: 100%;
-  min-height: 0;
-}
-
-.settings-shell.is-answer {
-  grid-template-columns: 232px minmax(0, 1fr) 380px;
-}
-
-/* Cột danh mục (desktop) */
-.settings-nav {
   display: flex;
-  flex-direction: column;
   height: 100%;
   min-height: 0;
-  overflow-y: auto;
-  padding: 20px 14px;
-  border-right: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.settings-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Header + tab nhóm */
+.settings-head {
+  flex-shrink: 0;
+  padding: 18px 32px 0;
+  border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
 
-.settings-nav-title {
-  margin: 0 8px 12px;
+.settings-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+
+.settings-head-copy {
+  min-width: 0;
+}
+
+.settings-title {
+  margin: 0;
   color: var(--text);
-  font-size: 20px;
+  font-size: 22px;
+  line-height: 1.2;
   letter-spacing: -0.02em;
 }
 
-.settings-nav-group {
-  margin-top: 14px;
-}
-
-.settings-nav-group-title {
-  margin: 0 8px 4px;
-  color: var(--text-faint);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.settings-nav-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px;
-  border-radius: 8px;
-  color: var(--text-secondary);
-  font-size: 13.5px;
-  text-decoration: none;
-}
-
-.settings-nav-item.is-sub {
-  padding-left: 22px;
+.settings-head-copy p {
+  margin: 3px 0 0;
   color: var(--text-muted);
   font-size: 13px;
-}
-
-.settings-nav-item:hover {
-  background: var(--surface-sunken);
-  color: var(--text);
-}
-
-.settings-nav-item.is-active {
-  background: var(--brand-subtle);
-  color: var(--brand-text);
-  font-weight: 600;
-}
-
-.settings-nav-hint {
-  margin: 18px 10px 0;
-  color: var(--text-faint);
-  font-size: 11.5px;
   line-height: 1.45;
 }
 
-.settings-nav-hint code {
-  font-family: var(--font-mono);
+.settings-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px 16px;
+}
+
+.settings-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.settings-saved::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+.settings-saved strong {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.settings-test-trigger {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
+}
+
+.settings-test-trigger:hover {
+  border-color: var(--brand-border);
+  background: var(--brand-subtle);
+  color: var(--brand-text);
+}
+
+.settings-tabs {
+  display: flex;
+  gap: 26px;
+  margin-top: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.settings-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 2px 12px;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.settings-tab:hover {
+  color: var(--text);
+}
+
+.settings-tab.is-active {
+  border-bottom-color: var(--brand);
+  color: var(--brand-text);
+}
+
+.settings-tab:focus-visible,
+.settings-kind-item:focus-visible,
+.settings-test-trigger:focus-visible,
+.pipeline-step:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
 }
 
 .settings-dirty-dot {
@@ -675,6 +729,7 @@ fieldset.config-field-group legend {
 /* Danh sách mục trên mobile; ẩn ở desktop. */
 .settings-index {
   display: none;
+  flex: 1;
   padding: 16px 16px 24px;
   overflow-y: auto;
 }
@@ -747,19 +802,16 @@ fieldset.config-field-group legend {
   line-height: 1.4;
 }
 
-.settings-main {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
+.settings-index-copy .settings-index-summary {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
 }
 
 .settings-back {
   display: none;
   align-items: center;
   gap: 6px;
-  align-self: flex-start;
-  margin: 12px 16px 0;
+  margin: 0 0 10px;
   padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -770,75 +822,7 @@ fieldset.config-field-group legend {
   cursor: pointer;
 }
 
-.settings-content {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.settings-head {
-  display: flex;
-  flex-shrink: 0;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 10px 28px 8px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-soft);
-}
-
-.settings-head h2 {
-  margin: 0;
-  font-size: 18px;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-}
-
-.settings-head p {
-  margin: 2px 0 0;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-.settings-head-title-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 16px;
-}
-
-.settings-saved {
-  color: var(--text-muted);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.settings-saved strong {
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.settings-test-trigger {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text-secondary);
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.settings-test-trigger:hover {
-  background: var(--surface-sunken);
-}
-
+/* Vùng nội dung của từng tab */
 .settings-content-body {
   position: relative;
   display: flex;
@@ -847,7 +831,9 @@ fieldset.config-field-group legend {
 }
 
 .settings-panel {
+  display: flex;
   flex: 1;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -859,50 +845,400 @@ fieldset.config-field-group legend {
 
 .settings-panel .config-page-wrapper,
 .settings-panel .models-page-wrapper {
-  height: 100%;
+  flex: 1;
+  height: auto;
+  background: transparent;
 }
 
+/* Thanh chọn loại mô hình */
+.settings-subbar {
+  flex-shrink: 0;
+  padding: 18px 32px 10px;
+}
+
+.settings-kind-nav {
+  display: inline-flex;
+  gap: 2px;
+  max-width: 100%;
+  padding: 3px;
+  overflow-x: auto;
+  border-radius: 12px;
+  background: var(--surface-sunken);
+}
+
+.settings-kind-item {
+  padding: 6px 16px;
+  border-radius: 9px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.settings-kind-item:hover {
+  color: var(--text);
+}
+
+.settings-kind-item.is-active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Tab Giao diện */
 .appearance-panel {
-  padding: 22px 28px;
+  padding: 24px 32px;
   overflow-y: auto;
 }
 
-/* Form "Hệ thống trả lời": một cột, tối đa 720px, theo thứ tự pipeline. */
+.settings-card {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 28px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.settings-card-head,
+.config-section-head {
+  padding: 18px 0 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-card-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+
+.settings-card-head p {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+/* --------------------------------------------------------------------------
+   Dải bốn bước
+   -------------------------------------------------------------------------- */
+.pipeline-steps {
+  display: flex;
+  align-items: center;
+  max-width: 1080px;
+  margin: 0 auto 20px;
+}
+
+.pipeline-end {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 68px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.pipeline-end-dot {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.pipeline-list {
+  position: relative;
+  display: flex;
+  flex: 1;
+  gap: 22px;
+  min-width: 0;
+  margin: 0;
+  padding: 0 22px;
+  list-style: none;
+}
+
+/* Đường nối nét đứt giữa các bước và tới hai đầu "Câu hỏi" / "Câu trả lời". */
+.pipeline-list::before,
+.pipeline-list::after,
+.pipeline-item + .pipeline-item::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--border-strong) 0 4px, transparent 4px 8px);
+}
+
+.pipeline-list::before {
+  left: 0;
+}
+
+.pipeline-list::after {
+  right: 0;
+}
+
+.pipeline-item {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.pipeline-item + .pipeline-item::before {
+  left: -22px;
+}
+
+.pipeline-step {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color var(--duration) var(--ease), box-shadow var(--duration) var(--ease),
+    background var(--duration) var(--ease);
+}
+
+.pipeline-step:hover {
+  border-color: var(--brand-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.pipeline-step-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 14px;
+}
+
+.pipeline-step-index {
+  color: var(--text-faint);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.pipeline-step-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.pipeline-step-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--brand-subtle);
+  color: var(--brand-text);
+}
+
+.pipeline-step-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.pipeline-chip {
+  max-width: 100%;
+  padding: 1px 7px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pipeline-step.is-active {
+  border-color: var(--brand);
+  background: var(--brand);
+  box-shadow: var(--shadow-brand);
+  color: var(--on-solid);
+}
+
+.pipeline-step.is-active .pipeline-step-index {
+  color: var(--on-solid);
+  opacity: 0.75;
+}
+
+.pipeline-step.is-active .pipeline-step-icon,
+.pipeline-step.is-active .pipeline-chip {
+  background: var(--on-solid-soft);
+  color: var(--on-solid);
+}
+
+.pipeline-step.is-active .settings-dirty-dot {
+  box-shadow: 0 0 0 2px var(--on-solid);
+}
+
+/* --------------------------------------------------------------------------
+   Form của bước đang chọn: card có header, hàng nhãn trái – điều khiển phải
+   -------------------------------------------------------------------------- */
 .config-view-container {
-  padding: 8px 28px 40px;
+  padding: 22px 32px 40px;
 }
 
 .config-form-column {
-  max-width: 720px;
+  max-width: 1080px;
   margin: 0 auto;
 }
 
-.config-section {
-  scroll-margin-top: 12px;
-  margin-top: 22px;
+.config-error-alert {
+  max-width: 1080px;
+  margin: 0 auto 16px;
 }
 
-.config-section:first-of-type {
-  margin-top: 4px;
+.config-section {
+  container-type: inline-size;
+  padding: 0 28px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.config-section[hidden] {
+  display: none;
 }
 
 .config-section-title {
   margin: 0;
   color: var(--text);
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .config-section-desc {
-  margin: 2px 0 8px;
+  margin: 3px 0 0;
   color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: 12.5px;
+  line-height: 1.45;
 }
 
-.config-error-alert {
-  max-width: 720px;
-  margin: 8px auto 0;
+.config-section .config-panel-card {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.config-section .config-card-body {
+  gap: 0;
+  padding: 0;
+}
+
+.config-section .config-card-body > .config-field-group,
+.config-section .config-card-body > .config-model-line,
+.config-section .config-card-body > .config-gate-na,
+.config-section .config-card-body > .sub-settings-panel {
+  margin: 0;
+  padding: 18px 0;
+}
+
+.config-section .config-card-body > * + * {
+  border-top: 1px solid var(--border);
+}
+
+.config-section .config-card-body > .config-gate-callout {
+  margin: 18px 0;
+}
+
+/* Công tắc: bỏ khung xám riêng, thành một hàng như các trường khác. */
+.config-section .config-field-group.bordered-group {
+  border-width: 1px 0 0;
+  border-color: var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.config-section .config-toggle-title,
+.config-section .config-field-label {
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.config-section .config-toggle-desc,
+.config-section .config-hint-text {
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.config-section .config-field-group.is-changed::before {
+  top: 18px;
+  bottom: 18px;
+  left: -16px;
+}
+
+@container (min-width: 640px) {
+  .config-field-group:not(.bordered-group) {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    grid-auto-flow: dense;
+    align-items: center;
+    gap: 6px 40px;
+  }
+
+  .config-field-group:not(.bordered-group) > * {
+    grid-column: 2;
+  }
+
+  .config-field-group:not(.bordered-group) > .config-label-row,
+  .config-field-group:not(.bordered-group) > .config-hint-text,
+  .config-field-group:not(.bordered-group) > legend {
+    grid-column: 1;
+  }
+
+  /* `legend` nổi thì không còn là "rendered legend" của fieldset nên thành grid item. */
+  fieldset.config-field-group:not(.bordered-group) > legend {
+    float: left;
+    width: auto;
+    margin: 0;
+  }
+
+  .config-field-group:not(.bordered-group) > .config-label-row {
+    justify-content: flex-start;
+  }
+
+  /* Trường công tắc (nhãn + nút gạt) giữ một hàng trải hết chiều ngang. */
+  .config-field-group:not(.bordered-group) > .config-toggle-header {
+    grid-column: 1 / -1;
+  }
+
+  /* Tham số phụ (số truy vấn phụ, hệ số ứng viên) cùng lưới nhãn – điều khiển. */
+  .config-section .sub-setting-row {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    align-items: center;
+    gap: 6px 40px;
+  }
 }
 
 .config-model-line {
@@ -928,25 +1264,57 @@ fieldset.config-field-group legend {
 
 .config-form-column .config-danger-zone {
   max-width: none;
-  margin-top: 26px;
+  margin-top: 20px;
+  border-radius: var(--radius);
 }
 
 /* ==========================================================================
-   BẢNG "THỬ VỚI CÂU HỎI"
+   BẢNG "THỬ VỚI CÂU HỎI" — ngăn kéo bên phải ở mọi khổ màn hình
    ========================================================================== */
+.retrieval-test-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  border: 0;
+  background: var(--scrim);
+  cursor: pointer;
+}
+
 .retrieval-test-panel {
-  display: flex;
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 60;
+  display: none;
   flex-direction: column;
   gap: 12px;
-  min-height: 0;
+  width: min(480px, 100%);
   padding: 18px 18px 28px;
   overflow-y: auto;
   border-left: 1px solid var(--border);
   background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.retrieval-test-panel[data-open="true"] {
+  display: flex;
+  animation: settings-drawer-in var(--duration-slow) var(--ease);
 }
 
 .retrieval-test-panel[hidden] {
   display: none !important;
+}
+
+@keyframes settings-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .retrieval-test-panel[data-open="true"] {
+    animation: none;
+  }
 }
 
 .retrieval-test-head {
@@ -969,7 +1337,7 @@ fieldset.config-field-group legend {
 }
 
 .retrieval-test-close {
-  display: none;
+  display: grid;
   flex: none;
   place-items: center;
   width: 32px;
@@ -1307,67 +1675,31 @@ fieldset.config-field-group legend {
   gap: 10px;
 }
 
+/* Màn vừa: bỏ hai đầu "Câu hỏi"/"Câu trả lời" để bốn bước đủ rộng. */
 @media (max-width: 1279px) {
-  .settings-shell,
-  .settings-shell.is-answer {
-    grid-template-columns: 224px minmax(0, 1fr);
-  }
-
-  .retrieval-test-scrim {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 59;
-    border: 0;
-    background: var(--scrim);
-    cursor: pointer;
-  }
-
-  .retrieval-test-panel {
+  .pipeline-end,
+  .pipeline-list::before,
+  .pipeline-list::after {
     display: none;
   }
 
-  .retrieval-test-panel[data-open="true"] {
-    display: flex;
-    position: fixed;
-    inset: 0 0 0 auto;
-    z-index: 60;
-    width: min(460px, 100%);
-    border-left: 1px solid var(--border);
-    box-shadow: var(--shadow-lg);
+  .pipeline-list {
+    gap: 14px;
+    padding: 0;
   }
 
-  .retrieval-test-close {
-    display: grid;
-  }
-}
-
-@media (min-width: 1280px) {
-  .settings-test-trigger,
-  .retrieval-test-scrim {
-    display: none;
+  .pipeline-item + .pipeline-item::before {
+    left: -14px;
+    width: 14px;
   }
 }
 
 @media (max-width: 1023px) {
-  .settings-shell,
-  .settings-shell.is-answer {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .settings-nav {
-    display: none;
-  }
-
   .settings-page.is-index .settings-index {
     display: block;
   }
 
-  .settings-page.is-index .settings-content {
-    display: none;
-  }
-
-  .settings-page.has-section .settings-index {
+  .settings-page.is-index .settings-main {
     display: none;
   }
 
@@ -1375,16 +1707,33 @@ fieldset.config-field-group legend {
     display: inline-flex;
   }
 
+  /* Mobile điều hướng bằng danh sách mục nên ẩn tab, dải bước và thanh loại mô hình. */
+  .settings-tabs,
+  .pipeline-steps,
+  .settings-subbar {
+    display: none;
+  }
+
   .settings-head {
-    padding: 14px 16px 10px;
+    padding: 12px 16px 14px;
   }
 
   .config-view-container {
-    padding: 8px 16px 40px;
+    padding: 12px 16px 32px;
+  }
+
+  .config-section,
+  .settings-card {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .config-section .config-field-group.is-changed::before {
+    left: -10px;
   }
 
   .appearance-panel {
-    padding: 20px 16px;
+    padding: 16px;
   }
 }
 
@@ -1397,9 +1746,6 @@ fieldset.config-field-group legend {
     padding-left: 62px;
   }
 
-  .settings-back {
-    margin-left: 62px;
-  }
 
   .save-bar {
     margin: 0;
@@ -1433,12 +1779,21 @@ fieldset.config-field-group legend {
     min-height: 44px;
   }
 
-  .settings-head {
+  .settings-head-row {
     flex-direction: column;
   }
 
-  .settings-test-trigger {
+  .settings-head-actions {
     width: 100%;
+    justify-content: flex-start;
+  }
+
+  .settings-saved {
+    flex-basis: 100%;
+  }
+
+  .settings-test-trigger {
+    flex: 1;
     justify-content: center;
   }
 }

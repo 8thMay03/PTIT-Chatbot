@@ -1,0 +1,738 @@
+<title>Phương án Cài đặt quản trị</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: trang tài liệu một cột; mỗi phương án là một khung app 1280×800 được thu nhỏ vừa bề ngang.
+   Token bám frontend/src/styles/tokens.css (maroon PTIT, thang xám, Inter). */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --soft: #f8fafc;
+  --sunken: #f1f5f9;
+  --sunken-strong: #e2e8f0;
+  --border: #e8ebf0;
+  --border-strong: #cbd5e1;
+  --text: #0f172a;
+  --text-2: #334155;
+  --muted: #5b6878;
+  --faint: #94a3b8;
+  --brand: #972635;
+  --brand-hover: #7d1f2c;
+  --brand-text: #972635;
+  --brand-subtle: #fdf3f4;
+  --brand-subtle-strong: #fbe3e6;
+  --brand-border: #f6c7cd;
+  --side-bg: #661a25;
+  --side-bg-2: #4d141c;
+  --side-text: #fbe3e6;
+  --side-muted: rgba(251, 227, 230, 0.62);
+  --on-solid: #ffffff;
+  --success: #047857;
+  --success-subtle: #f0fdf4;
+  --success-border: #bbf7d0;
+  --warning: #b45309;
+  --warning-dot: #d97706;
+  --warning-subtle: #fffbeb;
+  --warning-border: #fde68a;
+  --danger: #b91c1c;
+  --danger-subtle: #fef2f2;
+  --danger-border: #fecaca;
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 18px 40px rgba(15, 23, 42, 0.14);
+  --font: "Inter", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  --mono: "JetBrains Mono", Consolas, "SFMono-Regular", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d0f13; --surface: #14171c; --soft: #1a1e25; --sunken: #21262f; --sunken-strong: #2a303b;
+    --border: #262b34; --border-strong: #363d4a; --text: #eef1f5; --text-2: #c8ced8; --muted: #9aa4b2; --faint: #6b7483;
+    --brand: #c53d52; --brand-hover: #dc6476; --brand-text: #eb98a3; --brand-subtle: rgba(197, 61, 82, 0.12);
+    --brand-subtle-strong: rgba(197, 61, 82, 0.2); --brand-border: rgba(235, 152, 163, 0.32);
+    --side-bg: #1a1e25; --side-bg-2: #14171c; --side-text: #eef1f5; --side-muted: #9aa4b2;
+    --success: #6ee7b7; --success-subtle: rgba(16, 185, 129, 0.12); --success-border: rgba(110, 231, 183, 0.3);
+    --warning: #fcd34d; --warning-dot: #fbbf24; --warning-subtle: rgba(251, 191, 36, 0.1); --warning-border: rgba(252, 211, 77, 0.3);
+    --danger: #fca5a5; --danger-subtle: rgba(239, 68, 68, 0.1); --danger-border: rgba(252, 165, 165, 0.3);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3); --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4); --shadow-lg: 0 18px 40px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d0f13; --surface: #14171c; --soft: #1a1e25; --sunken: #21262f; --sunken-strong: #2a303b;
+  --border: #262b34; --border-strong: #363d4a; --text: #eef1f5; --text-2: #c8ced8; --muted: #9aa4b2; --faint: #6b7483;
+  --brand: #c53d52; --brand-hover: #dc6476; --brand-text: #eb98a3; --brand-subtle: rgba(197, 61, 82, 0.12);
+  --brand-subtle-strong: rgba(197, 61, 82, 0.2); --brand-border: rgba(235, 152, 163, 0.32);
+  --side-bg: #1a1e25; --side-bg-2: #14171c; --side-text: #eef1f5; --side-muted: #9aa4b2;
+  --success: #6ee7b7; --success-subtle: rgba(16, 185, 129, 0.12); --success-border: rgba(110, 231, 183, 0.3);
+  --warning: #fcd34d; --warning-dot: #fbbf24; --warning-subtle: rgba(251, 191, 36, 0.1); --warning-border: rgba(252, 211, 77, 0.3);
+  --danger: #fca5a5; --danger-subtle: rgba(239, 68, 68, 0.1); --danger-border: rgba(252, 165, 165, 0.3);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3); --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4); --shadow-lg: 0 18px 40px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.6; }
+.doc { max-width: 1120px; margin: 0 auto; padding: 40px 20px 80px; display: grid; gap: 56px; }
+.doc h1, .doc h2, .doc h3 { text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand-text); }
+.intro { display: grid; gap: 16px; max-width: 760px; }
+.intro h1 { font-size: 34px; line-height: 1.2; }
+.intro p { margin: 0; color: var(--text-2); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 8px; }
+.fact { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; font-size: 14px; color: var(--text-2); }
+.fact strong { display: block; color: var(--text); margin-bottom: 2px; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; }
+.toc a { text-decoration: none; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px; font-size: 14px; font-weight: 500; }
+.toc a:hover { border-color: var(--brand-border); color: var(--brand-text); }
+.toc a:focus-visible, button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.option { display: grid; gap: 18px; scroll-margin-top: 24px; }
+.option-head { display: grid; gap: 6px; max-width: 780px; }
+.option-head h2 { font-size: 26px; line-height: 1.25; }
+.option-head p { margin: 0; color: var(--text-2); }
+.tag-rec { display: inline-block; vertical-align: middle; margin-left: 10px; font-size: 12px; font-weight: 600; color: var(--success); background: var(--success-subtle); border: 1px solid var(--success-border); border-radius: 999px; padding: 2px 10px; letter-spacing: 0; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.note { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; min-width: 0; }
+.note h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.note ul { margin: 0; padding-left: 18px; color: var(--text-2); font-size: 14px; display: grid; gap: 4px; }
+.note.good h3 { color: var(--success); }
+.note.bad h3 { color: var(--warning); }
+.hint-small { font-size: 13px; color: var(--muted); margin: 0; }
+
+.stage { position: relative; overflow: hidden; border-radius: 16px; border: 1px solid var(--border); box-shadow: var(--shadow-lg); background: var(--bg); }
+.stage > .app { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.shot { border-radius: 16px; border: 1px solid var(--border); box-shadow: var(--shadow-md); width: 100%; display: block; }
+
+.compare-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+table.compare { border-collapse: collapse; width: 100%; min-width: 680px; font-size: 14px; }
+.compare th, .compare td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.compare thead th { font-size: 13px; color: var(--muted); font-weight: 600; background: var(--soft); }
+.compare tbody th { font-weight: 600; color: var(--text); width: 22%; }
+.compare tr:last-child td, .compare tr:last-child th { border-bottom: 0; }
+.rec-box { background: var(--brand-subtle); border: 1px solid var(--brand-border); border-radius: 16px; padding: 20px 22px; display: grid; gap: 8px; max-width: 820px; }
+.rec-box p { margin: 0; color: var(--text-2); }
+
+/* =========================================================================
+   KHUNG APP CHUNG (1280×800)
+   ========================================================================= */
+.app { width: 1280px; height: 800px; display: grid; grid-template-columns: 236px 1fr; background: var(--bg); color: var(--text); font-size: 13.5px; line-height: 1.5; overflow: hidden; }
+.app svg.i { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.app button { font: inherit; color: inherit; cursor: pointer; }
+.side { background: linear-gradient(180deg, var(--side-bg), var(--side-bg-2)); color: var(--side-text); display: flex; flex-direction: column; padding: 18px 14px; gap: 4px; }
+.side-brand { display: flex; align-items: center; gap: 10px; padding: 2px 6px 18px; }
+.side-logo { width: 34px; height: 34px; border-radius: 10px; background: rgba(255, 255, 255, 0.12); display: grid; place-items: center; }
+.side-brand strong { display: block; font-size: 14px; }
+.side-brand small { color: var(--side-muted); font-size: 12px; }
+.side-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; font-weight: 500; }
+.side-label { font-size: 12px; font-weight: 600; color: var(--side-muted); padding: 16px 10px 4px; }
+.side-empty { font-size: 12.5px; color: var(--side-muted); padding: 2px 10px; }
+.side-bottom { margin-top: auto; display: grid; gap: 4px; }
+.side-item.on { background: rgba(255, 255, 255, 0.95); color: #661a25; }
+.main { min-width: 0; overflow: hidden; position: relative; display: flex; flex-direction: column; }
+
+/* Điều khiển dùng chung trong khung */
+.mono { font-family: var(--mono); font-size: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 11.5px; padding: 1px 7px; border-radius: 6px; background: var(--sunken); color: var(--text-2); white-space: nowrap; }
+.chip.brand { background: var(--brand-subtle-strong); color: var(--brand-text); }
+.btn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface); font-weight: 600; font-size: 13px; white-space: nowrap; }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: var(--on-solid); }
+.btn.quiet { border-color: transparent; background: transparent; color: var(--muted); }
+.slider { position: relative; height: 6px; border-radius: 999px; background: var(--sunken-strong); flex: 1; }
+.slider > i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--brand); }
+.slider > b { position: absolute; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--surface); border: 2px solid var(--brand); box-shadow: var(--shadow-sm); }
+.num { width: 64px; height: 32px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); display: grid; place-items: center; font-variant-numeric: tabular-nums; font-weight: 500; }
+.ctrl-line { display: flex; align-items: center; gap: 14px; }
+.toggle { width: 36px; height: 20px; border-radius: 999px; background: var(--sunken-strong); position: relative; flex: none; }
+.toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); }
+.toggle.on { background: var(--brand); }
+.toggle.on::after { left: 18px; background: #fff; }
+.seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--sunken); border-radius: 10px; }
+.seg span { min-width: 38px; text-align: center; padding: 4px 10px; border-radius: 8px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+.seg span.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+.split { display: flex; height: 30px; border-radius: 8px; overflow: hidden; font-size: 12px; font-weight: 600; }
+.split > span { display: grid; place-items: center; }
+.split .v { background: var(--brand); color: var(--on-solid); }
+.split .k { background: var(--sunken-strong); color: var(--text-2); }
+.dirty { width: 7px; height: 7px; border-radius: 50%; background: var(--warning-dot); flex: none; }
+.savebar { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; padding: 10px 10px 10px 18px; border-radius: 14px; background: var(--text); color: var(--bg); box-shadow: var(--shadow-lg); white-space: nowrap; }
+.savebar .btn.quiet { color: var(--faint); }
+.savebar .sb-text { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.savebar .sb-text small { color: var(--faint); font-weight: 400; font-size: 12.5px; }
+
+/* Hàng cài đặt: nhãn trái, điều khiển phải */
+.row { display: grid; grid-template-columns: 290px 1fr; gap: 36px; padding: 18px 0; border-top: 1px solid var(--border); align-items: start; }
+.row:first-child { border-top: 0; }
+.row-label strong { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px; }
+.row-label p { margin: 3px 0 0; color: var(--muted); font-size: 12.5px; }
+.row-ctrl { display: grid; gap: 10px; min-width: 0; }
+.sub-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 14px; background: var(--soft); border: 1px solid var(--border); border-radius: 10px; }
+.sub-row span { color: var(--text-2); }
+
+/* Tiêu đề trang + tab trên cùng (A, C) */
+.top { padding: 22px 32px 0; background: var(--surface); border-bottom: 1px solid var(--border); }
+.top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.top h1 { margin: 0; font-size: 22px; letter-spacing: -0.01em; }
+.top p { margin: 2px 0 0; color: var(--muted); }
+.top-actions { display: flex; align-items: center; gap: 12px; }
+.saved { font-size: 12.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.saved::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+.tabs { display: flex; gap: 26px; margin-top: 16px; }
+.tabs span { display: inline-flex; align-items: center; gap: 7px; padding: 10px 0 12px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; }
+.tabs span.on { color: var(--brand-text); border-bottom-color: var(--brand); }
+
+/* =========================================================================
+   A — PIPELINE
+   ========================================================================= */
+.a-body { flex: 1; overflow: hidden; padding: 24px 32px 90px; display: grid; gap: 20px; align-content: start; }
+.pipe { display: flex; align-items: stretch; gap: 0; }
+.pipe-end { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; width: 74px; color: var(--muted); font-size: 12px; font-weight: 500; text-align: center; }
+.pipe-end .dot { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 1px dashed var(--border-strong); color: var(--muted); }
+.pipe-link { width: 22px; align-self: center; height: 2px; background: repeating-linear-gradient(90deg, var(--border-strong) 0 4px, transparent 4px 8px); flex: none; }
+.node { flex: 1; min-width: 0; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; display: grid; gap: 6px; box-shadow: var(--shadow-sm); transition: border-color .15s, background .15s; }
+.node:hover { border-color: var(--brand-border); }
+.node-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.node-step { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+.node-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+.node-ico { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--brand-subtle); color: var(--brand-text); flex: none; }
+.node-sum { display: flex; flex-wrap: wrap; gap: 4px; }
+.node.on { background: var(--brand); border-color: var(--brand); color: var(--on-solid); box-shadow: 0 10px 24px rgba(151, 38, 53, 0.28); }
+.node.on .node-step { color: rgba(255, 255, 255, 0.7); }
+.node.on .node-ico { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.node.on .chip { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.a-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 4px 28px 8px; }
+.a-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0 14px; border-bottom: 1px solid var(--border); }
+.a-panel-head h2 { margin: 0; font-size: 17px; }
+.a-panel-head p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+.a-pane[hidden] { display: none; }
+.model-pill { display: inline-flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--soft); }
+.model-pill a { color: var(--brand-text); font-weight: 600; text-decoration: none; }
+.a-drawer-hint { position: absolute; right: 0; top: 150px; writing-mode: vertical-rl; transform: rotate(180deg); background: var(--surface); border: 1px solid var(--border); border-right: 0; border-radius: 0 10px 10px 0; padding: 14px 8px; font-weight: 600; font-size: 12.5px; color: var(--brand-text); display: flex; align-items: center; gap: 8px; box-shadow: var(--shadow-sm); }
+.a-drawer-hint svg.i { transform: rotate(90deg); }
+
+/* =========================================================================
+   B — DANH MỤC CÓ ICON
+   ========================================================================= */
+.b-grid { flex: 1; display: grid; grid-template-columns: 268px 1fr 46px; min-height: 0; }
+.b-nav { background: var(--surface); border-right: 1px solid var(--border); padding: 22px 14px; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+.b-nav h1 { margin: 0 8px 12px; font-size: 22px; letter-spacing: -0.01em; }
+.b-search { display: flex; align-items: center; gap: 8px; margin: 0 4px 10px; height: 34px; padding: 0 10px; border-radius: 10px; background: var(--sunken); color: var(--faint); font-size: 13px; }
+.b-search kbd { margin-left: auto; font-family: var(--mono); font-size: 11px; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; color: var(--muted); }
+.b-group { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--faint); padding: 14px 10px 6px; }
+.b-item { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 10px; }
+.b-item .ico { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--sunken); color: var(--text-2); flex: none; }
+.b-item .txt { min-width: 0; display: grid; }
+.b-item .txt strong { font-weight: 600; font-size: 13px; }
+.b-item .txt small { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); }
+.b-item .dirty { margin-left: auto; }
+.b-item.on { background: var(--brand-subtle); }
+.b-item.on .ico { background: var(--brand); color: var(--on-solid); }
+.b-item.on .txt strong { color: var(--brand-text); }
+.b-content { overflow: hidden; padding: 28px 40px 90px; display: grid; gap: 18px; align-content: start; }
+.b-head { display: flex; align-items: center; gap: 16px; }
+.b-head .big-ico { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: var(--brand-subtle); color: var(--brand-text); border: 1px solid var(--brand-border); }
+.b-head .big-ico svg.i { width: 22px; height: 22px; }
+.b-head h2 { margin: 0; font-size: 22px; letter-spacing: -0.01em; }
+.b-head p { margin: 2px 0 0; color: var(--muted); }
+.b-head .saved { margin-left: auto; }
+.b-flow { display: flex; align-items: center; gap: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 18px; }
+.b-flow-step { display: grid; gap: 2px; flex: 1; }
+.b-flow-step small { font-size: 11.5px; color: var(--muted); }
+.b-flow-step strong { font-family: var(--mono); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.b-flow-arrow { color: var(--faint); padding: 0 12px; }
+.b-flow-verdict { white-space: nowrap; padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 12.5px; background: var(--danger-subtle); color: var(--danger); border: 1px solid var(--danger-border); }
+.b-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 6px 26px; }
+.b-card-title { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding: 14px 0 0; }
+.b-rail { border-left: 1px solid var(--border); background: var(--surface); display: flex; justify-content: center; align-items: flex-start; padding-top: 22px; }
+.b-rail span { writing-mode: vertical-rl; transform: rotate(180deg); display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 12.5px; color: var(--brand-text); padding: 12px 6px; border-radius: 10px; background: var(--brand-subtle); }
+.b-rail svg.i { transform: rotate(90deg); }
+.threshold { position: relative; height: 8px; border-radius: 999px; background: linear-gradient(90deg, var(--danger-subtle), var(--sunken-strong)); flex: 1; }
+.threshold > i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: linear-gradient(90deg, var(--danger-border), var(--brand)); }
+.threshold > b { position: absolute; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--surface); border: 2px solid var(--brand); box-shadow: var(--shadow-sm); }
+.scale-ticks { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10.5px; color: var(--faint); padding-right: 78px; }
+.callout { display: flex; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--soft); border: 1px solid var(--border); color: var(--text-2); font-size: 12.5px; }
+.override { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--warning-subtle); color: var(--warning); border: 1px solid var(--warning-border); }
+
+/* =========================================================================
+   C — BÀN THỬ NGHIỆM
+   ========================================================================= */
+.c-grid { flex: 1; display: grid; grid-template-columns: 1fr 448px; min-height: 0; }
+.c-left { overflow: hidden; padding: 22px 28px 90px; display: grid; gap: 10px; align-content: start; }
+.acc { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.acc-head { width: 100%; display: flex; align-items: center; gap: 12px; padding: 13px 16px; background: none; border: 0; text-align: left; }
+.acc-head .ico { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--sunken); color: var(--text-2); flex: none; }
+.acc-head .t { font-weight: 600; font-size: 14px; flex: none; }
+.acc-head .sum { display: flex; gap: 5px; flex-wrap: wrap; margin-left: 6px; min-width: 0; }
+.acc-head .chev { margin-left: auto; color: var(--faint); transition: transform .2s; }
+.acc.open .acc-head .chev { transform: rotate(180deg); }
+.acc.open .acc-head .ico { background: var(--brand); color: var(--on-solid); }
+.acc.open { border-color: var(--brand-border); box-shadow: var(--shadow-sm); }
+.acc-body { display: none; padding: 2px 18px 14px 58px; }
+.acc.open .acc-body { display: grid; gap: 0; }
+.stack { display: grid; gap: 8px; padding: 14px 0; border-top: 1px solid var(--border); }
+.stack:first-child { border-top: 0; padding-top: 4px; }
+.stack .lab { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stack .lab strong { font-weight: 600; }
+.stack p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.c-right { background: var(--surface); border-left: 1px solid var(--border); padding: 22px 24px; display: grid; gap: 16px; align-content: start; overflow: hidden; }
+.c-right-head { display: flex; align-items: center; justify-content: space-between; }
+.c-right-head h2 { margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.c-q { border: 1px solid var(--border-strong); border-radius: 12px; padding: 10px 12px; display: grid; gap: 10px; }
+.c-q p { margin: 0; font-weight: 500; }
+.c-q-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.c-q-foot .sel { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); padding: 4px 8px; border-radius: 8px; background: var(--sunken); }
+.verdict { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: var(--success-subtle); border: 1px solid var(--success-border); }
+.verdict .badge { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--success); color: var(--surface); flex: none; }
+.verdict strong { display: block; color: var(--success); }
+.verdict span { font-size: 12.5px; color: var(--text-2); }
+.sig { display: grid; gap: 6px; }
+.sig-top { display: flex; justify-content: space-between; font-size: 12.5px; }
+.sig-top span { color: var(--text-2); font-weight: 500; }
+.gauge { position: relative; height: 10px; border-radius: 999px; background: var(--sunken); }
+.gauge > i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--success); opacity: 0.85; }
+.gauge > .mk { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--text); border-radius: 2px; }
+.gauge > .mk.draft { background: var(--brand); }
+.gauge > .mk.draft::after { content: "nháp"; position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 600; color: var(--brand-text); }
+.gauge > .mk.saved::after { content: "đã lưu"; position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--muted); white-space: nowrap; }
+.chunks { display: grid; gap: 8px; }
+.chunks h3 { margin: 6px 0 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.chunk { display: grid; grid-template-columns: 22px 1fr 54px; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; }
+.chunk .rk { font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
+.chunk .ct { min-width: 0; }
+.chunk .ct strong { display: block; font-weight: 600; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chunk .ct small { color: var(--muted); font-size: 11.5px; }
+.chunk .sc { display: grid; gap: 3px; justify-items: end; font-family: var(--mono); font-size: 11px; color: var(--text-2); }
+.chunk .bar { width: 54px; height: 4px; border-radius: 99px; background: var(--sunken); position: relative; overflow: hidden; }
+.chunk .bar i { position: absolute; inset: 0 auto 0 0; background: var(--brand); border-radius: inherit; }
+.example-tag { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--sunken); border-radius: 999px; padding: 1px 8px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 520px) { .intro h1 { font-size: 27px; } .option-head h2 { font-size: 22px; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-rank" viewBox="0 0 24 24"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M13 8H7"/><path d="M17 12H7"/></symbol>
+  <symbol id="i-flask" viewBox="0 0 24 24"><path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+  <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+</svg>
+
+<main class="doc">
+  <header class="intro">
+    <span class="eyebrow">PTIT Chatbot · Quản trị</span>
+    <h1>Ba phương án cho màn Cài đặt</h1>
+    <p>Mục tiêu: màn Cài đặt có điểm nhấn hơn và bố cục thoáng hơn, giữ nguyên dữ liệu, API và địa chỉ <code>#settings/&lt;mục&gt;</code>. Cả ba phương án đều giữ một nút lưu cho toàn bộ "Hệ thống trả lời" và thanh lưu nổi khi có thay đổi.</p>
+    <div class="facts">
+      <div class="fact"><strong>Hiện tại: 4 cột</strong>Sidebar app, danh mục, form và bảng thử. Form còn khoảng 480px.</div>
+      <div class="fact"><strong>Nhạt, ít phân cấp</strong>Card trắng lồng card trắng, mục nào cũng giống mục nào.</div>
+      <div class="fact"><strong>Hai trang hai kiểu</strong>"Hệ thống trả lời" và "Mô hình" trình bày khác nhau.</div>
+    </div>
+    <nav class="toc" aria-label="Đi tới phương án">
+      <a href="#now">Hiện tại</a><a href="#opt-a">A · Đường ống</a><a href="#opt-b">B · Danh mục có icon</a><a href="#opt-c">C · Bàn thử nghiệm</a><a href="#compare">So sánh</a>
+    </nav>
+  </header>
+
+  <section class="option" id="now">
+    <div class="option-head">
+      <span class="eyebrow">Tham chiếu</span>
+      <h2>Màn hiện tại</h2>
+    </div>
+    <p class="hint-small">Ảnh màn cũ có trong bản artifact; xem task <code>2026-11-21-settings-pipeline-layout</code>.</p>
+  </section>
+
+  <!-- ================================================================ A -->
+  <section class="option" id="opt-a">
+    <div class="option-head">
+      <span class="eyebrow">Phương án A</span>
+      <h2>Đường ống trả lời <span class="tag-rec">Đề xuất</span></h2>
+      <p>Bỏ cột danh mục. Ba nhóm lớn thành tab trên cùng. "Hệ thống trả lời" mở đầu bằng một dải 4 bước theo đúng thứ tự xử lý câu hỏi, mỗi bước hiện sẵn giá trị đang dùng. Bấm bước nào thì form của bước đó hiện bên dưới, rộng hết khung. "Thử với câu hỏi" thành ngăn kéo trượt từ phải. Bấm thử các bước trong khung bên dưới.</p>
+    </div>
+    <div class="stage" data-stage>
+      <div class="app">
+        <aside class="side" data-side></aside>
+        <div class="main">
+          <div class="top">
+            <div class="top-row">
+              <div><h1>Cài đặt</h1><p>Điều chỉnh cách chatbot tìm tài liệu và trả lời sinh viên.</p></div>
+              <div class="top-actions">
+                <span class="saved">Đã lưu lúc 16:08 hôm nay</span>
+                <button class="btn" type="button"><svg class="i"><use href="#i-flask"/></svg>Thử với câu hỏi</button>
+              </div>
+            </div>
+            <div class="tabs">
+              <span class="on"><svg class="i"><use href="#i-sliders"/></svg>Hệ thống trả lời</span>
+              <span><svg class="i"><use href="#i-cpu"/></svg>Mô hình</span>
+              <span><svg class="i"><use href="#i-palette"/></svg>Giao diện</span>
+            </div>
+          </div>
+          <div class="a-body">
+            <div class="pipe" role="tablist" aria-label="Các bước trả lời">
+              <div class="pipe-end"><span class="dot"><svg class="i"><use href="#i-user"/></svg></span>Câu hỏi</div>
+              <span class="pipe-link"></span>
+              <button class="node on" type="button" data-node="retrieval">
+                <span class="node-top"><span class="node-step">Bước 1</span><span class="dirty" title="Có thay đổi chưa lưu"></span></span>
+                <span class="node-title"><span class="node-ico"><svg class="i"><use href="#i-search"/></svg></span>Truy xuất</span>
+                <span class="node-sum"><span class="chip">Top-K 4</span><span class="chip">Vector 65%</span><span class="chip">+3 truy vấn</span></span>
+              </button>
+              <span class="pipe-link"></span>
+              <button class="node" type="button" data-node="reranker">
+                <span class="node-top"><span class="node-step">Bước 2</span></span>
+                <span class="node-title"><span class="node-ico"><svg class="i"><use href="#i-rank"/></svg></span>Xếp hạng lại</span>
+                <span class="node-sum"><span class="chip">Heuristic</span><span class="chip">3× ứng viên</span></span>
+              </button>
+              <span class="pipe-link"></span>
+              <button class="node" type="button" data-node="gate">
+                <span class="node-top"><span class="node-step">Bước 3</span></span>
+                <span class="node-title"><span class="node-ico"><svg class="i"><use href="#i-shield"/></svg></span>Ngưỡng tin cậy</span>
+                <span class="node-sum"><span class="chip">BM25 ≥ 0.25</span><span class="chip">Cos ≥ 0.30</span></span>
+              </button>
+              <span class="pipe-link"></span>
+              <button class="node" type="button" data-node="generation">
+                <span class="node-top"><span class="node-step">Bước 4</span></span>
+                <span class="node-title"><span class="node-ico"><svg class="i"><use href="#i-msg"/></svg></span>Sinh câu trả lời</span>
+                <span class="node-sum"><span class="chip">gpt-4.1-mini</span><span class="chip">T 0</span></span>
+              </button>
+              <span class="pipe-link"></span>
+              <div class="pipe-end"><span class="dot"><svg class="i"><use href="#i-check"/></svg></span>Câu trả lời</div>
+            </div>
+
+            <section class="a-panel">
+              <div class="a-pane" data-pane="retrieval">
+                <div class="a-panel-head">
+                  <div><h2>Truy xuất</h2><p>Cách tìm các đoạn tài liệu liên quan tới câu hỏi.</p></div>
+                  <button class="btn quiet" type="button"><svg class="i"><use href="#i-reset"/></svg>Về mặc định</button>
+                </div>
+                <div class="row">
+                  <div class="row-label"><strong>Số đoạn nạp vào LLM <span class="chip brand">Top-K</span><span class="dirty"></span></strong><p>Nhiều đoạn giúp đủ ngữ cảnh nhưng tăng độ trễ và chi phí. Mặc định 4.</p></div>
+                  <div class="row-ctrl"><div class="ctrl-line"><div class="slider"><i style="width:30%"></i><b style="left:30%"></b></div><span class="num">6</span></div></div>
+                </div>
+                <div class="row">
+                  <div class="row-label"><strong>Tỷ trọng tìm kiếm lai</strong><p>Vector hiểu ngữ nghĩa; BM25 bắt đúng số điều khoản, tên môn, mức học phí.</p></div>
+                  <div class="row-ctrl"><div class="split"><span class="v" style="width:65%">Vector 65%</span><span class="k" style="width:35%">BM25 35%</span></div></div>
+                </div>
+                <div class="row">
+                  <div class="row-label"><strong>Mở rộng câu hỏi đa hướng</strong><p>Tự sinh thêm câu hỏi phụ để tìm toàn diện hơn.</p></div>
+                  <div class="row-ctrl">
+                    <div class="ctrl-line"><span class="toggle on"></span><span style="color:var(--muted)">Số truy vấn phụ</span><span class="seg"><span>1</span><span>2</span><span class="on">3</span><span>4</span><span>5</span></span></div>
+                    <div class="sub-row"><span>Dùng LLM để sinh truy vấn phụ</span><span class="toggle"></span></div>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="row-label"><strong>Viết lại câu hỏi bằng LLM</strong><p>Sửa câu hỏi không dấu, sai chính tả trước khi tìm. Tắt để tiết kiệm chi phí.</p></div>
+                  <div class="row-ctrl"><span class="toggle"></span></div>
+                </div>
+              </div>
+
+              <div class="a-pane" data-pane="reranker" hidden>
+                <div class="a-panel-head">
+                  <div><h2>Xếp hạng lại</h2><p>Sắp xếp lại các đoạn ứng viên theo độ liên quan trước khi đưa vào mô hình.</p></div>
+                  <button class="btn quiet" type="button"><svg class="i"><use href="#i-reset"/></svg>Về mặc định</button>
+                </div>
+                <div class="row">
+                  <div class="row-label"><strong>Bật xếp hạng lại</strong><p>Dùng mô hình xếp hạng đang chọn cho danh sách đoạn.</p></div>
+                  <div class="row-ctrl"><span class="toggle on"></span></div>
+                </div>
+                <div class="row">
+                  <div class="row-label"><strong>Mô hình xếp hạng</strong><p>Đổi mô hình ở tab Mô hình.</p></div>
+                  <div class="row-ctrl"><span class="model-pill"><svg class="i"><use href="#i-cpu"/></svg><strong>Heuristic</strong><a href="#opt-a">Đổi mô hình →</a></span></div>
+                </div>
+                <div class="row">
+                  <div class="row-label"><strong>Hệ số ứng viên sơ bộ</strong><p>Lấy 3 × Top-K = 12 đoạn rồi xếp hạng lại còn 4.</p></div>
+                  <div class="row-ctrl"><div class="ctrl-line"><div class="slider"><i style="width:40%"></i><b style="left:40%"></b></div><span class="num">3×</span></div></div>
+                </div>
+              </div>
+
+              <div class="a-pane" data-pane="gate" hidden>
+                <div class="a-panel-head">
+                  <div><h2>Ngưỡng tin cậy</h2><p>Đoạn khớp nhất phải vượt mọi ngưỡng, nếu không chatbot trả lời "Chưa tìm thấy thông tin này trong tài liệu."</p></div>
+                  <button class="btn quiet" type="button"><svg class="i"><use href="#i-reset"/></svg>Về mặc định</button>
+                </div>
+                <div class="row">
+                  <div class="row-label"><strong>Độ khớp từ khoá tối thiểu</strong><p>Điểm BM25 chuẩn hoá, thang 0–1. Mặc định 0.25.</p></div>
+                  <div class="row-ctrl"><div class="ctrl-line"><div class="slider"><i style="width:25%"></i><b style="left:25%"></b></div><span class="num">0.25</span></div></div>
+                </div>
+                <div class="row">
+                  <div class="row-label"><strong>Độ tương đồng ngữ nghĩa tối thiểu <span class="override">Ghi đè</span></strong><p>Cosine với text-embedding-3-small.</p></div>
+                  <div class="row-ctrl"><div class="ctrl-line"><div class="slider"><i style="width:30%"></i><b style="left:30%"></b></div><span class="num">0.30</span></div></div>
+                </div>
+                <div class="row">
+                  <div class="row-label"><strong>Chặn yêu cầu không an toàn</strong><p>Từ chối câu chèn lệnh, yêu cầu viết code, sáng tác hoặc làm bài tập.</p></div>
+                  <div class="row-ctrl"><span class="toggle on"></span></div>
+                </div>
+              </div>
+
+              <div class="a-pane" data-pane="generation" hidden>
+                <div class="a-panel-head">
+                  <div><h2>Sinh câu trả lời</h2><p>Độ ngẫu nhiên, thời gian chờ và số lần thử lại của mô hình ngôn ngữ.</p></div>
+                  <button class="btn quiet" type="button"><svg class="i"><use href="#i-reset"/></svg>Về mặc định</button>
+                </div>
+                <div class="row">
+                  <div class="row-label"><strong>Mô hình</strong><p>Đổi mô hình ở tab Mô hình.</p></div>
+                  <div class="row-ctrl"><span class="model-pill"><svg class="i"><use href="#i-cpu"/></svg><strong>gpt-4.1-mini</strong><span class="chip">OpenAI</span><a href="#opt-a">Đổi mô hình →</a></span></div>
+                </div>
+                <div class="row">
+                  <div class="row-label"><strong>Độ ngẫu nhiên <span class="chip brand">Temperature</span></strong><p>0 bám sát quy chế, hợp với hỏi đáp quy định.</p></div>
+                  <div class="row-ctrl"><div class="ctrl-line"><div class="slider"><i style="width:0%"></i><b style="left:0%"></b></div><span class="num">0</span></div></div>
+                </div>
+                <div class="row">
+                  <div class="row-label"><strong>Thời gian chờ tối đa</strong><p>Tự ngắt khi gọi mô hình quá lâu. Mặc định 30 giây.</p></div>
+                  <div class="row-ctrl"><div class="ctrl-line"><div class="slider"><i style="width:25%"></i><b style="left:25%"></b></div><span class="num">30 s</span></div></div>
+                </div>
+                <div class="row">
+                  <div class="row-label"><strong>Số lần thử lại khi lỗi mạng</strong></div>
+                  <div class="row-ctrl"><span class="seg"><span>0</span><span>1</span><span class="on">2</span><span>3</span></span></div>
+                </div>
+              </div>
+            </section>
+          </div>
+          <div class="savebar"><span class="sb-text"><span class="dirty"></span>1 thay đổi chưa lưu <small>Truy xuất · Top-K 4 → 6</small></span><button class="btn quiet" type="button">Huỷ</button><button class="btn primary" type="button">Lưu thay đổi</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note good"><h3>Được</h3><ul><li>Còn 2 vùng thay vì 4; form rộng gấp đôi.</li><li>Dải 4 bước cho thấy ngay cấu hình đang dùng mà không cần mở từng mục.</li><li>Có bản sắc riêng của RAG, không phải trang cài đặt chung chung.</li></ul></div>
+      <div class="note bad"><h3>Đánh đổi</h3><ul><li>Mỗi lúc chỉ thấy một bước; bỏ cuộn liền một form và scroll-spy hiện có.</li><li>Bảng thử thành ngăn kéo, che một phần form khi mở.</li></ul></div>
+      <div class="note"><h3>Trên điện thoại</h3><ul><li>Tab thành thanh cuộn ngang; dải 4 bước xếp dọc thành danh sách có giá trị.</li><li>Bấm một bước mở trang riêng có nút quay lại, như hiện nay.</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ================================================================ B -->
+  <section class="option" id="opt-b">
+    <div class="option-head">
+      <span class="eyebrow">Phương án B</span>
+      <h2>Danh mục có icon và giá trị</h2>
+      <p>Giữ cột danh mục bên trái nhưng mỗi mục có icon, giá trị đang dùng và chấm "chưa lưu". Nội dung chuyển sang kiểu hàng nhãn–điều khiển trong một card, không lồng card. Mỗi trang mở đầu bằng một dải tóm tắt (ở đây: cách ngưỡng quyết định trả lời hay từ chối). Bảng thử thu về một thanh dọc mảnh bên phải.</p>
+    </div>
+    <div class="stage" data-stage>
+      <div class="app">
+        <aside class="side" data-side></aside>
+        <div class="main">
+          <div class="b-grid">
+            <nav class="b-nav" aria-label="Danh mục cài đặt">
+              <h1>Cài đặt</h1>
+              <div class="b-search"><svg class="i"><use href="#i-search"/></svg>Tìm cài đặt…<kbd>/</kbd></div>
+              <div class="b-group">Hệ thống trả lời</div>
+              <div class="b-item"><span class="ico"><svg class="i"><use href="#i-search"/></svg></span><span class="txt"><strong>Truy xuất</strong><small>Top-K 4 · Vector 65%</small></span></div>
+              <div class="b-item"><span class="ico"><svg class="i"><use href="#i-rank"/></svg></span><span class="txt"><strong>Xếp hạng lại</strong><small>Heuristic · 3×</small></span></div>
+              <div class="b-item on"><span class="ico"><svg class="i"><use href="#i-shield"/></svg></span><span class="txt"><strong>Ngưỡng tin cậy</strong><small>BM25 0.25 · Cos 0.30</small></span><span class="dirty"></span></div>
+              <div class="b-item"><span class="ico"><svg class="i"><use href="#i-msg"/></svg></span><span class="txt"><strong>Sinh câu trả lời</strong><small>gpt-4.1-mini · T 0</small></span></div>
+              <div class="b-group">Mô hình</div>
+              <div class="b-item"><span class="ico"><svg class="i"><use href="#i-cpu"/></svg></span><span class="txt"><strong>Mô hình ngôn ngữ</strong><small>2 mô hình · gpt-4.1-mini</small></span></div>
+              <div class="b-item"><span class="ico"><svg class="i"><use href="#i-db"/></svg></span><span class="txt"><strong>Mô hình nhúng</strong><small>text-embedding-3-small</small></span></div>
+              <div class="b-item"><span class="ico"><svg class="i"><use href="#i-rank"/></svg></span><span class="txt"><strong>Mô hình xếp hạng</strong><small>Heuristic</small></span></div>
+              <div class="b-group">Cá nhân</div>
+              <div class="b-item"><span class="ico"><svg class="i"><use href="#i-palette"/></svg></span><span class="txt"><strong>Giao diện</strong><small>Theo hệ thống</small></span></div>
+            </nav>
+            <div class="b-content">
+              <div class="b-head">
+                <span class="big-ico"><svg class="i"><use href="#i-shield"/></svg></span>
+                <div><h2>Ngưỡng tin cậy</h2><p>Quyết định khi nào chatbot từ chối vì không đủ căn cứ.</p></div>
+                <span class="saved">Đã lưu lúc 16:08 hôm nay</span>
+              </div>
+              <div class="b-flow">
+                <div class="b-flow-step"><small>Đoạn khớp nhất</small><strong>BM25 ≥ 0.30</strong></div>
+                <span class="b-flow-arrow">và</span>
+                <div class="b-flow-step"><small>Ngữ nghĩa</small><strong>Cosine ≥ 0.30</strong></div>
+                <span class="b-flow-arrow">và</span>
+                <div class="b-flow-step"><small>Câu hỏi</small><strong>Không chèn lệnh</strong></div>
+                <span class="b-flow-arrow"><svg class="i"><use href="#i-right"/></svg></span>
+                <span class="b-flow-verdict">Thiếu một điều kiện → từ chối</span>
+              </div>
+              <div class="b-card">
+                <div class="b-card-title">Điểm tối thiểu</div>
+                <div class="row">
+                  <div class="row-label"><strong>Độ khớp từ khoá <span class="dirty"></span></strong><p>Điểm BM25 chuẩn hoá của đoạn khớp nhất. Cao hơn thì từ chối nhiều hơn. Mặc định 0.25.</p></div>
+                  <div class="row-ctrl"><div class="ctrl-line"><div class="threshold"><i style="width:30%"></i><b style="left:30%"></b></div><span class="num">0.30</span></div><div class="scale-ticks"><span>0</span><span>0.25</span><span>0.5</span><span>0.75</span><span>1</span></div></div>
+                </div>
+                <div class="row">
+                  <div class="row-label"><strong>Độ tương đồng ngữ nghĩa <span class="override">Ghi đè</span></strong><p>Cosine giữa câu hỏi và đoạn khớp nhất, theo text-embedding-3-small.</p></div>
+                  <div class="row-ctrl"><div class="ctrl-line"><div class="threshold"><i style="width:30%"></i><b style="left:30%"></b></div><span class="num">0.30</span></div><div class="callout"><svg class="i"><use href="#i-info"/></svg>0.30 là mặc định cũ chưa hiệu chỉnh cho mô hình này. Máy chủ bỏ qua giá trị này và giữ ngưỡng hiện tại.</div></div>
+                </div>
+                <div class="b-card-title">Bảo vệ</div>
+                <div class="row">
+                  <div class="row-label"><strong>Chặn yêu cầu không an toàn</strong><p>Từ chối câu chèn lệnh, yêu cầu viết code, sáng tác hoặc làm bài tập.</p></div>
+                  <div class="row-ctrl"><span class="toggle on"></span></div>
+                </div>
+              </div>
+            </div>
+            <div class="b-rail"><span><svg class="i"><use href="#i-flask"/></svg>Thử với câu hỏi</span></div>
+          </div>
+          <div class="savebar"><span class="sb-text"><span class="dirty"></span>1 thay đổi chưa lưu <small>Ngưỡng tin cậy · BM25 0.25 → 0.30</small></span><button class="btn quiet" type="button">Huỷ</button><button class="btn primary" type="button">Lưu thay đổi</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note good"><h3>Được</h3><ul><li>Thay đổi ít nhất: chủ yếu CSS và danh mục, rủi ro thấp.</li><li>Giá trị hiện trong danh mục giúp rà nhanh cả cấu hình.</li><li>Giữ được cuộn liền một form cho "Hệ thống trả lời".</li></ul></div>
+      <div class="note bad"><h3>Đánh đổi</h3><ul><li>Vẫn 3 vùng; form rộng hơn hiện nay nhưng không bằng A.</li><li>Ít khác biệt nhất so với một trang cài đặt thông thường.</li></ul></div>
+      <div class="note"><h3>Trên điện thoại</h3><ul><li>Danh mục thành danh sách toàn màn hình có icon và giá trị.</li><li>Thanh thử thành nút ở đầu trang, mở dạng tấm trượt từ dưới lên.</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ================================================================ C -->
+  <section class="option" id="opt-c">
+    <div class="option-head">
+      <span class="eyebrow">Phương án C</span>
+      <h2>Bàn thử nghiệm</h2>
+      <p>Coi việc chỉnh tham số là thí nghiệm. Bên trái là các bước dạng thu gọn, tiêu đề hiện sẵn giá trị; mở một bước để chỉnh. Bên phải là bảng thử luôn hiện, kèm thanh đo điểm so với ngưỡng đã lưu và ngưỡng nháp, nên kéo thanh trượt là thấy câu hỏi mẫu chuyển từ "trả lời" sang "từ chối".</p>
+    </div>
+    <div class="stage" data-stage>
+      <div class="app">
+        <aside class="side" data-side></aside>
+        <div class="main">
+          <div class="top">
+            <div class="top-row">
+              <div><h1>Cài đặt</h1><p>Điều chỉnh cách chatbot tìm tài liệu và trả lời sinh viên.</p></div>
+              <div class="top-actions"><span class="saved">Đã lưu lúc 16:08 hôm nay</span></div>
+            </div>
+            <div class="tabs">
+              <span class="on"><svg class="i"><use href="#i-sliders"/></svg>Hệ thống trả lời</span>
+              <span><svg class="i"><use href="#i-cpu"/></svg>Mô hình</span>
+              <span><svg class="i"><use href="#i-palette"/></svg>Giao diện</span>
+            </div>
+          </div>
+          <div class="c-grid">
+            <div class="c-left" data-acc>
+              <div class="acc">
+                <button class="acc-head" type="button"><span class="ico"><svg class="i"><use href="#i-search"/></svg></span><span class="t">Truy xuất</span><span class="sum"><span class="chip">Top-K 4</span><span class="chip">Vector 65%</span><span class="chip">+3 truy vấn</span></span><svg class="i chev"><use href="#i-down"/></svg></button>
+                <div class="acc-body">
+                  <div class="stack"><div class="lab"><strong>Số đoạn nạp vào LLM</strong><span class="chip brand">4 đoạn</span></div><div class="ctrl-line"><div class="slider"><i style="width:20%"></i><b style="left:20%"></b></div><span class="num">4</span></div></div>
+                  <div class="stack"><div class="lab"><strong>Tỷ trọng tìm kiếm lai</strong></div><div class="split"><span class="v" style="width:65%">Vector 65%</span><span class="k" style="width:35%">BM25 35%</span></div></div>
+                </div>
+              </div>
+              <div class="acc">
+                <button class="acc-head" type="button"><span class="ico"><svg class="i"><use href="#i-rank"/></svg></span><span class="t">Xếp hạng lại</span><span class="sum"><span class="chip">Heuristic</span><span class="chip">3× ứng viên</span></span><svg class="i chev"><use href="#i-down"/></svg></button>
+                <div class="acc-body">
+                  <div class="stack"><div class="lab"><strong>Bật xếp hạng lại</strong><span class="toggle on"></span></div><p>Mô hình: Heuristic. Đổi ở tab Mô hình.</p></div>
+                </div>
+              </div>
+              <div class="acc open">
+                <button class="acc-head" type="button"><span class="ico"><svg class="i"><use href="#i-shield"/></svg></span><span class="t">Ngưỡng tin cậy</span><span class="sum"><span class="chip brand">BM25 ≥ 0.45</span><span class="chip">Cos ≥ 0.30</span></span><svg class="i chev"><use href="#i-down"/></svg></button>
+                <div class="acc-body">
+                  <div class="stack"><div class="lab"><strong>Độ khớp từ khoá tối thiểu <span class="dirty" style="display:inline-block;margin-left:6px"></span></strong><span class="chip brand">0.25 → 0.45</span></div><p>Điểm BM25 chuẩn hoá của đoạn khớp nhất. Mặc định 0.25.</p><div class="ctrl-line"><div class="slider"><i style="width:45%"></i><b style="left:45%"></b></div><span class="num">0.45</span></div></div>
+                  <div class="stack"><div class="lab"><strong>Độ tương đồng ngữ nghĩa tối thiểu</strong><span class="override">Ghi đè</span></div><p>Cosine theo text-embedding-3-small.</p><div class="ctrl-line"><div class="slider"><i style="width:30%"></i><b style="left:30%"></b></div><span class="num">0.30</span></div></div>
+                  <div class="stack"><div class="lab"><strong>Chặn yêu cầu không an toàn</strong><span class="toggle on"></span></div></div>
+                </div>
+              </div>
+              <div class="acc">
+                <button class="acc-head" type="button"><span class="ico"><svg class="i"><use href="#i-msg"/></svg></span><span class="t">Sinh câu trả lời</span><span class="sum"><span class="chip">gpt-4.1-mini</span><span class="chip">T 0</span><span class="chip">30 s</span></span><svg class="i chev"><use href="#i-down"/></svg></button>
+                <div class="acc-body">
+                  <div class="stack"><div class="lab"><strong>Độ ngẫu nhiên (Temperature)</strong><span class="chip">0</span></div><div class="ctrl-line"><div class="slider"><i style="width:0%"></i><b style="left:0%"></b></div><span class="num">0</span></div></div>
+                </div>
+              </div>
+            </div>
+            <aside class="c-right">
+              <div class="c-right-head"><h2><svg class="i"><use href="#i-flask"/></svg>Thử với câu hỏi</h2><span class="example-tag">Dữ liệu ví dụ</span></div>
+              <div class="c-q">
+                <p>Điều kiện xét học bổng khuyến khích học tập là gì?</p>
+                <div class="c-q-foot"><span class="sel"><svg class="i"><use href="#i-db"/></svg>Tất cả dataset<svg class="i"><use href="#i-down"/></svg></span><button class="btn primary" type="button">Chạy lại</button></div>
+              </div>
+              <div class="verdict" style="background:var(--warning-subtle);border-color:var(--warning-border)">
+                <span class="badge" style="background:var(--warning)">!</span>
+                <div><strong style="color:var(--warning)">Với ngưỡng nháp: sẽ từ chối</strong><span>Đã lưu thì trả lời. BM25 của đoạn khớp nhất (0.41) thấp hơn ngưỡng nháp 0.45.</span></div>
+              </div>
+              <div class="sig">
+                <div class="sig-top"><span>Độ khớp từ khoá</span><span class="mono">0.41</span></div>
+                <div class="gauge"><i style="width:41%;background:var(--warning)"></i><span class="mk saved" style="left:25%"></span><span class="mk draft" style="left:45%"></span></div>
+              </div>
+              <div class="sig" style="margin-top:10px">
+                <div class="sig-top"><span>Độ tương đồng ngữ nghĩa</span><span class="mono">0.58</span></div>
+                <div class="gauge"><i style="width:58%"></i><span class="mk saved" style="left:30%"></span></div>
+              </div>
+              <div class="chunks">
+                <h3>4 đoạn tìm được</h3>
+                <div class="chunk"><span class="rk">#1</span><span class="ct"><strong>Quy định học bổng KKHT · Điều 4, khoản 2</strong><small>Điểm TB học kỳ từ 2.5, rèn luyện từ Khá…</small></span><span class="sc">0.82<span class="bar"><i style="width:82%"></i></span></span></div>
+                <div class="chunk"><span class="rk">#2</span><span class="ct"><strong>Quy định học bổng KKHT · Điều 3</strong><small>Đối tượng và phạm vi áp dụng…</small></span><span class="sc">0.71<span class="bar"><i style="width:71%"></i></span></span></div>
+                <div class="chunk"><span class="rk">#3</span><span class="ct"><strong>Quy chế công tác sinh viên · Điều 12</strong><small>Khen thưởng sinh viên có thành tích…</small></span><span class="sc">0.54<span class="bar"><i style="width:54%"></i></span></span></div>
+                <div class="chunk"><span class="rk">#4</span><span class="ct"><strong>Sổ tay sinh viên 2025 · Mục 5.3</strong><small>Mức học bổng theo xếp loại…</small></span><span class="sc">0.49<span class="bar"><i style="width:49%"></i></span></span></div>
+              </div>
+            </aside>
+          </div>
+          <div class="savebar" style="left:calc(50% - 224px)"><span class="sb-text"><span class="dirty"></span>1 thay đổi chưa lưu</span><button class="btn quiet" type="button">Huỷ</button><button class="btn primary" type="button">Lưu thay đổi</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note good"><h3>Được</h3><ul><li>Thấy hệ quả ngay khi kéo ngưỡng, đúng việc quản trị viên hay làm nhất.</li><li>Thanh đo điểm so ngưỡng là điểm nhấn thị giác có ý nghĩa.</li><li>Tiêu đề thu gọn hiện sẵn giá trị.</li></ul></div>
+      <div class="note bad"><h3>Đánh đổi</h3><ul><li>Bảng thử luôn chiếm khoảng 450px kể cả khi không dùng.</li><li>Form hẹp hơn A; phải đổi ConfigView sang dạng thu gọn.</li></ul></div>
+      <div class="note"><h3>Trên điện thoại</h3><ul><li>Các bước thu gọn xếp dọc, giữ nguyên.</li><li>Bảng thử thành tấm trượt từ dưới lên, có nút cố định "Thử".</li></ul></div>
+    </div>
+  </section>
+
+  <section class="option" id="compare">
+    <div class="option-head">
+      <span class="eyebrow">So sánh</span>
+      <h2>Chọn phương án nào</h2>
+    </div>
+    <div class="compare-wrap">
+      <table class="compare">
+        <thead><tr><th></th><th>A · Đường ống</th><th>B · Danh mục có icon</th><th>C · Bàn thử nghiệm</th></tr></thead>
+        <tbody>
+          <tr><th>Số vùng trên desktop</th><td>2 (sidebar app + nội dung)</td><td>3 (+ thanh thử mảnh)</td><td>3 (+ bảng thử luôn hiện)</td></tr>
+          <tr><th>Điểm nhấn</th><td>Dải 4 bước có giá trị</td><td>Icon, giá trị trong danh mục, dải tóm tắt</td><td>Thanh đo điểm so ngưỡng</td></tr>
+          <tr><th>Bảng "Thử với câu hỏi"</th><td>Ngăn kéo bên phải</td><td>Thanh dọc, bấm để mở</td><td>Luôn hiện</td></tr>
+          <tr><th>Form "Hệ thống trả lời"</th><td>Mỗi bước một panel, chung một nút lưu</td><td>Một form cuộn liền như hiện nay</td><td>Các bước thu gọn, mở từng bước</td></tr>
+          <tr><th>Khối lượng sửa code</th><td>Vừa: tab, dải bước, tách panel, ngăn kéo</td><td>Nhỏ: CSS, danh mục, thanh dọc</td><td>Vừa: thu gọn ConfigView, thanh đo trong bảng thử</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="rec-box">
+      <span class="eyebrow">Đề xuất</span>
+      <p><strong>Chọn A</strong>, và đưa thanh đo điểm so ngưỡng của C vào ngăn kéo "Thử với câu hỏi". A giải quyết cả hai vấn đề bạn nêu: bớt nhạt nhờ dải 4 bước, thoáng hơn nhờ bỏ hai cột phụ. Tab "Mô hình" và "Giao diện" sẽ dùng cùng kiểu hàng nhãn–điều khiển để ba trang đồng nhất.</p>
+      <p class="hint-small">Có thể ghép phương án, ví dụ dải bước của A với danh mục của B.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var sideHtml =
+    '<div class="side-brand"><span class="side-logo"><svg class="i"><use href="#i-shield"/></svg></span><div><strong>PTIT Chatbot</strong><small>Quản trị</small></div></div>' +
+    '<div class="side-item"><svg class="i"><use href="#i-plus"/></svg>Cuộc trò chuyện mới</div>' +
+    '<div class="side-item"><svg class="i"><use href="#i-db"/></svg>Dataset</div>' +
+    '<div class="side-label">Hội thoại gần đây</div><div class="side-empty">Chưa có hội thoại nào được lưu.</div>' +
+    '<div class="side-bottom"><div class="side-item on"><svg class="i"><use href="#i-sliders"/></svg>Cài đặt</div><div class="side-item"><svg class="i"><use href="#i-logout"/></svg>Đăng xuất</div></div>';
+  document.querySelectorAll("[data-side]").forEach(function (el) { el.innerHTML = sideHtml; });
+
+  function fit() {
+    document.querySelectorAll("[data-stage]").forEach(function (stage) {
+      var app = stage.firstElementChild;
+      var k = Math.min(1, stage.clientWidth / 1280);
+      app.style.transform = "scale(" + k + ")";
+      stage.style.height = 800 * k + "px";
+    });
+  }
+  fit();
+  window.addEventListener("resize", fit);
+  if (window.ResizeObserver) new ResizeObserver(fit).observe(document.body);
+
+  document.querySelectorAll("[data-node]").forEach(function (node) {
+    node.addEventListener("click", function () {
+      var key = node.getAttribute("data-node");
+      document.querySelectorAll("[data-node]").forEach(function (n) { n.classList.toggle("on", n === node); });
+      document.querySelectorAll("[data-pane]").forEach(function (p) { p.hidden = p.getAttribute("data-pane") !== key; });
+    });
+  });
+
+  document.querySelectorAll("[data-acc] .acc-head").forEach(function (head) {
+    head.addEventListener("click", function () {
+      var acc = head.parentElement;
+      var wasOpen = acc.classList.contains("open");
+      acc.parentElement.querySelectorAll(".acc").forEach(function (a) { a.classList.remove("open"); });
+      if (!wasOpen) acc.classList.add("open");
+    });
+  });
+})();
+</script>

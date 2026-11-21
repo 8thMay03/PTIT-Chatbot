@@ -28,6 +28,13 @@
   gap: var(--space-3);
 }
 
+/* Ghi chú nơi lưu kho mô hình là thông tin nền, không phải cảnh báo: tông trung tính. */
+.mdl-notices .inline-alert.is-info {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
 /* Hai cột: chọn mô hình + form bên trái, kho mô hình bên phải. */
 .mdl-kind-layout {
   display: grid;
@@ -350,7 +357,7 @@
    -------------------------------------------------------------------------- */
 .mdl-card {
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--surface);
   box-shadow: var(--shadow-xs);
 }
@@ -427,7 +434,7 @@
   padding: var(--space-3) var(--space-5);
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-soft);
-  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  border-radius: 0 0 var(--radius) var(--radius);
 }
 
 .mdl-dirty {

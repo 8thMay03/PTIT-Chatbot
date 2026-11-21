@@ -97,7 +97,7 @@ async function changeInput(input, value) {
   });
 }
 
-describe("SettingsView — danh mục dọc và form theo pipeline", () => {
+describe("SettingsView — tab nhóm, dải bước và form theo bước", () => {
   let container;
   let root;
   let queryClient;
@@ -130,60 +130,73 @@ describe("SettingsView — danh mục dọc và form theo pipeline", () => {
     await waitFor(() => container.querySelector("#cfg-topk"));
   }
 
-  it("mặc định mở form Hệ thống trả lời với Lần lưu gần nhất ở header", async () => {
+  it("mặc định mở tab Hệ thống trả lời, bước Truy xuất và Lần lưu gần nhất ở header", async () => {
     stubFetch();
     await render();
 
+    expect(container.querySelector(".settings-title").textContent).toBe("Cài đặt");
+    expect(container.querySelector('[data-settings-tab="answer"]').getAttribute("aria-current")).toBe("page");
     expect(container.querySelector("#settings-panel-answer").hidden).toBe(false);
     expect(container.querySelector("#settings-panel-models").hidden).toBe(true);
     expect(container.querySelector("#settings-panel-appearance").hidden).toBe(true);
-    expect(container.querySelector(".settings-head-title-row h2").textContent).toBe(
-      "Hệ thống trả lời"
-    );
+    expect(container.querySelector("#settings-section-retrieval").hidden).toBe(false);
+    expect(container.querySelector("#settings-section-gate").hidden).toBe(true);
     const saved = container.querySelector(".settings-saved").textContent;
     expect(saved).toContain("Lần lưu gần nhất:");
     expect(saved).toContain("hôm nay");
+    // Không còn cột danh mục dọc cũ.
+    expect(container.querySelector(".settings-nav")).toBeNull();
   });
 
-  it("chuyển mục trong nhóm trả lời đổi aria-current và gọi onSectionChange", async () => {
+  it("dải bước hiện giá trị đang dùng của bốn bước", async () => {
     stubFetch();
-    const onSectionChange = vi.fn();
+    await render({ section: "retrieval" });
+
+    const steps = [...container.querySelectorAll(".pipeline-step")];
+    expect(steps.map((step) => step.querySelector(".pipeline-step-title").textContent)).toEqual([
+      "Truy xuất",
+      "Xếp hạng lại",
+      "Ngưỡng tin cậy",
+      "Sinh câu trả lời",
+    ]);
+    expect(steps[0].textContent).toContain("Top-K 4");
+    expect(steps[0].textContent).toContain("Vector 65%");
+    expect(steps[1].textContent).toContain("Heuristic");
+    expect(steps[2].textContent).toContain("Cos ≥ 0.37");
+    expect(steps[3].textContent).toContain("gpt-4.1-mini");
+  });
+
+  it("bấm bước gọi onSectionChange; chỉ form của bước đang chọn hiển thị", async () => {
+    stubFetch();
+    // Như AdminShell: onSectionChange đổi `section` của route rồi render lại.
+    const onSectionChange = vi.fn((next) => render({ section: next, onSectionChange }));
     await render({ section: "retrieval", onSectionChange });
 
-    await click(container.querySelector('[data-settings-nav="gate"]'));
+    await click(container.querySelector('.pipeline-step[data-settings-nav="gate"]'));
+    await waitFor(() => !container.querySelector("#settings-section-gate").hidden);
 
     expect(onSectionChange).toHaveBeenCalledWith("gate");
-    expect(container.querySelector('[data-settings-nav="gate"]').getAttribute("aria-current")).toBe(
-      "location"
-    );
+    expect(container.querySelector('[data-settings-nav="gate"]').getAttribute("aria-current")).toBe("step");
+    const visible = [...container.querySelectorAll(".config-section")]
+      .filter((node) => !node.hidden)
+      .map((node) => node.id);
+    expect(visible).toEqual(["settings-section-gate"]);
   });
 
-  it("bấm Truy xuất khi đang ở #settings vẫn cuộn tới mục dù section quy về cùng anchor", async () => {
+  it("đổi bước không mất bản nháp; dải bước phản ánh giá trị nháp", async () => {
     stubFetch();
-    const scrolled = [];
-    const originalScroll = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function scrollIntoView() {
-      scrolled.push(this.id);
-    };
-    try {
-      // Như AdminShell: onSectionChange đổi `section` của route rồi render lại.
-      const onSectionChange = vi.fn((next) => render({ section: next, onSectionChange }));
-      await render({ section: null, onSectionChange });
-      const before = scrolled.filter((id) => id === "settings-section-retrieval").length;
+    await render({ section: "retrieval" });
+    await changeInput(container.querySelector("#cfg-topk"), "6");
 
-      await click(container.querySelector('[data-settings-nav="retrieval"]'));
-      await waitFor(
-        () => scrolled.filter((id) => id === "settings-section-retrieval").length === before + 1
-      );
+    await render({ section: "generation" });
 
-      await click(container.querySelector('[data-settings-nav="retrieval"]'));
-      await waitFor(
-        () => scrolled.filter((id) => id === "settings-section-retrieval").length === before + 2
-      );
-      expect(onSectionChange).toHaveBeenCalledTimes(2);
-    } finally {
-      Element.prototype.scrollIntoView = originalScroll;
-    }
+    expect(container.querySelector("#settings-section-retrieval").hidden).toBe(true);
+    expect(container.querySelector("#cfg-topk").value).toBe("6");
+    const retrievalStep = container.querySelector('.pipeline-step[data-settings-nav="retrieval"]');
+    expect(retrievalStep.textContent).toContain("Top-K 6");
+    expect(retrievalStep.querySelector(".settings-dirty-dot")).not.toBeNull();
+    expect(container.querySelector('[data-settings-tab="answer"] .settings-dirty-dot')).not.toBeNull();
+    expect(container.querySelector(".save-bar").textContent).toContain("1 thay đổi chưa lưu");
   });
 
   it("mục có thay đổi chưa lưu hiện chấm", async () => {
@@ -197,7 +210,7 @@ describe("SettingsView — danh mục dọc và form theo pipeline", () => {
     );
   });
 
-  it("mục Mô hình mở đúng panel loại mô hình, không trộn form trả lời", async () => {
+  it("tab Mô hình mở đúng panel loại mô hình, không trộn form trả lời", async () => {
     stubFetch();
     await render({ section: "models-embedding" });
 
@@ -205,7 +218,11 @@ describe("SettingsView — danh mục dọc và form theo pipeline", () => {
     expect(container.querySelector("#settings-panel-answer").hidden).toBe(true);
     expect(container.querySelector("#mdl-panel-embedding").hidden).toBe(false);
     expect(container.querySelector("#mdl-panel-llm").hidden).toBe(true);
-    expect(container.querySelector(".settings-head-title-row h2").textContent).toBe("Mô hình");
+    expect(container.querySelector('[data-settings-tab="models"]').getAttribute("aria-current")).toBe("page");
+    expect(
+      container.querySelector('.settings-kind-item[data-settings-nav="models-embedding"]').getAttribute("aria-current")
+    ).toBe("page");
+    expect(container.querySelector(".settings-test-trigger")).toBeNull();
   });
 
   it("mục Giao diện mở bộ chọn giao diện", async () => {
@@ -216,7 +233,7 @@ describe("SettingsView — danh mục dọc và form theo pipeline", () => {
     expect(container.querySelector('[aria-label="Chế độ giao diện"]')).not.toBeNull();
   });
 
-  it("nút Thử với câu hỏi mở drawer trên khổ hẹp", async () => {
+  it("nút Thử với câu hỏi mở ngăn kéo", async () => {
     stubFetch();
     await render({ section: "retrieval" });
 
