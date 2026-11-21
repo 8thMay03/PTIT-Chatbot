@@ -115,6 +115,18 @@ def test_value_back_to_env_removes_row(admin_client, config_store_db) -> None:
     assert "retrieval_default_top_k" not in _rows(config_store_db)
 
 
+def test_query_correction_flag_persists_and_survives_restart(admin_client, config_store_db) -> None:
+    enabled = not _INITIAL_SETTINGS["query_correction_enabled"]
+
+    response = admin_client.put("/api/config", json={"retrieval": {"query_correction_enabled": enabled}})
+    assert response.status_code == 200, response.text
+    assert _rows(config_store_db)["query_correction_enabled"].value is enabled
+
+    assert _simulate_restart() == ["query_correction_enabled"]
+    assert settings.query_correction_enabled is enabled
+    assert admin_client.get("/api/config").json()["retrieval"]["query_correction_enabled"] is enabled
+
+
 def test_reset_clears_saved_config(admin_client, config_store_db) -> None:
     admin_client.put("/api/config", json={"retrieval": {"top_k": _different("retrieval_default_top_k", 7, 8)}})
     assert _rows(config_store_db)

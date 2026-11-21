@@ -293,6 +293,7 @@ class RetrievalConfigPayload(BaseModel):
     multi_query_use_llm: bool = False
     multi_query_count: int = 3
     query_rewrite_use_llm: bool = False
+    query_correction_enabled: bool = False
     top_k: int = 4
     max_top_k: int = 10
     hybrid_vector_weight: float = 0.65
@@ -384,6 +385,7 @@ class UpdateRetrievalConfig(BaseModel):
     multi_query_use_llm: bool | None = None
     multi_query_count: int | None = None
     query_rewrite_use_llm: bool | None = None
+    query_correction_enabled: bool | None = None
     top_k: int | None = None
     hybrid_vector_weight: float | None = None
 

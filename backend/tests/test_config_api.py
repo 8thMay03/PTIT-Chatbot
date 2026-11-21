@@ -140,8 +140,10 @@ def test_retrieval_test_endpoint_returns_disabled_guardrail(monkeypatch) -> None
     assert response.status_code == 200
     assert settings.guardrail_scope_enabled is False
 
-    class _Rewriter:
-        def rewrite(self, question, history=None, budget=None):
+    from app.generation.query_rewriter import VietnameseQueryRewriter
+
+    class _Rewriter(VietnameseQueryRewriter):
+        def rewrite(self, question, history=None, budget=None, correction=None):
             return question
 
     class _MultiQuery:
@@ -189,8 +191,10 @@ def test_chat_endpoint_returns_200_when_scope_guardrail_disabled(monkeypatch) ->
     monkeypatch.setattr(routes, "add_message_sources", lambda *a, **k: None)
     monkeypatch.setattr(settings, "conversation_memory_enabled", False)
 
-    class _Rewriter:
-        def rewrite(self, question, history=None, budget=None):
+    from app.generation.query_rewriter import VietnameseQueryRewriter
+
+    class _Rewriter(VietnameseQueryRewriter):
+        def rewrite(self, question, history=None, budget=None, correction=None):
             return question
 
     class _MultiQuery:
@@ -344,6 +348,25 @@ def test_query_rewrite_toggle_round_trips() -> None:
         assert settings.query_rewrite_use_llm is True
     finally:
         settings.query_rewrite_use_llm = original
+
+
+def test_query_correction_toggle_round_trips() -> None:
+    original = settings.query_correction_enabled
+    try:
+        for value in (True, False):
+            response = client.put("/api/config", json={"retrieval": {"query_correction_enabled": value}})
+            assert response.status_code == 200
+            assert response.json()["retrieval"]["query_correction_enabled"] is value
+            assert client.get("/api/config").json()["retrieval"]["query_correction_enabled"] is value
+            assert settings.query_correction_enabled is value
+
+        # None (hoặc bỏ khóa) giữ nguyên giá trị đang chạy.
+        settings.query_correction_enabled = True
+        response = client.put("/api/config", json={"retrieval": {"query_correction_enabled": None}})
+        assert response.status_code == 200
+        assert settings.query_correction_enabled is True
+    finally:
+        settings.query_correction_enabled = original
 
 
 def test_get_config_updated_at_is_null_then_iso_with_timezone(calibrated_gate, monkeypatch) -> None:

@@ -63,7 +63,9 @@ flowchart TD
     API --> GR{"Security<br/>Guardrail"}
 
     GR -->|"Chèn lệnh / tác vụ cấm"| REFUSE["Câu từ chối cố định"]
-    GR -->|"Hợp lệ"| QR["Query Rewrite & Multi-query"]
+    GR -->|"Hợp lệ"| QC["Sửa chính tả & dấu bằng LLM<br/>(tùy chọn)"]
+    QC -->|"Câu đã sửa có chèn lệnh / tác vụ cấm"| REFUSE
+    QC --> QR["Query Rewrite & Multi-query"]
 
     QR --> VS["Vector Search (pgvector HNSW)"]
     QR --> BM["BM25 Search"]
@@ -85,12 +87,28 @@ flowchart TD
 Quy trình chính:
 
 1. Guardrail chặn prompt injection và tác vụ cấm theo danh sách mẫu (so khớp cả bản không dấu khi câu hỏi viết không dấu). Guardrail không lọc theo từ khóa chủ đề.
-2. Câu hỏi hợp lệ được chuẩn hóa và tạo nhiều truy vấn tìm kiếm.
+2. Câu hỏi hợp lệ được chuẩn hóa và tạo nhiều truy vấn tìm kiếm. Khi bật `QUERY_CORRECTION_ENABLED`, câu hỏi được LLM sửa chính tả và dấu trước (xem [Sửa chính tả câu hỏi bằng LLM](#sửa-chính-tả-câu-hỏi-bằng-llm)); câu đã sửa phải qua guardrail lần nữa.
 3. Vector search và BM25 chạy song song trên kho tài liệu.
 4. Kết quả được hợp nhất bằng RRF và sắp xếp lại bằng reranker.
 5. Confidence gate kiểm tra độ mạnh của context; câu ngoài phạm vi tài liệu dừng ở đây với câu "không tìm thấy thông tin".
 6. LLM chỉ sử dụng context được cung cấp để trả lời.
 7. Citation được kiểm tra, chuẩn hóa và trả về giao diện theo dạng streaming.
+
+### Sửa chính tả câu hỏi bằng LLM
+
+Kho tài liệu viết tiếng Việt có dấu, còn sinh viên hay gõ không dấu, sai dấu thanh, sót phím Telex (`hocj phis`), gõ nhầm ký tự hoặc dính chữ (`hocphi`). BM25 và vector nhận nguyên câu sai nên confidence gate từ chối gần hết các câu này. Bước sửa câu (`backend/app/generation/query_corrector.py`) chạy trước rewrite theo luật:
+
+- Cờ `QUERY_CORRECTION_ENABLED` (mặc định `false`; đổi trên màn Cấu hình qua khóa `retrieval.query_correction_enabled`, lưu trong `app_config_overrides`). Khi bật, **mọi câu có chữ cái** được gửi LLM đúng một lần, không có luật đoán câu nào sai; câu đã đúng thì LLM trả nguyên văn. Chuỗi chỉ có số/ký hiệu không gọi LLM.
+- Prompt chỉ cho sửa chính tả, dấu thanh, dấu câu, lỗi gõ; giữ nguyên ý, thứ tự từ, số, mã môn, tên riêng, từ viết tắt; coi câu hỏi là dữ liệu. `temperature=0`, `max_tokens` theo độ dài câu; với provider OpenAI-compatible, bước này tắt chế độ suy luận của model (`chat_template_kwargs.enable_thinking=false`).
+- **Kiểm tra đầu ra**: đầu ra LLM chỉ được dùng khi đủ cả ba điều kiện, không thì giữ câu gốc:
+  1. Khoảng cách Levenshtein giữa hai khóa so sánh (NFC, viết thường, bỏ dấu, bỏ dấu câu và khoảng trắng) ≤ `max(3, 20% độ dài khóa câu gốc)`;
+  2. Chữ có chữ số hoặc viết hoa toàn bộ từ 2 ký tự (`INT1340`, `QLDT`, `K2024`) còn nguyên văn;
+  3. Đầu ra khác rỗng, một dòng, không dài quá 2 lần câu gốc.
+  Nhờ vậy LLM sửa được lỗi gõ nhưng không viết lại câu, trả lời thay, chèn chỉ dẫn hay mở rộng viết tắt trong câu ngắn (`ktx o dau` → `ký túc xá ở đâu` bị bỏ).
+- **Guardrail hai lần**: câu đã sửa đi qua `check_scope` lần nữa; bị chặn thì trả câu từ chối cố định như câu gốc bị chặn (`retrieval_debug.guardrail.stage = "corrected"`).
+- Câu đã sửa chỉ dùng cho truy xuất; câu trả lời vẫn sinh từ câu hỏi gốc. Sự kiện stream `query_rewrite` và `retrieval_debug` có thêm `query_corrected`, `corrected_query`, `correction_reason`.
+- **Đường dự phòng**: LLM chưa cấu hình, lỗi, hết budget thời gian của lượt (`LLMBudget.optional_step`) hoặc đầu ra không đạt kiểm tra → dùng câu gốc như khi tắt cờ (câu sai vẫn có thể bị gate từ chối).
+- Đánh đổi: khi bật, mọi câu thêm một lần gọi LLM. Số đo trên bộ có dấu, bỏ dấu và lỗi gõ ở `documents/rag-eval/query-correction/`; đo lại bằng `python -m scripts.eval_confidence --set query_correction_enabled=true --perturb typo --seed 20261121` (từ `backend/`).
 
 ## Cấu trúc dự án
 

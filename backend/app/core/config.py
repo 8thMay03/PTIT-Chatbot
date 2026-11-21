@@ -152,6 +152,8 @@ class Settings(BaseSettings):
     # Deprecated: BM25 thô phụ thuộc kích thước kho, gate không còn dùng; giữ để đọc cấu hình cũ.
     retrieval_min_bm25_score: float = Field(default=2.0, ge=0, alias="RETRIEVAL_MIN_BM25_SCORE")
     query_rewrite_use_llm: bool = Field(default=False, alias="QUERY_REWRITE_USE_LLM")
+    # Sửa chính tả/dấu câu hỏi bằng LLM trước rewrite (app.generation.query_corrector).
+    query_correction_enabled: bool = Field(default=False, alias="QUERY_CORRECTION_ENABLED")
     multi_query_enabled: bool = Field(default=True, alias="MULTI_QUERY_ENABLED")
     multi_query_use_llm: bool = Field(default=False, alias="MULTI_QUERY_USE_LLM")
     multi_query_count: int = Field(default=3, ge=1, le=8, alias="MULTI_QUERY_COUNT")
@@ -528,6 +530,7 @@ def get_runtime_config_dict() -> dict:
             "multi_query_use_llm": settings.multi_query_use_llm,
             "multi_query_count": settings.multi_query_count,
             "query_rewrite_use_llm": settings.query_rewrite_use_llm,
+            "query_correction_enabled": settings.query_correction_enabled,
             "top_k": settings.retrieval_default_top_k,
             "max_top_k": settings.retrieval_max_top_k,
             "hybrid_vector_weight": settings.hybrid_vector_weight,
@@ -656,6 +659,8 @@ def update_runtime_config(payload: dict) -> dict:
         settings.multi_query_count = max(1, min(8, int(retrieval["multi_query_count"])))
     if "query_rewrite_use_llm" in retrieval and retrieval["query_rewrite_use_llm"] is not None:
         settings.query_rewrite_use_llm = bool(retrieval["query_rewrite_use_llm"])
+    if "query_correction_enabled" in retrieval and retrieval["query_correction_enabled"] is not None:
+        settings.query_correction_enabled = bool(retrieval["query_correction_enabled"])
     if "top_k" in retrieval and retrieval["top_k"] is not None:
         settings.retrieval_default_top_k = max(1, min(20, int(retrieval["top_k"])))
     if "hybrid_vector_weight" in retrieval and retrieval["hybrid_vector_weight"] is not None:
