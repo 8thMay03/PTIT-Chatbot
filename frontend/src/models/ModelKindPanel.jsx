@@ -25,7 +25,9 @@ import {
   KINDS,
   KNOWN_EMBEDDING_DIMENSIONS,
   buildPayload,
+  buildRerankerTestPayload,
   buildTestPayload,
+  canTestConnection,
   draftFromProfile,
   emptyDraft,
   isDraftDirty,
@@ -33,6 +35,7 @@ import {
   profileModelLabel,
   providerFields,
   providerName,
+  sendsDocumentsToService,
   validateDraft,
 } from "./catalog";
 import { ApiKeyField, ChoiceGroup, KIND_ICONS, ProviderIcon, StatusPill, TextField, useWarnBeforeUnload } from "./fields";
@@ -242,7 +245,11 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
     setTesting(true);
     setTestResult(null);
     try {
-      setTestResult(await modelProfilesApi.testLlm(buildTestPayload(draft, profile?.id)));
+      const result =
+        kind === "reranker"
+          ? await modelProfilesApi.testReranker(buildRerankerTestPayload(draft, profile?.id))
+          : await modelProfilesApi.testLlm(buildTestPayload(draft, profile?.id));
+      setTestResult(result);
     } catch (err) {
       setTestResult({ success: false, message: errorMessage(err, "Máy chủ từ chối yêu cầu kiểm tra.") });
     } finally {
@@ -302,7 +309,7 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
             {dirty ? "Có thay đổi chưa lưu" : ""}
           </span>
           <div className="mdl-actions">
-            {kind === "llm" && (
+            {canTestConnection(kind, draft.provider) && (
               <button type="button" className="ghost-btn" onClick={handleTest} disabled={busy}>
                 {testing ? <Loader2 size={15} className="spin" /> : <Zap size={15} />}
                 {testing ? "Đang kiểm tra..." : "Kiểm tra kết nối"}
@@ -405,6 +412,13 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
           </div>
         )}
 
+        {sendsDocumentsToService(kind, draft.provider) && (
+          <div className="inline-alert is-info" role="note">
+            <Info size={16} />
+            <span>Nội dung các đoạn tài liệu được gửi tới dịch vụ này.</span>
+          </div>
+        )}
+
         {rule && (
           <ApiKeyField
             key={draft.provider}
@@ -431,7 +445,12 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
               {(testResult.latency_ms != null || testResult.sample_output) && (
                 <p className="mdl-test-meta">
                   {testResult.latency_ms != null && <>Thời gian phản hồi: {Math.round(testResult.latency_ms)} ms</>}
-                  {testResult.sample_output && <> · Mô hình trả lời: “{testResult.sample_output}”</>}
+                  {testResult.sample_output &&
+                    (kind === "reranker" ? (
+                      <> · {testResult.sample_output}</>
+                    ) : (
+                      <> · Mô hình trả lời: “{testResult.sample_output}”</>
+                    ))}
                 </p>
               )}
             </div>

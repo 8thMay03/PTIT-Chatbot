@@ -48,7 +48,7 @@ function GeminiLogo({ size = 20 }) {
 const PROVIDER_ICONS = {
   llm: { openai: OpenAILogo, gemini: GeminiLogo, azure: Cloud, openai_compatible: Server },
   embedding: { openai: OpenAILogo, "sentence-transformers": HardDrive },
-  reranker: { "cross-encoder": Cpu, heuristic: ArrowDownUp },
+  reranker: { "cross-encoder": Cpu, heuristic: ArrowDownUp, rerank_api: Cloud },
 };
 
 export function ProviderIcon({ kind, provider, size = 18 }) {

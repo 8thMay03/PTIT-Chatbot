@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULTS } from "../lib/configDraft";
-import { pipelineSummary, shortModelName } from "./pipelineSummary";
+import { RERANKER_PROVIDER_LABELS, pipelineSummary, rerankScoreApplies, shortModelName } from "./pipelineSummary";
 
 const config = {
   llm: { model: "gpt-4.1-mini" },
@@ -49,6 +49,20 @@ describe("pipelineSummary", () => {
 
     expect(summary.reranker[0]).toBe("bge-reranker-v2-m3");
     expect(summary.gate).toEqual(["BM25 ≥ 0.25", "Cos ≥ 0.37", "Rerank ≥ -1.65"]);
+  });
+
+  it("Rerank API: hiện tên nhà cung cấp, ngưỡng rerank chỉ khi có ghi đè", () => {
+    const apiConfig = { ...config, reranker: { provider: "rerank_api", model: "rerank-v3.5" } };
+    const summary = pipelineSummary(DEFAULTS, apiConfig, { vector: 0.37, rerank: null });
+
+    expect(summary.reranker[0]).toBe("Rerank API · rerank-v3.5");
+    expect(summary.gate).toEqual(["BM25 ≥ 0.25", "Cos ≥ 0.37", "Rerank: bỏ qua"]);
+    expect(pipelineSummary({ ...DEFAULTS, minRerankScore: 0.3 }, apiConfig, { vector: 0.37 }).gate[2]).toBe(
+      "Rerank ≥ 0.30"
+    );
+    expect(rerankScoreApplies("rerank_api")).toBe(true);
+    expect(rerankScoreApplies("heuristic")).toBe(false);
+    expect(RERANKER_PROVIDER_LABELS).not.toHaveProperty("cohere");
   });
 
   it("chưa có bản nháp thì trả danh sách rỗng", () => {

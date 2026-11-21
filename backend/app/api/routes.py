@@ -63,6 +63,7 @@ from app.api.schemas import (
     TestLLMRequest,
     TestLLMResponse,
     TestModelProfileLLMRequest,
+    TestModelProfileRerankerRequest,
     UpdateConfigRequest,
     UpdateMarkdownRequest,
     UpdateModelProfileRequest,
@@ -146,6 +147,7 @@ from app.parsers import (
     resolve_parser_name,
 )
 from app.retrieval.bm25 import invalidate_bm25_cache
+from app.retrieval.reranker import RerankAPIError, call_rerank_api
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -569,6 +571,73 @@ def test_model_profile_llm(
     except ConfigValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return _run_llm_test(request, api_key)
+
+
+# Truy vấn mẫu cho "Kiểm tra kết nối" reranker: đoạn đầu liên quan, đoạn sau không.
+_RERANKER_TEST_QUERY = "Học phí một tín chỉ là bao nhiêu?"
+_RERANKER_TEST_DOCUMENTS = (
+    "Học phí được tính theo số tín chỉ sinh viên đăng ký trong học kỳ.",
+    "Thư viện mở cửa từ 7 giờ sáng đến 9 giờ tối các ngày trong tuần.",
+)
+_RERANKER_TEST_HINTS = {
+    401: " Kiểm tra API key.",
+    403: " Kiểm tra API key.",
+    404: " Kiểm tra Base URL (nhập tới trước /rerank).",
+}
+
+
+@router.post(
+    "/model-profiles/test-reranker",
+    response_model=TestLLMResponse,
+    dependencies=[Depends(require_admin)],
+)
+def test_model_profile_reranker(
+    request: TestModelProfileRerankerRequest,
+    session: Session = Depends(get_config_store_session),
+) -> TestLLMResponse:
+    """Gửi một truy vấn mẫu với hai đoạn tới ``{base_url}/rerank``; không lưu gì."""
+    if request.provider != "rerank_api":
+        raise HTTPException(status_code=422, detail="Chỉ kiểm tra kết nối được cho Rerank API.")
+    base_url = (request.base_url or "").strip()
+    model = (request.model or "").strip()
+    if not base_url:
+        raise HTTPException(status_code=422, detail="Thiếu Base URL.")
+    if not model:
+        raise HTTPException(status_code=422, detail="Thiếu tên mô hình.")
+    try:
+        # Kiểm URL trước khi lấy khoá: khoá đã lưu không bao giờ bị gửi tới host lạ.
+        validate_llm_url(base_url)
+        api_key = model_profiles.resolve_reranker_test_key(session, request.profile_id, request.api_key)
+    except model_profiles.ProfileNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ConfigValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    start_time = time.perf_counter()
+    try:
+        ranked = call_rerank_api(
+            base_url=base_url,
+            model=model,
+            api_key=api_key,
+            query=_RERANKER_TEST_QUERY,
+            documents=list(_RERANKER_TEST_DOCUMENTS),
+            top_n=len(_RERANKER_TEST_DOCUMENTS),
+        )
+    except RerankAPIError as exc:
+        hint = _RERANKER_TEST_HINTS.get(exc.status_code, "")
+        return TestLLMResponse(
+            success=False,
+            message=f"Lỗi khi kết nối tới Rerank API: {exc.reason}.{hint}",
+            latency_ms=round((time.perf_counter() - start_time) * 1000, 1),
+        )
+    latency_ms = round((time.perf_counter() - start_time) * 1000, 1)
+    scores = ", ".join(f"#{index + 1}: {score:.3f}" for index, score in sorted(ranked, key=lambda item: -item[1]))
+    return TestLLMResponse(
+        success=True,
+        message=f"Kết nối thành công tới Rerank API ({model}).",
+        latency_ms=latency_ms,
+        sample_output=f"Điểm liên quan {scores}",
+    )
 
 
 @router.put(

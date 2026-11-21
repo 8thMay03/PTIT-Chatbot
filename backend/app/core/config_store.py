@@ -44,6 +44,7 @@ SECRET_FIELDS = frozenset(
         "gemini_api_key",
         "azure_openai_api_key",
         "openai_compatible_api_key",
+        "reranker_api_key",
     }
 )
 
@@ -73,6 +74,7 @@ PERSISTED_FIELDS = SECRET_FIELDS | frozenset(
         "reranker_enabled",
         "reranker_provider",
         "reranker_model",
+        "reranker_base_url",
         "reranker_candidate_multiplier",
         "guardrail_scope_enabled",
         "retrieval_min_vector_score",
@@ -102,11 +104,13 @@ LLM_PROFILE_FIELDS = (
     "openai_compatible_api_key",
     "openai_compatible_model",
 )
-RERANKER_PROFILE_FIELDS = ("reranker_provider", "reranker_model")
+RERANKER_PROFILE_FIELDS = ("reranker_provider", "reranker_model", "reranker_base_url", "reranker_api_key")
 
-# URL LLM đọc từ DB vẫn phải qua allowlist hiện hành: allowlist trong `.env` có thể
-# đã bị thu hẹp sau lần lưu.
-_URL_FIELDS = frozenset({"openai_base_url", "openai_compatible_base_url", "azure_openai_endpoint"})
+# URL LLM/reranker đọc từ DB vẫn phải qua allowlist hiện hành: allowlist trong `.env` có
+# thể đã bị thu hẹp sau lần lưu.
+_URL_FIELDS = frozenset(
+    {"openai_base_url", "openai_compatible_base_url", "azure_openai_endpoint", "reranker_base_url"}
+)
 
 # Dòng metadata ghi lần lưu/khôi phục gần nhất. Không phải trường Settings nên không
 # nằm trong PERSISTED_FIELDS; `load_overrides` bỏ qua và `save_overrides` giữ lại.

@@ -5,9 +5,17 @@
 
 export const RERANKER_PROVIDER_LABELS = {
   heuristic: "Heuristic",
-  cohere: "Cohere",
   "cross-encoder": "Cross-Encoder",
+  rerank_api: "Rerank API",
 };
+
+/**
+ * Reranker cho điểm tuyệt đối nên confidence gate dùng được ngưỡng rerank. Heuristic chuẩn
+ * hoá trong danh sách ứng viên nên không dùng được; Rerank API chỉ dùng khi có ghi đè.
+ */
+export function rerankScoreApplies(provider) {
+  return provider === "cross-encoder" || provider === "rerank_api";
+}
 
 export function shortModelName(model) {
   return model ? String(model).split("/").pop() : "mô hình hiện tại";
@@ -42,7 +50,9 @@ export function pipelineSummary(values, config, calibrated = {}) {
     ? [
         provider === "cross-encoder"
           ? shortModelName(config?.reranker?.model)
-          : RERANKER_PROVIDER_LABELS[provider] ?? provider ?? "Reranker",
+          : provider === "rerank_api"
+            ? `Rerank API · ${shortModelName(config?.reranker?.model)}`
+            : RERANKER_PROVIDER_LABELS[provider] ?? provider ?? "Reranker",
         `${values.candidateMultiplier}× ứng viên`,
       ]
     : ["Đang tắt"];
@@ -50,7 +60,7 @@ export function pipelineSummary(values, config, calibrated = {}) {
   const gate = [`BM25 ≥ ${fixed2(values.minBm25NormScore)}`];
   const vector = effectiveThreshold(values.minVectorScore, calibrated.vector);
   gate.push(vector === null ? "Cos: bỏ qua" : `Cos ≥ ${fixed2(vector)}`);
-  if (values.rerankerEnabled && provider === "cross-encoder") {
+  if (values.rerankerEnabled && rerankScoreApplies(provider)) {
     const rerank = effectiveThreshold(values.minRerankScore, calibrated.rerank);
     gate.push(rerank === null ? "Rerank: bỏ qua" : `Rerank ≥ ${fixed2(rerank)}`);
   }

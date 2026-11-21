@@ -36,6 +36,11 @@ export const RERANKER_PROVIDERS = [
     name: "Cross-Encoder",
     description: "Chấm điểm từng cặp câu hỏi–đoạn, chạy cục bộ. Chính xác hơn heuristic, chậm hơn.",
   },
+  {
+    key: "rerank_api",
+    name: "Rerank API",
+    description: "Gọi dịch vụ /rerank chuẩn Cohere (Cohere, Jina, vLLM, Infinity…) qua Base URL.",
+  },
 ];
 
 export const COMPATIBLE_PRESETS = [
@@ -147,6 +152,22 @@ const FIELDS = {
         hint: "Tên mô hình trên Hugging Face. Lần dùng đầu tiên máy chủ sẽ tải mô hình về; nếu không tải được, hệ thống tự quay về heuristic.",
       },
     ],
+    rerank_api: [
+      {
+        name: "base_url",
+        label: "Base URL",
+        required: true,
+        url: true,
+        placeholder: "https://api.cohere.com/v2",
+        hint: "Địa chỉ tới trước /rerank, ví dụ https://api.jina.ai/v1 hoặc http://localhost:8000/v1. Host phải nằm trong LLM_BASE_URL_ALLOWLIST.",
+      },
+      {
+        ...MODEL_FIELD,
+        placeholder: "rerank-v3.5",
+        suggestions: ["rerank-v3.5", "rerank-multilingual-v3.0", "jina-reranker-v2-base-multilingual", "BAAI/bge-reranker-v2-m3"],
+        hint: "Dịch vụ lỗi hoặc quá 8 giây thì câu hỏi đó dùng heuristic.",
+      },
+    ],
   },
 };
 
@@ -162,8 +183,18 @@ const KEY_RULES = {
     openai_compatible: { envFallback: false },
   },
   embedding: { openai: { envFallback: true } },
-  reranker: {},
+  reranker: { rerank_api: { envFallback: false } },
 };
+
+/** Nhà cung cấp có nút "Kiểm tra kết nối" trong hộp thoại thêm/sửa. */
+export function canTestConnection(kind, provider) {
+  return kind === "llm" || (kind === "reranker" && provider === "rerank_api");
+}
+
+/** Nhà cung cấp gửi nội dung đoạn tài liệu ra dịch vụ ngoài: hộp thoại ghi chú cho admin. */
+export function sendsDocumentsToService(kind, provider) {
+  return kind === "reranker" && provider === "rerank_api";
+}
 
 export const KINDS = {
   llm: {
@@ -277,6 +308,18 @@ export function buildTestPayload(draft, profileId) {
     endpoint: trimmed(draft.endpoint),
     deployment_name: trimmed(draft.deployment_name),
     api_version: trimmed(draft.api_version),
+    profile_id: profileId ?? null,
+  };
+}
+
+/** Payload POST /model-profiles/test-reranker: không nhập khoá thì máy chủ dùng khoá đã lưu của profile. */
+export function buildRerankerTestPayload(draft, profileId) {
+  const trimmed = (value) => String(value ?? "").trim() || null;
+  return {
+    provider: draft.provider,
+    model: trimmed(draft.model),
+    base_url: trimmed(draft.base_url),
+    api_key: trimmed(draft.apiKey),
     profile_id: profileId ?? null,
   };
 }

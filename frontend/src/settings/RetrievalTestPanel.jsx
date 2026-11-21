@@ -13,6 +13,7 @@ import {
   decideGate,
   thresholdsFromRetrievalResult,
 } from "../lib/gateDecision";
+import { rerankScoreApplies } from "./pipelineSummary";
 
 /**
  * Bảng "Thử với câu hỏi": chạy `/retrieval/test` trên cấu hình đã lưu rồi so điểm
@@ -79,7 +80,7 @@ export function draftGateThresholds(config, draft) {
   const vectorOverride = draft?.minVectorScore ?? null;
   const rerankOverride = draft?.minRerankScore ?? null;
   const rerankerApplies =
-    Boolean(draft?.rerankerEnabled) && config?.reranker?.provider === "cross-encoder";
+    Boolean(draft?.rerankerEnabled) && rerankScoreApplies(config?.reranker?.provider);
 
   let vectorSource = "uncalibrated";
   if (vectorOverride !== null) vectorSource = "override";

@@ -57,6 +57,9 @@ function createFakeServer({ profiles = [], active = {}, runtime = {} } = {}) {
       state.profiles.push({ id: `p${nextId++}`, kind, ...rest, has_api_key: Boolean(apiKey) });
       return jsonResponse(snapshot(), 201);
     }
+    if (path === "model-profiles/test-reranker") {
+      return jsonResponse({ success: true, message: "Kết nối thành công tới Rerank API.", latency_ms: 42 });
+    }
     if (path === "model-profiles/activate") {
       state.active[body.kind] = body.profile_id;
       if (body.kind === "embedding") state.embedding_runtime.restart_required = body.profile_id !== null;
@@ -278,6 +281,56 @@ describe("ModelsView — kho mô hình theo loại", () => {
 
     await click(buttonByText(dialog(), "Huỷ"));
     expect(dialog()).toBeNull();
+  });
+
+  it("reranker: thêm Rerank API có Base URL, khoá tuỳ chọn, ghi chú gửi dữ liệu và kiểm tra kết nối", async () => {
+    const { fetchMock } = createFakeServer();
+    vi.stubGlobal("fetch", fetchMock);
+    await render("reranker");
+    const panel = container.querySelector("#mdl-panel-reranker");
+
+    await click(buttonByText(panel, "Thêm mô hình"));
+    await waitFor(() => dialog()?.querySelector("#mdl-reranker-form-model"));
+    // Cross-Encoder (mặc định): không có Base URL, khoá, ghi chú hay nút kiểm tra.
+    expect(dialog().querySelector("#mdl-reranker-form-base_url")).toBeNull();
+    expect(dialog().querySelector("#mdl-reranker-form-key")).toBeNull();
+    expect(buttonByText(dialog(), "Kiểm tra kết nối")).toBeUndefined();
+
+    await click(dialog().querySelector('input[type="radio"][value="rerank_api"]'));
+    await waitFor(() => dialog().querySelector("#mdl-reranker-form-base_url"));
+    expect(dialog().textContent).toContain("Nội dung các đoạn tài liệu được gửi tới dịch vụ này.");
+    expect(dialog().textContent).toContain("Không bắt buộc");
+    await changeInput(dialog().querySelector("#mdl-reranker-form-base_url"), "https://api.cohere.com/v2");
+    await changeInput(dialog().querySelector("#mdl-reranker-form-model"), "rerank-v3.5");
+    await changeInput(dialog().querySelector("#mdl-reranker-form-key"), "rk-secret-456");
+
+    await click(buttonByText(dialog(), "Kiểm tra kết nối"));
+    await waitFor(() => dialog().querySelector(".mdl-test-result.is-ok"));
+    const [[, testOptions]] = requestsTo(fetchMock, "/model-profiles/test-reranker", "POST");
+    expect(JSON.parse(testOptions.body)).toEqual({
+      provider: "rerank_api",
+      model: "rerank-v3.5",
+      base_url: "https://api.cohere.com/v2",
+      api_key: "rk-secret-456",
+      profile_id: null,
+    });
+    expect(requestsTo(fetchMock, "/model-profiles/test-llm", "POST")).toHaveLength(0);
+
+    await click(buttonByText(dialog(), "Thêm vào kho"));
+    await waitFor(() => rowByName(panel, "rerank-v3.5"));
+    const [[, createOptions]] = requestsTo(fetchMock, "/model-profiles", "POST").filter(([url]) =>
+      String(url).endsWith("/model-profiles")
+    );
+    expect(JSON.parse(createOptions.body)).toEqual({
+      kind: "reranker",
+      name: "rerank-v3.5",
+      provider: "rerank_api",
+      base_url: "https://api.cohere.com/v2",
+      model: "rerank-v3.5",
+      api_key: "rk-secret-456",
+    });
+    expect(document.body.innerHTML).not.toContain("rk-secret-456");
+    expect(rowByName(panel, "rerank-v3.5").textContent).toContain("Rerank API");
   });
 
   it("xoá mô hình không dùng sau khi xác nhận", async () => {

@@ -14,7 +14,7 @@ import {
   mergeConfigDraft,
   valuesFromConfig,
 } from "./lib/configDraft";
-import { RERANKER_PROVIDER_LABELS, shortModelName } from "./settings/pipelineSummary";
+import { RERANKER_PROVIDER_LABELS, rerankScoreApplies, shortModelName } from "./settings/pipelineSummary";
 import Modal from "./components/Modal";
 import SaveBar from "./components/SaveBar";
 import { useToast } from "./components/Toast";
@@ -230,7 +230,9 @@ export default function ConfigView({ activeSection = "retrieval", lead = null, o
   const llmModel = configQuery.data?.llm?.model;
   const rerankerProvider = configQuery.data?.reranker?.provider;
   const rerankerModel = configQuery.data?.reranker?.model;
-  const rerankApplies = values.rerankerEnabled && rerankerProvider === "cross-encoder";
+  const rerankApplies = values.rerankerEnabled && rerankScoreApplies(rerankerProvider);
+  // Rerank API: relevance_score thường trong [0, 1], không phải logit như Cross-Encoder.
+  const rerankIsApi = rerankerProvider === "rerank_api";
   const rerankerModelLabel =
     rerankerProvider === "heuristic" ? "Heuristic" : shortModelName(rerankerModel);
 
@@ -660,7 +662,9 @@ export default function ConfigView({ activeSection = "retrieval", lead = null, o
                       {changeMark("minRerankScore")}
                     </div>
                     <span className="config-hint-text">
-                      Điểm Cross-Encoder (logit) của đoạn khớp nhất sau khi xếp hạng lại.
+                      {rerankIsApi
+                        ? "Điểm relevance_score do Rerank API trả về cho đoạn khớp nhất. Chưa có giá trị hiệu chỉnh: nhập ngưỡng để dùng tín hiệu này."
+                        : "Điểm Cross-Encoder (logit) của đoạn khớp nhất sau khi xếp hạng lại."}
                     </span>
                     {uncalibratedWarning(rerankOverride, calibrated.rerank, shortModelName(rerankerModel))}
                     <div className="slider-with-number">
@@ -668,9 +672,9 @@ export default function ConfigView({ activeSection = "retrieval", lead = null, o
                         <input
                           id="cfg-minrerank"
                           type="range"
-                          min="-10"
-                          max="10"
-                          step="0.05"
+                          min={rerankIsApi ? "0" : "-10"}
+                          max={rerankIsApi ? "1" : "10"}
+                          step={rerankIsApi ? "0.01" : "0.05"}
                           className="custom-range-slider"
                           aria-label="Thanh trượt điểm xếp hạng lại tối thiểu"
                           value={rerankShown}
@@ -695,7 +699,7 @@ export default function ConfigView({ activeSection = "retrieval", lead = null, o
                   <p className="config-gate-na" data-testid="gate-rerank-na">
                     <span>Điểm xếp hạng lại tối thiểu:</span>{" "}
                     {values.rerankerEnabled
-                      ? `không áp dụng với ${RERANKER_PROVIDER_LABELS[rerankerProvider] ?? rerankerProvider ?? "reranker hiện tại"}, chỉ dùng khi xếp hạng bằng Cross-Encoder.`
+                      ? `không áp dụng với ${RERANKER_PROVIDER_LABELS[rerankerProvider] ?? rerankerProvider ?? "reranker hiện tại"}, chỉ dùng khi xếp hạng bằng Cross-Encoder hoặc Rerank API.`
                       : "không áp dụng khi tắt xếp hạng lại."}
                   </p>
                 )}
