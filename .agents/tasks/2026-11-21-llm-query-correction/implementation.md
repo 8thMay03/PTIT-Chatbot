@@ -20,6 +20,7 @@ Nhánh `feat/llm-query-correction` (tách từ `dev` tại `f3d01bd`). S-01 … 
   - Phát hiện khi thử LLM thật (`qwen3.8-27b` qua OpenAI-compatible): model thinking dùng hết `max_tokens` cho phần suy luận, nội dung trả về rỗng/cụt (7/9 câu thử `invalid_output`, có câu 16 s). Thêm `_no_thinking_kwargs`: chỉ với `OpenAICompatibleProvider`, gửi `extra_body={"chat_template_kwargs": {"enable_thinking": False}}`. Sau khi thêm, 11/11 câu thử cho đầu ra đúng, phần lớn 0,3–1 s. Không sửa file provider (ngoài phạm vi). Server không hiểu khóa này mà trả lỗi thì bước sửa câu rơi về câu gốc (`llm_error`). Lưu ý cho task khác: rewrite/multi-query bằng LLM (`max_tokens` 100/180) có cùng rủi ro với model thinking.
 - Kiểm tra đã chạy: `pytest tests/test_query_corrector.py` (59 test, đạt).
 - Còn lại/blocker: không.
+- Bổ sung `2026-11-21T16:44:32+07:00` (sửa R-07, R-08 của review vòng 2): `_clean_output(output, question)` bỏ ngoặc bao ngoài (`"`, `'`, `` ` ``, `“…”`) và nhãn mở đầu (`Câu đã sửa:`, `câu hỏi được sửa lại:`, `Đã sửa:`, `Sửa lại:`, `Kết quả:`, `Corrected question:`, `Output:`…, không phân biệt hoa thường) **chỉ khi câu gốc không có sẵn ngoặc/nhãn đó**. Thứ tự: ngoặc → nhãn → ngoặc. Nhờ vậy câu người dùng tự gõ trong ngoặc mà LLM trả nguyên văn vẫn là `unchanged`, và nhãn không còn lọt vào truy vấn ở câu dài. Thêm 11 test (`test_user_quoted_question_*`, `test_label_prefix_*`). Chạy lại kiểm tra đầu ra mới trên 1 121 đầu ra LLM thật đã lưu trong `on_none.json`, `on_strip_all.json`, `on_typo.json`: 0 quyết định thay đổi, nên số đo V-06 vẫn đúng với mã mới, không cần đo lại.
 
 ### S-02 — agent-rag
 
@@ -45,7 +46,7 @@ Nhánh `feat/llm-query-correction` (tách từ `dev` tại `f3d01bd`). S-01 … 
 
 ### S-04 — agent-rag
 
-- Cập nhật lúc: `2026-11-21T16:15:00+07:00`.
+- Cập nhật lúc: `≤ 2026-11-21T16:09:08+07:00`.
 - Đã làm:
   - Bộ sinh lỗi gõ `backend/scripts/typo_variants.py` (hàm thuần, `random.Random` truyền vào): `strip_all`, `strip_partial`, `wrong_tone`, `telex_leftover` (`to_telex`), `char_noise`, `merge_words`, `drop_punct`; `make_typo_variant` áp 1–3 loại khác nhau, thứ tự ngẫu nhiên, bỏ loại không áp dụng được; `perturb_question(text, mode, seed, case_id)` dùng rng riêng theo `"{seed}:{id}"` nên không phụ thuộc thứ tự câu. Không gây lỗi trên chữ có chữ số hoặc viết hoa toàn bộ (bộ sửa câu bắt giữ nguyên văn các chữ này; gây lỗi ở đó sẽ đo điều kiện 2 thay vì đo lỗi gõ chữ thường). Sửa lỗi phát hiện khi soát: đổi dấu thanh trên nguyên âm có mũ/móc ra ký tự tổ hợp sai (`viẻ̂n`) → đặt dấu mới cuối chuỗi dấu rồi NFC; thêm dấu thanh ưu tiên nguyên âm có mũ/móc.
   - `eval_retrieval.py`: `uses_llm_queries()` (gồm cờ sửa câu) dùng cho cảnh báo không lặp lại được và bỏ làm ấm cache embedding; `build_retrieval_fn(..., trace=None)` chế độ full gọi `rewriter.correct()` riêng, đo thời gian, ghi `trace["correction"]` rồi `rewrite(..., correction=...)`; `--perturb {none,strip_all,typo} --seed N` (mặc định seed `20261121`); case có `original_question`, `perturbations`, `correction`; `dataset.perturb` trong báo cáo.
@@ -61,7 +62,7 @@ Nhánh `feat/llm-query-correction` (tách từ `dev` tại `f3d01bd`). S-01 … 
 
 ### S-05 — agent-rag
 
-- Cập nhật lúc: `2026-11-21T16:15:00+07:00`.
+- Cập nhật lúc: `≤ 2026-11-21T16:09:08+07:00`.
 - Đã làm: `README.md` (sơ đồ luồng có bước sửa câu và nhánh chặn câu đã sửa; bước 2; mục mới "Sửa chính tả câu hỏi bằng LLM"); MSG-agent-rag-004 (Chương 2), MSG-agent-rag-005 (Ngọc).
 - File thay đổi: `README.md`, `implementation.md` của task.
 - Quyết định/giao diện ảnh hưởng nhiệm vụ khác: xem hai MSG.
@@ -102,7 +103,7 @@ Nhánh `feat/llm-query-correction` (tách từ `dev` tại `f3d01bd`). S-01 … 
 
 ### MSG-agent-rag-004
 
-- Lúc: `2026-11-21T16:15:00+07:00`.
+- Lúc: `≤ 2026-11-21T16:09:08+07:00`.
 - Từ: `agent-rag`; đến: người phụ trách Chương 2.
 - Nhiệm vụ: S-05.
 - Loại: `proposal`.
@@ -114,7 +115,7 @@ Nhánh `feat/llm-query-correction` (tách từ `dev` tại `f3d01bd`). S-01 … 
 
 ### MSG-agent-rag-005
 
-- Lúc: `2026-11-21T16:15:00+07:00`.
+- Lúc: `≤ 2026-11-21T16:09:08+07:00`.
 - Từ: `agent-rag`; đến: Ngọc (FE).
 - Nhiệm vụ: S-02, S-03.
 - Loại: `contract`.
@@ -128,7 +129,7 @@ Nhánh `feat/llm-query-correction` (tách từ `dev` tại `f3d01bd`). S-01 … 
 
 ## Bàn giao
 
-- Lúc: `2026-11-21T16:20:00+07:00`; từ `agent-rag` (triển khai) cho coordinator/reviewer (`agent-rag`, `self_review`) và người dùng.
+- Lúc: `≤ 2026-11-21T16:09:08+07:00`; từ `agent-rag` (triển khai) cho coordinator/reviewer (`agent-rag`, `self_review`) và người dùng.
 - Đã làm: S-01 … S-05 (chi tiết ở trên).
 - File: xem từng nhiệm vụ; commit ghi ở mục "Commit" bên dưới.
 - Giao diện ảnh hưởng: API cấu hình (`retrieval.query_correction_enabled`), trường mới của event `query_rewrite` và `retrieval_debug`, rewriter tùy biến của `RagChain` phải có `correct()` và nhận `correction=`.

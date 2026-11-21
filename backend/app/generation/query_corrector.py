@@ -62,6 +62,15 @@ REASON_NOT_CONFIGURED = "not_configured"
 
 _NON_ALNUM_RE = re.compile(r"[\W_]+", re.UNICODE)
 _WORD_RE = re.compile(r"\w+", re.UNICODE)
+# Ngoặc model hay bọc quanh câu đã sửa: ký tự mở → ký tự đóng.
+_QUOTE_PAIRS = {'"': '"', "'": "'", "`": "`", "“": "”"}
+# Nhãn model hay thêm trước câu đã sửa dù prompt cấm ("Câu đã sửa: ..."); ở câu dài nhãn
+# này vẫn nằm trong ngưỡng khoảng cách nên phải bỏ trước khi kiểm tra.
+_LABEL_PREFIX_RE = re.compile(
+    r"^(?:câu(?: hỏi)?(?: đã| được)? sửa(?: lại)?|đã sửa|sửa lại|kết quả"
+    r"|corrected(?: question| query| text)?|output)\s*[:：]\s*",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -116,7 +125,7 @@ def validate_correction(
     ``max(MIN_EDIT_DISTANCE, max_edit_ratio * len(key(question)))``.
     """
 
-    cleaned = _clean_output(output)
+    cleaned = _clean_output(output, question)
     if not cleaned or "\n" in cleaned or len(cleaned) > MAX_LENGTH_FACTOR * len(question.strip()):
         return QueryCorrectionResult(question, False, REASON_INVALID_OUTPUT, output)
 
@@ -189,15 +198,30 @@ def _same_text(left: str, right: str) -> bool:
     )
 
 
-def _clean_output(output: str) -> str:
+def _clean_output(output: str, question: str = "") -> str:
+    """Bỏ phần model thêm bao quanh câu đã sửa (ngoặc, nhãn), trừ khi câu gốc cũng có.
+
+    Câu gốc có sẵn ngoặc hoặc nhãn đó thì giữ nguyên, để LLM trả nguyên văn vẫn là ``unchanged``.
+    """
+
     text = unicodedata.normalize("NFC", output or "").strip()
-    # Bỏ ngoặc kép/backtick bao ngoài nếu model thêm vào.
-    if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'`":
-        text = text[1:-1].strip()
+    reference = unicodedata.normalize("NFC", question).strip()
+    text = _strip_added_quotes(text, reference)
+    if not _LABEL_PREFIX_RE.match(reference):
+        text = _LABEL_PREFIX_RE.sub("", text, count=1)
+    text = _strip_added_quotes(text, reference)
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     if len(lines) != 1:
         return "\n".join(lines)
     return " ".join(lines[0].split())
+
+
+def _strip_added_quotes(text: str, reference: str) -> str:
+    if len(text) < 2 or _QUOTE_PAIRS.get(text[0]) != text[-1]:
+        return text
+    if len(reference) >= 2 and reference[0] == text[0] and reference[-1] == text[-1]:
+        return text  # người dùng tự gõ ngoặc bao ngoài
+    return text[1:-1].strip()
 
 
 def _max_tokens(question: str) -> int:

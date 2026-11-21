@@ -5,7 +5,7 @@
 - Coordinator: `agent-rag`
 - Người yêu cầu: user (Khánh, phụ trách RAG)
 - Tạo lúc: `2026-11-21T12:28:50+07:00`
-- Cập nhật lúc: `2026-11-21T16:40:00+07:00`
+- Cập nhật lúc: `2026-11-21T16:44:32+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -99,4 +99,5 @@ Kết quả mong muốn:
 - 2026-11-21T12:28:50+07:00 — `agent-rag`: tạo task `2026-11-21-llm-accent-restoration` theo quyết định của người dùng dùng LLM khôi phục dấu. Bản đầu: chỉ gọi LLM với câu không dấu, đầu ra bỏ dấu phải trùng câu gốc, kiểm `check_scope` lần hai để giữ cam kết Q-3. Trạng thái `ready`.
 - 2026-11-21 — `agent-rag`: theo người dùng, bỏ luật phát hiện câu/chữ thiếu dấu: khi cờ bật, mọi câu đều gửi LLM, LLM tự nhận ra chữ thiếu dấu, kể cả câu dấu một phần.
 - 2026-11-21T13:02:24+07:00 — `agent-rag`: người dùng chỉ ra câu có thể gõ sai (typo, sai dấu thanh, sai dấu câu); ép giữ nguyên chữ đã có dấu sẽ giữ cả lỗi. Mở rộng phạm vi thành sửa chính tả và dấu; bỏ điều kiện bỏ dấu trùng khớp và giữ chữ có dấu, thay bằng ngưỡng khoảng cách chỉnh sửa trên khóa bỏ dấu + giữ nguyên chữ có số/viết hoa. Đổi ID thành `2026-11-21-llm-query-correction`, nhánh `feat/llm-query-correction`, cờ `QUERY_CORRECTION_ENABLED`, module `query_corrector.py`. Viết lại AC-01 … AC-07.
-- 2026-11-21T16:40:00+07:00 — `agent-rag`: triển khai xong S-01 … S-05, chuyển `in_review`; chờ người dùng chốt mặc định của cờ (AC-05).
+- `≤ 2026-11-21T16:09:08+07:00` — `agent-rag`: triển khai xong S-01 … S-05, chuyển `in_review`; chờ người dùng chốt mặc định của cờ (AC-05).
+- 2026-11-21T16:44:32+07:00 — `agent-rag`: review vòng 2 có R-07, R-08, R-09 (low); theo yêu cầu người dùng đã sửa cả ba. Các mốc thời gian ghi sau commit `d24f482` (16:09:08) không phải thời điểm thật, đã đổi thành cận trên `≤ 2026-11-21T16:09:08+07:00` vì thời điểm thật không được ghi lại. Task vẫn `in_review`, chờ AC-05.

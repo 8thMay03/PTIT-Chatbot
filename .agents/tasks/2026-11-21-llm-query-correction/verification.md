@@ -2,7 +2,7 @@
 
 - Verifier: `agent-rag`.
 - Trạng thái tổng: `passed` cho AC-01 … AC-04, AC-06 … AC-08; AC-05 `passed` phần kỹ thuật, còn chờ người dùng chốt giá trị mặc định của cờ.
-- Bản được kiểm tra: working tree nhánh `feat/llm-query-correction` (nền `f3d01bd`) trước commit triển khai; nội dung giống commit `9f2bdff`, `1c8c292`, `3d7d17a`.
+- Bản được kiểm tra: working tree nhánh `feat/llm-query-correction` (nền `f3d01bd`) trước commit triển khai; nội dung giống commit `9f2bdff`, `1c8c292`, `3d7d17a`. V-02, V-08 chạy lại trên working tree sau `d24f482` có bản sửa R-07, R-08.
 - Môi trường: Windows 11, `backend/.venv` (Python 3.11), Postgres + pgvector (Docker `ptit_chatbot_postgres`, đang chạy), LLM `openai_compatible`/`qwen3.8-27b`, embedding `text-embedding-3-small`.
 
 ## Kiểm chứng tiêu chí
@@ -26,6 +26,7 @@
 - Lệnh / thao tác: `.venv/Scripts/python.exe -m pytest tests/test_query_corrector.py -q`.
 - Kỳ vọng: đúng danh sách ở AC-02.
 - Kết quả thực tế: đạt. Được nhận (`test_typo_corrections_are_accepted`): 4 ví dụ của AC-02 nguyên văn, thêm câu giữ `INT1340`/`K2024`/`QLDT`, `GPA` + thêm dấu `?`, lỗi gõ ký tự, đầu ra bọc ngoặc kép. Câu đúng trả nguyên văn → `unchanged`; khác khoảng trắng → `unchanged`; đầu vào NFD sửa được và trả NFC; NFD đúng → `unchanged`. Bị bỏ (`test_rewrites_and_bad_outputs_are_rejected`, 16 ca): diễn đạt lại (ví dụ AC-02 bị bỏ ở điều kiện 3 vì dài gấp > 2 lần; ca dài vừa phải bị bỏ ở điều kiện 1), trả lời câu hỏi, thêm đoạn chỉ dẫn, `ktx o dau` → `ký túc xá ở đâu` (`too_different`), đổi/viết thường `INT1340`, `QLDT`, tách/đổi `K2024` (`protected_token_changed`), đầu ra rỗng, chỉ khoảng trắng, nhiều dòng, quá dài (`invalid_output`).
+- Chạy lại `2026-11-21T16:44:32+07:00` sau khi sửa R-07, R-08: `pytest tests/test_query_corrector.py tests/test_query_rewriter.py tests/test_rag_chain.py` → `91 passed`. Ca mới: câu người dùng tự gõ ngoặc (`"…"`, `“…”`, `` `INT1340` ``) được LLM trả nguyên văn → `unchanged`; câu có ngoặc được sửa vẫn giữ ngoặc; 6 dạng nhãn mở đầu (có/không ngoặc, xuống dòng sau nhãn) bị bỏ → `corrected` với đúng câu đã sửa; câu gốc bắt đầu bằng `Kết quả:` giữ nhãn. Chạy `validate_correction` mới trên 1 121 đầu ra LLM thật trong 3 báo cáo cờ bật: 0 khác biệt về `text`/`reason` so với bản đã ghi.
 - Trạng thái: `passed`.
 - Bằng chứng: output pytest.
 
@@ -87,7 +88,7 @@
 
 ### V-07 — AC-07 (tài liệu và thông báo)
 
-- Người thực hiện / thời gian: `agent-rag` / `2026-11-21T16:15:00+07:00`.
+- Người thực hiện / thời gian: `agent-rag` / `≤ 2026-11-21T16:09:08+07:00`.
 - Loại: review tài liệu.
 - Thư mục chạy: repo.
 - Lệnh / thao tác: đọc `README.md` (sơ đồ luồng, bước 2, mục "Sửa chính tả câu hỏi bằng LLM"); kiểm MSG-agent-rag-004 (Chương 2) và MSG-agent-rag-005 (Ngọc) trong `implementation.md`.
@@ -98,12 +99,12 @@
 
 ### V-08 — AC-08 (toàn bộ test backend)
 
-- Người thực hiện / thời gian: `agent-rag` / `2026-11-21T15:19:00+07:00`; chạy lại trên bản cuối (sau khi thêm README báo cáo, không đổi mã) `2026-11-21T16:20:00+07:00`.
+- Người thực hiện / thời gian: `agent-rag` / `2026-11-21T15:19:00+07:00`; chạy lại trên bản cuối (sau khi thêm README báo cáo, không đổi mã) `≤ 2026-11-21T16:09:08+07:00`.
 - Loại: test tự động.
 - Thư mục chạy: `backend/`.
 - Lệnh / thao tác: `.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider` (Postgres chạy).
 - Kỳ vọng: đạt toàn bộ hoặc ghi rõ test hỏng sẵn.
-- Kết quả thực tế: lần 1 `1496 passed, 24 skipped, 1 warning in 51.11s` (đã gồm mọi test mới của task); lần 2 `1496 passed, 24 skipped, 1 warning in 48.60s`. Warning duy nhất là `StarletteDeprecationWarning` có sẵn. Không có test hỏng.
+- Kết quả thực tế: lần 1 `1496 passed, 24 skipped, 1 warning in 51.11s` (đã gồm mọi test mới của task); lần 2 `1496 passed, 24 skipped, 1 warning in 48.60s`. Warning duy nhất là `StarletteDeprecationWarning` có sẵn. Không có test hỏng. Lần 3 (`2026-11-21T16:44:32+07:00`, sau khi sửa R-07, R-08): `1507 passed, 24 skipped, 1 warning in 51.62s` (thêm 11 test mới).
 - Trạng thái: `passed`.
 - Bằng chứng: output pytest.
 

@@ -228,6 +228,48 @@ def test_whitespace_only_difference_is_unchanged(correction_on) -> None:
     assert (result.text, result.corrected, result.reason) == (question, False, "unchanged")
 
 
+@pytest.mark.parametrize("question", ['"hoc phi la bao nhieu"', "“học phí là bao nhiêu”", "`INT1340`"])
+def test_user_quoted_question_echoed_is_unchanged(correction_on, question) -> None:
+    result = QueryCorrector(FakeLLM()).correct(question)
+
+    assert (result.text, result.corrected, result.reason) == (question, False, "unchanged")
+
+
+def test_user_quoted_question_keeps_its_quotes_when_corrected(correction_on) -> None:
+    result = QueryCorrector(FakeLLM('"học phí là bao nhiêu"')).correct('"hoc phi la bao nhieu"')
+
+    assert (result.text, result.corrected) == ('"học phí là bao nhiêu"', True)
+
+
+LONG_QUESTION = "hoc phi mot tin chi la bao nhieu va hoc phi ky he co khac hoc phi ky chinh khong a"
+LONG_CORRECTED = "học phí một tín chỉ là bao nhiêu và học phí kỳ hè có khác học phí kỳ chính không ạ"
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        f"Câu đã sửa: {LONG_CORRECTED}",
+        f"câu hỏi được sửa lại: {LONG_CORRECTED}",
+        f"Đã sửa: “{LONG_CORRECTED}”",
+        f'"Kết quả: {LONG_CORRECTED}"',
+        f"Corrected question: {LONG_CORRECTED}",
+        f"Câu đã sửa:\n{LONG_CORRECTED}",
+    ],
+)
+def test_label_prefix_is_removed_from_output(correction_on, output) -> None:
+    result = QueryCorrector(FakeLLM(output)).correct(LONG_QUESTION)
+
+    assert (result.text, result.corrected, result.reason) == (LONG_CORRECTED, True, "corrected")
+
+
+def test_label_prefix_kept_when_question_starts_with_it(correction_on) -> None:
+    question = "Kết quả: hoc ky 1 xem o dau"
+
+    result = QueryCorrector(FakeLLM("Kết quả: học kỳ 1 xem ở đâu")).correct(question)
+
+    assert result.text == "Kết quả: học kỳ 1 xem ở đâu"
+
+
 def test_nfd_input_is_corrected_to_nfc(correction_on) -> None:
     question = unicodedata.normalize("NFD", "hoc phì một tin chi")
     output = unicodedata.normalize("NFD", "học phí một tín chỉ")
