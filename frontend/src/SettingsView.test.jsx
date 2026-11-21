@@ -45,8 +45,10 @@ function baseConfig() {
 
 function emptyRegistry() {
   return {
-    profiles: [],
-    active: { llm: null, embedding: null, reranker: null },
+    profiles: [
+      { id: "p1", kind: "llm", name: "Gemini Flash", provider: "gemini", model: "gemini-2.5-flash", has_api_key: true },
+    ],
+    active: { llm: "p1", embedding: null, reranker: null },
     embedding_runtime: { profile_id: null, restart_required: false, load_error: null },
     env_defaults: {},
     secret_encryption_enabled: true,
@@ -148,6 +150,18 @@ describe("SettingsView — tab nhóm, dải bước và form theo bước", () =
     expect(container.querySelector(".settings-nav")).toBeNull();
   });
 
+  it("danh sách mục (mobile) hiện mô hình đang dùng của ba loại", async () => {
+    stubFetch();
+    await render();
+
+    const summary = (key) =>
+      container.querySelector(`[data-settings-index="${key}"] .settings-index-summary`)?.textContent;
+    await waitFor(() => summary("models-llm"));
+    expect(summary("models-llm")).toBe("Gemini Flash");
+    expect(summary("models-embedding")).toBe("Cấu hình máy chủ");
+    expect(summary("models-reranker")).toBe("Heuristic");
+  });
+
   it("dải bước hiện giá trị đang dùng của bốn bước", async () => {
     stubFetch();
     await render({ section: "retrieval" });
@@ -220,8 +234,11 @@ describe("SettingsView — tab nhóm, dải bước và form theo bước", () =
     expect(container.querySelector("#mdl-panel-llm").hidden).toBe(true);
     expect(container.querySelector('[data-settings-tab="models"]').getAttribute("aria-current")).toBe("page");
     expect(
-      container.querySelector('.settings-kind-item[data-settings-nav="models-embedding"]').getAttribute("aria-current")
+      container.querySelector('.mdl-kind[data-settings-nav="models-embedding"]').getAttribute("aria-current")
     ).toBe("page");
+    expect(container.querySelector('.mdl-kind[data-settings-nav="models-llm"]').hasAttribute("aria-current")).toBe(
+      false
+    );
     expect(container.querySelector(".settings-test-trigger")).toBeNull();
   });
 

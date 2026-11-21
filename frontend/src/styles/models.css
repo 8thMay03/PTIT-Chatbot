@@ -1,147 +1,149 @@
 /* ==========================================================================
    SETTINGS → MÔ HÌNH
-   Ba tab con: LLM model, Embedding model, Rerank model. Mỗi tab gồm thẻ chọn
-   mô hình đang dùng, form thêm/sửa và danh sách mô hình trong kho.
+   Ba thẻ khâu (LLM / Embedding / Reranker) ở đầu trang, bên dưới là danh sách
+   mô hình của loại đang xem: hàng .env rồi kho mô hình, mỗi hàng có nút "Dùng".
+   Thêm/sửa mở hộp thoại ở giữa màn hình.
    ========================================================================== */
 .mdl-page {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px 32px 56px;
+  padding: 20px 32px 56px;
 }
 
-.mdl-wrap,
-.mdl-notices,
-.mdl-kind-main,
-.mdl-kind-side {
+.mdl-wrap {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
-}
-
-.mdl-wrap {
-  max-width: 2200px;
-}
-
-.mdl-notices {
-  gap: var(--space-3);
-}
-
-/* Ghi chú nơi lưu kho mô hình là thông tin nền, không phải cảnh báo: tông trung tính. */
-.mdl-notices .inline-alert.is-info {
-  border-color: var(--border);
-  background: var(--surface);
-  color: var(--text-muted);
-}
-
-/* Hai cột: chọn mô hình + form bên trái, kho mô hình bên phải. */
-.mdl-kind-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr);
-  align-items: start;
-  gap: var(--space-4);
-}
-
-.mdl-kind-side {
-  position: sticky;
-  top: 0;
-}
-
-@media (max-width: 1100px) {
-  .mdl-kind-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .mdl-kind-side {
-    position: static;
-  }
+  max-width: 1120px;
 }
 
 /* --------------------------------------------------------------------------
-   Tab con
+   Thẻ khâu
    -------------------------------------------------------------------------- */
-.mdl-subtabs {
+.mdl-kinds {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mdl-kind {
   display: flex;
+  flex-direction: column;
   gap: 4px;
-  padding: 4px;
+  min-width: 0;
+  padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
-  overflow-x: auto;
-}
-
-.mdl-subtab {
-  display: inline-flex;
-  flex: 1 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border: 0;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
-}
-
-.mdl-subtab:hover {
-  color: var(--text);
-}
-
-.mdl-subtab.is-active {
+  border-radius: var(--radius);
   background: var(--surface);
-  color: var(--brand-text);
   box-shadow: var(--shadow-xs);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color var(--duration) var(--ease), box-shadow var(--duration) var(--ease),
+    background var(--duration) var(--ease);
 }
 
-.mdl-subtab:focus-visible {
+.mdl-kind:hover {
+  border-color: var(--brand-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.mdl-kind:focus-visible {
   outline: none;
   box-shadow: var(--ring);
 }
 
-.mdl-subtab-count {
-  min-width: 20px;
-  padding: 0 6px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-sunken);
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
-  line-height: 1.6;
+.mdl-kind-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-.mdl-subtab.is-active .mdl-subtab-count {
+.mdl-kind-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
   background: var(--brand-subtle);
   color: var(--brand-text);
 }
 
-/* --------------------------------------------------------------------------
-   Danh sách mô hình trong kho (cột phải, card gọn)
-   -------------------------------------------------------------------------- */
-.mdl-list-head {
+.mdl-kind-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--border-subtle);
+  gap: 8px;
+  min-width: 0;
+  margin-top: 4px;
 }
 
-.mdl-list-head h3 {
-  margin: 0;
-  font-size: var(--text-base);
-  font-weight: 650;
-  color: var(--text);
+/* Tên dài thì cắt, chip trạng thái luôn nằm một dòng. */
+.mdl-kind-head .mdl-pill,
+.mdl-kind-head .mdl-pill.is-warn {
+  flex: none;
+  padding: 0 7px;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
-.mdl-list-head p {
-  margin: 1px 0 0;
-  font-size: var(--text-xs);
+.mdl-kind-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdl-kind-meta {
+  overflow: hidden;
   color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Thẻ đang xem: nền thương hiệu, giống bước đang chọn ở tab Hệ thống trả lời. */
+.mdl-kind.is-active {
+  border-color: var(--brand);
+  background: var(--brand);
+  box-shadow: var(--shadow-brand);
+  color: var(--on-solid);
+}
+
+.mdl-kind.is-active .mdl-kind-label,
+.mdl-kind.is-active .mdl-kind-meta {
+  color: var(--on-solid);
+  opacity: 0.8;
+}
+
+.mdl-kind.is-active .mdl-kind-icon,
+.mdl-kind.is-active .mdl-pill {
+  border-color: transparent;
+  background: var(--on-solid-soft);
+  color: var(--on-solid);
+}
+
+/* --------------------------------------------------------------------------
+   Danh sách mô hình của một loại
+   -------------------------------------------------------------------------- */
+.mdl-list-card .mdl-card-head {
+  align-items: center;
+}
+
+.mdl-list-card .mdl-card-heading {
+  flex: 1;
 }
 
 .mdl-add-btn {
@@ -151,112 +153,312 @@
   font-size: var(--text-sm);
 }
 
-.mdl-empty {
-  padding: var(--space-4);
-  font-size: var(--text-sm);
-  line-height: 1.5;
-  color: var(--text-muted);
+.mdl-list-notices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5) 0;
 }
 
-.mdl-empty p {
+.mdl-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   margin: 0;
-}
-
-/* Cột phải rộng (màn lớn) thì card tự xếp nhiều cột. */
-.mdl-profile-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 8px;
-  margin: 0;
-  padding: var(--space-3);
+  padding: var(--space-2);
   list-style: none;
 }
 
-.mdl-profile {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 8px 8px 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  background: var(--surface);
-  transition: border-color var(--duration-fast) var(--ease);
+.mdl-row {
+  display: grid;
+  grid-template-columns: 16px 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  transition: background var(--duration-fast) var(--ease);
 }
 
-.mdl-profile:hover {
-  border-color: var(--border-strong);
+.mdl-row:hover {
+  background: var(--surface-soft);
 }
 
-.mdl-profile.is-active {
+.mdl-row.is-active {
   border-color: var(--brand-border);
   background: var(--brand-subtle);
 }
 
-.mdl-profile.is-editing {
-  border-color: var(--brand);
-  box-shadow: inset 0 0 0 1px var(--brand);
+/* Dấu chọn kiểu radio: chỉ để nhìn, hành động nằm ở nút "Dùng". */
+.mdl-row-mark {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
 }
 
-.mdl-profile-icon {
+.mdl-row.is-active .mdl-row-mark {
+  border-color: var(--brand);
+  background: var(--brand);
+  box-shadow: inset 0 0 0 3px var(--surface);
+}
+
+.mdl-row-icon {
   display: grid;
   place-items: center;
-  flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  margin-top: 1px;
-  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   background: var(--surface-sunken);
   color: var(--text);
 }
 
-.mdl-profile.is-active .mdl-profile-icon {
+.mdl-row.is-env .mdl-row-icon {
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.mdl-row.is-active .mdl-row-icon {
   background: var(--surface);
 }
 
-.mdl-profile-text {
+.mdl-row-text {
   display: flex;
-  flex: 1;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
 }
 
-.mdl-profile-name {
+.mdl-row-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.mdl-row-name {
   overflow: hidden;
+  max-width: 100%;
+  color: var(--text);
   font-size: var(--text-sm);
   font-weight: 600;
   line-height: 1.45;
-  color: var(--text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.mdl-profile-meta {
-  overflow: hidden;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  color: var(--text-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mdl-profile-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
-}
-
-.mdl-profile-tags .mdl-pill {
-  padding: 0 6px;
+.mdl-row-title .mdl-pill {
+  padding: 0 7px;
   font-size: 11px;
 }
 
-.mdl-profile-actions {
+.mdl-row-meta {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdl-row-actions {
   display: flex;
-  flex-shrink: 0;
+  align-items: center;
+  justify-content: flex-end;
   gap: 2px;
+}
+
+/* Hàng .env không có nút sửa/xoá: chừa chỗ để nút "Dùng" thẳng cột với các hàng khác. */
+.mdl-row.is-env .mdl-row-actions::after {
+  content: "";
+  width: 58px;
+}
+
+.mdl-use-btn {
+  margin-right: 6px;
+  padding: 4px 14px;
+  font-size: var(--text-sm);
+}
+
+.mdl-empty {
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.mdl-list-foot,
+.mdl-foot-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.mdl-list-foot {
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.mdl-list-foot svg,
+.mdl-foot-note svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+/* --------------------------------------------------------------------------
+   Hộp thoại thêm/sửa ở giữa màn hình (render qua portal vào body)
+   -------------------------------------------------------------------------- */
+.mdl-dialog-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  background: var(--scrim);
+  animation: mdl-dialog-fade var(--duration) var(--ease);
+}
+
+/* inset 0 + margin auto + height fit-content: căn giữa cả hai chiều, cao theo nội
+   dung, quá cao thì phần thân tự cuộn. */
+.mdl-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: min(640px, calc(100% - 32px));
+  height: fit-content;
+  max-height: calc(100dvh - 48px);
+  margin: auto;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  outline: none;
+  animation: mdl-dialog-in var(--duration-slow) var(--ease);
+}
+
+.mdl-dialog[hidden],
+.mdl-dialog-scrim[hidden] {
+  display: none;
+}
+
+@keyframes mdl-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@keyframes mdl-dialog-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mdl-dialog,
+  .mdl-dialog-scrim {
+    animation: none;
+  }
+}
+
+.mdl-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.mdl-dialog-heading {
+  min-width: 0;
+}
+
+.mdl-dialog-heading h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-md);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.mdl-dialog-heading p {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.mdl-dialog-close {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.mdl-dialog-close:hover {
+  color: var(--text);
+}
+
+.mdl-dialog-close:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
+.mdl-dialog-body {
+  flex: 1;
+  min-height: 0;
+  padding: 18px 20px 24px;
+  overflow-y: auto;
+}
+
+.mdl-dialog-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-soft);
+}
+
+/* Nhà cung cấp xếp lưới 2 cột trong hộp thoại. */
+.mdl-dialog .mdl-choices {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mdl-dialog .mdl-choice {
+  align-items: center;
+  padding: 10px;
+}
+
+.mdl-dialog .mdl-choice-text strong {
+  font-size: var(--text-sm);
+}
+
+.mdl-dialog .mdl-choice-text span {
+  font-size: var(--text-xs);
+}
+
+.mdl-dialog .mdl-grid {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
 .mdl-icon-btn {
@@ -289,11 +491,6 @@
 .mdl-icon-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
-}
-
-.mdl-input.mdl-select {
-  font-family: var(--font-sans);
-  cursor: pointer;
 }
 
 .mdl-provider-note {
@@ -339,7 +536,8 @@
   cursor: not-allowed;
 }
 
-.mdl-wrap code {
+.mdl-wrap code,
+.mdl-dialog code {
   padding: 1px 5px;
   border-radius: 4px;
   background: var(--surface-sunken);
@@ -347,7 +545,8 @@
   font-size: 0.92em;
 }
 
-.mdl-wrap .inline-alert svg {
+.mdl-wrap .inline-alert svg,
+.mdl-dialog .inline-alert svg {
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -399,42 +598,10 @@
   color: var(--text-muted);
 }
 
-.mdl-current {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-.mdl-current strong {
-  color: var(--text);
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-.mdl-card-body {
-  padding: var(--space-5);
-}
-
 .mdl-stack {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-}
-
-.mdl-card-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-5);
-  border-top: 1px solid var(--border-subtle);
-  background: var(--surface-soft);
-  border-radius: 0 0 var(--radius) var(--radius);
 }
 
 .mdl-dirty {
@@ -776,22 +943,70 @@
 /* --------------------------------------------------------------------------
    Khổ hẹp
    -------------------------------------------------------------------------- */
+/* Mobile điều hướng loại mô hình bằng danh sách mục Cài đặt nên ẩn thẻ khâu. */
+@media (max-width: 1023px) {
+  .mdl-kinds {
+    display: none;
+  }
+}
+
 @media (max-width: 900px) {
   .mdl-page {
-    padding: 4px 16px 40px;
+    padding: 12px 16px 40px;
   }
 
-  .mdl-card-head,
-  .mdl-card-body {
+  .mdl-card-head {
     padding: var(--space-4);
   }
 
-  .mdl-card-foot {
+  .mdl-list-notices {
+    padding: var(--space-3) var(--space-4) 0;
+  }
+
+  .mdl-list-foot {
     padding: var(--space-3) var(--space-4);
   }
 
+  .mdl-empty {
+    padding: 0 var(--space-4) var(--space-4);
+  }
 }
 
+@media (max-width: 560px) {
+  .mdl-list-card .mdl-card-head {
+    flex-wrap: wrap;
+  }
+
+  .mdl-list-card .mdl-card-icon {
+    display: none;
+  }
+
+  .mdl-list-card .mdl-card-heading {
+    flex-basis: 100%;
+  }
+
+  .mdl-row {
+    grid-template-columns: 30px minmax(0, 1fr);
+    padding: 10px;
+  }
+
+  .mdl-row-mark {
+    display: none;
+  }
+
+  .mdl-row-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+
+  .mdl-row.is-env .mdl-row-actions::after {
+    content: none;
+  }
+
+  .mdl-dialog .mdl-choices {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 
 @media (max-width: 480px) {
   .mdl-actions {

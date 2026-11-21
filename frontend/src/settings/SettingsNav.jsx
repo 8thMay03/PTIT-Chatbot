@@ -8,7 +8,8 @@ import {
 
 /**
  * Ba nhóm của trang Cài đặt quản trị. Nhóm "Hệ thống trả lời" là một form chia
- * theo bước; "Mô hình" là ba trang riêng; "Cá nhân" là tùy chọn giao diện.
+ * theo bước; "Mô hình" là ba trang riêng (chọn bằng thẻ khâu trong `ModelsView`);
+ * "Cá nhân" là tùy chọn giao diện.
  */
 export const SETTINGS_NAV_GROUPS = [
   {
@@ -71,7 +72,7 @@ export function DirtyDot() {
 }
 
 /** Link mục cài đặt: giữ `href` để mở tab mới được, bấm thường thì đổi route tại chỗ. */
-function navClick(onSelect, key) {
+export function navClick(onSelect, key) {
   return (event) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.button === 1) return;
     event.preventDefault();
@@ -97,31 +98,6 @@ export function SettingsTabs({ group, dirty = false, onSelect }) {
             <Icon size={16} aria-hidden="true" />
             <span>{label}</span>
             {id === "answer" && dirty && <DirtyDot />}
-          </a>
-        );
-      })}
-    </nav>
-  );
-}
-
-/** Thanh chọn loại mô hình trong tab "Mô hình" (desktop). */
-export function ModelKindNav({ activeKey, onSelect }) {
-  const items = SETTINGS_NAV_GROUPS.find((group) => group.id === "models").items;
-  return (
-    <nav className="settings-kind-nav" aria-label="Loại mô hình">
-      {items.map((item) => {
-        const active = activeKey === item.key;
-        return (
-          <a
-            key={item.key}
-            className={`settings-kind-item ${active ? "is-active" : ""}`}
-            href={settingsHref(item.key)}
-            aria-current={active ? "page" : undefined}
-            data-settings-nav={item.key}
-            title={item.hint}
-            onClick={navClick(onSelect, item.key)}
-          >
-            {item.short}
           </a>
         );
       })}

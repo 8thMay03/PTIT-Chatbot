@@ -1,12 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, FlaskConical } from "lucide-react";
+import { configApi, modelProfilesApi, queryKeys } from "./api";
 import ConfigView from "./ConfigView";
 import ModelsView from "./ModelsView";
 import ThemePicker from "./components/ThemePicker";
-import { ModelKindNav, SettingsIndex, SettingsTabs, settingsGroupOf } from "./settings/SettingsNav";
+import { SettingsIndex, SettingsTabs, settingsGroupOf } from "./settings/SettingsNav";
 import PipelineSteps from "./settings/PipelineSteps";
 import RetrievalTestPanel from "./settings/RetrievalTestPanel";
 import { pipelineSummary } from "./settings/pipelineSummary";
+import { activeModelSummary } from "./models/activeModels";
+import { KIND_ORDER } from "./models/catalog";
 import { formatLastSaved } from "./settings/relativeTime";
 import { ADMIN_ANSWER_SECTIONS, modelKindForSection } from "./lib/appRoute";
 
@@ -21,7 +25,7 @@ const EMPTY_DRAFT = {
 
 const GROUP_DESCRIPTIONS = {
   answer: "Điều chỉnh cách chatbot tìm tài liệu và trả lời sinh viên. Áp dụng sau khi lưu.",
-  models: "Kho mô hình cho từng khâu; mỗi loại có nút thêm, sửa, xoá riêng.",
+  models: "Mô hình cho từng khâu trả lời. Đổi mô hình có hiệu lực ngay, riêng mô hình nhúng cần khởi động lại.",
   personal: "Chọn chế độ hiển thị phù hợp với bạn.",
 };
 
@@ -63,6 +67,24 @@ export default function SettingsView({
     [draftState.values, draftState.config, draftState.calibrated]
   );
 
+  // Danh sách mục trên mobile cũng hiện mô hình đang dùng; dùng chung cache với ModelsView.
+  const registryQuery = useQuery({
+    queryKey: queryKeys.modelProfiles,
+    queryFn: ({ signal }) => modelProfilesApi.list({ signal }),
+  });
+  const configQuery = useQuery({
+    queryKey: queryKeys.config,
+    queryFn: ({ signal }) => configApi.get({ signal }),
+  });
+  const indexSummaries = useMemo(() => {
+    const next = { ...summaries };
+    KIND_ORDER.forEach((kind) => {
+      const model = activeModelSummary(kind, registryQuery.data, configQuery.data);
+      if (model) next[`models-${kind}`] = model.status.tone === "warn" ? [model.name, model.status.label] : [model.name];
+    });
+    return next;
+  }, [summaries, registryQuery.data, configQuery.data]);
+
   const lastSavedLabel = draftState.config
     ? formatLastSaved(draftState.config.updated_at)
     : "Đang tải…";
@@ -74,7 +96,7 @@ export default function SettingsView({
     >
       <SettingsIndex
         dirtySections={draftState.dirtySections}
-        summaries={summaries}
+        summaries={indexSummaries}
         onSelect={handleSelect}
       />
 
@@ -135,10 +157,7 @@ export default function SettingsView({
           </div>
 
           <div className="settings-panel" id="settings-panel-models" hidden={!showModels}>
-            <div className="settings-subbar">
-              <ModelKindNav activeKey={section} onSelect={handleSelect} />
-            </div>
-            <ModelsView kind={modelKind ?? "llm"} />
+            <ModelsView kind={modelKind ?? "llm"} onKindSelect={handleSelect} />
           </div>
 
           <div

@@ -133,18 +133,28 @@ describe("ModelsView — kho mô hình theo loại", () => {
     vi.unstubAllGlobals();
   });
 
-  async function render(kind = "llm") {
+  async function render(kind = "llm", { onKindSelect } = {}) {
     await act(async () => {
       root.render(
         <QueryClientProvider client={queryClient}>
           <ToastProvider>
-            <ModelsView kind={kind} />
+            <ModelsView kind={kind} onKindSelect={onKindSelect} />
           </ToastProvider>
         </QueryClientProvider>
       );
     });
-    await waitFor(() => container.querySelector(`#mdl-panel-${kind}`));
+    await waitFor(() => container.querySelector(`#mdl-panel-${kind} .mdl-row`));
   }
+
+  /** Hàng trong danh sách theo tên hiển thị. */
+  function rowByName(panel, name) {
+    return [...panel.querySelectorAll(".mdl-row")].find(
+      (row) => row.querySelector(".mdl-row-name").textContent === name
+    );
+  }
+
+  // Hộp thoại thêm/sửa render qua portal vào body.
+  const dialog = () => document.body.querySelector(".mdl-dialog");
 
   it("chỉ mở panel của mục Mô hình đang chọn và dọn khoá tab cũ", async () => {
     const { fetchMock } = createFakeServer();
@@ -157,21 +167,57 @@ describe("ModelsView — kho mô hình theo loại", () => {
     expect(container.querySelector("#mdl-panel-llm").hidden).toBe(true);
     expect(container.querySelector("#mdl-panel-embedding").hidden).toBe(true);
     expect(localStorage.getItem("ptit_models_tab")).toBeNull();
+    // Không còn ô chọn "Mô hình đang dùng" kiểu cũ.
+    expect(container.querySelector("select")).toBeNull();
   });
 
-  it("thêm LLM vào kho rồi chọn làm mô hình đang dùng", async () => {
+  it("thẻ khâu hiện mô hình đang dùng, trạng thái và đổi loại qua link", async () => {
+    const { fetchMock } = createFakeServer({
+      profiles: [
+        { id: "e1", kind: "embedding", name: "bge-m3", provider: "sentence-transformers", model: "BAAI/bge-m3", dimension: 1536 },
+      ],
+      active: { embedding: "e1" },
+      runtime: { restart_required: true },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const onKindSelect = vi.fn();
+    await render("llm", { onKindSelect });
+
+    const cards = [...container.querySelectorAll(".mdl-kind")];
+    expect(cards.map((card) => card.getAttribute("href"))).toEqual([
+      "#settings/models-llm",
+      "#settings/models-embedding",
+      "#settings/models-reranker",
+    ]);
+    expect(cards[0].getAttribute("aria-current")).toBe("page");
+    expect(cards[1].hasAttribute("aria-current")).toBe(false);
+    expect(cards[0].querySelector(".mdl-kind-name").textContent).toBe("Cấu hình máy chủ");
+    expect(cards[0].querySelector(".mdl-kind-meta").textContent).toBe("OpenAI · gpt-4.1-mini");
+    expect(cards[1].querySelector(".mdl-kind-name").textContent).toBe("bge-m3");
+    expect(cards[1].querySelector(".mdl-pill").textContent).toBe("Chờ khởi động lại");
+    expect(cards[2].querySelector(".mdl-kind-name").textContent).toBe("Heuristic");
+    expect(cards[2].querySelector(".mdl-pill").textContent).toBe("Đang bật");
+
+    await click(cards[2]);
+    expect(onKindSelect).toHaveBeenCalledWith("models-reranker");
+  });
+
+  it("thêm LLM qua hộp thoại rồi bấm Dùng để chọn, bấm Dùng hàng .env để quay lại", async () => {
     const { state, fetchMock } = createFakeServer();
     vi.stubGlobal("fetch", fetchMock);
     await render();
     const panel = container.querySelector("#mdl-panel-llm");
+    expect(panel.querySelector(".mdl-row.is-env").getAttribute("aria-current")).toBe("true");
 
     await click(buttonByText(panel, "Thêm mô hình"));
-    const modelInput = await waitFor(() => panel.querySelector("#mdl-llm-form-model"));
+    const modelInput = await waitFor(() => dialog()?.querySelector("#mdl-llm-form-model"));
+    expect(dialog().getAttribute("role")).toBe("dialog");
+    expect(document.activeElement).toBe(dialog().querySelector("#mdl-llm-form-name"));
     await changeInput(modelInput, "gpt-4.1");
-    await changeInput(panel.querySelector("#mdl-llm-form-key"), "sk-secret-123");
-    await click(buttonByText(panel, "Thêm vào kho"));
+    await changeInput(dialog().querySelector("#mdl-llm-form-key"), "sk-secret-123");
+    await click(buttonByText(dialog(), "Thêm vào kho"));
 
-    await waitFor(() => panel.querySelector(".mdl-profile"));
+    await waitFor(() => rowByName(panel, "gpt-4.1"));
     const [[, createOptions]] = requestsTo(fetchMock, "/model-profiles", "POST");
     expect(JSON.parse(createOptions.body)).toEqual({
       kind: "llm",
@@ -181,28 +227,57 @@ describe("ModelsView — kho mô hình theo loại", () => {
       base_url: null,
       api_key: "sk-secret-123",
     });
-    // Form đóng sau khi lưu, khoá không còn trong DOM.
-    expect(panel.querySelector("#mdl-llm-form-key")).toBeNull();
-    expect(container.innerHTML).not.toContain("sk-secret-123");
-    expect(panel.querySelector(".mdl-profile").textContent).toContain("Đã lưu khoá");
+    // Hộp thoại đóng sau khi lưu, khoá không còn trong DOM.
+    expect(dialog()).toBeNull();
+    expect(document.body.innerHTML).not.toContain("sk-secret-123");
+    expect(rowByName(panel, "gpt-4.1").textContent).toContain("Đã lưu khoá");
 
-    const select = panel.querySelector("#mdl-llm-active");
-    expect([...select.options].map((option) => option.textContent)).toEqual([
-      "Cấu hình .env · gpt-4.1-mini (OpenAI)",
-      "gpt-4.1 — OpenAI · gpt-4.1",
-    ]);
-    const apply = buttonByText(panel, "Dùng mô hình này");
-    expect(apply.disabled).toBe(true);
-    await changeInput(select, "p1");
-    expect(apply.disabled).toBe(false);
-    await click(apply);
-
-    await waitFor(() => panel.querySelector(".mdl-profile.is-active"));
+    await click(rowByName(panel, "gpt-4.1").querySelector('button[aria-label="Dùng gpt-4.1"]'));
+    await waitFor(() => rowByName(panel, "gpt-4.1").classList.contains("is-active"));
     expect(state.active.llm).toBe("p1");
     const [[, activateOptions]] = requestsTo(fetchMock, "/model-profiles/activate", "POST");
     expect(JSON.parse(activateOptions.body)).toEqual({ kind: "llm", profile_id: "p1" });
-    // Không xoá được mô hình đang dùng.
+    // Hàng đang dùng không có nút Dùng và không xoá được.
+    expect(rowByName(panel, "gpt-4.1").querySelector(".mdl-use-btn")).toBeNull();
     expect(panel.querySelector('button[aria-label="Xoá gpt-4.1"]').disabled).toBe(true);
+
+    await click(panel.querySelector('button[aria-label="Dùng Cấu hình máy chủ"]'));
+    await waitFor(() => panel.querySelector(".mdl-row.is-env.is-active"));
+    expect(state.active.llm).toBeNull();
+    const activations = requestsTo(fetchMock, "/model-profiles/activate", "POST");
+    expect(JSON.parse(activations[1][1].body)).toEqual({ kind: "llm", profile_id: null });
+  });
+
+  it("hộp thoại: Esc đóng khi chưa đổi, giữ mở khi đã nhập, Huỷ luôn đóng", async () => {
+    const { fetchMock } = createFakeServer({
+      profiles: [{ id: "p1", kind: "llm", name: "Mini", provider: "openai", model: "gpt-4.1-mini" }],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await render();
+    const panel = container.querySelector("#mdl-panel-llm");
+    const editButton = panel.querySelector('button[aria-label="Sửa Mini"]');
+
+    // Trình duyệt focus nút khi bấm; jsdom thì không nên focus tay để kiểm tra trả focus.
+    editButton.focus();
+    await click(editButton);
+    expect(dialog().querySelector(".mdl-dialog-heading h3").textContent).toBe("Sửa Mini");
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    expect(dialog()).toBeNull();
+    expect(document.activeElement).toBe(editButton);
+
+    await click(editButton);
+    await changeInput(dialog().querySelector("#mdl-llm-form-model"), "gpt-4.1");
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    await click(document.body.querySelector(".mdl-dialog-scrim"));
+    expect(dialog()).not.toBeNull();
+    expect(dialog().textContent).toContain("Có thay đổi chưa lưu");
+
+    await click(buttonByText(dialog(), "Huỷ"));
+    expect(dialog()).toBeNull();
   });
 
   it("xoá mô hình không dùng sau khi xác nhận", async () => {
@@ -213,9 +288,10 @@ describe("ModelsView — kho mô hình theo loại", () => {
     await render("reranker");
     const panel = container.querySelector("#mdl-panel-reranker");
     expect(panel.hidden).toBe(false);
-    expect(panel.querySelector("#mdl-reranker-active").options[0].textContent).toBe(
-      "Heuristic (có sẵn, không cần mô hình)"
-    );
+    // Hàng đầu của reranker là Heuristic có sẵn, đang dùng vì chưa chọn mô hình nào.
+    const envRow = panel.querySelector(".mdl-row.is-env");
+    expect(envRow.querySelector(".mdl-row-name").textContent).toBe("Heuristic");
+    expect(envRow.classList.contains("is-active")).toBe(true);
 
     await click(panel.querySelector('button[aria-label="Xoá BGE"]'));
     const confirm = await waitFor(() =>
@@ -228,7 +304,7 @@ describe("ModelsView — kho mô hình theo loại", () => {
     expect(requestsTo(fetchMock, "/model-profiles/r1", "DELETE")).toHaveLength(1);
   });
 
-  it("embedding: khoá lựa chọn sai số chiều và báo cần khởi động lại", async () => {
+  it("embedding: khoá Dùng khi sai số chiều, hỏi xác nhận rồi báo cần khởi động lại", async () => {
     const { fetchMock } = createFakeServer({
       profiles: [
         { id: "e1", kind: "embedding", name: "Small", provider: "openai", model: "text-embedding-3-small", dimension: 1536 },
@@ -239,15 +315,31 @@ describe("ModelsView — kho mô hình theo loại", () => {
     await render("embedding");
     const panel = container.querySelector("#mdl-panel-embedding");
 
-    const select = panel.querySelector("#mdl-embedding-active");
-    const options = Object.fromEntries([...select.options].map((option) => [option.value, option]));
-    expect(options.e1.disabled).toBe(false);
-    expect(options.e2.disabled).toBe(true);
-    expect(panel.textContent).toContain("Khác VECTOR_DIM");
+    expect(panel.querySelector('button[aria-label="Dùng Small"]').disabled).toBe(false);
+    expect(panel.querySelector('button[aria-label="Dùng Large"]').disabled).toBe(true);
+    expect(rowByName(panel, "Large").textContent).toContain("Khác VECTOR_DIM");
 
-    await changeInput(select, "e1");
-    await click(buttonByText(panel, "Dùng mô hình này"));
+    // Huỷ ở hộp xác nhận thì không gọi API.
+    await click(panel.querySelector('button[aria-label="Dùng Small"]'));
+    const cancel = await waitFor(() =>
+      [...document.querySelectorAll(".modal button")].find((item) => item.textContent.trim() === "Huỷ")
+    );
+    expect(document.querySelector(".modal").textContent).toContain("Nạp lại toàn bộ");
+    await click(cancel);
+    expect(requestsTo(fetchMock, "/model-profiles/activate", "POST")).toHaveLength(0);
+
+    await click(panel.querySelector('button[aria-label="Dùng Small"]'));
+    const confirm = await waitFor(() =>
+      [...document.querySelectorAll(".modal button")].find((item) => item.textContent.trim() === "Chọn mô hình này")
+    );
+    await click(confirm);
     await waitFor(() => panel.textContent.includes("khởi động lại backend"));
-    expect(panel.querySelector(".mdl-profile.is-active").textContent).toContain("Đã chọn");
+    expect(rowByName(panel, "Small").textContent).toContain("Đã chọn");
+    expect(JSON.parse(requestsTo(fetchMock, "/model-profiles/activate", "POST")[0][1].body)).toEqual({
+      kind: "embedding",
+      profile_id: "e1",
+    });
+    // Backend vẫn chạy cấu hình .env cho tới khi khởi động lại.
+    expect(panel.querySelector(".mdl-row.is-env").textContent).toContain("Đang chạy");
   });
 });
