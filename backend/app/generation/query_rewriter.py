@@ -31,21 +31,40 @@ CONVERSATIONAL_PREFIXES = (
 )
 
 
+from app.generation.query_corrector import QueryCorrectionResult, QueryCorrector
 from app.llm import BaseLLMProvider, LLMBudget, describe_error, get_llm_provider
 
 
 class VietnameseQueryRewriter:
-    def __init__(self, llm_provider: BaseLLMProvider | None = None) -> None:
+    def __init__(
+        self,
+        llm_provider: BaseLLMProvider | None = None,
+        query_corrector: QueryCorrector | None = None,
+    ) -> None:
         self.llm_provider = llm_provider
+        self.query_corrector = query_corrector or QueryCorrector(llm_provider)
+
+    def correct(self, question: str, budget: LLMBudget | None = None) -> QueryCorrectionResult:
+        """Sửa chính tả/dấu câu hỏi bằng LLM (cờ QUERY_CORRECTION_ENABLED); tắt thì trả câu gốc."""
+        return self.query_corrector.correct(question, budget=budget)
 
     def rewrite(
         self,
         question: str,
         history: list[dict[str, str]] | None = None,
         budget: LLMBudget | None = None,
+        correction: QueryCorrectionResult | None = None,
     ) -> str:
+        """Viết lại câu hỏi thành truy vấn tìm kiếm.
+
+        Bước sửa câu chạy trước rule-based để lời dẫn có dấu và từ điển viết tắt khớp được
+        trên câu đã sửa. ``correction``: kết quả :meth:`correct` đã chạy sẵn (rag_chain kiểm
+        ``check_scope`` câu đã sửa trước khi rewrite); None thì tự sửa câu ở đây.
+        """
         history = history or []
-        fallback = rule_based_rewrite(question)
+        if correction is None:
+            correction = self.correct(question, budget=budget)
+        fallback = rule_based_rewrite(correction.text)
         fallback = _resolve_rule_based_follow_up(fallback, history)
         if not settings.query_rewrite_use_llm:
             return fallback

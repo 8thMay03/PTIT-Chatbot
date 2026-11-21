@@ -178,3 +178,91 @@ def test_rerank_rules_are_only_swept_for_cross_encoder_reports() -> None:
     assert heuristic["sweep"]["rerank"] == {"rule": "rerank", "available": False}
     assert heuristic["sweep"]["rerank_and_norm"]["available"] is False
     assert cross_encoder["sweep"]["rerank_and_norm"]["best"]["refusal_gate"] == 1.0
+
+
+# ---------------------------------------------------------------------------
+# Sửa câu bằng LLM + biến thể lỗi gõ (task 2026-11-21-llm-query-correction)
+# ---------------------------------------------------------------------------
+
+
+def _corrected_record(case_id, *, reason, strong, hit_rank=1, perturbations=(), answerable=True, elapsed=10.0,
+                      scope_stage="original"):
+    record = _record(case_id, answerable, 0.6, 0.5, hit_rank=hit_rank,
+                     scope_allowed=scope_stage != "corrected")
+    record["gate"] = {"strong": strong, "reason": "passed" if strong else "below_bm25_norm"}
+    record["perturbations"] = list(perturbations)
+    record["scope_stage"] = scope_stage
+    record["question"] = f"cau {case_id}"
+    record["correction"] = {
+        "corrected": reason == "corrected",
+        "reason": reason,
+        "text": f"câu {case_id}" if reason == "corrected" else f"cau {case_id}",
+        "llm_output": "",
+        "elapsed_ms": elapsed,
+    }
+    return record
+
+
+def test_correction_summary_counts_gate_hits_reasons_and_timing() -> None:
+    from scripts.eval_confidence import correction_summary
+
+    records = [
+        _corrected_record("a", reason="corrected", strong=True, perturbations=["wrong_tone"], elapsed=10),
+        _corrected_record("b", reason="unchanged", strong=True, hit_rank=7, perturbations=["drop_punct"], elapsed=20),
+        _corrected_record("c", reason="too_different", strong=False, hit_rank=None,
+                          perturbations=["wrong_tone", "merge_words"], elapsed=30),
+        _corrected_record("d", reason="protected_token_changed", strong=False, elapsed=40),
+        _corrected_record("e", reason="invalid_output", strong=True, elapsed=50),
+        _corrected_record("f", reason="corrected", strong=True, answerable=False, scope_stage="corrected", elapsed=0),
+    ]
+
+    summary = correction_summary(records)
+
+    rag = summary["by_dataset"]["ptit_rag_300"]
+    assert rag["n"] == 5
+    assert rag["gate_pass"] == 3
+    assert rag["hit@4"] == 3  # a, d, e (rank 1); b rank 7; c không trúng
+    assert rag["corrected"] == 1
+    assert rag["rejected"] == {
+        "condition_1_too_different": 1,
+        "condition_2_protected_token_changed": 1,
+        "condition_3_invalid_output": 1,
+    }
+    assert rag["elapsed_ms"]["median"] == 30.0
+    assert rag["elapsed_ms"]["p95"] == 48.0
+    no_answer = summary["by_dataset"]["ptit_no_answer_56"]
+    assert no_answer["hit@4"] is None
+    assert no_answer["blocked_after_correction"] == 1
+    assert no_answer["gate_pass_e2e"] == 0
+    assert set(summary["by_dataset"]) == {"ptit_rag_300", "ptit_no_answer_56", "ptit_no_answer_56:in_domain_missing"}
+    by_type = summary["by_perturbation"]
+    assert by_type["ptit_rag_300:wrong_tone"]["n"] == 2
+    assert by_type["ptit_rag_300:wrong_tone"]["gate_pass"] == 1
+    assert by_type["ptit_rag_300:merge_words"]["n"] == 1
+    assert [case["id"] for case in summary["changed_cases"]] == ["a", "f"]
+
+
+def test_apply_perturbation_keeps_original_question() -> None:
+    from scripts.eval_retrieval import apply_perturbation as perturb_cases
+
+    cases = load_cases(FIXTURES / "ptit_rag_300.json")[:5]
+
+    assert perturb_cases(cases, "none", 1) is cases
+    stripped = perturb_cases(cases, "strip_all", 1)
+    assert [case["original_question"] for case in stripped] == [case["question"] for case in cases]
+    assert all(case["perturbations"] == ["strip_all"] for case in stripped)
+    typo_a = perturb_cases(cases, "typo", 7)
+    assert typo_a == perturb_cases(cases, "typo", 7)
+    assert all(case["question"] != case["original_question"] for case in typo_a)
+
+
+def test_warm_cache_is_skipped_when_correction_uses_llm(monkeypatch) -> None:
+    from scripts.eval_retrieval import uses_llm_queries, warm_cache_texts
+
+    monkeypatch.setattr("app.core.config.settings.query_rewrite_use_llm", False)
+    monkeypatch.setattr("app.core.config.settings.multi_query_use_llm", False)
+    monkeypatch.setattr("app.core.config.settings.query_correction_enabled", True)
+
+    assert uses_llm_queries() is True
+    assert warm_cache_texts("full", ["hoc phi"]) == []
+    assert warm_cache_texts("hybrid", ["hoc phi"]) == ["hoc phi"]

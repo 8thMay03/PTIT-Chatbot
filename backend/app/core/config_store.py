@@ -67,6 +67,7 @@ PERSISTED_FIELDS = SECRET_FIELDS | frozenset(
         "multi_query_use_llm",
         "multi_query_count",
         "query_rewrite_use_llm",
+        "query_correction_enabled",
         "retrieval_default_top_k",
         "hybrid_vector_weight",
         "reranker_enabled",

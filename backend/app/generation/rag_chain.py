@@ -152,6 +152,28 @@ class RagChain:
             step_started = time.perf_counter()
             return {"step": step, "detail": detail or {}, "elapsed_ms": elapsed_ms}
 
+        def blocked_result(guardrail: dict, correction_fields: dict | None = None) -> dict:
+            retrieval_debug = {
+                "original_query": question,
+                "rewritten_query": "",
+                **(correction_fields or {}),
+                "retrieval_queries": [],
+                "requested_top_k": top_k,
+                "candidate_count": 0,
+                "retrieved_chunks": [],
+                "selected_chunks": [],
+                "strong_context": False,
+                "guardrail": guardrail,
+            }
+            return {
+                "result": {
+                    "contexts": [],
+                    "retrieval_debug": retrieval_debug,
+                    "strong_context": False,
+                    "guardrail_allowed": False,
+                }
+            }
+
         scope_allowed = True
         scope_reason = "disabled"
         if settings.guardrail_scope_enabled:
@@ -160,29 +182,31 @@ class RagChain:
             scope_reason = scope.reason
         yield step_event("guardrail", {"allowed": scope_allowed, "reason": scope_reason})
         if not scope_allowed:
-            retrieval_debug = {
-                "original_query": question,
-                "rewritten_query": "",
-                "retrieval_queries": [],
-                "requested_top_k": top_k,
-                "candidate_count": 0,
-                "retrieved_chunks": [],
-                "selected_chunks": [],
-                "strong_context": False,
-                "guardrail": {"allowed": False, "reason": scope_reason},
-            }
-            yield {
-                "result": {
-                    "contexts": [],
-                    "retrieval_debug": retrieval_debug,
-                    "strong_context": False,
-                    "guardrail_allowed": False,
-                }
-            }
+            yield blocked_result({"allowed": False, "reason": scope_reason})
             return
 
-        rewritten_query = self.query_rewriter.rewrite(question, history=history, budget=budget)
-        yield step_event("query_rewrite", {"rewritten_query": rewritten_query})
+        correction = self.query_rewriter.correct(question, budget=budget)
+        correction_fields = {
+            "query_corrected": correction.corrected,
+            "corrected_query": correction.text if correction.corrected else "",
+            "correction_reason": correction.reason,
+        }
+        # Câu do LLM sửa là đầu vào mới của truy xuất: kiểm lại guardrail (Q-3 Chương 2).
+        # Không phát event guardrail thứ hai; lý do chặn nằm ở retrieval_debug.guardrail.
+        if settings.guardrail_scope_enabled and correction.corrected:
+            corrected_scope = check_scope(correction.text)
+            if not corrected_scope.allowed:
+                yield step_event("query_rewrite", {"rewritten_query": "", **correction_fields})
+                yield blocked_result(
+                    {"allowed": False, "reason": corrected_scope.reason, "stage": "corrected"},
+                    correction_fields,
+                )
+                return
+
+        rewritten_query = self.query_rewriter.rewrite(
+            question, history=history, budget=budget, correction=correction
+        )
+        yield step_event("query_rewrite", {"rewritten_query": rewritten_query, **correction_fields})
         queries = self.multi_query_generator.generate(rewritten_query, budget=budget)
         yield step_event("multi_query", {"queries": queries})
         candidate_count = (
@@ -238,6 +262,7 @@ class RagChain:
         retrieval_debug = {
             "original_query": question,
             "rewritten_query": rewritten_query,
+            **correction_fields,
             "retrieval_queries": queries,
             "requested_top_k": top_k,
             "candidate_count": candidate_count,

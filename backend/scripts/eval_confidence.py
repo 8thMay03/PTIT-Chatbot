@@ -15,6 +15,12 @@ hybrid, rerank theo cấu hình; không gọi LLM) rồi ghi cho từng câu:
     python -m scripts.eval_confidence --output ../documents/rag-eval/rag-18/local.json --sweep
     python -m scripts.eval_confidence --set multi_query_enabled=true --set reranker_enabled=true \
         --set reranker_provider=heuristic --sweep
+
+Bước sửa câu bằng LLM (``--set query_correction_enabled=true``) chạy trước rewrite như trong
+app; câu đã sửa được kiểm ``check_scope`` lần hai. ``--perturb strip_all|typo --seed N`` đo
+trên biến thể câu hỏi sinh lúc chạy (``scripts.typo_variants``), không ghi fixture mới.
+Báo cáo thêm ``summary.correction``: số câu sửa, số câu bị bỏ theo điều kiện kiểm tra đầu ra,
+thời gian sửa câu (median, p95), qua gate và hit@4 theo bộ và theo loại lỗi gõ.
 """
 
 from __future__ import annotations
@@ -31,6 +37,8 @@ from scripts.eval_retrieval import (
     BACKEND_DIR,
     DEFAULT_CACHE_FILE,
     CachedEmbeddingModel,
+    add_perturb_arguments,
+    apply_perturbation,
     build_retrieval_fn,
     dataset_sha256,
     first_hit_rank,
@@ -43,7 +51,8 @@ from scripts.eval_retrieval import (
 FIXTURES = BACKEND_DIR / "tests" / "fixtures"
 DEFAULT_ANSWERABLE = (FIXTURES / "ptit_rag_300.json", FIXTURES / "ptit_ragas_100.json")
 DEFAULT_UNANSWERABLE = FIXTURES / "ptit_no_answer_56.json"
-SCHEMA_VERSION = 1
+# v2: câu hỏi có thể là biến thể lỗi (`original_question`, `perturbations`), thêm `correction`.
+SCHEMA_VERSION = 2
 SIGNALS = ("vector", "bm25", "bm25_norm", "rerank")
 SIGNAL_FIELDS = {
     "vector": "vector_score",
@@ -57,6 +66,8 @@ HIT_K = 4
 MAX_FALSE_REFUSAL = 0.05
 PRIMARY_DATASET = "ptit_rag_300"
 EXTRA_CONFIG_FIELDS = ("embedding_provider", "embedding_model", "retrieval_min_bm25_norm_score")
+# reason của bước sửa câu bị bỏ do kiểm tra đầu ra, theo điều kiện trong task.
+REJECTION_CONDITIONS = {"too_different": 1, "protected_token_changed": 2, "invalid_output": 3}
 
 
 # ---------------------------------------------------------------------------
@@ -301,6 +312,86 @@ def histogram(values: list[float], bins: int = 10, lower: float | None = None, u
     return [(round(low + index * width, 4), round(low + (index + 1) * width, 4), count) for index, count in enumerate(counts)]
 
 
+def _passes_gate(record: dict) -> bool:
+    gate = record.get("gate")
+    return bool(gate["strong"]) if gate else False
+
+
+def _hit(record: dict) -> bool:
+    rank = record.get("first_hit_rank")
+    return rank is not None and rank <= HIT_K
+
+
+def correction_stats(records: list[dict]) -> dict:
+    """Số liệu một nhóm câu: qua gate, hit@4, kết quả bước sửa câu và thời gian.
+
+    ``gate_pass`` chỉ tính gate; ``gate_pass_e2e`` tính cả câu bị ``check_scope`` chặn (câu gốc
+    hoặc câu đã sửa). ``elapsed_ms`` lấy trên mọi câu, kể cả câu không gọi LLM.
+    """
+
+    corrections = [record.get("correction") or {} for record in records]
+    reasons: dict[str, int] = {}
+    for correction in corrections:
+        reason = correction.get("reason", "none")
+        reasons[reason] = reasons.get(reason, 0) + 1
+    rejected = {
+        f"condition_{condition}_{reason}": reasons.get(reason, 0)
+        for reason, condition in REJECTION_CONDITIONS.items()
+    }
+    elapsed = [float(correction["elapsed_ms"]) for correction in corrections if "elapsed_ms" in correction]
+    answerable = [record for record in records if record["answerable"]]
+    return {
+        "n": len(records),
+        "scope_pass": sum(record["scope_allowed"] for record in records),
+        "gate_pass": sum(_passes_gate(record) for record in records),
+        "gate_pass_e2e": sum(_passes_gate(record) and record["scope_allowed"] for record in records),
+        "hit@4": sum(_hit(record) for record in answerable) if answerable else None,
+        "corrected": sum(bool(correction.get("corrected")) for correction in corrections),
+        "reasons": dict(sorted(reasons.items())),
+        "rejected": rejected,
+        "blocked_after_correction": sum(record.get("scope_stage") == "corrected" for record in records),
+        "elapsed_ms": {
+            "median": percentile(elapsed, 50),
+            "p95": percentile(elapsed, 95),
+            "max": max(elapsed) if elapsed else None,
+        },
+    }
+
+
+def correction_summary(records: list[dict]) -> dict:
+    """``correction_stats`` theo bộ câu, theo category câu không có đáp án và theo loại lỗi gõ.
+
+    ``changed_cases``: câu bị LLM đổi (để soát câu đúng bị sửa nhầm khi chạy không biến thể).
+    """
+
+    by_dataset: dict[str, list[dict]] = {}
+    for record in records:
+        by_dataset.setdefault(record["dataset"], []).append(record)
+        if not record["answerable"]:
+            by_dataset.setdefault(f"{record['dataset']}:{record['category']}", []).append(record)
+    by_type: dict[str, list[dict]] = {}
+    for record in records:
+        if not record["answerable"]:
+            continue
+        for name in record.get("perturbations") or []:
+            by_type.setdefault(f"{record['dataset']}:{name}", []).append(record)
+    return {
+        "by_dataset": {name: correction_stats(items) for name, items in sorted(by_dataset.items())},
+        "by_perturbation": {name: correction_stats(items) for name, items in sorted(by_type.items())},
+        "changed_cases": [
+            {
+                "id": record["id"],
+                "dataset": record["dataset"],
+                "question": record["question"],
+                "corrected": record["correction"]["text"],
+                "perturbations": record.get("perturbations") or [],
+            }
+            for record in records
+            if (record.get("correction") or {}).get("corrected")
+        ],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Nạp dataset và chạy pipeline
 # ---------------------------------------------------------------------------
@@ -359,7 +450,29 @@ def apply_overrides(pairs: list[str]) -> dict[str, Any]:
     return applied
 
 
-def run(datasets: list[Path], top_k: int, cache_file: Path) -> dict:
+def llm_snapshot() -> dict:
+    """Provider/model LLM của bước sửa câu (không ghi key)."""
+
+    from app.core.config import settings
+
+    try:
+        from app.llm import get_llm_provider
+
+        provider = get_llm_provider()
+        model = getattr(provider, "model_name", None)
+        configured = provider.is_configured()
+    except Exception:  # noqa: BLE001 - chỉ để ghi báo cáo
+        model, configured = None, False
+    return {"provider": settings.llm_provider, "model": model, "configured": configured}
+
+
+def run(
+    datasets: list[Path],
+    top_k: int,
+    cache_file: Path,
+    perturb: str = "none",
+    seed: int = 0,
+) -> dict:
     from app.core.config import settings
     from app.embeddings import create_embedding_model
     from app.generation.confidence import (
@@ -370,14 +483,15 @@ def run(datasets: list[Path], top_k: int, cache_file: Path) -> dict:
     from app.guardrails import check_scope
 
     started = time.monotonic()
-    cases = [case for path in datasets for case in load_cases(path)]
+    cases = apply_perturbation([case for path in datasets for case in load_cases(path)], perturb, seed)
     inner = create_embedding_model()
     model_name = str(getattr(inner, "model_name", "") or settings.embedding_model)
     embedding = CachedEmbeddingModel(inner, settings.embedding_provider, model_name, cache_file)
     warm = warm_cache_texts("full", [case["question"] for case in cases])
     if warm:
         embedding.embed(warm)
-    retrieval_fn = build_retrieval_fn("full", top_k, embedding)
+    trace: dict = {}
+    retrieval_fn = build_retrieval_fn("full", top_k, embedding, trace=trace)
     thresholds = thresholds_from_settings()
     # Gate cũ để so sánh: ngưỡng vector cũ (mặc định 0.30 khi chưa đặt) OR BM25 thô.
     legacy_min_vector = settings.retrieval_min_vector_score or LEGACY_DEFAULT_MIN_VECTOR_SCORE
@@ -385,7 +499,15 @@ def run(datasets: list[Path], top_k: int, cache_file: Path) -> dict:
     records: list[dict] = []
     for index, case in enumerate(cases, start=1):
         scope = check_scope(case["question"])
+        trace.pop("correction", None)
         contexts = retrieval_fn(case["question"])
+        correction = trace.get("correction")
+        scope_stage = "original"
+        # Như rag_chain: câu đã sửa phải qua check_scope lần hai (vẫn đo tín hiệu để so sánh).
+        if scope.allowed and correction and correction["corrected"]:
+            corrected_scope = check_scope(correction["text"])
+            if not corrected_scope.allowed:
+                scope, scope_stage = corrected_scope, "corrected"
         signals = top_signals(contexts)
         rank = None
         if case["answerable"]:
@@ -398,6 +520,7 @@ def run(datasets: list[Path], top_k: int, cache_file: Path) -> dict:
             "category": case["category"],
             "scope_allowed": scope.allowed,
             "scope_reason": scope.reason,
+            "scope_stage": scope_stage,
             "signals": signals,
             "first_hit_rank": rank,
             "gate_legacy": legacy_gate(signals, legacy_min_vector, settings.retrieval_min_bm25_score),
@@ -411,6 +534,11 @@ def run(datasets: list[Path], top_k: int, cache_file: Path) -> dict:
                 for position, context in enumerate(contexts[:3], start=1)
             ],
         }
+        if "original_question" in case:
+            record["original_question"] = case["original_question"]
+            record["perturbations"] = case["perturbations"]
+        if correction is not None:
+            record["correction"] = correction
         decision = assess_context(contexts, thresholds)
         record["gate"] = {"strong": decision.strong, "reason": decision.reason}
         records.append(record)
@@ -434,6 +562,8 @@ def run(datasets: list[Path], top_k: int, cache_file: Path) -> dict:
             "cache_misses": embedding.cache_misses,
         },
         "reranker": {"enabled": settings.reranker_enabled, "provider": settings.reranker_provider},
+        "perturb": {"mode": perturb, "seed": seed if perturb == "typo" else None},
+        "llm": llm_snapshot() if settings.query_correction_enabled else None,
         "corpus": snapshot_corpus(),
         "config": config,
         "gate_thresholds": thresholds.as_dict(),
@@ -456,6 +586,7 @@ def build_summary(report: dict, sweep: bool) -> dict:
     }
     if any("gate" in record for record in records):
         summary["gate"] = _decision_metrics(records, "gate")
+        summary["correction"] = correction_summary(records)
     if sweep:
         # rerank_score của reranker heuristic là min-max trong danh sách ứng viên: không quét ngưỡng.
         reranker = report.get("reranker") or {}
@@ -533,6 +664,9 @@ def print_report(report: dict, summary: dict) -> None:
             f" | từ chối nhầm (gate/e2e) {parts}"
         )
 
+    if "correction" in summary:
+        print_correction(report, summary["correction"])
+
     print("\nGate đã ghi:")
     print_metrics("legacy (vector OR bm25 thô)", summary["legacy_gate"])
     if "gate" in summary:
@@ -558,6 +692,31 @@ def print_report(report: dict, summary: dict) -> None:
                 )
 
 
+def print_correction(report: dict, correction: dict) -> None:
+    perturb = report.get("perturb") or {"mode": "none"}
+    llm = report.get("llm") or {}
+    flag = (report.get("config") or {}).get("query_correction_enabled")
+    print(
+        f"\nSửa câu: cờ={flag} perturb={perturb.get('mode')} seed={perturb.get('seed')} "
+        f"llm={llm.get('provider')}/{llm.get('model')}"
+    )
+    header = (
+        f"  {'nhóm':<44} {'n':>4} {'scope':>5} {'gate':>5} {'hit@4':>5} {'sửa':>4} "
+        f"{'bỏ1':>4} {'bỏ2':>4} {'bỏ3':>4} {'lỗi':>4} {'chặn2':>5} {'med ms':>7} {'p95 ms':>7}"
+    )
+    print(header)
+    for section in ("by_dataset", "by_perturbation"):
+        for name, stats in correction[section].items():
+            rejected = list(stats["rejected"].values())
+            hit = "—" if stats["hit@4"] is None else stats["hit@4"]
+            print(
+                f"  {name:<44} {stats['n']:>4} {stats['scope_pass']:>5} {stats['gate_pass']:>5} {hit:>5} "
+                f"{stats['corrected']:>4} {rejected[0]:>4} {rejected[1]:>4} {rejected[2]:>4} "
+                f"{stats['reasons'].get('llm_error', 0):>4} {stats['blocked_after_correction']:>5} "
+                f"{_fmt(stats['elapsed_ms']['median'], 0):>7} {_fmt(stats['elapsed_ms']['p95'], 0):>7}"
+            )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dataset", action="append", type=Path, help="Dataset JSON (lặp được); mặc định 3 bộ RAG-18")
@@ -567,6 +726,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sweep", action="store_true", help="Quét lưới ngưỡng cho từng luật")
     parser.add_argument("--output", type=Path, help="Ghi báo cáo JSON")
     parser.add_argument("--from-report", type=Path, help="Bỏ qua bước chạy, tính lại tóm tắt từ báo cáo có sẵn")
+    add_perturb_arguments(parser)
     args = parser.parse_args(argv)
 
     if hasattr(sys.stdout, "reconfigure"):
@@ -579,7 +739,9 @@ def main(argv: list[str] | None = None) -> int:
 
         applied = apply_overrides(args.overrides)
         datasets = args.dataset or [*DEFAULT_ANSWERABLE, DEFAULT_UNANSWERABLE]
-        report = run(datasets, args.top_k or settings.retrieval_default_top_k, args.cache_file)
+        report = run(
+            datasets, args.top_k or settings.retrieval_default_top_k, args.cache_file, args.perturb, args.seed
+        )
         report["overrides"] = applied
     summary = build_summary(report, args.sweep)
     report["summary"] = summary
