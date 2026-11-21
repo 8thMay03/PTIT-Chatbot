@@ -26,6 +26,10 @@ Ví dụ::
     python -m scripts.eval_retrieval --mode hybrid
     python -m scripts.eval_retrieval --mode full --output documents/rag-eval/full.json
     python -m scripts.eval_retrieval --compare a.json b.json
+    python -m scripts.eval_retrieval --mode full --perturb typo --seed 20261121
+
+``--perturb strip_all|typo`` đo trên biến thể câu hỏi sinh lúc chạy (``scripts.typo_variants``,
+seed cố định) mà không ghi fixture mới.
 """
 
 from __future__ import annotations
@@ -54,6 +58,7 @@ METRIC_KS = (1, 4, 10)
 # v3: thêm `retrieved[].section_path` và `metrics.section_dominance`.
 SCHEMA_VERSION = 3
 DOMINANCE_K = 4
+DEFAULT_PERTURB_SEED = 20261121
 RANK_METRICS = ("hit@1", "hit@4", "hit@10", "mrr")
 COVERAGE_METRICS = ("coverage@1", "coverage@4", "coverage@10")
 REPORT_METRICS = RANK_METRICS + COVERAGE_METRICS
@@ -79,6 +84,7 @@ CONFIG_FIELDS = (
     "retrieval_min_vector_score",
     "retrieval_min_bm25_score",
     "query_rewrite_use_llm",
+    "query_correction_enabled",
     "multi_query_enabled",
     "multi_query_use_llm",
     "multi_query_count",
@@ -442,12 +448,41 @@ def dataset_sha256(path: Path) -> str:
 # ---------------------------------------------------------------------------
 
 
+def uses_llm_queries() -> bool:
+    """Bước tạo truy vấn có gọi LLM (sửa câu, rewrite, multi-query) nên không đoán trước được."""
+
+    from app.core.config import settings
+
+    return (
+        settings.query_correction_enabled
+        or settings.query_rewrite_use_llm
+        or (settings.multi_query_enabled and settings.multi_query_use_llm)
+    )
+
+
+def correction_trace(correction: Any, elapsed_ms: float) -> dict:
+    """Ghi vết bước sửa câu cho báo cáo (``QueryCorrectionResult`` + thời gian)."""
+
+    return {
+        "corrected": correction.corrected,
+        "reason": correction.reason,
+        "text": correction.text,
+        "llm_output": correction.llm_output,
+        "elapsed_ms": round(elapsed_ms, 1),
+    }
+
+
 def build_retrieval_fn(
     mode: str,
     top_k: int,
     embedding_model: Any | None,
+    trace: dict | None = None,
 ) -> Callable[[str], list[dict]]:
-    """Dựng hàm retrieval dùng đúng component của app cho từng chế độ."""
+    """Dựng hàm retrieval dùng đúng component của app cho từng chế độ.
+
+    ``trace``: chế độ full ghi kết quả bước sửa câu của lần gọi gần nhất vào
+    ``trace["correction"]`` (xem :func:`correction_trace`).
+    """
 
     from app.core.config import settings
     from app.retrieval.bm25 import BM25Search
@@ -504,17 +539,18 @@ def build_retrieval_fn(
     rewriter = VietnameseQueryRewriter()
     multi_query_generator = VietnameseMultiQueryGenerator()
     reranker = Reranker() if settings.reranker_enabled else None
-    uses_llm_queries = settings.query_rewrite_use_llm or (
-        settings.multi_query_enabled and settings.multi_query_use_llm
-    )
-    if uses_llm_queries:
+    if uses_llm_queries():
         print(
-            "Cảnh báo: query rewrite/multi-query dùng LLM nên kết quả có thể không lặp lại được.",
+            "Cảnh báo: sửa câu/query rewrite/multi-query dùng LLM nên kết quả có thể không lặp lại được.",
             file=sys.stderr,
         )
 
     def retrieve_full(query: str) -> list[dict]:
-        rewritten = rewriter.rewrite(query, history=None)
+        started = time.perf_counter()
+        correction = rewriter.correct(query)
+        if trace is not None:
+            trace["correction"] = correction_trace(correction, (time.perf_counter() - started) * 1000)
+        rewritten = rewriter.rewrite(query, history=None, correction=correction)
         queries = multi_query_generator.generate(rewritten)
         candidate_count_full = (
             max(top_k, top_k * settings.reranker_candidate_multiplier)
@@ -540,8 +576,8 @@ def build_retrieval_fn(
 def warm_cache_texts(mode: str, questions: list[str]) -> list[str]:
     """Liệt kê trước các câu sẽ cần embed để gọi API theo lô thay vì từng câu.
 
-    Với chế độ full dùng LLM cho rewrite/multi-query thì không đoán trước được,
-    trả rỗng và để cache hoạt động per-call.
+    Với chế độ full dùng LLM cho sửa câu/rewrite/multi-query thì không đoán trước được,
+    trả rỗng và để cache hoạt động per-call (không gọi LLM chỉ để làm ấm cache).
     """
 
     if mode in ("bm25",):
@@ -549,11 +585,7 @@ def warm_cache_texts(mode: str, questions: list[str]) -> list[str]:
     if mode in ("vector", "hybrid"):
         return list(questions)
 
-    from app.core.config import settings
-
-    if settings.query_rewrite_use_llm or (
-        settings.multi_query_enabled and settings.multi_query_use_llm
-    ):
+    if uses_llm_queries():
         return []
     from app.generation.multi_query import VietnameseMultiQueryGenerator
     from app.generation.query_rewriter import VietnameseQueryRewriter
@@ -619,15 +651,24 @@ def evaluate(mode: str, cases: list[dict], top_k: int, cache_file: Path) -> dict
             }
         )
 
-    retrieval_fn = build_retrieval_fn(mode, top_k, embedding_model)
+    trace: dict = {}
+    retrieval_fn = build_retrieval_fn(mode, top_k, embedding_model, trace=trace)
 
     case_results: list[dict] = []
     for index, case in enumerate(cases, start=1):
+        trace.pop("correction", None)
         outcome = run_case(case["question"], retrieval_fn, case["expected_terms"])
+        extra: dict = {}
+        if "original_question" in case:
+            extra["original_question"] = case["original_question"]
+            extra["perturbations"] = case["perturbations"]
+        if "correction" in trace:
+            extra["correction"] = trace["correction"]
         case_results.append(
             {
                 "id": case["id"],
                 "question": case["question"],
+                **extra,
                 "source": case["source"],
                 "question_type": case["question_type"],
                 "diacritics": diacritics_group(case["question"]),
@@ -666,15 +707,41 @@ def evaluate(mode: str, cases: list[dict], top_k: int, cache_file: Path) -> dict
     return report
 
 
-def evaluate_with_dataset(mode: str, dataset_path: Path, top_k: int, cache_file: Path, limit: int | None) -> tuple[dict, Path]:
+def apply_perturbation(cases: list[dict], mode: str, seed: int) -> list[dict]:
+    """Thay ``question`` bằng biến thể lỗi (giữ ``original_question``, ``perturbations``)."""
+
+    if mode == "none":
+        return cases
+    from scripts.typo_variants import perturb_question
+
+    perturbed = []
+    for case in cases:
+        question, applied = perturb_question(case["question"], mode, seed, case["id"])
+        perturbed.append(
+            {**case, "question": question, "original_question": case["question"], "perturbations": applied}
+        )
+    return perturbed
+
+
+def evaluate_with_dataset(
+    mode: str,
+    dataset_path: Path,
+    top_k: int,
+    cache_file: Path,
+    limit: int | None,
+    perturb: str = "none",
+    seed: int = 0,
+) -> tuple[dict, Path]:
     cases = load_dataset(dataset_path)
     if limit:
         cases = cases[:limit]
+    cases = apply_perturbation(cases, perturb, seed)
     report = evaluate(mode, cases, top_k, cache_file)
     report["dataset"] = {
         "path": str(dataset_path),
         "cases": len(cases),
         "sha256": dataset_sha256(dataset_path),
+        "perturb": {"mode": perturb, "seed": seed if perturb == "typo" else None},
     }
     return report, dataset_path
 
@@ -879,6 +946,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help=f"File cache embedding (mặc định {DEFAULT_CACHE_FILE}).",
     )
     parser.add_argument("--limit", type=int, help="Chỉ chạy N câu đầu (debug nhanh).")
+    add_perturb_arguments(parser)
     parser.add_argument(
         "--compare",
         nargs=2,
@@ -890,6 +958,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     if args.compare is None and not 1 <= args.top_k <= 20:
         parser.error("--top-k phải nằm trong 1..20")
     return args
+
+
+def add_perturb_arguments(parser: argparse.ArgumentParser) -> None:
+    from scripts.typo_variants import PERTURB_MODES
+
+    parser.add_argument(
+        "--perturb",
+        choices=PERTURB_MODES,
+        default="none",
+        help="Biến thể câu hỏi sinh lúc chạy: bỏ hết dấu hoặc 1–3 lỗi gõ mỗi câu (không ghi fixture).",
+    )
+    parser.add_argument("--seed", type=int, default=DEFAULT_PERTURB_SEED, help="Seed cho --perturb typo.")
 
 
 def resolve_output(output: Path | None, mode: str) -> Path:
@@ -907,7 +987,7 @@ def main(argv: list[str] | None = None) -> int:
         return compare_reports(args.compare[0], args.compare[1])
 
     report, dataset_path = evaluate_with_dataset(
-        args.mode, args.dataset, args.top_k, args.embedding_cache, args.limit
+        args.mode, args.dataset, args.top_k, args.embedding_cache, args.limit, args.perturb, args.seed
     )
     output = resolve_output(args.output, args.mode)
     write_report(report, output)
