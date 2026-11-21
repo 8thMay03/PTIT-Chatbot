@@ -1,17 +1,18 @@
 import React, { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, HardDrive, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, Loader2, LockKeyhole, RefreshCw } from "lucide-react";
 import { configApi, describeError, modelProfilesApi, queryKeys } from "./api";
 import { KIND_ORDER } from "./models/catalog";
+import ModelKindCards from "./models/ModelKindCards";
 import ModelKindPanel from "./models/ModelKindPanel";
 
 /*
- * Màn Mô hình: mỗi mục trong danh mục Settings ứng với một loại mô hình
- * (LLM / Embedding / Reranker). Loại đang xem do route quyết định
+ * Tab Mô hình: ba thẻ khâu (LLM / Embedding / Reranker) ở đầu trang, bên dưới là danh
+ * sách mô hình của loại đang xem. Loại đang xem do route quyết định
  * (`#settings/models-llm`…), nên cả ba panel được giữ mounted và chỉ ẩn panel khác.
  *
- * Mỗi panel có kho cấu hình mô hình (thêm/sửa/xoá) và ô chọn mô hình đang dùng lấy từ
- * kho đó (/api/model-profiles). LLM và reranker đổi có hiệu lực ngay; embedding nạp
+ * Mỗi danh sách gồm cấu hình `.env` và kho mô hình (/api/model-profiles); bấm "Dùng"
+ * để chọn mô hình đang dùng. LLM và reranker đổi có hiệu lực ngay; embedding nạp
  * một lần lúc khởi động nên lựa chọn chỉ có hiệu lực sau khi backend khởi động lại.
  */
 
@@ -29,7 +30,7 @@ function normalizeRegistry(data) {
   };
 }
 
-export default function ModelsView({ kind = "llm" }) {
+export default function ModelsView({ kind = "llm", onKindSelect }) {
   const activeKind = KIND_ORDER.includes(kind) ? kind : "llm";
 
   const registryQuery = useQuery({
@@ -90,30 +91,28 @@ export default function ModelsView({ kind = "llm" }) {
   } else {
     body = (
       <>
-        <div className="mdl-notices">
-          <div className="inline-alert is-info">
-            <HardDrive size={16} />
+        {!registry.secret_encryption_enabled && (
+          <div className="inline-alert is-warning" role="alert">
+            <AlertTriangle size={16} />
             <span>
-              Kho mô hình và lựa chọn mô hình đang dùng được lưu vào cơ sở dữ liệu; API key được mã hoá trước khi lưu.
-              Chưa chọn mô hình nào thì hệ thống dùng cấu hình trong <code>.env</code>.
+              Máy chủ chưa có <code>CONFIG_ENCRYPTION_KEY</code> hợp lệ nên sẽ từ chối lưu API key. Mô hình không cần khoá
+              (hoặc dùng khoá trong <code>.env</code>) vẫn lưu bình thường.
             </span>
           </div>
-          {!registry.secret_encryption_enabled && (
-            <div className="inline-alert is-warning" role="alert">
-              <AlertTriangle size={16} />
-              <span>
-                Máy chủ chưa có <code>CONFIG_ENCRYPTION_KEY</code> hợp lệ nên sẽ từ chối lưu API key. Mô hình không cần
-                khoá (hoặc dùng khoá trong <code>.env</code>) vẫn lưu bình thường.
-              </span>
-            </div>
-          )}
-        </div>
+        )}
         {/* Giữ các panel mounted để không mất form đang nhập dở khi đổi mục. */}
         {KIND_ORDER.map((panelKind) => (
           <div key={panelKind} id={`mdl-panel-${panelKind}`} hidden={activeKind !== panelKind}>
-            <ModelKindPanel kind={panelKind} registry={registry} config={config} />
+            <ModelKindPanel kind={panelKind} registry={registry} config={config} active={activeKind === panelKind} />
           </div>
         ))}
+        <p className="mdl-foot-note">
+          <LockKeyhole size={14} aria-hidden="true" />
+          <span>
+            Kho mô hình lưu trong cơ sở dữ liệu; API key được mã hoá và không hiển thị lại. Hàng <code>.env</code> là cấu
+            hình mặc định của máy chủ, dùng khi chưa chọn mô hình nào trong kho.
+          </span>
+        </p>
       </>
     );
   }
@@ -121,7 +120,10 @@ export default function ModelsView({ kind = "llm" }) {
   return (
     <div className="models-page-wrapper">
       <div className="mdl-page">
-        <div className="mdl-wrap">{body}</div>
+        <div className="mdl-wrap">
+          <ModelKindCards activeKind={activeKind} registry={registry} config={config} onSelect={onKindSelect} />
+          {body}
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,22 @@
 import React, { useEffect, useState } from "react";
-import { AlertTriangle, ArrowDownUp, Binary, Check, Cloud, Cpu, Eye, EyeOff, HardDrive, Server, Undo2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDownUp,
+  Binary,
+  Check,
+  Cloud,
+  Cpu,
+  Eye,
+  EyeOff,
+  HardDrive,
+  MessageSquareText,
+  Server,
+  Undo2,
+} from "lucide-react";
 
-/* Thành phần giao diện dùng chung cho ba tab của màn Mô hình. */
+/* Thành phần giao diện dùng chung cho ba loại mô hình của màn Mô hình. */
+
+export const KIND_ICONS = { llm: MessageSquareText, embedding: Binary, reranker: ArrowDownUp };
 
 function OpenAILogo({ size = 20 }) {
   return (
@@ -55,27 +70,6 @@ export function useWarnBeforeUnload(active) {
 
 export function StatusPill({ tone = "muted", children }) {
   return <span className={`mdl-pill is-${tone}`}>{children}</span>;
-}
-
-export function Section({ id, icon, title, description, current, children, footer }) {
-  return (
-    <section className="mdl-card" aria-labelledby={`${id}-title`} id={id}>
-      <header className="mdl-card-head">
-        {icon && (
-          <span className="mdl-card-icon" aria-hidden="true">
-            {icon}
-          </span>
-        )}
-        <div className="mdl-card-heading">
-          <h3 id={`${id}-title`}>{title}</h3>
-          {description && <p>{description}</p>}
-          {current && <div className="mdl-current">{current}</div>}
-        </div>
-      </header>
-      {children && <div className="mdl-card-body">{children}</div>}
-      {footer && <footer className="mdl-card-foot">{footer}</footer>}
-    </section>
-  );
 }
 
 export function ChoiceGroup({ kind, name, legend, options, value, onChange }) {

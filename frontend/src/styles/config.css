@@ -711,7 +711,6 @@ fieldset.config-field-group legend {
 }
 
 .settings-tab:focus-visible,
-.settings-kind-item:focus-visible,
 .settings-test-trigger:focus-visible,
 .pipeline-step:focus-visible {
   outline: none;
@@ -848,42 +847,6 @@ fieldset.config-field-group legend {
   flex: 1;
   height: auto;
   background: transparent;
-}
-
-/* Thanh chọn loại mô hình */
-.settings-subbar {
-  flex-shrink: 0;
-  padding: 18px 32px 10px;
-}
-
-.settings-kind-nav {
-  display: inline-flex;
-  gap: 2px;
-  max-width: 100%;
-  padding: 3px;
-  overflow-x: auto;
-  border-radius: 12px;
-  background: var(--surface-sunken);
-}
-
-.settings-kind-item {
-  padding: 6px 16px;
-  border-radius: 9px;
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.settings-kind-item:hover {
-  color: var(--text);
-}
-
-.settings-kind-item.is-active {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: var(--shadow-xs);
 }
 
 /* Tab Giao diện */
@@ -1707,10 +1670,9 @@ fieldset.config-field-group legend {
     display: inline-flex;
   }
 
-  /* Mobile điều hướng bằng danh sách mục nên ẩn tab, dải bước và thanh loại mô hình. */
+  /* Mobile điều hướng bằng danh sách mục nên ẩn tab và dải bước (thẻ khâu ẩn trong models.css). */
   .settings-tabs,
-  .pipeline-steps,
-  .settings-subbar {
+  .pipeline-steps {
     display: none;
   }
 

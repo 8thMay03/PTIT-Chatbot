@@ -3,14 +3,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   AlertTriangle,
-  ArrowDownUp,
   ArrowRight,
-  Binary,
   CheckCircle2,
+  FileCog,
   Info,
   KeyRound,
   Loader2,
-  MessageSquareText,
   Pencil,
   Plus,
   RotateCw,
@@ -21,6 +19,7 @@ import {
 import { errorMessage, modelProfilesApi, queryKeys } from "../api";
 import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
+import { ENV_ROW_NAME, normalizeEnvLlmProvider } from "./activeModels";
 import {
   COMPATIBLE_PRESETS,
   KINDS,
@@ -36,17 +35,8 @@ import {
   providerName,
   validateDraft,
 } from "./catalog";
-import {
-  ApiKeyField,
-  ChoiceGroup,
-  ProviderIcon,
-  Section,
-  StatusPill,
-  TextField,
-  useWarnBeforeUnload,
-} from "./fields";
-
-const KIND_ICONS = { llm: MessageSquareText, embedding: Binary, reranker: ArrowDownUp };
+import { ApiKeyField, ChoiceGroup, KIND_ICONS, ProviderIcon, StatusPill, TextField, useWarnBeforeUnload } from "./fields";
+import ProfileDialog from "./ProfileDialog";
 
 const ENV_KEY_LABELS = {
   llm: {
@@ -56,6 +46,9 @@ const ENV_KEY_LABELS = {
   },
   embedding: { openai: "OPENAI_API_KEY đang chạy" },
 };
+
+// Hàng `.env` không có id trong kho; dùng khoá riêng cho trạng thái "đang áp dụng".
+const ENV_ROW_ID = "__env__";
 
 /** Ghi trạng thái kho mới vào cache; cấu hình chung cũng đổi khi chọn/sửa LLM, reranker. */
 async function storeRegistry(queryClient, registry) {
@@ -67,206 +60,136 @@ function dimensionMismatch(kind, profile, vectorDim) {
   return kind === "embedding" && profile.dimension != null && profile.dimension !== vectorDim;
 }
 
-// ---------------------------------------------------------------------------
-// Mô hình đang dùng
-// ---------------------------------------------------------------------------
-
-function envOptionLabel(kind, registry) {
+/** Hàng đầu danh sách: cấu hình `.env` của máy chủ (reranker: Heuristic có sẵn). */
+function envRow(kind, registry) {
   const env = registry.env_defaults?.[kind] ?? {};
-  if (kind === "reranker") return "Heuristic (có sẵn, không cần mô hình)";
-  const provider = kind === "llm" ? normalizeEnvLlmProvider(env.provider) : env.provider;
-  return `Cấu hình .env · ${env.model || "—"} (${providerName(kind, provider)})`;
-}
-
-function normalizeEnvLlmProvider(value) {
-  const name = String(value || "").toLowerCase();
-  if (name === "google") return "gemini";
-  if (name === "azure_openai") return "azure";
-  if (["openai", "gemini", "azure"].includes(name)) return name;
-  return "openai_compatible";
-}
-
-function CurrentLine({ kind, registry, config, profilesById }) {
-  if (kind === "llm") {
-    const llm = config?.llm;
-    if (!llm) return null;
-    return (
-      <>
-        <span>
-          Đang dùng <strong>{llm.model || "—"}</strong> · {providerName("llm", normalizeEnvLlmProvider(llm.provider))}
-        </span>
-        {llm.has_api_key === false && (
-          <StatusPill tone="warn">
-            <AlertTriangle size={12} /> Chưa có API key — chatbot sẽ không trả lời được
-          </StatusPill>
-        )}
-      </>
-    );
-  }
   if (kind === "reranker") {
-    const reranker = config?.reranker;
-    if (!reranker) return null;
-    const usesModel = reranker.provider === "cross-encoder";
-    return (
-      <>
+    return { name: "Heuristic", tag: "Có sẵn", meta: "Không cần mô hình, chạy nhanh", label: "Heuristic" };
+  }
+  const provider = kind === "llm" ? normalizeEnvLlmProvider(env.provider) : env.provider;
+  return {
+    name: ENV_ROW_NAME,
+    tag: ".env",
+    meta: [providerName(kind, provider), env.model || "—"].join(" · "),
+    label: "cấu hình .env",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Cảnh báo của từng loại
+// ---------------------------------------------------------------------------
+
+function KindNotices({ kind, registry, config }) {
+  const notices = [];
+  if (kind === "llm" && config?.llm?.has_api_key === false) {
+    notices.push(
+      <div key="key" className="inline-alert is-warning" role="alert">
+        <AlertTriangle size={16} />
         <span>
-          Đang dùng <strong>{usesModel ? reranker.model : "Heuristic"}</strong>
-          {usesModel && " · Cross-Encoder"}
+          Mô hình đang dùng chưa có API key nên chatbot sẽ không trả lời được. Sửa mô hình để thêm khoá, hoặc đặt khoá
+          trong <code>.env</code>.
         </span>
-        {reranker.enabled === false ? (
-          <StatusPill tone="warn">Đang tắt</StatusPill>
-        ) : (
-          <StatusPill tone="ok">Đang bật</StatusPill>
-        )}
-      </>
+      </div>
+    );
+  }
+  if (kind === "reranker" && config?.reranker?.enabled === false) {
+    notices.push(
+      <div key="off" className="inline-alert is-warning">
+        <AlertTriangle size={16} />
+        <span>
+          Reranker đang tắt nên mô hình được chọn chưa được dùng.{" "}
+          <a className="mdl-inline-link" href="#settings/reranker">
+            Bật trong mục Xếp hạng lại <ArrowRight size={13} />
+          </a>
+        </span>
+      </div>
     );
   }
   const runtime = registry.embedding_runtime;
-  const running = runtime.profile_id ? profilesById[runtime.profile_id] : null;
-  return (
-    <>
-      <span>
-        Đang chạy <strong>{runtime.model || "—"}</strong> · {providerName("embedding", runtime.provider)}
-        {running ? ` (${running.name})` : " (.env)"}
-      </span>
-      <StatusPill>VECTOR_DIM = {runtime.vector_dim}</StatusPill>
-    </>
-  );
-}
-
-function ActiveModelCard({ kind, registry, config, profiles, profilesById }) {
-  const toast = useToast();
-  const queryClient = useQueryClient();
-  const active = registry.active?.[kind] ?? "";
-  const [selected, setSelected] = useState(active);
-  const [applying, setApplying] = useState(false);
-  const vectorDim = registry.embedding_runtime?.vector_dim;
-  const selectId = `mdl-${kind}-active`;
-
-  useEffect(() => setSelected(active), [active]);
-
-  async function handleApply() {
-    setApplying(true);
-    try {
-      const next = await modelProfilesApi.activate(kind, selected || null);
-      await storeRegistry(queryClient, next);
-      const profile = selected ? profilesById[selected] : null;
-      const label = profile ? profile.name : envOptionLabel(kind, registry);
-      if (kind === "embedding") {
-        toast.success(`Đã chọn ${label}. Khởi động lại backend để áp dụng.`);
-      } else {
-        toast.success(`Đã chuyển ${KINDS[kind].label} sang ${label}.`);
-      }
-    } catch (err) {
-      toast.error(`Chưa đổi được mô hình đang dùng. ${errorMessage(err, "Máy chủ từ chối yêu cầu.")}`);
-    } finally {
-      setApplying(false);
-    }
-  }
-
-  const runtime = registry.embedding_runtime;
-  const rerankerOff = kind === "reranker" && config?.reranker?.enabled === false;
-  const KindIcon = KIND_ICONS[kind];
-
-  return (
-    <Section
-      id={`mdl-${kind}-current`}
-      icon={<KindIcon size={18} />}
-      title={KINDS[kind].title}
-      description={KINDS[kind].description}
-      current={<CurrentLine kind={kind} registry={registry} config={config} profilesById={profilesById} />}
-      footer={
-        <div className="mdl-actions">
-          <button
-            type="button"
-            className="primary-btn"
-            onClick={handleApply}
-            disabled={applying || selected === active}
-          >
-            {applying ? <Loader2 size={15} className="spin" /> : <CheckCircle2 size={15} />}
-            {applying ? "Đang áp dụng..." : "Dùng mô hình này"}
-          </button>
-        </div>
-      }
-    >
-      <div className="mdl-stack">
-        <div className="mdl-field">
-          <label htmlFor={selectId}>Mô hình đang dùng cho hệ thống</label>
-          <select
-            id={selectId}
-            className="mdl-input mdl-select"
-            value={selected}
-            onChange={(event) => setSelected(event.target.value)}
-            disabled={applying}
-          >
-            <option value="">{envOptionLabel(kind, registry)}</option>
-            {profiles.map((profile) => {
-              const mismatch = dimensionMismatch(kind, profile, vectorDim);
-              return (
-                <option key={profile.id} value={profile.id} disabled={mismatch && profile.id !== active}>
-                  {profile.name} — {providerName(kind, profile.provider)} · {profileModelLabel(profile)}
-                  {mismatch ? ` (${profile.dimension} chiều, khác VECTOR_DIM)` : ""}
-                </option>
-              );
-            })}
-          </select>
-          <span className="mdl-field-hint">
-            {profiles.length === 0
-              ? "Chưa có mô hình nào trong kho. Thêm mô hình ở danh sách bên dưới để chọn tại đây."
-              : "Chọn từ những mô hình đã cấu hình bên dưới."}
-          </span>
-        </div>
-
-        {rerankerOff && (
-          <div className="inline-alert is-warning">
-            <AlertTriangle size={16} />
-            <span>
-              Reranker đang tắt nên mô hình được chọn chưa được dùng.{" "}
-              <a className="mdl-inline-link" href="#settings/reranker">
-                Bật trong mục Xếp hạng lại <ArrowRight size={13} />
-              </a>
-            </span>
-          </div>
-        )}
-
-        {kind === "embedding" && runtime.load_error && (
-          <div className="inline-alert is-error" role="alert">
-            <AlertCircle size={16} />
-            <span>
-              Lần khởi động này không áp được embedding đã chọn nên vẫn chạy cấu hình <code>.env</code>:{" "}
-              {runtime.load_error}
-            </span>
-          </div>
-        )}
-        {kind === "embedding" && runtime.restart_required && !runtime.load_error && (
-          <div className="inline-alert is-warning" role="status">
-            <RotateCw size={16} />
-            <span>
-              Lựa chọn mới có hiệu lực sau khi <strong>khởi động lại backend</strong>. Sau đó vào{" "}
-              <strong>Dataset</strong> → <strong>Nạp lại toàn bộ</strong> để tạo lại vector cho mọi tài liệu; trước khi nạp
-              lại, kết quả tìm kiếm sẽ sai lệch.
-            </span>
-          </div>
-        )}
-        {kind === "embedding" && (
-          <div className="inline-alert is-info">
-            <Info size={16} />
-            <span>
-              Số chiều của mô hình nhúng phải bằng <code>VECTOR_DIM</code> ({vectorDim}) của kho vector. Script dòng lệnh
-              (<code>scripts/ingest.py</code>) vẫn dùng embedding trong <code>.env</code>.
-            </span>
-          </div>
-        )}
+  if (kind === "embedding" && runtime.load_error) {
+    notices.push(
+      <div key="load" className="inline-alert is-error" role="alert">
+        <AlertCircle size={16} />
+        <span>
+          Lần khởi động này không áp được embedding đã chọn nên vẫn chạy cấu hình <code>.env</code>:{" "}
+          {runtime.load_error}
+        </span>
       </div>
-    </Section>
-  );
+    );
+  }
+  if (kind === "embedding" && runtime.restart_required && !runtime.load_error) {
+    notices.push(
+      <div key="restart" className="inline-alert is-warning" role="status">
+        <RotateCw size={16} />
+        <span>
+          Lựa chọn mới có hiệu lực sau khi <strong>khởi động lại backend</strong>. Sau đó vào <strong>Dataset</strong> →{" "}
+          <strong>Nạp lại toàn bộ</strong> để tạo lại vector cho mọi tài liệu; trước khi nạp lại, kết quả tìm kiếm sẽ sai
+          lệch.
+        </span>
+      </div>
+    );
+  }
+  if (notices.length === 0) return null;
+  return <div className="mdl-list-notices">{notices}</div>;
 }
 
 // ---------------------------------------------------------------------------
-// Form thêm / sửa
+// Hàng trong danh sách
 // ---------------------------------------------------------------------------
 
-function ProfileEditor({ kind, profile, registry, onClose }) {
+function ModelRow({ name, meta, metaTitle, icon, tags, isActive, isEnv = false, useButton, actions }) {
+  return (
+    <li className={`mdl-row ${isActive ? "is-active" : ""} ${isEnv ? "is-env" : ""}`} aria-current={isActive || undefined}>
+      <span className="mdl-row-mark" aria-hidden="true" />
+      <span className="mdl-row-icon" aria-hidden="true">
+        {icon}
+      </span>
+      <div className="mdl-row-text">
+        <div className="mdl-row-title">
+          <strong className="mdl-row-name" title={name}>
+            {name}
+          </strong>
+          {tags}
+        </div>
+        <span className="mdl-row-meta" title={metaTitle}>
+          {meta}
+        </span>
+      </div>
+      <div className="mdl-row-actions">
+        {useButton}
+        {actions}
+      </div>
+    </li>
+  );
+}
+
+function UseButton({ name, onClick, applying, disabled, title }) {
+  return (
+    <button
+      type="button"
+      className="ghost-btn mdl-use-btn"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      aria-label={`Dùng ${name}`}
+    >
+      {applying ? <Loader2 size={14} className="spin" /> : null}
+      Dùng
+    </button>
+  );
+}
+
+function profileMeta(kind, profile) {
+  const parts = [providerName(kind, profile.provider), profileModelLabel(profile)];
+  if (kind === "embedding" && profile.dimension) parts.push(`${profile.dimension} chiều`);
+  return parts.join(" · ");
+}
+
+// ---------------------------------------------------------------------------
+// Form thêm / sửa (trong hộp thoại)
+// ---------------------------------------------------------------------------
+
+function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const isEdit = Boolean(profile);
@@ -286,9 +209,7 @@ function ProfileEditor({ kind, profile, registry, onClose }) {
   useWarnBeforeUnload(dirty);
 
   useEffect(() => {
-    const node = rootRef.current;
-    node?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
-    node?.querySelector("input")?.focus({ preventScroll: true });
+    rootRef.current?.querySelector("input")?.focus({ preventScroll: true });
   }, []);
 
   function update(name, value) {
@@ -355,270 +276,169 @@ function ProfileEditor({ kind, profile, registry, onClose }) {
   const dimensionValue = Number(draft.dimension);
   const showDimWarning = kind === "embedding" && draft.dimension && !errors.dimension && dimensionValue !== vectorDim;
   const kindLabel = KINDS[kind].label;
+  const isActiveProfile = isEdit && registry.active?.[kind] === profile.id;
+  let description = "Mô hình được lưu vào kho; bấm “Dùng” trong danh sách để chọn làm mô hình đang dùng.";
+  if (isEdit) {
+    description = isActiveProfile
+      ? "Đây là mô hình đang dùng: lưu xong hệ thống áp dụng ngay."
+      : "Thay đổi được lưu vào kho.";
+    if (isActiveProfile && kind === "embedding") {
+      description = "Đây là mô hình đã chọn: thay đổi có hiệu lực sau khi khởi động lại backend.";
+    }
+  }
+  const busy = saving || testing;
 
   return (
-    <div ref={rootRef}>
-      <Section
-        id={`${idPrefix}`}
-        title={isEdit ? `Sửa ${profile.name}` : `Thêm ${kindLabel}`}
-        description={
-          isEdit
-            ? "Thay đổi được lưu vào kho. Nếu đây là mô hình đang dùng, hệ thống áp dụng ngay sau khi lưu."
-            : "Mô hình được lưu vào kho để chọn làm mô hình đang dùng ở phía trên."
-        }
-        footer={
-          <>
-            <span className="mdl-dirty" role="status">
-              {dirty ? "Có thay đổi chưa lưu" : ""}
-            </span>
-            <div className="mdl-actions">
-              {kind === "llm" && (
-                <button type="button" className="ghost-btn" onClick={handleTest} disabled={testing || saving}>
-                  {testing ? <Loader2 size={15} className="spin" /> : <Zap size={15} />}
-                  {testing ? "Đang kiểm tra..." : "Kiểm tra kết nối"}
-                </button>
-              )}
-              <button type="button" className="ghost-btn" onClick={onClose} disabled={saving}>
-                Huỷ
+    <ProfileDialog
+      id={idPrefix}
+      title={isEdit ? `Sửa ${profile.name}` : `Thêm ${kindLabel}`}
+      description={description}
+      hidden={hidden}
+      onClose={() => !saving && onClose()}
+      onDismiss={dirty || busy ? undefined : onClose}
+      footer={
+        <>
+          <span className="mdl-dirty" role="status">
+            {dirty ? "Có thay đổi chưa lưu" : ""}
+          </span>
+          <div className="mdl-actions">
+            {kind === "llm" && (
+              <button type="button" className="ghost-btn" onClick={handleTest} disabled={busy}>
+                {testing ? <Loader2 size={15} className="spin" /> : <Zap size={15} />}
+                {testing ? "Đang kiểm tra..." : "Kiểm tra kết nối"}
               </button>
-              <button
-                type="button"
-                className="primary-btn"
-                onClick={handleSave}
-                disabled={saving || (isEdit && !dirty)}
-              >
-                {saving ? <Loader2 size={15} className="spin" /> : <Save size={15} />}
-                {saving ? "Đang lưu..." : isEdit ? "Lưu thay đổi" : "Thêm vào kho"}
-              </button>
-            </div>
-          </>
-        }
-      >
-        <div className="mdl-stack">
-          <div className="mdl-grid">
-            <TextField
-              id={`${idPrefix}-name`}
-              field={{
-                label: "Tên hiển thị",
-                placeholder: "Mặc định là tên mô hình",
-                hint: "Tên dùng trong danh sách chọn mô hình, không trùng trong cùng mục.",
-              }}
-              value={draft.name}
-              onChange={(value) => update("name", value)}
-              error={showErrors ? errors.name : undefined}
-            />
+            )}
+            <button type="button" className="ghost-btn" onClick={onClose} disabled={saving}>
+              Huỷ
+            </button>
+            <button type="button" className="primary-btn" onClick={handleSave} disabled={saving || (isEdit && !dirty)}>
+              {saving ? <Loader2 size={15} className="spin" /> : <Save size={15} />}
+              {saving ? "Đang lưu..." : isEdit ? "Lưu thay đổi" : "Thêm vào kho"}
+            </button>
           </div>
+        </>
+      }
+    >
+      <div className="mdl-stack" ref={rootRef}>
+        <TextField
+          id={`${idPrefix}-name`}
+          field={{
+            label: "Tên hiển thị",
+            placeholder: "Mặc định là tên mô hình",
+            hint: "Tên dùng trong danh sách mô hình, không trùng trong cùng loại.",
+          }}
+          value={draft.name}
+          onChange={(value) => update("name", value)}
+          error={showErrors ? errors.name : undefined}
+        />
 
-          {KINDS[kind].providers.length > 1 ? (
-            <ChoiceGroup
-              kind={kind}
-              name={`${idPrefix}-provider`}
-              legend="Nhà cung cấp"
-              options={KINDS[kind].providers}
-              value={draft.provider}
-              onChange={(provider) => {
-                setDraft((current) => ({ ...current, provider }));
-                setShowErrors(false);
-                setTestResult(null);
-              }}
-            />
-          ) : (
-            <p className="mdl-provider-note">
-              <ProviderIcon kind={kind} provider={draft.provider} size={16} />
-              <span>
-                <strong>{KINDS[kind].providers[0].name}</strong> — {KINDS[kind].providers[0].description}
-              </span>
-            </p>
-          )}
+        {KINDS[kind].providers.length > 1 ? (
+          <ChoiceGroup
+            kind={kind}
+            name={`${idPrefix}-provider`}
+            legend="Nhà cung cấp"
+            options={KINDS[kind].providers}
+            value={draft.provider}
+            onChange={(provider) => {
+              setDraft((current) => ({ ...current, provider }));
+              setShowErrors(false);
+              setTestResult(null);
+            }}
+          />
+        ) : (
+          <p className="mdl-provider-note">
+            <ProviderIcon kind={kind} provider={draft.provider} size={16} />
+            <span>
+              <strong>{KINDS[kind].providers[0].name}</strong> — {KINDS[kind].providers[0].description}
+            </span>
+          </p>
+        )}
 
-          {draft.provider === "openai_compatible" && (
-            <div className="mdl-presets" role="group" aria-label="Điền nhanh địa chỉ máy chủ">
-              <span>Điền nhanh:</span>
-              {COMPATIBLE_PRESETS.map((preset) => (
-                <button
-                  key={preset.key}
-                  type="button"
-                  className="mdl-preset"
-                  aria-pressed={draft.base_url === preset.baseUrl}
-                  onClick={() => {
-                    setDraft((current) => ({
-                      ...current,
-                      base_url: preset.baseUrl,
-                      model: preset.model || current.model,
-                    }));
-                    setTestResult(null);
-                  }}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="mdl-grid">
-            {fields.map((field) => (
-              <TextField
-                key={`${draft.provider}-${field.name}`}
-                id={`${idPrefix}-${field.name}`}
-                field={field}
-                value={draft[field.name]}
-                onChange={(value) => update(field.name, value)}
-                error={
-                  showErrors || ((field.url || field.number) && String(draft[field.name]).trim())
-                    ? errors[field.name]
-                    : undefined
-                }
-              />
+        {draft.provider === "openai_compatible" && (
+          <div className="mdl-presets" role="group" aria-label="Điền nhanh địa chỉ máy chủ">
+            <span>Điền nhanh:</span>
+            {COMPATIBLE_PRESETS.map((preset) => (
+              <button
+                key={preset.key}
+                type="button"
+                className="mdl-preset"
+                aria-pressed={draft.base_url === preset.baseUrl}
+                onClick={() => {
+                  setDraft((current) => ({
+                    ...current,
+                    base_url: preset.baseUrl,
+                    model: preset.model || current.model,
+                  }));
+                  setTestResult(null);
+                }}
+              >
+                {preset.label}
+              </button>
             ))}
           </div>
+        )}
 
-          {showDimWarning && (
-            <div className="inline-alert is-warning">
-              <AlertTriangle size={16} />
-              <span>
-                Mô hình có {dimensionValue} chiều, khác <code>VECTOR_DIM</code> ({vectorDim}) của kho vector: lưu được
-                nhưng chưa chọn làm mô hình đang dùng được.
-              </span>
-            </div>
-          )}
-
-          {rule && (
-            <ApiKeyField
-              key={draft.provider}
-              id={`${idPrefix}-key`}
-              value={draft.apiKey}
-              onChange={(value) => update("apiKey", value)}
-              hasKey={Boolean(profile?.has_api_key) && profile?.provider === draft.provider}
-              envFallback={rule.envFallback}
-              envKeyLabel={ENV_KEY_LABELS[kind]?.[draft.provider]}
-              clearKey={draft.clearApiKey}
-              onClearKeyChange={(clearApiKey) => setDraft((current) => ({ ...current, clearApiKey }))}
+        <div className="mdl-grid">
+          {fields.map((field) => (
+            <TextField
+              key={`${draft.provider}-${field.name}`}
+              id={`${idPrefix}-${field.name}`}
+              field={field}
+              value={draft[field.name]}
+              onChange={(value) => update(field.name, value)}
+              error={
+                showErrors || ((field.url || field.number) && String(draft[field.name]).trim())
+                  ? errors[field.name]
+                  : undefined
+              }
             />
-          )}
+          ))}
+        </div>
 
-          {testResult && (
-            <div
-              className={`mdl-test-result ${testResult.success ? "is-ok" : "is-error"}`}
-              role={testResult.success ? "status" : "alert"}
-            >
-              {testResult.success ? <CheckCircle2 size={17} /> : <AlertCircle size={17} />}
-              <div>
-                <strong>{testResult.success ? "Kết nối thành công" : "Kết nối thất bại"}</strong>
-                <p>{testResult.message}</p>
-                {(testResult.latency_ms != null || testResult.sample_output) && (
-                  <p className="mdl-test-meta">
-                    {testResult.latency_ms != null && <>Thời gian phản hồi: {Math.round(testResult.latency_ms)} ms</>}
-                    {testResult.sample_output && <> · Mô hình trả lời: “{testResult.sample_output}”</>}
-                  </p>
-                )}
-              </div>
+        {showDimWarning && (
+          <div className="inline-alert is-warning">
+            <AlertTriangle size={16} />
+            <span>
+              Mô hình có {dimensionValue} chiều, khác <code>VECTOR_DIM</code> ({vectorDim}) của kho vector: lưu được
+              nhưng chưa chọn làm mô hình đang dùng được.
+            </span>
+          </div>
+        )}
+
+        {rule && (
+          <ApiKeyField
+            key={draft.provider}
+            id={`${idPrefix}-key`}
+            value={draft.apiKey}
+            onChange={(value) => update("apiKey", value)}
+            hasKey={Boolean(profile?.has_api_key) && profile?.provider === draft.provider}
+            envFallback={rule.envFallback}
+            envKeyLabel={ENV_KEY_LABELS[kind]?.[draft.provider]}
+            clearKey={draft.clearApiKey}
+            onClearKeyChange={(clearApiKey) => setDraft((current) => ({ ...current, clearApiKey }))}
+          />
+        )}
+
+        {testResult && (
+          <div
+            className={`mdl-test-result ${testResult.success ? "is-ok" : "is-error"}`}
+            role={testResult.success ? "status" : "alert"}
+          >
+            {testResult.success ? <CheckCircle2 size={17} /> : <AlertCircle size={17} />}
+            <div>
+              <strong>{testResult.success ? "Kết nối thành công" : "Kết nối thất bại"}</strong>
+              <p>{testResult.message}</p>
+              {(testResult.latency_ms != null || testResult.sample_output) && (
+                <p className="mdl-test-meta">
+                  {testResult.latency_ms != null && <>Thời gian phản hồi: {Math.round(testResult.latency_ms)} ms</>}
+                  {testResult.sample_output && <> · Mô hình trả lời: “{testResult.sample_output}”</>}
+                </p>
+              )}
             </div>
-          )}
-        </div>
-      </Section>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Danh sách mô hình đã cấu hình
-// ---------------------------------------------------------------------------
-
-function ProfileMeta({ kind, profile }) {
-  const parts = [providerName(kind, profile.provider), profileModelLabel(profile)];
-  if (kind === "embedding" && profile.dimension) parts.push(`${profile.dimension} chiều`);
-  // Địa chỉ máy chủ dài: chỉ hiện khi rê chuột để card giữ một dòng.
-  const address = profile.base_url || profile.endpoint;
-  return (
-    <span className="mdl-profile-meta" title={address ? `${parts.join(" · ")}
-${address}` : undefined}>
-      {parts.join(" · ")}
-    </span>
-  );
-}
-
-function ProfileList({ kind, registry, profiles, editingId, onAdd, onEdit, onDelete, adding }) {
-  const active = registry.active?.[kind];
-  const runtime = registry.embedding_runtime;
-  const vectorDim = runtime?.vector_dim;
-
-  return (
-    <section className="mdl-card" aria-labelledby={`mdl-${kind}-list-title`}>
-      <header className="mdl-list-head">
-        <div>
-          <h3 id={`mdl-${kind}-list-title`}>Mô hình đã cấu hình</h3>
-          <p>{profiles.length} mô hình trong kho</p>
-        </div>
-        <button type="button" className="ghost-btn mdl-add-btn" onClick={onAdd} disabled={adding}>
-          <Plus size={15} />
-          Thêm mô hình
-        </button>
-      </header>
-      {profiles.length === 0 ? (
-        <div className="mdl-empty">
-          <p>Chưa có {KINDS[kind].label} nào. Thêm mô hình để chọn làm mô hình đang dùng cho hệ thống.</p>
-        </div>
-      ) : (
-        <ul className="mdl-profile-list">
-          {profiles.map((profile) => {
-            const isActive = active === profile.id;
-            const isRunning = kind === "embedding" && runtime?.profile_id === profile.id;
-            const mismatch = dimensionMismatch(kind, profile, vectorDim);
-            return (
-              <li
-                key={profile.id}
-                className={`mdl-profile ${isActive ? "is-active" : ""} ${editingId === profile.id ? "is-editing" : ""}`}
-              >
-                <span className="mdl-profile-icon" aria-hidden="true">
-                  <ProviderIcon kind={kind} provider={profile.provider} size={15} />
-                </span>
-                <div className="mdl-profile-text">
-                  <strong className="mdl-profile-name" title={profile.name}>
-                    {profile.name}
-                  </strong>
-                  <ProfileMeta kind={kind} profile={profile} />
-                  {(isActive || isRunning || profile.has_api_key || mismatch) && (
-                    <div className="mdl-profile-tags">
-                      {isActive && (
-                        <StatusPill tone="ok">{kind === "embedding" ? "Đã chọn" : "Đang dùng"}</StatusPill>
-                      )}
-                      {isRunning && <StatusPill tone="ok">Đang chạy</StatusPill>}
-                      {profile.has_api_key && (
-                        <StatusPill>
-                          <KeyRound size={11} /> Đã lưu khoá
-                        </StatusPill>
-                      )}
-                      {mismatch && <StatusPill tone="warn">Khác VECTOR_DIM</StatusPill>}
-                    </div>
-                  )}
-                </div>
-                <div className="mdl-profile-actions">
-                  <button
-                    type="button"
-                    className="mdl-icon-btn"
-                    onClick={() => onEdit(profile)}
-                    aria-label={`Sửa ${profile.name}`}
-                    title="Sửa"
-                  >
-                    <Pencil size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    className="mdl-icon-btn is-danger"
-                    onClick={() => onDelete(profile)}
-                    disabled={isActive}
-                    aria-label={`Xoá ${profile.name}`}
-                    title={isActive ? "Đang được dùng — chọn mô hình khác trước khi xoá." : "Xoá"}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
+          </div>
+        )}
+      </div>
+    </ProfileDialog>
   );
 }
 
@@ -626,20 +446,51 @@ function ProfileList({ kind, registry, profiles, editingId, onAdd, onEdit, onDel
 // Panel của một loại mô hình
 // ---------------------------------------------------------------------------
 
-export default function ModelKindPanel({ kind, registry, config }) {
+/**
+ * Một danh sách cho một loại mô hình: hàng `.env` (reranker: Heuristic) rồi các mô hình
+ * trong kho. Bấm "Dùng" trên hàng nào thì hệ thống đổi sang mô hình đó; với embedding
+ * cần xác nhận vì phải khởi động lại backend và nạp lại tài liệu. Thêm/sửa mở hộp thoại ở giữa màn hình.
+ */
+export default function ModelKindPanel({ kind, registry, config, active = true }) {
   const toast = useToast();
   const queryClient = useQueryClient();
   // null: không mở form; { profile: null } thêm mới; { profile } sửa.
   const [editing, setEditing] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  // id đang áp dụng (ENV_ROW_ID cho hàng `.env`) và lựa chọn embedding chờ xác nhận.
+  const [applyingId, setApplyingId] = useState(null);
+  const [pendingActivate, setPendingActivate] = useState(null);
 
   const allProfiles = registry.profiles ?? [];
   const profiles = useMemo(() => allProfiles.filter((profile) => profile.kind === kind), [allProfiles, kind]);
-  const profilesById = useMemo(
-    () => Object.fromEntries(profiles.map((profile) => [profile.id, profile])),
-    [profiles]
-  );
+  const activeId = registry.active?.[kind] ?? null;
+  const runtime = registry.embedding_runtime;
+  const vectorDim = runtime?.vector_dim;
+  const env = envRow(kind, registry);
+  const KindIcon = KIND_ICONS[kind];
+
+  async function activate(target) {
+    setApplyingId(target.id ?? ENV_ROW_ID);
+    try {
+      const next = await modelProfilesApi.activate(kind, target.id);
+      await storeRegistry(queryClient, next);
+      if (kind === "embedding") {
+        toast.success(`Đã chọn ${target.label}. Khởi động lại backend để áp dụng.`);
+      } else {
+        toast.success(`Đã chuyển ${KINDS[kind].label} sang ${target.label}.`);
+      }
+    } catch (err) {
+      toast.error(`Chưa đổi được mô hình đang dùng. ${errorMessage(err, "Máy chủ từ chối yêu cầu.")}`);
+    } finally {
+      setApplyingId(null);
+    }
+  }
+
+  function requestActivate(target) {
+    if (kind === "embedding") setPendingActivate(target);
+    else activate(target);
+  }
 
   async function confirmDelete() {
     const target = pendingDelete;
@@ -657,39 +508,152 @@ export default function ModelKindPanel({ kind, registry, config }) {
     }
   }
 
+  const applying = applyingId !== null;
+  const activeTag = <StatusPill tone="ok">{kind === "embedding" ? "Đã chọn" : "Đang dùng"}</StatusPill>;
+  const runningTag = <StatusPill>Đang chạy</StatusPill>;
+
   return (
-    <div className="mdl-kind-layout">
-      {/* Cột trái: chọn mô hình đang dùng + form; cột phải: kho mô hình. Màn hẹp xếp một cột. */}
-      <div className="mdl-kind-main">
-        <ActiveModelCard
-          kind={kind}
-          registry={registry}
-          config={config}
-          profiles={profiles}
-          profilesById={profilesById}
-        />
-        {editing && (
-          <ProfileEditor
-            key={editing.profile?.id ?? "new"}
-            kind={kind}
-            profile={editing.profile}
-            registry={registry}
-            onClose={() => setEditing(null)}
+    <>
+      <section className="mdl-card mdl-list-card" aria-labelledby={`mdl-${kind}-list-title`}>
+        <header className="mdl-card-head">
+          <span className="mdl-card-icon" aria-hidden="true">
+            <KindIcon size={18} />
+          </span>
+          <div className="mdl-card-heading">
+            <h3 id={`mdl-${kind}-list-title`}>{KINDS[kind].title}</h3>
+            <p>{KINDS[kind].description}</p>
+          </div>
+          <button
+            type="button"
+            className="ghost-btn mdl-add-btn"
+            onClick={() => setEditing({ profile: null })}
+            disabled={Boolean(editing)}
+          >
+            <Plus size={15} />
+            Thêm mô hình
+          </button>
+        </header>
+
+        <KindNotices kind={kind} registry={registry} config={config} />
+
+        <ul className="mdl-rows" aria-label={`Danh sách ${KINDS[kind].label}`}>
+          <ModelRow
+            isEnv
+            name={env.name}
+            meta={env.meta}
+            icon={kind === "reranker" ? <ProviderIcon kind="reranker" provider="heuristic" size={15} /> : <FileCog size={15} />}
+            isActive={activeId === null}
+            tags={
+              <>
+                <StatusPill>{env.tag}</StatusPill>
+                {activeId === null && activeTag}
+                {kind === "embedding" && !runtime?.profile_id && runningTag}
+              </>
+            }
+            useButton={
+              activeId !== null && (
+                <UseButton
+                  name={env.name}
+                  applying={applyingId === ENV_ROW_ID}
+                  disabled={applying}
+                  onClick={() => requestActivate({ id: null, label: env.label })}
+                />
+              )
+            }
           />
+          {profiles.map((profile) => {
+            const isActive = activeId === profile.id;
+            const isRunning = kind === "embedding" && runtime?.profile_id === profile.id;
+            const mismatch = dimensionMismatch(kind, profile, vectorDim);
+            const meta = profileMeta(kind, profile);
+            const address = profile.base_url || profile.endpoint;
+            return (
+              <ModelRow
+                key={profile.id}
+                name={profile.name}
+                meta={meta}
+                metaTitle={address ? `${meta}\n${address}` : undefined}
+                icon={<ProviderIcon kind={kind} provider={profile.provider} size={15} />}
+                isActive={isActive}
+                tags={
+                  <>
+                    {isActive && activeTag}
+                    {isRunning && runningTag}
+                    {profile.has_api_key && (
+                      <StatusPill>
+                        <KeyRound size={11} /> Đã lưu khoá
+                      </StatusPill>
+                    )}
+                    {mismatch && <StatusPill tone="warn">Khác VECTOR_DIM</StatusPill>}
+                  </>
+                }
+                useButton={
+                  !isActive && (
+                    <UseButton
+                      name={profile.name}
+                      applying={applyingId === profile.id}
+                      disabled={applying || mismatch}
+                      title={mismatch ? `${profile.dimension} chiều, kho vector dùng ${vectorDim}.` : undefined}
+                      onClick={() => requestActivate({ id: profile.id, label: profile.name })}
+                    />
+                  )
+                }
+                actions={
+                  <>
+                    <button
+                      type="button"
+                      className="mdl-icon-btn"
+                      onClick={() => setEditing({ profile })}
+                      aria-label={`Sửa ${profile.name}`}
+                      title="Sửa"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className="mdl-icon-btn is-danger"
+                      onClick={() => setPendingDelete(profile)}
+                      disabled={isActive}
+                      aria-label={`Xoá ${profile.name}`}
+                      title={isActive ? "Đang được dùng — chọn mô hình khác trước khi xoá." : "Xoá"}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </>
+                }
+              />
+            );
+          })}
+        </ul>
+
+        {profiles.length === 0 && (
+          <p className="mdl-empty">
+            Chưa có {KINDS[kind].label} nào trong kho. Bấm &ldquo;Thêm mô hình&rdquo; để cấu hình rồi chọn dùng tại đây.
+          </p>
         )}
-      </div>
-      <div className="mdl-kind-side">
-        <ProfileList
+
+        {kind === "embedding" && (
+          <p className="mdl-list-foot">
+            <Info size={14} aria-hidden="true" />
+            <span>
+              Kho vector dùng <code>VECTOR_DIM = {vectorDim}</code>: mô hình khác số chiều lưu được nhưng không chọn dùng
+              được. Script dòng lệnh (<code>scripts/ingest.py</code>) vẫn dùng embedding trong <code>.env</code>.
+            </span>
+          </p>
+        )}
+      </section>
+
+      {editing && (
+        <ProfileEditor
+          key={editing.profile?.id ?? "new"}
           kind={kind}
+          profile={editing.profile}
           registry={registry}
-          profiles={profiles}
-          editingId={editing?.profile?.id}
-          adding={Boolean(editing && !editing.profile)}
-          onAdd={() => setEditing({ profile: null })}
-          onEdit={(profile) => setEditing({ profile })}
-          onDelete={setPendingDelete}
+          hidden={!active}
+          onClose={() => setEditing(null)}
         />
-      </div>
+      )}
+
       <Modal
         open={Boolean(pendingDelete)}
         onClose={() => !deleting && setPendingDelete(null)}
@@ -711,6 +675,37 @@ export default function ModelKindPanel({ kind, registry, config }) {
           </>
         }
       />
-    </div>
+
+      <Modal
+        open={Boolean(pendingActivate)}
+        onClose={() => setPendingActivate(null)}
+        title="Đổi mô hình nhúng?"
+        description={
+          pendingActivate
+            ? `Chọn ${pendingActivate.label} có hiệu lực sau khi khởi động lại backend. Sau đó cần vào Dataset → Nạp lại toàn bộ để tạo lại vector; trước khi nạp lại, kết quả tìm kiếm sẽ sai lệch.`
+            : ""
+        }
+        icon={<RotateCw size={20} />}
+        actions={
+          <>
+            <button type="button" className="ghost-btn" onClick={() => setPendingActivate(null)}>
+              Huỷ
+            </button>
+            <button
+              type="button"
+              className="primary-btn"
+              onClick={() => {
+                const target = pendingActivate;
+                setPendingActivate(null);
+                activate(target);
+              }}
+            >
+              <CheckCircle2 size={15} />
+              Chọn mô hình này
+            </button>
+          </>
+        }
+      />
+    </>
   );
 }

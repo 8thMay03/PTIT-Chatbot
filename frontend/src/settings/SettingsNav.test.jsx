@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ModelKindNav, SettingsIndex, SettingsTabs, settingsGroupOf } from "./SettingsNav";
+import { SettingsIndex, SettingsTabs, settingsGroupOf } from "./SettingsNav";
 import PipelineSteps from "./PipelineSteps";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -62,22 +62,6 @@ describe("SettingsNav", () => {
 
     await click(container.querySelector('[data-settings-tab="models"]'), { ctrlKey: true });
     expect(onSelect).not.toHaveBeenCalled();
-  });
-
-  it("thanh loại mô hình có ba mục và hash riêng", async () => {
-    const onSelect = vi.fn();
-    await render(<ModelKindNav activeKey="models-embedding" onSelect={onSelect} />);
-
-    const items = [...container.querySelectorAll("[data-settings-nav]")];
-    expect(items.map((item) => [item.textContent, item.getAttribute("href")])).toEqual([
-      ["Ngôn ngữ", "#settings/models-llm"],
-      ["Nhúng", "#settings/models-embedding"],
-      ["Xếp hạng", "#settings/models-reranker"],
-    ]);
-    expect(items[1].getAttribute("aria-current")).toBe("page");
-
-    await click(items[2]);
-    expect(onSelect).toHaveBeenCalledWith("models-reranker");
   });
 
   it("dải bước theo thứ tự pipeline, hiện giá trị và chấm chưa lưu", async () => {
