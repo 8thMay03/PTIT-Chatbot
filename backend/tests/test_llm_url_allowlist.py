@@ -93,12 +93,36 @@ def test_default_allowlist_comes_from_startup_env(monkeypatch) -> None:
 
     assert entries == [
         "https://api.openai.com",
+        "https://api.cohere.com",
+        "https://api.cohere.ai",
+        "https://api.jina.ai",
         "https://startup.openai.example",
         "http://127.0.0.1:9000",
     ]
     validate_llm_url("https://startup.openai.example/v1")  # hợp lệ
     with pytest.raises(ConfigValidationError):
         validate_llm_url("https://runtime-mutated.example/v1")
+
+
+def test_default_allowlist_includes_public_rerank_apis(monkeypatch) -> None:
+    """Allowlist rỗng cho phép sẵn Cohere/Jina để chọn rerank API từ giao diện."""
+    monkeypatch.setattr(settings, "llm_base_url_allowlist", "")
+    monkeypatch.setattr(config_module, "_INITIAL_SETTINGS", {})
+
+    validate_llm_url("https://api.jina.ai/v1")
+    validate_llm_url("https://api.cohere.com/v2")
+    validate_llm_url("https://api.cohere.ai/v1")
+    for url in ("http://api.jina.ai/v1", "https://api.jina.ai:8443/v1", "https://evil.api.jina.ai/v1"):
+        with pytest.raises(ConfigValidationError):
+            validate_llm_url(url)
+
+
+def test_explicit_allowlist_drops_builtin_rerank_apis(monkeypatch) -> None:
+    """Đặt LLM_BASE_URL_ALLOWLIST thì chỉ danh sách đó được dùng."""
+    monkeypatch.setattr(settings, "llm_base_url_allowlist", "https://api.openai.com")
+
+    with pytest.raises(ConfigValidationError):
+        validate_llm_url("https://api.jina.ai/v1")
 
 
 # ==========================================

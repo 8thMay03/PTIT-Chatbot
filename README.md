@@ -368,7 +368,8 @@ Hội thoại của khách gắn với phiên ẩn danh qua cookie `ptit_sid` (`
 LLM_BASE_URL_ALLOWLIST=https://api.openai.com,http://localhost:11434,https://*.openai.azure.com
 ```
 
-- Để trống: allowlist gồm `https://api.openai.com` và origin của `OPENAI_BASE_URL`, `OPENAI_COMPATIBLE_BASE_URL`, `AZURE_OPENAI_ENDPOINT` đọc từ env lúc khởi động.
+- Để trống: allowlist gồm `https://api.openai.com`, các dịch vụ rerank công khai `https://api.cohere.com`, `https://api.cohere.ai`, `https://api.jina.ai` và origin của `OPENAI_BASE_URL`, `OPENAI_COMPATIBLE_BASE_URL`, `AZURE_OPENAI_ENDPOINT`, `RERANKER_BASE_URL` đọc từ env lúc khởi động.
+- Đặt giá trị thì chỉ danh sách đó được dùng (mặc định ở trên bị thay thế); khi đó tự thêm origin Cohere/Jina nếu cần.
 - Chỉ nhận `http`/`https`, không chứa `user:pass@`; cổng phải khớp (mục không ghi cổng chỉ khớp cổng mặc định 80/443). Giá trị rỗng được phép (dùng mặc định của SDK).
 
 ### 5. Tài khoản người dùng (`/register`, `/login`)
