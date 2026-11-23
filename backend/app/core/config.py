@@ -388,13 +388,24 @@ def _host_matches(pattern: str, host: str) -> bool:
     return pattern == host
 
 
+# Dịch vụ rerank công khai có API chuẩn Cohere (`POST /rerank`, trả `results[].relevance_score`).
+# Origin HTTPS cố định của nhà cung cấp, không trỏ vào mạng nội bộ, nên được phép sẵn khi
+# LLM_BASE_URL_ALLOWLIST trống để admin chọn được mà không phải sửa `.env`.
+_BUILTIN_RERANK_API_ORIGINS = (
+    "https://api.cohere.com",
+    "https://api.cohere.ai",
+    "https://api.jina.ai",
+)
+
+
 def _default_llm_url_allowlist() -> list[str]:
-    """Allowlist mặc định: origin các URL LLM đọc từ env lúc khởi động + api.openai.com.
+    """Allowlist mặc định: origin các URL LLM đọc từ env lúc khởi động + api.openai.com
+    + các dịch vụ rerank công khai trong `_BUILTIN_RERANK_API_ORIGINS`.
 
     Dùng `_INITIAL_SETTINGS` (snapshot lúc import) chứ không phải settings runtime,
     vì PUT /config có thể đã đổi giá trị các trường này sau khi khởi động.
     """
-    entries = ["https://api.openai.com"]
+    entries = ["https://api.openai.com", *_BUILTIN_RERANK_API_ORIGINS]
     for field in ("openai_base_url", "openai_compatible_base_url", "azure_openai_endpoint", "reranker_base_url"):
         parsed = _parse_origin(str(_INITIAL_SETTINGS.get(field) or ""))
         if parsed is not None:

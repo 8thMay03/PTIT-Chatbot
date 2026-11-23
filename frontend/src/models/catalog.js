@@ -159,7 +159,7 @@ const FIELDS = {
         required: true,
         url: true,
         placeholder: "https://api.cohere.com/v2",
-        hint: "Địa chỉ tới trước /rerank, ví dụ https://api.jina.ai/v1 hoặc http://localhost:8000/v1. Host phải nằm trong LLM_BASE_URL_ALLOWLIST.",
+        hint: "Địa chỉ tới trước /rerank, ví dụ https://api.jina.ai/v1 hoặc http://localhost:8000/v1. Cohere (api.cohere.com) và Jina (api.jina.ai) được phép sẵn; host khác phải nằm trong LLM_BASE_URL_ALLOWLIST.",
       },
       {
         ...MODEL_FIELD,
