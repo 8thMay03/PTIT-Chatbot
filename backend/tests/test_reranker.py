@@ -4,7 +4,12 @@ import httpx
 import pytest
 
 from app.retrieval import reranker as reranker_module
-from app.retrieval.reranker import Reranker, RerankAPIError, call_rerank_api, heuristic_rerank
+from app.retrieval.reranker import (
+    RerankAPIError,
+    Reranker,
+    call_rerank_api,
+    heuristic_rerank,
+)
 
 
 def test_heuristic_reranker_promotes_exact_query_coverage(monkeypatch) -> None:
