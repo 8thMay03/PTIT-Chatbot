@@ -69,6 +69,8 @@ thích; endpoint chỉ cho admin.
 - `2026-11-24T22:44:10+07:00` — claude-agent — S-03 (diff so với `9e65a5a`) — `approved`, không có nhận xét mới. Đã đọc:
   mọi chỗ còn dùng `description`/`hint`/`hintId` (không còn `aria-describedby` trỏ tới id đã bỏ), không còn import
   thừa (`sendsDocumentsToService`), cảnh báo `VECTOR_DIM` và lỗi tải danh sách vẫn hiện.
+- `2026-11-24T22:47:51+07:00` — claude-agent — bỏ placeholder Endpoint/Mô hình/API key — `approved`, không có nhận xét mới; nhãn
+  "Đã lưu khoá"/"Dùng … nếu để trống" vẫn thay cho thông tin placeholder cũ của ô khoá.
 
 ## Kết luận
 

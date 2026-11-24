@@ -362,9 +362,6 @@ export function ApiKeyField({
 }) {
   const [visible, setVisible] = useState(false);
   const keepsStoredKey = hasKey && !clearKey;
-  let placeholder = "Dán API key";
-  if (keepsStoredKey) placeholder = "Để trống để giữ khoá đã lưu";
-  else if (envFallback) placeholder = `Để trống để dùng ${envKeyLabel}`;
 
   return (
     <div className="mdl-field">
@@ -388,7 +385,6 @@ export function ApiKeyField({
           type={visible ? "text" : "password"}
           className={`mdl-input ${error ? "is-invalid" : ""}`}
           value={value}
-          placeholder={placeholder}
           autoComplete="new-password"
           spellCheck={false}
           aria-invalid={Boolean(error)}

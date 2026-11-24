@@ -101,7 +101,6 @@ const FIELDS = {
     openai: [
       {
         ...MODEL_FIELD,
-        placeholder: "gpt-4.1-mini",
         suggestions: ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"],
       },
       { name: "base_url", label: "Base URL", url: true, placeholder: "https://api.openai.com/v1" },
@@ -109,18 +108,11 @@ const FIELDS = {
     gemini: [
       {
         ...MODEL_FIELD,
-        placeholder: "gemini-2.0-flash",
         suggestions: ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
       },
     ],
     azure: [
-      {
-        name: "endpoint",
-        label: "Endpoint",
-        required: true,
-        url: true,
-        placeholder: "https://<tên-tài-nguyên>.openai.azure.com",
-      },
+      { name: "endpoint", label: "Endpoint", required: true, url: true },
       {
         name: "deployment_name",
         label: "Tên deployment",
@@ -132,14 +124,13 @@ const FIELDS = {
     ],
     openai_compatible: [
       { name: "base_url", label: "Base URL", required: true, url: true, placeholder: "http://localhost:11434/v1" },
-      { ...MODEL_FIELD, placeholder: "qwen2.5:7b" },
+      MODEL_FIELD,
     ],
   },
   embedding: {
     openai: [
       {
         ...MODEL_FIELD,
-        placeholder: "text-embedding-3-small",
         suggestions: ["text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002"],
       },
       { ...DIMENSION_FIELD, placeholder: "1536" },
@@ -147,7 +138,6 @@ const FIELDS = {
     "sentence-transformers": [
       {
         ...MODEL_FIELD,
-        placeholder: "BAAI/bge-m3",
         suggestions: [
           "BAAI/bge-m3",
           "intfloat/multilingual-e5-base",
@@ -160,7 +150,6 @@ const FIELDS = {
     voyage: [
       {
         ...MODEL_FIELD,
-        placeholder: "voyage-3.5",
         suggestions: ["voyage-3.5", "voyage-3.5-lite", "voyage-3-large", "voyage-multilingual-2"],
       },
       { ...DIMENSION_FIELD, placeholder: "1024" },
@@ -168,7 +157,6 @@ const FIELDS = {
     cohere: [
       {
         ...MODEL_FIELD,
-        placeholder: "embed-v4.0",
         suggestions: ["embed-v4.0", "embed-multilingual-v3.0", "embed-multilingual-light-v3.0"],
       },
       { ...DIMENSION_FIELD, placeholder: "1536" },
@@ -176,7 +164,6 @@ const FIELDS = {
     gemini: [
       {
         ...MODEL_FIELD,
-        placeholder: "gemini-embedding-001",
         suggestions: ["gemini-embedding-001", "text-embedding-004"],
       },
       { ...DIMENSION_FIELD, placeholder: "1536" },
@@ -184,14 +171,13 @@ const FIELDS = {
     jina: [
       {
         ...MODEL_FIELD,
-        placeholder: "jina-embeddings-v3",
         suggestions: ["jina-embeddings-v3"],
       },
       { ...DIMENSION_FIELD, placeholder: "1024" },
     ],
     openai_compatible: [
       { name: "base_url", label: "Base URL", required: true, url: true, placeholder: "http://localhost:11434/v1" },
-      { ...MODEL_FIELD, placeholder: "bge-m3", suggestions: ["bge-m3", "nomic-embed-text", "mistral-embed"] },
+      { ...MODEL_FIELD, suggestions: ["bge-m3", "nomic-embed-text", "mistral-embed"] },
       { ...DIMENSION_FIELD, placeholder: "1024" },
     ],
   },
@@ -200,7 +186,6 @@ const FIELDS = {
       {
         ...MODEL_FIELD,
         label: "Mô hình cross-encoder",
-        placeholder: "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
         suggestions: [
           "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
           "BAAI/bge-reranker-base",
@@ -212,35 +197,30 @@ const FIELDS = {
       { name: "base_url", label: "Base URL", required: true, url: true, placeholder: "https://api.cohere.com/v2" },
       {
         ...MODEL_FIELD,
-        placeholder: "rerank-v3.5",
         suggestions: ["rerank-v3.5", "rerank-multilingual-v3.0", "jina-reranker-v2-base-multilingual", "BAAI/bge-reranker-v2-m3"],
       },
     ],
     cohere: [
       {
         ...MODEL_FIELD,
-        placeholder: "rerank-v3.5",
         suggestions: ["rerank-v3.5", "rerank-v4.0-pro", "rerank-v4.0-fast", "rerank-multilingual-v3.0"],
       },
     ],
     jina: [
       {
         ...MODEL_FIELD,
-        placeholder: "jina-reranker-v3",
         suggestions: ["jina-reranker-v3", "jina-reranker-v2-base-multilingual"],
       },
     ],
     voyage: [
       {
         ...MODEL_FIELD,
-        placeholder: "rerank-2.5",
         suggestions: ["rerank-2.5", "rerank-2.5-lite"],
       },
     ],
     pinecone: [
       {
         ...MODEL_FIELD,
-        placeholder: "bge-reranker-v2-m3",
         suggestions: ["bge-reranker-v2-m3", "cohere-rerank-4-fast"],
         hint: "bge-reranker-v2-m3 nhận tối đa 100 đoạn mỗi lần (Top-K × hệ số ứng viên).",
       },
@@ -249,7 +229,6 @@ const FIELDS = {
       { name: "base_url", label: "Base URL", required: true, url: true, placeholder: "http://localhost:8080" },
       {
         ...MODEL_FIELD,
-        placeholder: "BAAI/bge-reranker-v2-m3",
         suggestions: ["BAAI/bge-reranker-v2-m3", "BAAI/bge-reranker-base", "Alibaba-NLP/gte-multilingual-reranker-base"],
         hint: "TEI mặc định nhận tối đa 32 đoạn mỗi lần (--max-client-batch-size).",
       },

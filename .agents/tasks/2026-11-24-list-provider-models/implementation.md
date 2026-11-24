@@ -64,6 +64,9 @@ S-01 và S-02 đã tích hợp trên nhánh `feat/list-provider-models` (tách t
   - `models.css`: bỏ `.mdl-provider-note` và style dòng mô tả thẻ nhà cung cấp.
   - Giữ nguyên các hộp thoại xác nhận (xoá mô hình, đổi embedding): mô tả nêu hệ quả không hoàn tác/cần nạp lại.
 - Kiểm tra đã chạy: V-05.
+- Bổ sung `2026-11-24T22:47:51+07:00` (yêu cầu người dùng): bỏ placeholder của ô Endpoint (Azure), mọi ô Mô hình và ô API key (gồm
+  "Để trống để giữ khoá đã lưu"/"Để trống để dùng … .env" — nhãn trạng thái cạnh ô khoá vẫn báo điều này). Giữ
+  placeholder của Base URL, Tên deployment, API version, Số chiều, Tên hiển thị.
 - Còn lại/blocker: không có.
 
 ## Trao đổi giữa agents

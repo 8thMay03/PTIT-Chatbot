@@ -83,6 +83,8 @@
 - Trạng thái: `passed`.
 - Bằng chứng: test "thêm LLM qua hộp thoại…" kiểm `.mdl-dialog-heading p`, `.mdl-choice-text span`,
   `#mdl-llm-form-key-hint` không tồn tại; ảnh trong scratchpad phiên (không commit).
+- Chạy lại `2026-11-24T22:47:51+07:00` sau khi bỏ placeholder: `npx vitest run` → `47 files, 407 passed`; `npx vite build` → `✓ built`; test
+  "thêm LLM qua hộp thoại…" kiểm ô mô hình và ô khoá không có thuộc tính `placeholder`.
 
 ## Lỗi, kiểm tra lại và phần chưa xác minh
 

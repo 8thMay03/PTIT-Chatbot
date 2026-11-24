@@ -231,6 +231,8 @@ describe("ModelsView — kho mô hình theo loại", () => {
     expect(dialog().querySelector(".mdl-dialog-heading p")).toBeNull();
     expect(dialog().querySelector(".mdl-choice-text span")).toBeNull();
     expect(dialog().querySelector("#mdl-llm-form-key-hint")).toBeNull();
+    expect(modelInput.hasAttribute("placeholder")).toBe(false);
+    expect(dialog().querySelector("#mdl-llm-form-key").hasAttribute("placeholder")).toBe(false);
     await changeInput(modelInput, "gpt-4.1");
     await changeInput(dialog().querySelector("#mdl-llm-form-key"), "sk-secret-123");
     await click(buttonByText(dialog(), "Thêm vào kho"));
