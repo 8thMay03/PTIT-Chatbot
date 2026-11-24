@@ -73,6 +73,7 @@ thích; endpoint chỉ cho admin.
   "Đã lưu khoá"/"Dùng … nếu để trống" vẫn thay cho thông tin placeholder cũ của ô khoá.
 - `2026-11-24T22:49:13+07:00` — claude-agent — bỏ nhãn "Dùng … .env nếu để trống" — `approved`, không có nhận xét mới. Ghi nhận: admin không
   còn thấy trong hộp thoại rằng để trống khoá OpenAI/Gemini/Azure sẽ dùng khoá `.env` (theo yêu cầu người dùng).
+- `2026-11-24T22:50:49+07:00` — claude-agent — dọn gợi ý/placeholder Azure — `approved`, không có nhận xét mới.
 
 ## Kết luận
 

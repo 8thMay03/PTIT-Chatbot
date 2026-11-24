@@ -71,6 +71,9 @@ S-01 và S-02 đã tích hợp trên nhánh `feat/list-provider-models` (tách t
   để trống" và "Dùng OPENAI_API_KEY đang chạy nếu để trống" cạnh ô khoá; nhà cung cấp dự phòng khoá `.env` giờ hiện
   "Không bắt buộc" như các ô khoá tuỳ chọn khác. Bỏ `ENV_KEY_LABELS`, prop `envFallback`/`envKeyLabel` của `ApiKeyField`
   (`KEY_RULES.envFallback` trong catalog giữ nguyên, mô tả hành vi máy chủ).
+- Bổ sung `2026-11-24T22:50:49+07:00` (yêu cầu người dùng): Azure OpenAI bỏ gợi ý "Tên deployment đã tạo trên Azure, không phải tên mô hình
+  gốc." và placeholder của Tên deployment, API version (Endpoint đã bỏ trước đó). Giá trị mặc định `2024-02-15-preview`
+  điền sẵn vào ô API version khi thêm mới (`emptyDraft`) giữ nguyên — đó là giá trị, không phải placeholder.
 - Còn lại/blocker: không có.
 
 ## Trao đổi giữa agents

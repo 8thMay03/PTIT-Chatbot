@@ -87,6 +87,8 @@
   "thêm LLM qua hộp thoại…" kiểm ô mô hình và ô khoá không có thuộc tính `placeholder`.
 - Chạy lại `2026-11-24T22:49:13+07:00` sau khi bỏ nhãn khoá `.env`: `npx vitest run` → `47 files, 407 passed`; `npx vite build` → `✓ built`;
   test "thêm LLM qua hộp thoại…" kiểm hộp thoại OpenAI không chứa ".env" và hiện "Không bắt buộc".
+- Chạy lại `2026-11-24T22:50:49+07:00` sau khi dọn Azure: `npx vitest run` → `47 files, 407 passed`; `npx vite build` → `✓ built`; test "sửa
+  profile: …Azure không có nút tải" kiểm 4 ô Azure không có `placeholder` và không còn `.mdl-field-hint`.
 
 ## Lỗi, kiểm tra lại và phần chưa xác minh
 

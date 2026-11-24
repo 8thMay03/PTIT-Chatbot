@@ -655,5 +655,10 @@ describe("ModelsView — kho mô hình theo loại", () => {
     expect(buttonByText(dialog(), "Tải danh sách")).not.toBeUndefined();
     await click(dialog().querySelector('input[type="radio"][value="azure"]'));
     expect(buttonByText(dialog(), "Tải danh sách")).toBeUndefined();
+    // Azure: không placeholder, không gợi ý dưới ô.
+    for (const name of ["endpoint", "deployment_name", "api_version", "key"]) {
+      expect(dialog().querySelector(`#mdl-llm-form-${name}`).hasAttribute("placeholder")).toBe(false);
+    }
+    expect(dialog().querySelector(".mdl-field-hint")).toBeNull();
   });
 });

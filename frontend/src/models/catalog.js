@@ -113,14 +113,8 @@ const FIELDS = {
     ],
     azure: [
       { name: "endpoint", label: "Endpoint", required: true, url: true },
-      {
-        name: "deployment_name",
-        label: "Tên deployment",
-        required: true,
-        placeholder: "gpt-4o-mini",
-        hint: "Tên deployment đã tạo trên Azure, không phải tên mô hình gốc.",
-      },
-      { name: "api_version", label: "API version", required: true, placeholder: "2024-02-15-preview" },
+      { name: "deployment_name", label: "Tên deployment", required: true },
+      { name: "api_version", label: "API version", required: true },
     ],
     openai_compatible: [
       { name: "base_url", label: "Base URL", required: true, url: true, placeholder: "http://localhost:11434/v1" },
