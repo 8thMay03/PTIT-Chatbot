@@ -54,15 +54,6 @@ import {
 } from "./fields";
 import ProfileDialog from "./ProfileDialog";
 
-const ENV_KEY_LABELS = {
-  llm: {
-    openai: "OPENAI_API_KEY trong .env",
-    gemini: "GEMINI_API_KEY trong .env",
-    azure: "AZURE_OPENAI_API_KEY trong .env",
-  },
-  embedding: { openai: "OPENAI_API_KEY đang chạy" },
-};
-
 // Hàng `.env` không có id trong kho; dùng khoá riêng cho trạng thái "đang áp dụng".
 const ENV_ROW_ID = "__env__";
 
@@ -517,10 +508,8 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
             value={draft.apiKey}
             onChange={(value) => update("apiKey", value)}
             hasKey={hasStoredKey}
-            envFallback={rule.envFallback}
             required={Boolean(rule.required)}
             error={showErrors ? errors.apiKey : undefined}
-            envKeyLabel={ENV_KEY_LABELS[kind]?.[draft.provider]}
             onBlur={listable ? (event) => autoLoadModels(event.target.value) : undefined}
             clearKey={draft.clearApiKey}
             onClearKeyChange={(clearApiKey) => setDraft((current) => ({ ...current, clearApiKey }))}

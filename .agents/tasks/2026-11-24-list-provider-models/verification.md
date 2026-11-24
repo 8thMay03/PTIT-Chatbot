@@ -85,6 +85,8 @@
   `#mdl-llm-form-key-hint` không tồn tại; ảnh trong scratchpad phiên (không commit).
 - Chạy lại `2026-11-24T22:47:51+07:00` sau khi bỏ placeholder: `npx vitest run` → `47 files, 407 passed`; `npx vite build` → `✓ built`; test
   "thêm LLM qua hộp thoại…" kiểm ô mô hình và ô khoá không có thuộc tính `placeholder`.
+- Chạy lại `2026-11-24T22:49:13+07:00` sau khi bỏ nhãn khoá `.env`: `npx vitest run` → `47 files, 407 passed`; `npx vite build` → `✓ built`;
+  test "thêm LLM qua hộp thoại…" kiểm hộp thoại OpenAI không chứa ".env" và hiện "Không bắt buộc".
 
 ## Lỗi, kiểm tra lại và phần chưa xác minh
 

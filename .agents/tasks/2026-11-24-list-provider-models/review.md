@@ -71,6 +71,8 @@ thích; endpoint chỉ cho admin.
   thừa (`sendsDocumentsToService`), cảnh báo `VECTOR_DIM` và lỗi tải danh sách vẫn hiện.
 - `2026-11-24T22:47:51+07:00` — claude-agent — bỏ placeholder Endpoint/Mô hình/API key — `approved`, không có nhận xét mới; nhãn
   "Đã lưu khoá"/"Dùng … nếu để trống" vẫn thay cho thông tin placeholder cũ của ô khoá.
+- `2026-11-24T22:49:13+07:00` — claude-agent — bỏ nhãn "Dùng … .env nếu để trống" — `approved`, không có nhận xét mới. Ghi nhận: admin không
+  còn thấy trong hộp thoại rằng để trống khoá OpenAI/Gemini/Azure sẽ dùng khoá `.env` (theo yêu cầu người dùng).
 
 ## Kết luận
 

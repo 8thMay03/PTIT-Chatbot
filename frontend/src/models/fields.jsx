@@ -352,11 +352,9 @@ export function ApiKeyField({
   value,
   onChange,
   hasKey,
-  envFallback,
   required = false,
   clearKey,
   onClearKeyChange,
-  envKeyLabel,
   onBlur,
   error,
 }) {
@@ -371,8 +369,6 @@ export function ApiKeyField({
           <StatusPill tone="ok">
             <Check size={12} /> Đã lưu khoá
           </StatusPill>
-        ) : envFallback ? (
-          <StatusPill>Dùng {envKeyLabel} nếu để trống</StatusPill>
         ) : required ? (
           <StatusPill>Bắt buộc</StatusPill>
         ) : (

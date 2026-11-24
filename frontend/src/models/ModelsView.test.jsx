@@ -233,6 +233,9 @@ describe("ModelsView — kho mô hình theo loại", () => {
     expect(dialog().querySelector("#mdl-llm-form-key-hint")).toBeNull();
     expect(modelInput.hasAttribute("placeholder")).toBe(false);
     expect(dialog().querySelector("#mdl-llm-form-key").hasAttribute("placeholder")).toBe(false);
+    // OpenAI dự phòng khoá `.env` nhưng không ghi tên biến; ô khoá chỉ báo "Không bắt buộc".
+    expect(dialog().textContent).not.toContain(".env");
+    expect(dialog().textContent).toContain("Không bắt buộc");
     await changeInput(modelInput, "gpt-4.1");
     await changeInput(dialog().querySelector("#mdl-llm-form-key"), "sk-secret-123");
     await click(buttonByText(dialog(), "Thêm vào kho"));

@@ -67,6 +67,10 @@ S-01 và S-02 đã tích hợp trên nhánh `feat/list-provider-models` (tách t
 - Bổ sung `2026-11-24T22:47:51+07:00` (yêu cầu người dùng): bỏ placeholder của ô Endpoint (Azure), mọi ô Mô hình và ô API key (gồm
   "Để trống để giữ khoá đã lưu"/"Để trống để dùng … .env" — nhãn trạng thái cạnh ô khoá vẫn báo điều này). Giữ
   placeholder của Base URL, Tên deployment, API version, Số chiều, Tên hiển thị.
+- Bổ sung `2026-11-24T22:49:13+07:00` (yêu cầu người dùng): bỏ nhãn "Dùng OPENAI_API_KEY/GEMINI_API_KEY/AZURE_OPENAI_API_KEY trong .env nếu
+  để trống" và "Dùng OPENAI_API_KEY đang chạy nếu để trống" cạnh ô khoá; nhà cung cấp dự phòng khoá `.env` giờ hiện
+  "Không bắt buộc" như các ô khoá tuỳ chọn khác. Bỏ `ENV_KEY_LABELS`, prop `envFallback`/`envKeyLabel` của `ApiKeyField`
+  (`KEY_RULES.envFallback` trong catalog giữ nguyên, mô tả hành vi máy chủ).
 - Còn lại/blocker: không có.
 
 ## Trao đổi giữa agents
