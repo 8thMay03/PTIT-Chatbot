@@ -341,6 +341,54 @@ describe("ModelsView — kho mô hình theo loại", () => {
     expect(rowByName(panel, "rerank-v3.5").textContent).toContain("Rerank API");
   });
 
+  it("reranker: thêm Voyage AI không có Base URL, khoá bắt buộc và kiểm tra kết nối", async () => {
+    const { fetchMock } = createFakeServer();
+    vi.stubGlobal("fetch", fetchMock);
+    await render("reranker");
+    const panel = container.querySelector("#mdl-panel-reranker");
+
+    await click(buttonByText(panel, "Thêm mô hình"));
+    await waitFor(() => dialog()?.querySelector("#mdl-reranker-form-model"));
+    await click(dialog().querySelector('input[type="radio"][value="voyage"]'));
+    await waitFor(() => dialog().querySelector("#mdl-reranker-form-key"));
+    expect(dialog().querySelector("#mdl-reranker-form-base_url")).toBeNull();
+    expect(dialog().textContent).toContain("Bắt buộc");
+    expect(dialog().textContent).toContain("Nội dung các đoạn tài liệu được gửi tới dịch vụ này.");
+    await changeInput(dialog().querySelector("#mdl-reranker-form-model"), "rerank-2.5");
+
+    // Thiếu khoá: không gửi gì, báo lỗi ở ô khoá.
+    await click(buttonByText(dialog(), "Thêm vào kho"));
+    await waitFor(() => dialog().querySelector("#mdl-reranker-form-key-error"));
+    expect(requestsTo(fetchMock, "/model-profiles", "POST")).toHaveLength(0);
+
+    await changeInput(dialog().querySelector("#mdl-reranker-form-key"), "pa-rerank-321");
+    await click(buttonByText(dialog(), "Kiểm tra kết nối"));
+    await waitFor(() => dialog().querySelector(".mdl-test-result.is-ok"));
+    const [[, testOptions]] = requestsTo(fetchMock, "/model-profiles/test-reranker", "POST");
+    expect(JSON.parse(testOptions.body)).toEqual({
+      provider: "voyage",
+      model: "rerank-2.5",
+      base_url: null,
+      api_key: "pa-rerank-321",
+      profile_id: null,
+    });
+
+    await click(buttonByText(dialog(), "Thêm vào kho"));
+    await waitFor(() => rowByName(panel, "rerank-2.5"));
+    const [[, createOptions]] = requestsTo(fetchMock, "/model-profiles", "POST").filter(([url]) =>
+      String(url).endsWith("/model-profiles")
+    );
+    expect(JSON.parse(createOptions.body)).toEqual({
+      kind: "reranker",
+      name: "rerank-2.5",
+      provider: "voyage",
+      model: "rerank-2.5",
+      api_key: "pa-rerank-321",
+    });
+    expect(document.body.innerHTML).not.toContain("pa-rerank-321");
+    expect(rowByName(panel, "rerank-2.5").textContent).toContain("Voyage AI");
+  });
+
   it("embedding: thêm Voyage AI với khoá bắt buộc, số chiều tự điền, ghi chú đệm 0 và kiểm tra kết nối", async () => {
     const { fetchMock } = createFakeServer();
     vi.stubGlobal("fetch", fetchMock);

@@ -58,6 +58,12 @@ _PROVIDER_FIELDS: dict[tuple[str, str], dict[str, bool]] = {
     ("embedding", "openai_compatible"): {"base_url": True, "model": True, "dimension": True},
     ("reranker", "cross-encoder"): {"model": True},
     ("reranker", "rerank_api"): {"base_url": True, "model": True},
+    ("reranker", "cohere"): {"model": True},
+    ("reranker", "jina"): {"model": True},
+    ("reranker", "voyage"): {"model": True},
+    ("reranker", "pinecone"): {"model": True},
+    # TEI phục vụ đúng một mô hình nên không gửi tên mô hình; vẫn cần để hiển thị.
+    ("reranker", "tei"): {"base_url": True, "model": True},
 }
 PROVIDERS: dict[str, tuple[str, ...]] = {
     kind: tuple(provider for (k, provider) in _PROVIDER_FIELDS if k == kind) for kind in KINDS
@@ -66,10 +72,13 @@ PROVIDERS: dict[str, tuple[str, ...]] = {
 _KEYED = (
     {("llm", p) for p in PROVIDERS["llm"]}
     | {("embedding", p) for p in PROVIDERS["embedding"] if p != "sentence-transformers"}
-    | {("reranker", "rerank_api")}
+    | {("reranker", p) for p in PROVIDERS["reranker"] if p != "cross-encoder"}
 )
-# Profile bắt buộc có API key: embedding qua API của từng hãng không dự phòng khoá `.env` (D-04).
-_KEY_REQUIRED = {("embedding", p) for p in ("voyage", "cohere", "gemini", "jina")}
+# Profile bắt buộc có API key: embedding/reranker qua API của từng hãng không dự phòng khoá
+# `.env` (D-04).
+_KEY_REQUIRED = {("embedding", p) for p in ("voyage", "cohere", "gemini", "jina")} | {
+    ("reranker", p) for p in ("cohere", "jina", "voyage", "pinecone")
+}
 _URL_FIELDS = ("base_url", "endpoint")
 _PARAM_FIELDS = ("base_url", "endpoint", "deployment_name", "api_version", "dimension")
 _FIELD_LABELS = {
@@ -476,11 +485,13 @@ def resolve_llm_test_key(session: Session, provider: str, profile_id: str | None
     return "not-needed"
 
 
-def resolve_reranker_test_key(session: Session, profile_id: str | None, api_key: str | None) -> str | None:
+def resolve_reranker_test_key(
+    session: Session, provider: str, profile_id: str | None, api_key: str | None
+) -> str | None:
     """Khoá dùng cho POST /model-profiles/test-reranker: nhập tay > khoá profile reranker > không khoá.
 
-    Không dự phòng khoá `.env` (D-02) và chỉ lấy khoá của profile reranker, để khoá LLM
-    không bị gửi tới dịch vụ xếp hạng lại.
+    Không dự phòng khoá `.env` (D-02) và chỉ lấy khoá của profile reranker cùng nhà cung cấp,
+    để khoá LLM hay khoá của hãng khác không bị gửi tới dịch vụ xếp hạng lại.
     """
     key = _clean(api_key)
     if key:
@@ -490,7 +501,7 @@ def resolve_reranker_test_key(session: Session, profile_id: str | None, api_key:
     row = _get(session, profile_id)
     if row.kind != "reranker":
         raise ConfigValidationError("Cấu hình này không phải mô hình xếp hạng lại.")
-    return _profile_key_or_422(row)
+    return _profile_key_or_422(row) if row.provider == provider else None
 
 
 def resolve_embedding_test_key(

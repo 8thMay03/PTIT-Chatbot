@@ -45,12 +45,25 @@ export const RERANKER_PROVIDERS = [
     name: "Cross-Encoder",
     description: "Chấm điểm từng cặp câu hỏi–đoạn, chạy cục bộ. Chính xác hơn heuristic, chậm hơn.",
   },
+  { key: "cohere", name: "Cohere", description: "API Rerank của Cohere (rerank-v3.5, rerank-v4.0…), đa ngôn ngữ." },
+  { key: "jina", name: "Jina AI", description: "API Reranker của Jina AI (jina-reranker-v3, v2 multilingual)." },
+  { key: "voyage", name: "Voyage AI", description: "API Rerank của Voyage AI (rerank-2.5, rerank-2.5-lite)." },
+  { key: "pinecone", name: "Pinecone", description: "Rerank qua Pinecone Inference (bge-reranker-v2-m3, Cohere)." },
+  {
+    key: "tei",
+    name: "HF TEI",
+    description: "Máy chủ Text Embeddings Inference tự host chạy mô hình reranker (BGE, GTE).",
+  },
   {
     key: "rerank_api",
     name: "Rerank API",
-    description: "Gọi dịch vụ /rerank chuẩn Cohere (Cohere, Jina, vLLM, Infinity…) qua Base URL.",
+    description: "Endpoint /rerank chuẩn Cohere bất kỳ (vLLM, Infinity, LiteLLM…) qua Base URL.",
   },
 ];
+
+/** Reranker gọi dịch vụ ngoài (khớp `API_RERANK_PROVIDERS` ở backend). */
+export const API_RERANKER_PROVIDERS = ["cohere", "jina", "voyage", "pinecone", "tei", "rerank_api"];
+const RERANKER_BASE_URL_PROVIDERS = ["tei", "rerank_api"];
 
 export const COMPATIBLE_PRESETS = [
   { key: "ollama", label: "Ollama", baseUrl: "http://localhost:11434/v1", model: "qwen2.5:7b" },
@@ -270,6 +283,54 @@ const FIELDS = {
         hint: "Dịch vụ lỗi hoặc quá 8 giây thì câu hỏi đó dùng heuristic.",
       },
     ],
+    cohere: [
+      {
+        ...MODEL_FIELD,
+        placeholder: "rerank-v3.5",
+        suggestions: ["rerank-v3.5", "rerank-v4.0-pro", "rerank-v4.0-fast", "rerank-multilingual-v3.0"],
+        hint: "Các mô hình này đều hỗ trợ tiếng Việt. Dịch vụ lỗi hoặc quá 8 giây thì câu hỏi đó dùng heuristic.",
+      },
+    ],
+    jina: [
+      {
+        ...MODEL_FIELD,
+        placeholder: "jina-reranker-v3",
+        suggestions: ["jina-reranker-v3", "jina-reranker-v2-base-multilingual"],
+        hint: "Dịch vụ lỗi hoặc quá 8 giây thì câu hỏi đó dùng heuristic.",
+      },
+    ],
+    voyage: [
+      {
+        ...MODEL_FIELD,
+        placeholder: "rerank-2.5",
+        suggestions: ["rerank-2.5", "rerank-2.5-lite"],
+        hint: "rerank-2.5 và rerank-2.5-lite đa ngôn ngữ. Dịch vụ lỗi hoặc quá 8 giây thì câu hỏi đó dùng heuristic.",
+      },
+    ],
+    pinecone: [
+      {
+        ...MODEL_FIELD,
+        placeholder: "bge-reranker-v2-m3",
+        suggestions: ["bge-reranker-v2-m3", "cohere-rerank-4-fast"],
+        hint: "bge-reranker-v2-m3 nhận tối đa 100 đoạn mỗi lần (Top-K × hệ số ứng viên); cohere-rerank-4-fast cần gói Standard.",
+      },
+    ],
+    tei: [
+      {
+        name: "base_url",
+        label: "Base URL",
+        required: true,
+        url: true,
+        placeholder: "http://localhost:8080",
+        hint: "Địa chỉ máy chủ TEI, tới trước /rerank. Host phải nằm trong LLM_BASE_URL_ALLOWLIST.",
+      },
+      {
+        ...MODEL_FIELD,
+        placeholder: "BAAI/bge-reranker-v2-m3",
+        suggestions: ["BAAI/bge-reranker-v2-m3", "BAAI/bge-reranker-base", "Alibaba-NLP/gte-multilingual-reranker-base"],
+        hint: "Mô hình máy chủ TEI đang chạy (--model-id), chỉ để hiển thị. TEI mặc định nhận tối đa 32 đoạn mỗi lần (--max-client-batch-size).",
+      },
+    ],
   },
 };
 
@@ -292,19 +353,26 @@ const KEY_RULES = {
     jina: { envFallback: false, required: true },
     openai_compatible: { envFallback: false },
   },
-  reranker: { rerank_api: { envFallback: false } },
+  reranker: {
+    cohere: { envFallback: false, required: true },
+    jina: { envFallback: false, required: true },
+    voyage: { envFallback: false, required: true },
+    pinecone: { envFallback: false, required: true },
+    tei: { envFallback: false },
+    rerank_api: { envFallback: false },
+  },
 };
 
 /** Nhà cung cấp có nút "Kiểm tra kết nối" trong hộp thoại thêm/sửa. */
 export function canTestConnection(kind, provider) {
   if (kind === "embedding") return provider !== "sentence-transformers";
-  return kind === "llm" || (kind === "reranker" && provider === "rerank_api");
+  return kind === "llm" || (kind === "reranker" && API_RERANKER_PROVIDERS.includes(provider));
 }
 
 /** Nhà cung cấp gửi nội dung đoạn tài liệu ra dịch vụ ngoài: hộp thoại ghi chú cho admin. */
 export function sendsDocumentsToService(kind, provider) {
   if (kind === "embedding") return provider !== "sentence-transformers";
-  return kind === "reranker" && provider === "rerank_api";
+  return kind === "reranker" && API_RERANKER_PROVIDERS.includes(provider);
 }
 
 export const KINDS = {
@@ -435,7 +503,7 @@ export function buildRerankerTestPayload(draft, profileId) {
   return {
     provider: draft.provider,
     model: trimmed(draft.model),
-    base_url: trimmed(draft.base_url),
+    base_url: RERANKER_BASE_URL_PROVIDERS.includes(draft.provider) ? trimmed(draft.base_url) : null,
     api_key: trimmed(draft.apiKey),
     profile_id: profileId ?? null,
   };

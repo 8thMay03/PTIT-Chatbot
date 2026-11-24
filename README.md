@@ -32,7 +32,7 @@ Thay vì để mô hình trả lời hoàn toàn từ kiến thức có sẵn, c
 | Vector database | **`pgvector`** (Tích hợp trực tiếp trong PostgreSQL 16 với HNSW Index) |
 | Keyword retrieval | BM25 với `rank-bm25` |
 | Data storage & Migration | PostgreSQL 16 với `pgvector` (Production) / SQLite (Dev), SQLAlchemy 2.0, Alembic, Psycopg 3 |
-| Reranking | Heuristic reranker hoặc CrossEncoder |
+| Reranking | Heuristic, CrossEncoder hoặc rerank API (Cohere, Jina, Voyage, Pinecone, HF TEI, chuẩn Cohere `/rerank`) |
 | Evaluation | Ragas, pytest |
 | Deployment | Docker, Docker Compose, Nginx |
 

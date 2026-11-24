@@ -161,7 +161,13 @@ from app.parsers import (
     resolve_parser_name,
 )
 from app.retrieval.bm25 import invalidate_bm25_cache
-from app.retrieval.reranker import RerankAPIError, call_rerank_api
+from app.retrieval.reranker import (
+    API_RERANK_PROVIDERS,
+    BASE_URL_RERANK_PROVIDERS,
+    RERANK_PROVIDER_LABELS,
+    RerankAPIError,
+    call_rerank_api,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -596,7 +602,8 @@ _RERANKER_TEST_DOCUMENTS = (
 _RERANKER_TEST_HINTS = {
     401: " Kiểm tra API key.",
     403: " Kiểm tra API key.",
-    404: " Kiểm tra Base URL (nhập tới trước /rerank).",
+    404: " Kiểm tra tên mô hình và Base URL (nhập tới trước /rerank).",
+    429: " Dịch vụ đang giới hạn tần suất; thử lại sau.",
 }
 
 
@@ -609,27 +616,33 @@ def test_model_profile_reranker(
     request: TestModelProfileRerankerRequest,
     session: Session = Depends(get_config_store_session),
 ) -> TestLLMResponse:
-    """Gửi một truy vấn mẫu với hai đoạn tới ``{base_url}/rerank``; không lưu gì."""
-    if request.provider != "rerank_api":
-        raise HTTPException(status_code=422, detail="Chỉ kiểm tra kết nối được cho Rerank API.")
-    base_url = (request.base_url or "").strip()
+    """Gửi một truy vấn mẫu với hai đoạn tới dịch vụ rerank; không lưu gì."""
+    provider = request.provider
+    if provider not in API_RERANK_PROVIDERS:
+        raise HTTPException(status_code=422, detail="Chỉ kiểm tra kết nối được cho reranker gọi qua API.")
+    label = RERANK_PROVIDER_LABELS[provider]
+    # Hãng có URL cố định: bỏ Base URL client gửi để khoá không đi tới host khác.
+    base_url = (request.base_url or "").strip() if provider in BASE_URL_RERANK_PROVIDERS else None
     model = (request.model or "").strip()
-    if not base_url:
+    if provider in BASE_URL_RERANK_PROVIDERS and not base_url:
         raise HTTPException(status_code=422, detail="Thiếu Base URL.")
     if not model:
         raise HTTPException(status_code=422, detail="Thiếu tên mô hình.")
     try:
         # Kiểm URL trước khi lấy khoá: khoá đã lưu không bao giờ bị gửi tới host lạ.
         validate_llm_url(base_url)
-        api_key = model_profiles.resolve_reranker_test_key(session, request.profile_id, request.api_key)
+        api_key = model_profiles.resolve_reranker_test_key(session, provider, request.profile_id, request.api_key)
     except model_profiles.ProfileNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ConfigValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not api_key and provider not in BASE_URL_RERANK_PROVIDERS:
+        raise HTTPException(status_code=422, detail="Nhập API key.")
 
     start_time = time.perf_counter()
     try:
         ranked = call_rerank_api(
+            provider=provider,
             base_url=base_url,
             model=model,
             api_key=api_key,
@@ -641,14 +654,14 @@ def test_model_profile_reranker(
         hint = _RERANKER_TEST_HINTS.get(exc.status_code, "")
         return TestLLMResponse(
             success=False,
-            message=f"Lỗi khi kết nối tới Rerank API: {exc.reason}.{hint}",
+            message=f"Lỗi khi kết nối tới {label}: {exc.reason}.{hint}",
             latency_ms=round((time.perf_counter() - start_time) * 1000, 1),
         )
     latency_ms = round((time.perf_counter() - start_time) * 1000, 1)
     scores = ", ".join(f"#{index + 1}: {score:.3f}" for index, score in sorted(ranked, key=lambda item: -item[1]))
     return TestLLMResponse(
         success=True,
-        message=f"Kết nối thành công tới Rerank API ({model}).",
+        message=f"Kết nối thành công tới {label} ({model}).",
         latency_ms=latency_ms,
         sample_output=f"Điểm liên quan {scores}",
     )

@@ -15,6 +15,30 @@ logger = logging.getLogger(__name__)
 # Thời gian chờ tối đa của một lần gọi /rerank; quá hạn thì câu hỏi dùng heuristic (D-04).
 RERANK_API_TIMEOUT_SECONDS = 8.0
 
+# Reranker gọi dịch vụ ngoài: điểm tuyệt đối (dùng được cho confidence gate) và gửi nội dung
+# đoạn tài liệu ra ngoài. ``rerank_api`` là endpoint chuẩn Cohere bất kỳ do admin nhập.
+API_RERANK_PROVIDERS = ("rerank_api", "cohere", "jina", "voyage", "pinecone", "tei")
+RERANK_PROVIDER_LABELS = {
+    "rerank_api": "Rerank API",
+    "cohere": "Cohere",
+    "jina": "Jina AI",
+    "voyage": "Voyage AI",
+    "pinecone": "Pinecone",
+    "tei": "HF TEI",
+}
+# Dịch vụ của từng hãng: URL cố định trong code (không qua allowlist) và bắt buộc API key.
+FIXED_RERANK_URLS = {
+    "cohere": "https://api.cohere.com/v2/rerank",
+    "jina": "https://api.jina.ai/v1/rerank",
+    "voyage": "https://api.voyageai.com/v1/rerank",
+    "pinecone": "https://api.pinecone.io/rerank",
+}
+KEY_REQUIRED_RERANK_PROVIDERS = frozenset(FIXED_RERANK_URLS)
+# Base URL do admin nhập (tới trước ``/rerank``), kiểm qua allowlist mỗi lần gọi.
+BASE_URL_RERANK_PROVIDERS = frozenset({"rerank_api", "tei"})
+# Pinecone bắt buộc chọn phiên bản API; thiếu header thì dùng bản cũ nhất còn hỗ trợ.
+PINECONE_API_VERSION = "2026-07"
+
 
 class RerankAPIError(Exception):
     """Gọi /rerank thất bại. ``reason`` chỉ gồm loại lỗi/mã HTTP: an toàn để ghi log
@@ -27,7 +51,7 @@ class RerankAPIError(Exception):
 
 
 class Reranker:
-    """Rerank hybrid candidates with a local heuristic, a CrossEncoder or a /rerank API."""
+    """Rerank hybrid candidates with a local heuristic, a CrossEncoder or a rerank API."""
 
     def __init__(self) -> None:
         self._cross_encoder: Any | None = None
@@ -38,7 +62,7 @@ class Reranker:
             return []
 
         provider = settings.reranker_provider
-        if provider in ("cross-encoder", "rerank_api"):
+        if provider == "cross-encoder" or provider in API_RERANK_PROVIDERS:
             try:
                 if provider == "cross-encoder":
                     return self._cross_encoder_rerank(query, contexts, top_k)
@@ -50,6 +74,7 @@ class Reranker:
 
     def _api_rerank(self, query: str, contexts: list[dict], top_k: int) -> list[dict]:
         ranked = call_rerank_api(
+            provider=settings.reranker_provider,
             base_url=settings.reranker_base_url,
             model=settings.reranker_model,
             api_key=settings.reranker_api_key,
@@ -94,6 +119,7 @@ class Reranker:
 
 def call_rerank_api(
     *,
+    provider: str = "rerank_api",
     base_url: str | None,
     model: str | None,
     api_key: str | None,
@@ -102,26 +128,23 @@ def call_rerank_api(
     top_n: int,
     timeout: float = RERANK_API_TIMEOUT_SECONDS,
 ) -> list[tuple[int, float]]:
-    """Gọi ``POST {base_url}/rerank`` (chuẩn Cohere); trả về ``[(index, relevance_score)]``.
+    """Xếp hạng lại ``documents`` qua dịch vụ ``provider``; trả về ``[(index, điểm)]``.
 
-    Lỗi bất kỳ (URL ngoài allowlist, timeout, mạng, HTTP không thành công, response sai
-    định dạng, ``index`` ngoài phạm vi) raise ``RerankAPIError``.
+    Lỗi bất kỳ (thiếu cấu hình, URL ngoài allowlist, timeout, mạng, HTTP không thành công,
+    response sai định dạng, ``index`` ngoài phạm vi) raise ``RerankAPIError``.
     """
-    if not base_url or not model:
-        raise RerankAPIError("missing_config")
-    try:
-        # Kiểm lại mỗi lần gọi: allowlist có thể đã bị thu hẹp sau khi lưu cấu hình.
-        validate_llm_url(base_url)
-    except ConfigValidationError:
-        raise RerankAPIError("url_not_allowed") from None
-
-    headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-    body = {"model": model, "query": query, "documents": documents, "top_n": top_n}
+    url, headers, body = build_rerank_request(
+        provider=provider,
+        base_url=base_url,
+        model=model,
+        api_key=api_key,
+        query=query,
+        documents=documents,
+        top_n=top_n,
+    )
     try:
         # Không theo redirect: đích chuyển hướng không qua allowlist.
-        response = httpx.post(f"{base_url.rstrip('/')}/rerank", json=body, headers=headers, timeout=timeout)
+        response = httpx.post(url, json=body, headers=headers, timeout=timeout)
     except httpx.TimeoutException:
         raise RerankAPIError("timeout") from None
     except httpx.HTTPError as exc:
@@ -133,16 +156,87 @@ def call_rerank_api(
         payload = response.json()
     except ValueError:
         raise RerankAPIError("invalid_json") from None
+    ranked = parse_rerank_response(provider, payload, len(documents))
+    # TEI không nhận top_n và trả điểm của mọi đoạn.
+    return sorted(ranked, key=lambda item: -item[1])[:top_n] if provider == "tei" else ranked
 
-    results = payload.get("results") if isinstance(payload, dict) else None
+
+def build_rerank_request(
+    *,
+    provider: str,
+    base_url: str | None,
+    model: str | None,
+    api_key: str | None,
+    query: str,
+    documents: list[str],
+    top_n: int,
+) -> tuple[str, dict, dict]:
+    """(url, headers, body) theo định dạng của từng dịch vụ; cấu hình thiếu/sai thì ``RerankAPIError``."""
+    if provider not in API_RERANK_PROVIDERS:
+        raise RerankAPIError("unsupported_provider")
+    if not model:
+        raise RerankAPIError("missing_config")
+    if provider in KEY_REQUIRED_RERANK_PROVIDERS:
+        if not api_key:
+            raise RerankAPIError("missing_api_key")
+        url = FIXED_RERANK_URLS[provider]
+    else:
+        if not base_url:
+            raise RerankAPIError("missing_config")
+        try:
+            # Kiểm lại mỗi lần gọi: allowlist có thể đã bị thu hẹp sau khi lưu cấu hình.
+            validate_llm_url(base_url)
+        except ConfigValidationError:
+            raise RerankAPIError("url_not_allowed") from None
+        url = f"{base_url.rstrip('/')}/rerank"
+
+    headers = {"Content-Type": "application/json"}
+    if provider == "pinecone":
+        headers["Api-Key"] = api_key
+        headers["X-Pinecone-Api-Version"] = PINECONE_API_VERSION
+    elif api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    if provider == "tei":
+        body: dict[str, Any] = {"query": query, "texts": documents}
+    elif provider == "voyage":
+        body = {"model": model, "query": query, "documents": documents, "top_k": top_n}
+    elif provider == "pinecone":
+        body = {
+            "model": model,
+            "query": query,
+            "documents": [{"text": text} for text in documents],
+            "top_n": top_n,
+            "return_documents": False,
+        }
+    else:
+        body = {"model": model, "query": query, "documents": documents, "top_n": top_n}
+        if provider == "jina":
+            body["return_documents"] = False
+    return url, headers, body
+
+
+def parse_rerank_response(provider: str, payload: Any, count: int) -> list[tuple[int, float]]:
+    """``[(index, điểm)]`` từ response; sai định dạng thì ``RerankAPIError``.
+
+    Cohere, Jina, ``rerank_api``: ``results[].relevance_score``; Voyage: ``data[].relevance_score``;
+    Pinecone: ``data[].score``; TEI: mảng ``[{index, score}]``.
+    """
+    if provider == "tei":
+        results = payload
+    elif isinstance(payload, dict):
+        results = payload.get("data" if provider in ("voyage", "pinecone") else "results")
+    else:
+        results = None
     if not isinstance(results, list) or not results:
         raise RerankAPIError("invalid_response")
+    score_field = "score" if provider in ("pinecone", "tei") else "relevance_score"
     ranked: list[tuple[int, float]] = []
     seen: set[int] = set()
     for result in results:
         index = result.get("index") if isinstance(result, dict) else None
-        score = result.get("relevance_score") if isinstance(result, dict) else None
-        if not isinstance(index, int) or isinstance(index, bool) or not 0 <= index < len(documents) or index in seen:
+        score = result.get(score_field) if isinstance(result, dict) else None
+        if not isinstance(index, int) or isinstance(index, bool) or not 0 <= index < count or index in seen:
             raise RerankAPIError("invalid_index")
         if not isinstance(score, (int, float)) or isinstance(score, bool) or not math.isfinite(score):
             raise RerankAPIError("invalid_score")
@@ -155,9 +249,12 @@ def _log_fallback(provider: str, exc: Exception) -> None:
     """Cảnh báo khi quay về heuristic (D-04/D-05): chỉ provider, mô hình, host và loại lỗi."""
     reason = exc.reason if isinstance(exc, RerankAPIError) else type(exc).__name__
     host = None
-    if provider == "rerank_api" and settings.reranker_base_url:
+    url = FIXED_RERANK_URLS.get(provider) or (
+        settings.reranker_base_url if provider in BASE_URL_RERANK_PROVIDERS else None
+    )
+    if url:
         try:
-            parts = urlsplit(settings.reranker_base_url)
+            parts = urlsplit(url)
             host = parts.hostname
             if host and parts.port:
                 host = f"{host}:{parts.port}"

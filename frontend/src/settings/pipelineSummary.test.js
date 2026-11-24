@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULTS } from "../lib/configDraft";
-import { RERANKER_PROVIDER_LABELS, pipelineSummary, rerankScoreApplies, shortModelName } from "./pipelineSummary";
+import {
+  RERANKER_PROVIDER_LABELS,
+  isApiReranker,
+  pipelineSummary,
+  rerankScoreApplies,
+  shortModelName,
+} from "./pipelineSummary";
 
 const config = {
   llm: { model: "gpt-4.1-mini" },
@@ -62,7 +68,19 @@ describe("pipelineSummary", () => {
     );
     expect(rerankScoreApplies("rerank_api")).toBe(true);
     expect(rerankScoreApplies("heuristic")).toBe(false);
-    expect(RERANKER_PROVIDER_LABELS).not.toHaveProperty("cohere");
+  });
+
+  it("reranker của hãng: hiện tên hãng và áp ngưỡng rerank như Rerank API", () => {
+    const cohereConfig = { ...config, reranker: { provider: "cohere", model: "rerank-v3.5" } };
+    const summary = pipelineSummary({ ...DEFAULTS, minRerankScore: 0.3 }, cohereConfig, { vector: 0.37 });
+    expect(summary.reranker[0]).toBe("Cohere · rerank-v3.5");
+    expect(summary.gate[2]).toBe("Rerank ≥ 0.30");
+    ["cohere", "jina", "voyage", "pinecone", "tei"].forEach((provider) => {
+      expect(rerankScoreApplies(provider)).toBe(true);
+      expect(isApiReranker(provider)).toBe(true);
+    });
+    expect(isApiReranker("cross-encoder")).toBe(false);
+    expect(isApiReranker("toString")).toBe(false);
   });
 
   it("chưa có bản nháp thì trả danh sách rỗng", () => {
