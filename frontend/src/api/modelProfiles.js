@@ -54,3 +54,12 @@ export function testLlm(payload) {
     timeout: 60_000,
   });
 }
+
+/** Hỏi nhà cung cấp danh sách mô hình khả dụng; máy chủ chờ tối đa 10 giây mỗi request. */
+export function listModels(payload) {
+  return request("model-profiles/list-models", {
+    method: "POST",
+    body: payload,
+    timeout: 30_000,
+  });
+}

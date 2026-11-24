@@ -8,6 +8,8 @@ import {
   Cpu,
   Eye,
   EyeOff,
+  ListRestart,
+  Loader2,
   MessageSquareText,
   Server,
   TreePine,
@@ -174,7 +176,7 @@ export function ChoiceGroup({ kind, name, legend, options, value, onChange }) {
     <fieldset className="mdl-choice-group">
       <legend>{legend}</legend>
       <div className="mdl-choices">
-        {options.map(({ key, name: label, description }) => (
+        {options.map(({ key, name: label }) => (
           <label key={key} className={`mdl-choice ${value === key ? "is-selected" : ""}`}>
             <input type="radio" name={name} value={key} checked={value === key} onChange={() => onChange(key)} />
             <span className="mdl-choice-icon" aria-hidden="true">
@@ -182,7 +184,6 @@ export function ChoiceGroup({ kind, name, legend, options, value, onChange }) {
             </span>
             <span className="mdl-choice-text">
               <strong>{label}</strong>
-              <span>{description}</span>
             </span>
           </label>
         ))}
@@ -191,7 +192,7 @@ export function ChoiceGroup({ kind, name, legend, options, value, onChange }) {
   );
 }
 
-export function TextField({ id, field, value, onChange, error }) {
+export function TextField({ id, field, value, onChange, onBlur, error }) {
   const listId = field.suggestions ? `${id}-suggestions` : undefined;
   const hintId = `${id}-hint`;
   const describedBy = [error ? `${id}-error` : null, field.hint ? hintId : null].filter(Boolean).join(" ");
@@ -214,6 +215,7 @@ export function TextField({ id, field, value, onChange, error }) {
         aria-invalid={Boolean(error)}
         aria-describedby={describedBy || undefined}
         onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
       />
       {listId && (
         <datalist id={listId}>
@@ -237,6 +239,111 @@ export function TextField({ id, field, value, onChange, error }) {
 }
 
 /**
+ * Ô "Mô hình" lấy được danh sách từ nhà cung cấp. Đã tải danh sách thì chọn trong ô chọn,
+ * vẫn chuyển được sang gõ tay (máy chủ có thể không liệt kê đủ mô hình dùng được).
+ *
+ * `listing`: `{ status: "idle" | "loading" | "ok" | "error", models, message }`.
+ * `mode`: `"select"` hoặc `"text"`; chỉ có tác dụng khi đã có danh sách.
+ */
+export function ModelField({ id, field, value, onChange, error, listing, onLoad, mode, onModeChange }) {
+  const { status, models = [], message } = listing;
+  const hasList = status === "ok" && models.length > 0;
+  const useSelect = hasList && mode === "select";
+  const trimmed = value.trim();
+  const statusId = `${id}-list-status`;
+  const hintId = `${id}-hint`;
+  const describedBy = [error ? `${id}-error` : null, status === "error" ? statusId : null, field.hint ? hintId : null]
+    .filter(Boolean)
+    .join(" ");
+  // Gõ tay: gợi ý gồm mô hình đã tải rồi tới gợi ý có sẵn.
+  const suggestions = [...new Set([...(hasList ? models : []), ...(field.suggestions ?? [])])];
+  const listId = suggestions.length ? `${id}-suggestions` : undefined;
+  const inputProps = {
+    id,
+    className: `mdl-input ${error ? "is-invalid" : ""}`,
+    value,
+    "aria-invalid": Boolean(error),
+    "aria-describedby": describedBy || undefined,
+    onChange: (event) => onChange(event.target.value),
+  };
+
+  // Chỉ báo khi không có gì để chọn; tải thành công thì ô chọn đã đủ rõ.
+  let statusNode = null;
+  if (status === "error") {
+    statusNode = (
+      <span className="mdl-field-error" id={statusId} role="alert">
+        Không tải được danh sách: {message}
+      </span>
+    );
+  } else if (status === "ok" && !hasList) {
+    statusNode = (
+      <span className="mdl-field-hint" id={statusId} role="status">
+        {message || "Không có mô hình nào."}
+      </span>
+    );
+  }
+
+  return (
+    <div className="mdl-field">
+      <div className="mdl-field-label-row">
+        <label htmlFor={id}>{field.label}</label>
+        <button type="button" className="mdl-link-btn mdl-list-btn" onClick={onLoad} disabled={status === "loading"}>
+          {status === "loading" ? <Loader2 size={13} className="spin" /> : <ListRestart size={13} />}
+          {status === "loading" ? "Đang tải..." : hasList ? "Tải lại danh sách" : "Tải danh sách"}
+        </button>
+      </div>
+      {useSelect ? (
+        <select {...inputProps}>
+          <option value="">— Chọn trong {models.length} mô hình —</option>
+          {trimmed && !models.includes(trimmed) && <option value={value}>{trimmed}</option>}
+          {models.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          {...inputProps}
+          type="text"
+          placeholder={field.placeholder}
+          list={listId}
+          spellCheck={false}
+          autoComplete="off"
+        />
+      )}
+      {!useSelect && listId && (
+        <datalist id={listId}>
+          {suggestions.map((item) => (
+            <option key={item} value={item} />
+          ))}
+        </datalist>
+      )}
+      {error && (
+        <span className="mdl-field-error" id={`${id}-error`}>
+          {error}
+        </span>
+      )}
+      {statusNode}
+      {hasList && (
+        <button
+          type="button"
+          className="mdl-link-btn mdl-list-mode"
+          onClick={() => onModeChange(useSelect ? "text" : "select")}
+        >
+          {useSelect ? "Nhập tên khác" : `Chọn trong danh sách (${models.length})`}
+        </button>
+      )}
+      {field.hint && (
+        <span className="mdl-field-hint" id={hintId}>
+          {field.hint}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
  * Ô API key của một profile. Khoá đã lưu không bao giờ hiển thị lại; để trống khi sửa
  * là giữ khoá cũ, "Xoá khoá đã lưu" để quay về khoá `.env` (nếu nhà cung cấp cho phép).
  */
@@ -245,20 +352,14 @@ export function ApiKeyField({
   value,
   onChange,
   hasKey,
-  envFallback,
   required = false,
   clearKey,
   onClearKeyChange,
-  envKeyLabel,
+  onBlur,
   error,
 }) {
   const [visible, setVisible] = useState(false);
-  const hintId = `${id}-hint`;
-  const describedBy = [error ? `${id}-error` : null, hintId].filter(Boolean).join(" ");
   const keepsStoredKey = hasKey && !clearKey;
-  let placeholder = "Dán API key";
-  if (keepsStoredKey) placeholder = "Để trống để giữ khoá đã lưu";
-  else if (envFallback) placeholder = `Để trống để dùng ${envKeyLabel}`;
 
   return (
     <div className="mdl-field">
@@ -268,8 +369,6 @@ export function ApiKeyField({
           <StatusPill tone="ok">
             <Check size={12} /> Đã lưu khoá
           </StatusPill>
-        ) : envFallback ? (
-          <StatusPill>Dùng {envKeyLabel} nếu để trống</StatusPill>
         ) : required ? (
           <StatusPill>Bắt buộc</StatusPill>
         ) : (
@@ -282,12 +381,12 @@ export function ApiKeyField({
           type={visible ? "text" : "password"}
           className={`mdl-input ${error ? "is-invalid" : ""}`}
           value={value}
-          placeholder={placeholder}
           autoComplete="new-password"
           spellCheck={false}
           aria-invalid={Boolean(error)}
-          aria-describedby={describedBy}
+          aria-describedby={error ? `${id}-error` : undefined}
           onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
         />
         <button
           type="button"
@@ -304,9 +403,6 @@ export function ApiKeyField({
           {error}
         </span>
       )}
-      <span className="mdl-field-hint" id={hintId}>
-        Khoá được mã hoá trước khi lưu trên máy chủ, không lưu trong trình duyệt và không bao giờ hiển thị lại.
-      </span>
       {hasKey && !required && (
         <button
           type="button"

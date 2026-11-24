@@ -23,7 +23,7 @@ function baseConfig() {
 }
 
 /** Máy chủ giả giữ kho mô hình trong bộ nhớ, theo hợp đồng /api/model-profiles. */
-function createFakeServer({ profiles = [], active = {}, runtime = {} } = {}) {
+function createFakeServer({ profiles = [], active = {}, runtime = {}, listModels } = {}) {
   const state = {
     profiles: [...profiles],
     active: { llm: null, embedding: null, reranker: null, ...active },
@@ -67,6 +67,9 @@ function createFakeServer({ profiles = [], active = {}, runtime = {} } = {}) {
     }
     if (path === "model-profiles/test-reranker") {
       return jsonResponse({ success: true, message: "Kết nối thành công tới Rerank API.", latency_ms: 42 });
+    }
+    if (path === "model-profiles/list-models") {
+      return jsonResponse(listModels ? listModels(body) : { success: true, message: null, models: [] });
     }
     if (path === "model-profiles/activate") {
       state.active[body.kind] = body.profile_id;
@@ -224,6 +227,15 @@ describe("ModelsView — kho mô hình theo loại", () => {
     const modelInput = await waitFor(() => dialog()?.querySelector("#mdl-llm-form-model"));
     expect(dialog().getAttribute("role")).toBe("dialog");
     expect(document.activeElement).toBe(dialog().querySelector("#mdl-llm-form-name"));
+    // Hộp thoại thêm mới không có mô tả phụ: không mô tả đầu hộp thoại, nhà cung cấp hay ô khoá.
+    expect(dialog().querySelector(".mdl-dialog-heading p")).toBeNull();
+    expect(dialog().querySelector(".mdl-choice-text span")).toBeNull();
+    expect(dialog().querySelector("#mdl-llm-form-key-hint")).toBeNull();
+    expect(modelInput.hasAttribute("placeholder")).toBe(false);
+    expect(dialog().querySelector("#mdl-llm-form-key").hasAttribute("placeholder")).toBe(false);
+    // OpenAI dự phòng khoá `.env` nhưng không ghi tên biến; ô khoá chỉ báo "Không bắt buộc".
+    expect(dialog().textContent).not.toContain(".env");
+    expect(dialog().textContent).toContain("Không bắt buộc");
     await changeInput(modelInput, "gpt-4.1");
     await changeInput(dialog().querySelector("#mdl-llm-form-key"), "sk-secret-123");
     await click(buttonByText(dialog(), "Thêm vào kho"));
@@ -291,7 +303,7 @@ describe("ModelsView — kho mô hình theo loại", () => {
     expect(dialog()).toBeNull();
   });
 
-  it("reranker: thêm Rerank API có Base URL, khoá tuỳ chọn, ghi chú gửi dữ liệu và kiểm tra kết nối", async () => {
+  it("reranker: thêm Rerank API có Base URL, khoá tuỳ chọn và kiểm tra kết nối", async () => {
     const { fetchMock } = createFakeServer();
     vi.stubGlobal("fetch", fetchMock);
     await render("reranker");
@@ -306,7 +318,14 @@ describe("ModelsView — kho mô hình theo loại", () => {
 
     await click(dialog().querySelector('input[type="radio"][value="rerank_api"]'));
     await waitFor(() => dialog().querySelector("#mdl-reranker-form-base_url"));
-    expect(dialog().textContent).toContain("Nội dung các đoạn tài liệu được gửi tới dịch vụ này.");
+    // Mọi nhà cung cấp reranker: không placeholder, không gợi ý dưới ô.
+    for (const provider of ["cohere", "jina", "voyage", "pinecone", "tei", "rerank_api"]) {
+      await click(dialog().querySelector(`input[type="radio"][value="${provider}"]`));
+      for (const input of dialog().querySelectorAll(".mdl-grid input, #mdl-reranker-form-key")) {
+        expect(input.hasAttribute("placeholder")).toBe(false);
+      }
+      expect(dialog().querySelector(".mdl-field-hint")).toBeNull();
+    }
     expect(dialog().textContent).toContain("Không bắt buộc");
     await changeInput(dialog().querySelector("#mdl-reranker-form-base_url"), "https://api.cohere.com/v2");
     await changeInput(dialog().querySelector("#mdl-reranker-form-model"), "rerank-v3.5");
@@ -353,7 +372,6 @@ describe("ModelsView — kho mô hình theo loại", () => {
     await waitFor(() => dialog().querySelector("#mdl-reranker-form-key"));
     expect(dialog().querySelector("#mdl-reranker-form-base_url")).toBeNull();
     expect(dialog().textContent).toContain("Bắt buộc");
-    expect(dialog().textContent).toContain("Nội dung các đoạn tài liệu được gửi tới dịch vụ này.");
     await changeInput(dialog().querySelector("#mdl-reranker-form-model"), "rerank-2.5");
 
     // Thiếu khoá: không gửi gì, báo lỗi ở ô khoá.
@@ -389,7 +407,7 @@ describe("ModelsView — kho mô hình theo loại", () => {
     expect(rowByName(panel, "rerank-2.5").textContent).toContain("Voyage AI");
   });
 
-  it("embedding: thêm Voyage AI với khoá bắt buộc, số chiều tự điền, ghi chú đệm 0 và kiểm tra kết nối", async () => {
+  it("embedding: thêm Voyage AI với khoá bắt buộc, số chiều tự điền và kiểm tra kết nối", async () => {
     const { fetchMock } = createFakeServer();
     vi.stubGlobal("fetch", fetchMock);
     await render("embedding");
@@ -397,20 +415,17 @@ describe("ModelsView — kho mô hình theo loại", () => {
 
     await click(buttonByText(panel, "Thêm mô hình"));
     await waitFor(() => dialog()?.querySelector("#mdl-embedding-form-model"));
-    // Sentence-Transformers chạy cục bộ: không khoá, không kiểm tra kết nối, không ghi chú gửi dữ liệu.
+    // Sentence-Transformers chạy cục bộ: không khoá, không kiểm tra kết nối.
     await click(dialog().querySelector('input[type="radio"][value="sentence-transformers"]'));
     await waitFor(() => !dialog().querySelector("#mdl-embedding-form-key"));
     expect(buttonByText(dialog(), "Kiểm tra kết nối")).toBeUndefined();
-    expect(dialog().textContent).not.toContain("được gửi tới dịch vụ này");
 
     await click(dialog().querySelector('input[type="radio"][value="voyage"]'));
     await waitFor(() => dialog().querySelector("#mdl-embedding-form-key"));
     expect(dialog().querySelector("#mdl-embedding-form-base_url")).toBeNull();
     expect(dialog().textContent).toContain("Bắt buộc");
-    expect(dialog().textContent).toContain("câu hỏi của sinh viên được gửi tới dịch vụ này");
     await changeInput(dialog().querySelector("#mdl-embedding-form-model"), "voyage-3.5");
     expect(dialog().querySelector("#mdl-embedding-form-dimension").value).toBe("1024");
-    expect(dialog().textContent).toContain("được thêm số 0 cho đủ");
 
     // Thiếu khoá: không gửi gì, báo lỗi ở ô khoá.
     await click(buttonByText(dialog(), "Thêm vào kho"));
@@ -512,5 +527,146 @@ describe("ModelsView — kho mô hình theo loại", () => {
     });
     // Backend vẫn chạy cấu hình .env cho tới khi khởi động lại.
     expect(panel.querySelector(".mdl-row.is-env").textContent).toContain("Đang chạy");
+  });
+
+  async function blur(input) {
+    await act(async () => {
+      input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    });
+  }
+
+  it("LLM tương thích OpenAI: rời ô Base URL thì tự tải danh sách, chọn mô hình trong ô chọn rồi lưu", async () => {
+    const { fetchMock } = createFakeServer({
+      listModels: () => ({ success: true, message: null, models: ["llama3.1:8b", "qwen2.5:7b"] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await render();
+    const panel = container.querySelector("#mdl-panel-llm");
+    await click(buttonByText(panel, "Thêm mô hình"));
+    await waitFor(() => dialog()?.querySelector("#mdl-llm-form-model"));
+    await click(dialog().querySelector('input[type="radio"][value="openai_compatible"]'));
+    const baseUrl = await waitFor(() => dialog().querySelector("#mdl-llm-form-base_url"));
+
+    // Ô trống: rời ô không gọi máy chủ.
+    await blur(baseUrl);
+    expect(requestsTo(fetchMock, "/model-profiles/list-models", "POST")).toHaveLength(0);
+
+    await changeInput(baseUrl, "http://localhost:11434/v1");
+    await blur(baseUrl);
+    const select = await waitFor(() => dialog().querySelector("select#mdl-llm-form-model"));
+    const [[, listOptions]] = requestsTo(fetchMock, "/model-profiles/list-models", "POST");
+    expect(JSON.parse(listOptions.body)).toEqual({
+      kind: "llm",
+      provider: "openai_compatible",
+      base_url: "http://localhost:11434/v1",
+      api_key: null,
+      profile_id: null,
+    });
+    expect([...select.options].map((option) => option.value)).toEqual(["", "llama3.1:8b", "qwen2.5:7b"]);
+
+    // Rời ô lần nữa với cùng cấu hình: không tải lại.
+    await blur(baseUrl);
+    expect(requestsTo(fetchMock, "/model-profiles/list-models", "POST")).toHaveLength(1);
+
+    await changeInput(select, "qwen2.5:7b");
+    // Chuyển sang gõ tay vẫn giữ giá trị và gợi ý từ danh sách.
+    await click(buttonByText(dialog(), "Nhập tên khác"));
+    const input = dialog().querySelector("input#mdl-llm-form-model");
+    expect(input.value).toBe("qwen2.5:7b");
+    expect([...dialog().querySelectorAll("#mdl-llm-form-model-suggestions option")].map((o) => o.value)).toContain(
+      "llama3.1:8b"
+    );
+    await click(buttonByText(dialog(), "Chọn trong danh sách (2)"));
+    expect(dialog().querySelector("select#mdl-llm-form-model").value).toBe("qwen2.5:7b");
+
+    await click(buttonByText(dialog(), "Thêm vào kho"));
+    await waitFor(() => rowByName(panel, "qwen2.5:7b"));
+    const [[, createOptions]] = requestsTo(fetchMock, "/model-profiles", "POST").filter(([url]) =>
+      String(url).endsWith("/model-profiles")
+    );
+    expect(JSON.parse(createOptions.body)).toMatchObject({ provider: "openai_compatible", model: "qwen2.5:7b" });
+  });
+
+  it("đổi Base URL thì ẩn danh sách cũ; lỗi từ nhà cung cấp hiện cạnh ô và vẫn gõ tay được", async () => {
+    const { fetchMock } = createFakeServer({
+      listModels: (body) =>
+        body.base_url === "http://localhost:8000/v1"
+          ? { success: false, message: "HTTP 401. Kiểm tra API key.", models: [] }
+          : { success: true, message: null, models: ["qwen2.5:7b"] },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await render();
+    await click(buttonByText(container.querySelector("#mdl-panel-llm"), "Thêm mô hình"));
+    await waitFor(() => dialog()?.querySelector("#mdl-llm-form-model"));
+    await click(dialog().querySelector('input[type="radio"][value="openai_compatible"]'));
+    const baseUrl = await waitFor(() => dialog().querySelector("#mdl-llm-form-base_url"));
+
+    // Bấm tay khi chưa có Base URL: báo thiếu, không gọi máy chủ.
+    await click(buttonByText(dialog(), "Tải danh sách"));
+    expect(dialog().textContent).toContain("Nhập Base URL trước.");
+    expect(requestsTo(fetchMock, "/model-profiles/list-models", "POST")).toHaveLength(0);
+
+    await changeInput(baseUrl, "http://localhost:11434/v1");
+    await click(buttonByText(dialog(), "Tải danh sách"));
+    // Máy chủ chỉ có một mô hình: điền luôn vào ô đang trống.
+    await waitFor(() => dialog().querySelector("select#mdl-llm-form-model")?.value === "qwen2.5:7b");
+
+    await changeInput(baseUrl, "http://localhost:8000/v1");
+    expect(dialog().querySelector("select#mdl-llm-form-model")).toBeNull();
+    expect(dialog().querySelector("input#mdl-llm-form-model").value).toBe("qwen2.5:7b");
+
+    await click(buttonByText(dialog(), "Tải danh sách"));
+    await waitFor(() => dialog().querySelector("#mdl-llm-form-model-list-status[role=alert]"));
+    expect(dialog().textContent).toContain("Không tải được danh sách: HTTP 401. Kiểm tra API key.");
+    expect(dialog().querySelector("input#mdl-llm-form-model")).not.toBeNull();
+  });
+
+  it("sửa profile: tải danh sách bằng khoá đã lưu; khoá bắt buộc thì báo thiếu khoá; Azure không có nút tải", async () => {
+    const { fetchMock } = createFakeServer({
+      profiles: [
+        { id: "r1", kind: "reranker", name: "Cohere", provider: "cohere", model: "rerank-v3.5", has_api_key: true },
+      ],
+      listModels: () => ({ success: true, message: null, models: ["rerank-v3.5", "rerank-v4.0-pro"] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await render("reranker");
+    const panel = container.querySelector("#mdl-panel-reranker");
+    await click(panel.querySelector('button[aria-label="Sửa Cohere"]'));
+    await waitFor(() => dialog()?.querySelector("#mdl-reranker-form-model"));
+
+    await click(buttonByText(dialog(), "Tải danh sách"));
+    const select = await waitFor(() => dialog().querySelector("select#mdl-reranker-form-model"));
+    expect(select.value).toBe("rerank-v3.5");
+    const [[, listOptions]] = requestsTo(fetchMock, "/model-profiles/list-models", "POST");
+    expect(JSON.parse(listOptions.body)).toEqual({
+      kind: "reranker",
+      provider: "cohere",
+      base_url: null,
+      api_key: null,
+      profile_id: "r1",
+    });
+
+    // Đổi sang Pinecone (khoá Cohere không dùng được): thiếu khoá, không gọi máy chủ.
+    await click(dialog().querySelector('input[type="radio"][value="pinecone"]'));
+    await click(buttonByText(dialog(), "Tải danh sách"));
+    expect(dialog().textContent).toContain("Nhập API key trước.");
+    expect(requestsTo(fetchMock, "/model-profiles/list-models", "POST")).toHaveLength(1);
+
+    // Cross-Encoder chạy cục bộ: không có nút tải.
+    await click(dialog().querySelector('input[type="radio"][value="cross-encoder"]'));
+    expect(buttonByText(dialog(), "Tải danh sách")).toBeUndefined();
+    await click(buttonByText(dialog(), "Huỷ"));
+
+    await render("llm");
+    await click(buttonByText(container.querySelector("#mdl-panel-llm"), "Thêm mô hình"));
+    await waitFor(() => dialog()?.querySelector("#mdl-llm-form-model"));
+    expect(buttonByText(dialog(), "Tải danh sách")).not.toBeUndefined();
+    await click(dialog().querySelector('input[type="radio"][value="azure"]'));
+    expect(buttonByText(dialog(), "Tải danh sách")).toBeUndefined();
+    // Azure: không placeholder, không gợi ý dưới ô.
+    for (const name of ["endpoint", "deployment_name", "api_version", "key"]) {
+      expect(dialog().querySelector(`#mdl-llm-form-${name}`).hasAttribute("placeholder")).toBe(false);
+    }
+    expect(dialog().querySelector(".mdl-field-hint")).toBeNull();
   });
 });

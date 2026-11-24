@@ -497,6 +497,21 @@ class TestModelProfileEmbeddingRequest(BaseModel):
     profile_id: str | None = None
 
 
+class ListProviderModelsRequest(BaseModel):
+    kind: ModelKind
+    provider: str = Field(max_length=50)
+    base_url: str | None = Field(default=None, max_length=2048)
+    api_key: str | None = Field(default=None, max_length=4096)
+    # Không nhập api_key thì dùng khoá đã lưu của profile này (cùng loại, cùng nhà cung cấp).
+    profile_id: str | None = None
+
+
+class ListProviderModelsResponse(BaseModel):
+    success: bool
+    message: str | None = None
+    models: list[str] = Field(default_factory=list)
+
+
 class ModelProfileItem(BaseModel):
     id: str
     kind: ModelKind

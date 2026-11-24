@@ -1,16 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
   KINDS,
+  KNOWN_EMBEDDING_DIMENSIONS,
   buildEmbeddingTestPayload,
+  buildListModelsPayload,
   buildPayload,
   buildRerankerTestPayload,
   buildTestPayload,
+  canListModels,
   canTestConnection,
   draftFromProfile,
   emptyDraft,
   isDraftDirty,
   keyRule,
-  sendsDocumentsToService,
+  listModelsBlocker,
+  modelListSignature,
+  providerFields,
   validateDraft,
 } from "./catalog";
 
@@ -29,8 +34,6 @@ describe("catalog kho mô hình", () => {
     expect(keyRule("reranker", "cross-encoder")).toBeNull();
     expect(canTestConnection("reranker", "rerank_api")).toBe(true);
     expect(canTestConnection("reranker", "cross-encoder")).toBe(false);
-    expect(sendsDocumentsToService("reranker", "rerank_api")).toBe(true);
-    expect(sendsDocumentsToService("reranker", "cross-encoder")).toBe(false);
 
     const empty = { ...emptyDraft("reranker"), provider: "rerank_api" };
     expect(validateDraft("reranker", empty)).toEqual({ base_url: "Nhập base url.", model: "Nhập mô hình." });
@@ -60,7 +63,6 @@ describe("catalog kho mô hình", () => {
     ["cohere", "jina", "voyage", "pinecone"].forEach((provider) => {
       expect(keyRule("reranker", provider)).toEqual({ envFallback: false, required: true });
       expect(canTestConnection("reranker", provider)).toBe(true);
-      expect(sendsDocumentsToService("reranker", provider)).toBe(true);
     });
     expect(keyRule("reranker", "tei")).toEqual({ envFallback: false });
 
@@ -107,8 +109,6 @@ describe("catalog kho mô hình", () => {
     expect(canTestConnection("embedding", "cohere")).toBe(true);
     expect(canTestConnection("embedding", "openai")).toBe(true);
     expect(canTestConnection("embedding", "sentence-transformers")).toBe(false);
-    expect(sendsDocumentsToService("embedding", "gemini")).toBe(true);
-    expect(sendsDocumentsToService("embedding", "sentence-transformers")).toBe(false);
 
     const voyage = { ...emptyDraft("embedding"), provider: "voyage", model: "voyage-3.5", dimension: "1024" };
     expect(validateDraft("embedding", voyage)).toEqual({ apiKey: "Nhập API key." });
@@ -212,5 +212,47 @@ describe("catalog kho mô hình", () => {
       api_key: null,
       profile_id: "p1",
     });
+  });
+
+  it("lấy danh sách mô hình: nhà cung cấp hỗ trợ, điều kiện gọi và payload", () => {
+    const listable = (kind) => KINDS[kind].providers.map((item) => item.key).filter((key) => canListModels(kind, key));
+    expect(listable("llm")).toEqual(["openai", "gemini", "openai_compatible"]);
+    expect(listable("embedding")).toEqual(["openai", "cohere", "gemini", "openai_compatible"]);
+    expect(listable("reranker")).toEqual(["cohere", "pinecone", "tei", "rerank_api"]);
+
+    const compatible = { ...emptyDraft("llm"), provider: "openai_compatible" };
+    expect(listModelsBlocker("llm", compatible)).toBe("Nhập Base URL trước.");
+    expect(listModelsBlocker("llm", { ...compatible, base_url: "localhost:11434" })).toMatch(/http/);
+    expect(listModelsBlocker("llm", { ...compatible, base_url: "http://localhost:11434/v1" })).toBeNull();
+    // OpenAI: Base URL tuỳ chọn, để trống thì máy chủ dùng khoá `.env`.
+    expect(listModelsBlocker("llm", emptyDraft("llm"))).toBeNull();
+
+    const cohere = { ...emptyDraft("reranker"), provider: "cohere" };
+    expect(listModelsBlocker("reranker", cohere)).toBe("Nhập API key trước.");
+    expect(listModelsBlocker("reranker", cohere, { hasStoredKey: true })).toBeNull();
+    expect(listModelsBlocker("reranker", { ...cohere, clearApiKey: true }, { hasStoredKey: true })).toBe(
+      "Nhập API key trước."
+    );
+
+    // Hãng có URL cố định không gửi Base URL; "Xoá khoá đã lưu" thì không gửi id profile.
+    expect(buildListModelsPayload("reranker", { ...cohere, base_url: "https://evil.example", apiKey: " k " }, "p1")).toEqual(
+      { kind: "reranker", provider: "cohere", base_url: null, api_key: "k", profile_id: "p1" }
+    );
+    expect(buildListModelsPayload("llm", { ...emptyDraft("llm"), clearApiKey: true }, "p1").profile_id).toBeNull();
+
+    // Chữ ký đổi khi Base URL/khoá đổi, không đổi khi sửa tên mô hình.
+    const signature = modelListSignature("llm", { ...compatible, base_url: "http://a/v1" });
+    expect(modelListSignature("llm", { ...compatible, base_url: "http://a/v1", model: "x" })).toBe(signature);
+    expect(modelListSignature("llm", { ...compatible, base_url: "http://b/v1" })).not.toBe(signature);
+    expect(modelListSignature("llm", { ...compatible, base_url: "http://a/v1", apiKey: "k" })).not.toBe(signature);
+  });
+
+  it("Voyage: gợi ý theo dòng mô hình hiện hành (voyage-4, rerank-3) và tự điền số chiều", () => {
+    const suggestions = (kind) => providerFields(kind, "voyage").find((field) => field.name === "model").suggestions;
+    expect(suggestions("embedding").slice(0, 3)).toEqual(["voyage-4-large", "voyage-4", "voyage-4-lite"]);
+    expect(suggestions("reranker").slice(0, 2)).toEqual(["rerank-3", "rerank-3-lite"]);
+    for (const model of ["voyage-4-large", "voyage-4", "voyage-4-lite"]) {
+      expect(KNOWN_EMBEDDING_DIMENSIONS[model]).toBe(1024);
+    }
   });
 });
