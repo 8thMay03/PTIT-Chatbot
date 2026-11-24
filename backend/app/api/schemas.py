@@ -341,7 +341,7 @@ class AvailableProviders(BaseModel):
         "jina",
         "openai_compatible",
     ]
-    reranker: list[str] = ["heuristic", "cross-encoder", "rerank_api"]
+    reranker: list[str] = ["heuristic", "cross-encoder", "rerank_api", "cohere", "jina", "voyage", "pinecone", "tei"]
 
 
 class ConfigPersistenceInfo(BaseModel):

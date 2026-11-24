@@ -14,7 +14,7 @@ import {
   mergeConfigDraft,
   valuesFromConfig,
 } from "./lib/configDraft";
-import { RERANKER_PROVIDER_LABELS, rerankScoreApplies, shortModelName } from "./settings/pipelineSummary";
+import { RERANKER_PROVIDER_LABELS, isApiReranker, rerankScoreApplies, shortModelName } from "./settings/pipelineSummary";
 import Modal from "./components/Modal";
 import SaveBar from "./components/SaveBar";
 import { useToast } from "./components/Toast";
@@ -231,8 +231,8 @@ export default function ConfigView({ activeSection = "retrieval", lead = null, o
   const rerankerProvider = configQuery.data?.reranker?.provider;
   const rerankerModel = configQuery.data?.reranker?.model;
   const rerankApplies = values.rerankerEnabled && rerankScoreApplies(rerankerProvider);
-  // Rerank API: relevance_score thường trong [0, 1], không phải logit như Cross-Encoder.
-  const rerankIsApi = rerankerProvider === "rerank_api";
+  // Reranker qua API: điểm liên quan thường trong [0, 1], không phải logit như Cross-Encoder.
+  const rerankIsApi = isApiReranker(rerankerProvider);
   const rerankerModelLabel =
     rerankerProvider === "heuristic" ? "Heuristic" : shortModelName(rerankerModel);
 
@@ -663,7 +663,7 @@ export default function ConfigView({ activeSection = "retrieval", lead = null, o
                     </div>
                     <span className="config-hint-text">
                       {rerankIsApi
-                        ? "Điểm relevance_score do Rerank API trả về cho đoạn khớp nhất. Chưa có giá trị hiệu chỉnh: nhập ngưỡng để dùng tín hiệu này."
+                        ? `Điểm liên quan (0–1) do ${RERANKER_PROVIDER_LABELS[rerankerProvider]} trả về cho đoạn khớp nhất. Chưa có giá trị hiệu chỉnh: nhập ngưỡng để dùng tín hiệu này.`
                         : "Điểm Cross-Encoder (logit) của đoạn khớp nhất sau khi xếp hạng lại."}
                     </span>
                     {uncalibratedWarning(rerankOverride, calibrated.rerank, shortModelName(rerankerModel))}
@@ -699,7 +699,7 @@ export default function ConfigView({ activeSection = "retrieval", lead = null, o
                   <p className="config-gate-na" data-testid="gate-rerank-na">
                     <span>Điểm xếp hạng lại tối thiểu:</span>{" "}
                     {values.rerankerEnabled
-                      ? `không áp dụng với ${RERANKER_PROVIDER_LABELS[rerankerProvider] ?? rerankerProvider ?? "reranker hiện tại"}, chỉ dùng khi xếp hạng bằng Cross-Encoder hoặc Rerank API.`
+                      ? `không áp dụng với ${RERANKER_PROVIDER_LABELS[rerankerProvider] ?? rerankerProvider ?? "reranker hiện tại"}, chỉ dùng khi xếp hạng bằng Cross-Encoder hoặc dịch vụ rerank qua API.`
                       : "không áp dụng khi tắt xếp hạng lại."}
                   </p>
                 )}

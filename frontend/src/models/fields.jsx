@@ -10,6 +10,7 @@ import {
   EyeOff,
   MessageSquareText,
   Server,
+  TreePine,
   Undo2,
 } from "lucide-react";
 
@@ -135,7 +136,16 @@ const PROVIDER_ICONS = {
     jina: JinaLogo,
     openai_compatible: Server,
   },
-  reranker: { "cross-encoder": Cpu, heuristic: ArrowDownUp, rerank_api: Cloud },
+  reranker: {
+    "cross-encoder": Cpu,
+    heuristic: ArrowDownUp,
+    cohere: CohereLogo,
+    jina: JinaLogo,
+    voyage: VoyageLogo,
+    pinecone: TreePine,
+    tei: HuggingFaceLogo,
+    rerank_api: Cloud,
+  },
 };
 
 export function ProviderIcon({ kind, provider, size = 18 }) {

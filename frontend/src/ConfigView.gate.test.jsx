@@ -211,9 +211,22 @@ describe("ConfigView — ngưỡng tin cậy, thanh lưu, vùng nguy hiểm", ()
         })
       );
       const rerank = container.querySelector('[data-testid="gate-rerank"]');
-      expect(rerank.textContent).toContain("relevance_score do Rerank API");
+      expect(rerank.textContent).toContain("Điểm liên quan (0–1) do Rerank API trả về");
       expect(rerank.querySelector("#cfg-minrerank-number").value).toBe("");
       expect(rerank.textContent).not.toContain("-1.65");
+    });
+
+    it("reranker của hãng (Voyage): ngưỡng rerank thang 0–1 giống Rerank API", async () => {
+      await render(
+        baseConfig({
+          reranker: { provider: "voyage", model: "rerank-2.5" },
+          guardrails: { rerank_threshold_source: "override", calibrated_min_rerank_score: null, min_rerank_score: 0.4 },
+        })
+      );
+      const rerank = container.querySelector('[data-testid="gate-rerank"]');
+      expect(rerank.textContent).toContain("do Voyage AI trả về");
+      const slider = rerank.querySelector("#cfg-minrerank");
+      expect([slider.min, slider.max, slider.step]).toEqual(["0", "1", "0.01"]);
     });
 
     it("cross-encoder bật thì hiện ngưỡng rerank; tắt reranker trong bản nháp thì ẩn", async () => {

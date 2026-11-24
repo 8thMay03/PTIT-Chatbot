@@ -159,9 +159,10 @@ def test_cross_encoder_uses_rerank_threshold_only_when_calibrated(gate_settings,
     assert thresholds_from_settings().rerank_source == "not_applicable"
 
 
-def test_rerank_api_uses_override_only_never_cross_encoder_table(gate_settings, caplog) -> None:
+@pytest.mark.parametrize("provider", ["rerank_api", "cohere", "jina", "voyage", "pinecone", "tei"])
+def test_rerank_api_uses_override_only_never_cross_encoder_table(gate_settings, caplog, provider) -> None:
     # Trùng tên mô hình trong RERANK_THRESHOLDS vẫn không dùng: điểm API khác thang đo (D-03).
-    gate_settings.reranker_provider = "rerank_api"
+    gate_settings.reranker_provider = provider
     with caplog.at_level(logging.WARNING, logger="app.generation.confidence"):
         uncalibrated = thresholds_from_settings()
     assert uncalibrated.min_rerank_score is None

@@ -6,15 +6,25 @@
 export const RERANKER_PROVIDER_LABELS = {
   heuristic: "Heuristic",
   "cross-encoder": "Cross-Encoder",
+  cohere: "Cohere",
+  jina: "Jina AI",
+  voyage: "Voyage AI",
+  pinecone: "Pinecone",
+  tei: "HF TEI",
   rerank_api: "Rerank API",
 };
 
+/** Reranker gọi dịch vụ ngoài: điểm liên quan trong [0, 1], chưa có bảng hiệu chỉnh. */
+export function isApiReranker(provider) {
+  return Object.hasOwn(RERANKER_PROVIDER_LABELS, provider) && provider !== "heuristic" && provider !== "cross-encoder";
+}
+
 /**
  * Reranker cho điểm tuyệt đối nên confidence gate dùng được ngưỡng rerank. Heuristic chuẩn
- * hoá trong danh sách ứng viên nên không dùng được; Rerank API chỉ dùng khi có ghi đè.
+ * hoá trong danh sách ứng viên nên không dùng được; reranker qua API chỉ dùng khi có ghi đè.
  */
 export function rerankScoreApplies(provider) {
-  return provider === "cross-encoder" || provider === "rerank_api";
+  return provider === "cross-encoder" || isApiReranker(provider);
 }
 
 export function shortModelName(model) {
@@ -50,8 +60,8 @@ export function pipelineSummary(values, config, calibrated = {}) {
     ? [
         provider === "cross-encoder"
           ? shortModelName(config?.reranker?.model)
-          : provider === "rerank_api"
-            ? `Rerank API · ${shortModelName(config?.reranker?.model)}`
+          : isApiReranker(provider)
+            ? `${RERANKER_PROVIDER_LABELS[provider]} · ${shortModelName(config?.reranker?.model)}`
             : RERANKER_PROVIDER_LABELS[provider] ?? provider ?? "Reranker",
         `${values.candidateMultiplier}× ứng viên`,
       ]

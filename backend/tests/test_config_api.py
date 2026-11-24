@@ -36,8 +36,16 @@ def test_get_config_returns_full_structure() -> None:
     assert "gemini" in data["available_providers"]["llm"]
     assert "heuristic" in data["available_providers"]["reranker"]
     assert "cross-encoder" in data["available_providers"]["reranker"]
-    assert "rerank_api" in data["available_providers"]["reranker"]
-    assert "cohere" not in data["available_providers"]["reranker"]
+    assert data["available_providers"]["reranker"] == [
+        "heuristic",
+        "cross-encoder",
+        "rerank_api",
+        "cohere",
+        "jina",
+        "voyage",
+        "pinecone",
+        "tei",
+    ]
 
 
 def test_update_config_llm_and_toggles() -> None:

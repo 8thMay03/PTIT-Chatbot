@@ -16,7 +16,15 @@ import {
 
 describe("catalog kho mô hình", () => {
   it("reranker Rerank API: Base URL + mô hình bắt buộc, khoá tuỳ chọn không dự phòng .env", () => {
-    expect(KINDS.reranker.providers.map((item) => item.key)).toEqual(["cross-encoder", "rerank_api"]);
+    expect(KINDS.reranker.providers.map((item) => item.key)).toEqual([
+      "cross-encoder",
+      "cohere",
+      "jina",
+      "voyage",
+      "pinecone",
+      "tei",
+      "rerank_api",
+    ]);
     expect(keyRule("reranker", "rerank_api")).toEqual({ envFallback: false });
     expect(keyRule("reranker", "cross-encoder")).toBeNull();
     expect(canTestConnection("reranker", "rerank_api")).toBe(true);
@@ -46,6 +54,41 @@ describe("catalog kho mô hình", () => {
       api_key: null,
       profile_id: "r1",
     });
+  });
+
+  it("reranker của hãng: chỉ mô hình + khoá bắt buộc; TEI cần Base URL, khoá tuỳ chọn", () => {
+    ["cohere", "jina", "voyage", "pinecone"].forEach((provider) => {
+      expect(keyRule("reranker", provider)).toEqual({ envFallback: false, required: true });
+      expect(canTestConnection("reranker", provider)).toBe(true);
+      expect(sendsDocumentsToService("reranker", provider)).toBe(true);
+    });
+    expect(keyRule("reranker", "tei")).toEqual({ envFallback: false });
+
+    const voyage = { ...emptyDraft("reranker"), provider: "voyage", base_url: "https://stale.example.com" };
+    expect(validateDraft("reranker", voyage)).toEqual({ model: "Nhập mô hình.", apiKey: "Nhập API key." });
+    expect(validateDraft("reranker", { ...voyage, model: "rerank-2.5" }, { hasStoredKey: true })).toEqual({});
+    const draft = { ...voyage, model: "rerank-2.5", apiKey: "pa-x" };
+    // Base URL còn sót từ provider khác không được gửi đi.
+    expect(buildPayload("reranker", draft)).toEqual({
+      kind: "reranker",
+      name: "rerank-2.5",
+      provider: "voyage",
+      model: "rerank-2.5",
+      api_key: "pa-x",
+    });
+    expect(buildRerankerTestPayload(draft, null)).toEqual({
+      provider: "voyage",
+      model: "rerank-2.5",
+      base_url: null,
+      api_key: "pa-x",
+      profile_id: null,
+    });
+
+    const tei = { ...emptyDraft("reranker"), provider: "tei" };
+    expect(validateDraft("reranker", tei)).toEqual({ base_url: "Nhập base url.", model: "Nhập mô hình." });
+    const teiDraft = { ...tei, base_url: "http://tei:8080", model: "BAAI/bge-reranker-v2-m3" };
+    expect(validateDraft("reranker", teiDraft)).toEqual({});
+    expect(buildRerankerTestPayload(teiDraft, null).base_url).toBe("http://tei:8080");
   });
 
   it("embedding qua API: khoá bắt buộc với hãng, tuỳ chọn với tương thích OpenAI", () => {

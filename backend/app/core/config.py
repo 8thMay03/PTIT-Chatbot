@@ -508,6 +508,7 @@ def _mask_api_key(key: str | None) -> str | None:
 def get_runtime_config_dict() -> dict:
     """Return a comprehensive runtime configuration dictionary with masked API keys."""
     from app.generation.confidence import RERANK_THRESHOLDS, VECTOR_THRESHOLDS, thresholds_from_settings
+    from app.retrieval.reranker import API_RERANK_PROVIDERS
 
     gate = thresholds_from_settings()
     provider = settings.llm_provider.lower()
@@ -586,9 +587,9 @@ def get_runtime_config_dict() -> dict:
             # Giá trị bảng hiệu chỉnh (None nếu model chưa có): UI dùng cho "Dùng giá trị hiệu chỉnh".
             "calibrated_min_vector_score": VECTOR_THRESHOLDS.get(gate.embedding_model),
             "rerank_threshold_source": gate.rerank_source,
-            # Bảng chỉ hiệu chỉnh cho cross-encoder; điểm Rerank API khác thang đo (D-03).
+            # Bảng chỉ hiệu chỉnh cho cross-encoder; điểm của rerank API khác thang đo (D-03).
             "calibrated_min_rerank_score": (
-                None if settings.reranker_provider == "rerank_api" else RERANK_THRESHOLDS.get(settings.reranker_model)
+                RERANK_THRESHOLDS.get(settings.reranker_model) if settings.reranker_provider == "cross-encoder" else None
             ),
         },
         "embedding": {
@@ -606,7 +607,7 @@ def get_runtime_config_dict() -> dict:
                 "jina",
                 "openai_compatible",
             ],
-            "reranker": ["heuristic", "cross-encoder", "rerank_api"],
+            "reranker": ["heuristic", "cross-encoder", *API_RERANK_PROVIDERS],
         },
     }
 
