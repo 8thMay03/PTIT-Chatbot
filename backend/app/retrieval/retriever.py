@@ -1,5 +1,5 @@
 from app.core.config import settings
-from app.embeddings import EmbeddingModel, runtime_embedding_model
+from app.embeddings import EmbeddingModel, embed_signed, runtime_embedding_model
 from app.retrieval.bm25 import BM25Search
 from app.retrieval.hybrid import reciprocal_rank_fusion
 from app.retrieval.parent_child import collapse_parent_results
@@ -19,8 +19,13 @@ class Retriever:
 
     def retrieve(self, query: str, top_k: int = 4, dataset_ids: list[str] | None = None) -> list[dict]:
         candidate_count = max(top_k, top_k * settings.hybrid_candidate_multiplier)
-        query_embedding = self.embedding_model.embed_query([query])[0]
-        vector_results = self.vector_store.search(query_embedding, top_k=candidate_count, dataset_ids=dataset_ids)
+        vectors, signature = embed_signed(self.embedding_model, [query], query=True)
+        # Chỉ so với vector của cùng mô hình (D-02): đoạn chưa nhúng lại sau khi đổi mô hình
+        # chỉ còn được tìm bằng BM25. Mô hình không có chữ ký (fake trong test) thì không lọc.
+        search_options = {"embedding_signature": signature} if signature is not None else {}
+        vector_results = self.vector_store.search(
+            vectors[0], top_k=candidate_count, dataset_ids=dataset_ids, **search_options
+        )
         keyword_results = self.keyword_search.search(query, top_k=candidate_count, dataset_ids=dataset_ids)
         fused_children = reciprocal_rank_fusion(
             vector_results,

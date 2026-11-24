@@ -5,6 +5,7 @@ import { formatDate, formatSize } from "../lib/format";
 export default function DatasetCard({ dataset, onOpen, onEdit, onDelete, onToggle, toggling }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const pending = dataset.pending_count ?? 0;
+  const staleEmbedding = dataset.stale_document_count ?? 0;
 
   return (
     <article className="dataset-card" aria-label={`Dataset ${dataset.name}`}>
@@ -22,6 +23,11 @@ export default function DatasetCard({ dataset, onOpen, onEdit, onDelete, onToggl
             <span className="dataset-card-size">{formatSize(dataset.size_bytes)}</span>
           )}
           {pending > 0 && <span className="dataset-card-pending">{pending} chờ chia đoạn</span>}
+          {staleEmbedding > 0 && (
+            <span className="dataset-card-pending" title="Chưa có vector của mô hình nhúng đang dùng">
+              {staleEmbedding} cần nhúng lại
+            </span>
+          )}
           <span className="dataset-card-meta">
             <span className={`dataset-status-dot ${dataset.enabled ? "on" : "off"}`} aria-hidden="true" />
             {dataset.enabled ? "Đang dùng khi trả lời" : "Đã tắt"} · {formatDate(dataset.updated_at)}

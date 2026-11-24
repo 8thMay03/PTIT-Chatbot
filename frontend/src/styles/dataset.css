@@ -57,8 +57,22 @@
 
 .dataset-view-toolbar {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 8px;
+}
+
+/* Nhiều nút: xuống hàng cả nút thay vì bẻ nhãn thành hai dòng */
+.dataset-view-toolbar > button,
+.dataset-view-toolbar > .dataset-enabled-badge {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.dataset-detail-title {
+  flex: 1 1 240px;
+  min-width: 0;
 }
 
 
@@ -172,6 +186,33 @@
 .btn-outline-dataset:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* Còn tài liệu chưa có vector của mô hình nhúng đang dùng */
+.btn-outline-dataset.is-attention {
+  border-color: var(--warning-border);
+  background: var(--warning-subtle);
+  color: var(--warning-text);
+}
+
+.btn-outline-dataset.is-attention:hover:not(:disabled) {
+  background: var(--warning-subtle);
+  color: var(--warning-text);
+  border-color: var(--warning-text);
+}
+
+/* Banner nhắc nhúng lại: chữ co giãn, nút bám phải; màn hẹp thì nút xuống dòng */
+.embed-stale-banner {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.embed-stale-banner > span {
+  flex: 1 1 280px;
+}
+
+.embed-stale-banner .btn-outline-dataset {
+  flex-shrink: 0;
 }
 
 /* Banners */
@@ -528,6 +569,12 @@
 
 /* Markdown đổi sau lần chia đoạn gần nhất: đoạn cũ vẫn đang được dùng */
 .doc-status-badge.is-stale {
+  background: var(--warning-subtle);
+  color: var(--warning-text);
+}
+
+/* Đoạn chưa có vector của mô hình nhúng đang dùng: chỉ tìm được bằng từ khóa */
+.doc-status-badge.is-unembedded {
   background: var(--warning-subtle);
   color: var(--warning-text);
 }

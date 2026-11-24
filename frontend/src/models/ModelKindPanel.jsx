@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   AlertTriangle,
   ArrowRight,
+  Binary,
   CheckCircle2,
   FileCog,
   Info,
@@ -16,7 +17,7 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
-import { errorMessage, modelProfilesApi, queryKeys } from "../api";
+import { embeddingsApi, errorMessage, modelProfilesApi, queryKeys } from "../api";
 import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
 import { ENV_ROW_NAME, normalizeEnvLlmProvider } from "./activeModels";
@@ -105,6 +106,13 @@ function envRow(kind, registry) {
   };
 }
 
+/** Đổi embedding thay đổi số đoạn cần nhúng lại ở trang Dataset và banner nhắc nhúng. */
+function invalidateEmbeddingData(queryClient) {
+  queryClient.invalidateQueries({ queryKey: queryKeys.embeddingStatus });
+  queryClient.invalidateQueries({ queryKey: queryKeys.datasets });
+  queryClient.invalidateQueries({ queryKey: queryKeys.documents });
+}
+
 // ---------------------------------------------------------------------------
 // Cảnh báo của từng loại
 // ---------------------------------------------------------------------------
@@ -141,8 +149,7 @@ function KindNotices({ kind, registry, config }) {
       <div key="load" className="inline-alert is-error" role="alert">
         <AlertCircle size={16} />
         <span>
-          Lần khởi động này không áp được embedding đã chọn nên vẫn chạy cấu hình <code>.env</code>:{" "}
-          {runtime.load_error}
+          Không áp được embedding đã chọn nên vẫn chạy cấu hình <code>.env</code>: {runtime.load_error}
         </span>
       </div>
     );
@@ -152,15 +159,63 @@ function KindNotices({ kind, registry, config }) {
       <div key="restart" className="inline-alert is-warning" role="status">
         <RotateCw size={16} />
         <span>
-          Lựa chọn mới có hiệu lực sau khi <strong>khởi động lại backend</strong>. Sau đó vào <strong>Dataset</strong> →{" "}
-          <strong>Nạp lại toàn bộ</strong> để tạo lại vector cho mọi tài liệu; trước khi nạp lại, kết quả tìm kiếm sẽ sai
-          lệch.
+          Mô hình đã chọn chưa được áp cho embedder đang chạy (ví dụ sau khi khôi phục cấu hình). Bấm{" "}
+          <strong>Dùng</strong> lại trên mô hình đó hoặc khởi động lại backend.
         </span>
       </div>
     );
   }
   if (notices.length === 0) return null;
   return <div className="mdl-list-notices">{notices}</div>;
+}
+
+/**
+ * Đổi mô hình nhúng làm vector cũ không còn so được với câu hỏi: nhắc nhúng lại toàn bộ
+ * tài liệu (job nền; tiến độ hiện ở màn Dataset).
+ */
+function ReembedNotice({ enabled }) {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const [submitting, setSubmitting] = useState(false);
+  const statusQuery = useQuery({
+    queryKey: queryKeys.embeddingStatus,
+    queryFn: ({ signal }) => embeddingsApi.status({ signal }),
+    enabled,
+  });
+  const status = statusQuery.data;
+  if (!enabled || !status || (status.stale_chunks ?? 0) === 0) return null;
+
+  async function reembed() {
+    setSubmitting(true);
+    try {
+      await embeddingsApi.reembedAll();
+      toast.success("Đang nhúng lại toàn bộ tài liệu ở chế độ nền. Xem tiến độ trong mục Dataset.");
+      queryClient.invalidateQueries({ queryKey: queryKeys.embeddingStatus });
+    } catch (err) {
+      toast.error(errorMessage(err, "Không bắt đầu được job nhúng lại."));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="mdl-list-notices">
+      <div className="inline-alert is-warning embed-stale-banner" role="status">
+        <AlertTriangle size={16} />
+        <span>
+          Cần nhúng lại tài liệu: {status.stale_documents} tài liệu ({status.stale_chunks}/{status.total_chunks} đoạn)
+          chưa có vector của mô hình nhúng đang dùng nên chỉ tìm được bằng từ khóa.{" "}
+          <a className="mdl-inline-link" href="#documents">
+            Xem trong Dataset <ArrowRight size={13} />
+          </a>
+        </span>
+        <button type="button" className="ghost-btn" onClick={reembed} disabled={submitting}>
+          {submitting ? <Loader2 size={15} className="spin" /> : <Binary size={15} />}
+          Nhúng lại toàn bộ
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -344,8 +399,11 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
       await storeRegistry(queryClient, next);
       const isActive = isEdit && next.active?.[kind] === profile.id;
       let message = isEdit ? `Đã lưu ${payload.name}.` : `Đã thêm ${payload.name} vào kho.`;
-      if (isActive && kind !== "embedding") message += " Hệ thống đã áp dụng thay đổi.";
-      if (isActive && kind === "embedding") message += " Khởi động lại backend để áp dụng.";
+      if (isActive) message += " Hệ thống đã áp dụng thay đổi.";
+      if (isActive && kind === "embedding") {
+        message += " Nếu đã đổi mô hình hoặc số chiều, hãy nhúng lại toàn bộ tài liệu.";
+        invalidateEmbeddingData(queryClient);
+      }
       toast.success(message);
       onClose();
     } catch (err) {
@@ -366,7 +424,7 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
   if (isActiveProfile) {
     description =
       kind === "embedding"
-        ? "Mô hình đã chọn: thay đổi có hiệu lực sau khi khởi động lại backend."
+        ? "Mô hình đang dùng: lưu xong áp dụng ngay. Đổi mô hình hoặc số chiều thì phải nhúng lại toàn bộ tài liệu."
         : "Mô hình đang dùng: lưu xong áp dụng ngay.";
   }
   const busy = saving || testing;
@@ -550,8 +608,8 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
 
 /**
  * Một danh sách cho một loại mô hình: hàng `.env` (reranker: Heuristic) rồi các mô hình
- * trong kho. Bấm "Dùng" trên hàng nào thì hệ thống đổi sang mô hình đó; với embedding
- * cần xác nhận vì phải khởi động lại backend và nạp lại tài liệu. Thêm/sửa mở hộp thoại ở giữa màn hình.
+ * trong kho. Bấm "Dùng" trên hàng nào thì hệ thống đổi sang mô hình đó ngay; với embedding
+ * cần xác nhận vì sau khi đổi phải nhúng lại toàn bộ tài liệu. Thêm/sửa mở hộp thoại ở giữa màn hình.
  */
 export default function ModelKindPanel({ kind, registry, config, active = true }) {
   const toast = useToast();
@@ -578,7 +636,8 @@ export default function ModelKindPanel({ kind, registry, config, active = true }
       const next = await modelProfilesApi.activate(kind, target.id);
       await storeRegistry(queryClient, next);
       if (kind === "embedding") {
-        toast.success(`Đã chọn ${target.label}. Khởi động lại backend để áp dụng.`);
+        toast.success(`Đã chuyển mô hình nhúng sang ${target.label}. Hãy nhúng lại toàn bộ tài liệu.`);
+        invalidateEmbeddingData(queryClient);
       } else {
         toast.success(`Đã chuyển ${KINDS[kind].label} sang ${target.label}.`);
       }
@@ -637,6 +696,7 @@ export default function ModelKindPanel({ kind, registry, config, active = true }
         </header>
 
         <KindNotices kind={kind} registry={registry} config={config} />
+        {kind === "embedding" && <ReembedNotice enabled={active} />}
 
         <ul className="mdl-rows" aria-label={`Danh sách ${KINDS[kind].label}`}>
           <ModelRow
@@ -784,7 +844,9 @@ export default function ModelKindPanel({ kind, registry, config, active = true }
         title="Đổi mô hình nhúng?"
         description={
           pendingActivate
-            ? `Chọn ${pendingActivate.label} có hiệu lực sau khi khởi động lại backend. Sau đó cần vào Dataset → Nạp lại toàn bộ để tạo lại vector; trước khi nạp lại, kết quả tìm kiếm sẽ sai lệch.`
+            ? `${pendingActivate.label} sẽ được dùng ngay. Vector hiện có thuộc mô hình cũ nên toàn bộ tài liệu phải được nhúng lại; ` +
+              "trong lúc chờ, các đoạn chưa nhúng lại chỉ tìm được bằng từ khóa. Sau khi đổi, bấm “Nhúng lại toàn bộ” " +
+              "ở đây hoặc trong mục Dataset."
             : ""
         }
         icon={<RotateCw size={20} />}

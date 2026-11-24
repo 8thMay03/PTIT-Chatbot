@@ -628,46 +628,91 @@ def test_embedding_dimension_must_match_vector_dim(admin_client, config_store_db
     assert settings.embedding_profile_id is None
 
 
-def test_embedding_selection_applies_at_startup(admin_client, config_store_db, monkeypatch) -> None:
-    running = (settings.embedding_provider, settings.embedding_model)
+def test_embedding_selection_applies_immediately(admin_client, config_store_db, monkeypatch) -> None:
     profile = _embedding_profile(admin_client)
+    fake = _FakeEmbedding()
+    monkeypatch.setattr("app.embeddings.create_embedding_model", lambda: fake)
 
     response = _activate(admin_client, "embedding", profile["id"])
     assert response.status_code == 200, response.text
     data = response.json()
     assert data["active"]["embedding"] == profile["id"]
-    # Embedder đang chạy chưa đổi cho tới khi khởi động lại.
-    assert data["embedding_runtime"]["restart_required"] is True
-    assert (settings.embedding_provider, settings.embedding_model) == running
-
-    fake = _FakeEmbedding()
-    monkeypatch.setattr("app.embeddings.create_embedding_model", lambda: fake)
-    _simulate_restart()
-    embedding_runtime.reset()
-    model_profiles.load_selected_embedding_at_startup()
-
+    # Embedder mới chạy ngay, không cần khởi động lại (D-01 reembed-documents).
+    assert data["embedding_runtime"]["restart_required"] is False
+    assert data["embedding_runtime"]["profile_id"] == profile["id"]
     assert embedding_runtime.get() is fake
     assert retriever.embedding_model is runtime_embedding_model
     assert ingestion_pipeline.embedding_model is runtime_embedding_model
     assert settings.embedding_model == "unit-test/st-model"
+
+    # Khởi động lại vẫn áp lựa chọn đã lưu.
+    _simulate_restart()
+    embedding_runtime.reset()
+    model_profiles.load_selected_embedding_at_startup()
+    assert embedding_runtime.get() is fake
     runtime = admin_client.get("/api/model-profiles").json()["embedding_runtime"]
     assert runtime["profile_id"] == profile["id"]
     assert runtime["restart_required"] is False
 
-    # Sửa model của profile đang chạy → cần khởi động lại; xoá profile đang chọn → 409.
+    # Sửa model của profile đang chạy → áp ngay; xoá profile đang chọn → 409.
+    other = _FakeEmbedding()
+    monkeypatch.setattr("app.embeddings.create_embedding_model", lambda: other)
     admin_client.put(
         f"/api/model-profiles/{profile['id']}",
         json={"name": "ST", "provider": "sentence-transformers", "model": "unit-test/other", "dimension": settings.vector_dim},
     )
-    assert admin_client.get("/api/model-profiles").json()["embedding_runtime"]["restart_required"] is True
+    assert embedding_runtime.get() is other
+    assert settings.embedding_model == "unit-test/other"
+    assert admin_client.get("/api/model-profiles").json()["embedding_runtime"]["restart_required"] is False
     assert admin_client.delete(f"/api/model-profiles/{profile['id']}").status_code == 409
+
+    # Đổi về cấu hình `.env` cũng áp ngay.
+    env_model = _FakeEmbedding()
+    monkeypatch.setattr("app.embeddings.create_embedding_model", lambda: env_model)
+    response = _activate(admin_client, "embedding", None)
+    assert response.status_code == 200, response.text
+    assert embedding_runtime.get() is env_model
+    assert settings.embedding_model == _INITIAL_SETTINGS["embedding_model"]
+
+
+def test_embedding_switch_failure_keeps_running_model(admin_client, config_store_db, monkeypatch) -> None:
+    before = embedding_runtime.get()
+    running = tuple(getattr(settings, field) for field in model_profiles._EMBEDDING_SETTINGS_FIELDS)
+    profile = _embedding_profile(admin_client)
+
+    def broken_factory():
+        raise EmbeddingUnavailableError("Không tải được mô hình sentence-transformers 'unit-test/st-model' (OSError).")
+
+    monkeypatch.setattr("app.embeddings.create_embedding_model", broken_factory)
+    response = _activate(admin_client, "embedding", profile["id"])
+    assert response.status_code == 422
+    assert "Không chuyển được mô hình nhúng" in response.json()["detail"]
+    assert embedding_runtime.get() is before
+    assert tuple(getattr(settings, field) for field in model_profiles._EMBEDDING_SETTINGS_FIELDS) == running
+    data = admin_client.get("/api/model-profiles").json()
+    assert data["active"]["embedding"] is None
+    assert data["embedding_runtime"]["restart_required"] is False
+
+    # Sửa profile đang dùng mà mô hình mới không tạo được → 422, profile trong DB không đổi.
+    monkeypatch.setattr("app.embeddings.create_embedding_model", lambda: _FakeEmbedding())
+    assert _activate(admin_client, "embedding", profile["id"]).status_code == 200
+    monkeypatch.setattr("app.embeddings.create_embedding_model", broken_factory)
+    response = admin_client.put(
+        f"/api/model-profiles/{profile['id']}",
+        json={"name": "ST", "provider": "sentence-transformers", "model": "unit-test/other", "dimension": settings.vector_dim},
+    )
+    assert response.status_code == 422
+    stored = next(p for p in admin_client.get("/api/model-profiles").json()["profiles"] if p["id"] == profile["id"])
+    assert stored["model"] == "unit-test/st-model"
+    assert settings.embedding_model == "unit-test/st-model"
 
 
 def test_embedding_load_failure_keeps_env_embedder(admin_client, config_store_db, monkeypatch) -> None:
     before = embedding_runtime.get()
     running = (settings.embedding_provider, settings.embedding_model)
     profile = _embedding_profile(admin_client)
-    _activate(admin_client, "embedding", profile["id"])
+    # Lựa chọn đã lưu từ trước; lần khởi động này không tạo được mô hình của nó.
+    monkeypatch.setattr(settings, "embedding_profile_id", profile["id"])
 
     def broken_factory():
         raise EmbeddingUnavailableError("Không tải được mô hình sentence-transformers 'unit-test/st-model' (OSError).")
@@ -680,6 +725,7 @@ def test_embedding_load_failure_keeps_env_embedder(admin_client, config_store_db
     runtime = admin_client.get("/api/model-profiles").json()["embedding_runtime"]
     assert runtime["profile_id"] is None
     assert runtime["load_error"]
+    assert runtime["restart_required"] is True
 
 
 def test_reset_config_clears_selection_but_keeps_profiles(admin_client, config_store_db) -> None:

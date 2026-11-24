@@ -9,3 +9,15 @@ export function isActiveParseJob(job) {
 export function parseJobLabel(job) {
   return job?.result?.file_name || job?.file_name || "tài liệu";
 }
+
+/** Job nền nhúng lại vector (cùng hàng đợi/endpoint với job parse). */
+export function isEmbedJob(job) {
+  return job?.kind === "embed";
+}
+
+/** Job embed thuộc dataset này: job của dataset, của một tài liệu trong dataset, hoặc toàn kho. */
+export function embedJobCoversDataset(job, datasetId) {
+  if (!isEmbedJob(job)) return false;
+  if (!job.dataset_id && !job.document_id) return true;
+  return job.dataset_id === datasetId;
+}

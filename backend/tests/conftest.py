@@ -15,9 +15,12 @@
 - ``config_store_db`` (autouse): bảng cấu hình đã lưu (PUT /config, lifespan) và kho
   mô hình (``model_profiles``) trỏ sang SQLite tạm, dọn sau mỗi test; không test nào
   đọc/ghi cấu hình trong DB dev.
+- ``_no_startup_vector_adoption`` (autouse): lifespan không gán chữ ký embedding cho đoạn
+  trong DB dev (``pipeline.adopt_unsigned_vectors``).
 - ``_ready_embedding`` (autouse): embedder dùng chung (BE-13) là ``HashEmbeddingModel``
   ``VECTOR_DIM`` chiều, đã ``ready``; suite không cần key embedding thật và không gọi
-  mạng. Test cần trạng thái thật thì gọi ``embedding_runtime.reset()``.
+  mạng. Settings ``embedding_*`` (bị đổi khi test chọn profile embedding) được khôi phục.
+  Test cần trạng thái thật thì gọi ``embedding_runtime.reset()``.
 - ``_isolated_llm_provider_cache`` (autouse): cache provider LLM theo dấu vân tay cấu hình
   (BE-12) rỗng mỗi test, để provider/đăng ký của test trước không lọt sang test sau.
 - ``_no_real_http`` (autouse): chặn request mạng thật qua ``httpx.HTTPTransport`` (SDK
@@ -79,10 +82,23 @@ def _isolated_llm_provider_cache():
 
 
 @pytest.fixture(autouse=True)
+def _no_startup_vector_adoption(monkeypatch):
+    """Lifespan gán chữ ký embedding cho đoạn cũ trong DB thật; test có lifespan không được chạm DB dev."""
+    from app.ingestion import pipeline
+
+    monkeypatch.setattr(pipeline, "adopt_unsigned_vectors", lambda: 0)
+
+
+@pytest.fixture(autouse=True)
 def _ready_embedding():
+    # Chọn profile embedding đổi embedder ngay (ghi settings embedding_*): khôi phục sau mỗi test.
+    fields = model_profiles._EMBEDDING_SETTINGS_FIELDS
+    saved = {field: getattr(settings, field) for field in fields}
     embedding_runtime.override(HashEmbeddingModel(dimensions=settings.vector_dim))
     yield
     embedding_runtime.reset()
+    for field, value in saved.items():
+        setattr(settings, field, value)
 
 
 @pytest.fixture(scope="session")

@@ -163,6 +163,9 @@ class Chunk(Base):
     token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     vector_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
+    # Mô hình đã tạo `embedding` ("provider:model:số chiều[@base_url]"); khác mô hình đang chạy
+    # (hoặc NULL) thì đoạn cần nhúng lại và bị bỏ khỏi tìm kiếm vector.
+    embedding_signature: Mapped[str | None] = mapped_column(String, nullable=True)
     chunk_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -12,8 +12,8 @@ import ModelKindPanel from "./models/ModelKindPanel";
  * (`#settings/models-llm`…), nên cả ba panel được giữ mounted và chỉ ẩn panel khác.
  *
  * Mỗi danh sách gồm cấu hình `.env` và kho mô hình (/api/model-profiles); bấm "Dùng"
- * để chọn mô hình đang dùng. LLM và reranker đổi có hiệu lực ngay; embedding nạp
- * một lần lúc khởi động nên lựa chọn chỉ có hiệu lực sau khi backend khởi động lại.
+ * để chọn mô hình đang dùng; đổi có hiệu lực ngay. Đổi embedding thì vector cũ cần được
+ * nhúng lại (banner trong panel embedding và màn Dataset).
  */
 
 const LEGACY_TAB_STORAGE_KEY = "ptit_models_tab";

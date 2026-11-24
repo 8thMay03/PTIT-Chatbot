@@ -1,4 +1,4 @@
-"""Background parse jobs.
+"""Background parse and embed jobs.
 
 Parsing a large PDF/DOCX with Docling or LlamaParse can take minutes. The API
 validates the request, stages an upload when needed and returns a job
@@ -6,6 +6,12 @@ immediately; one worker thread runs the parser so the event loop and the other
 endpoints stay responsive. Job state lives in memory: the pipeline still
 commits the parsed text and chunks to the database, so a server restart only
 loses progress reporting, not stored results.
+
+Embed jobs (kind ``embed``) refresh the vectors of existing chunks, e.g. after
+switching the embedding model. They run on their own worker so a long parse
+does not hold them back, and are listed with parse jobs so clients poll one
+endpoint. Vectors are committed batch by batch; a restart keeps finished
+batches and the rest still counts as needing embedding.
 """
 
 from __future__ import annotations
@@ -66,6 +72,7 @@ class ParseJobManager:
     ) -> None:
         self._pipeline = pipeline or ingestion_pipeline
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="ptit-parse")
+        self._embed_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ptit-embed")
         self._lock = threading.Lock()
         self._jobs: OrderedDict[str, ParseJob] = OrderedDict()
         # Reserve the key before staging/parsing so two requests cannot overwrite
@@ -134,6 +141,40 @@ class ParseJobManager:
         self._executor.submit(self._run_upload, job.id, key, staged_path, dataset_id, parser_name)
         return job
 
+    def enqueue_embed(
+        self,
+        *,
+        label: str,
+        dataset_id: str | None = None,
+        document_id: str | None = None,
+        include_current: bool = False,
+    ) -> ParseJob:
+        """Nhúng lại vector của một tài liệu, một dataset hoặc toàn kho (cả hai đều ``None``).
+
+        Mỗi phạm vi chỉ có một job đang chờ/chạy; các job nhúng chạy lần lượt.
+        """
+        if document_id is not None:
+            key = f"embed:document:{document_id}"
+        elif dataset_id is not None:
+            key = f"embed:dataset:{dataset_id}"
+        else:
+            key = "embed:all"
+        with self._lock:
+            job_id = self._reserve_locked(key)
+            if document_id is not None and dataset_id is None:
+                dataset_id = _dataset_for_document(document_id)
+            job = self._add_locked(
+                job_id=job_id,
+                kind="embed",
+                document_id=document_id,
+                file_name=label,
+                parser_name=None,
+                dataset_id=dataset_id,
+            )
+        scope = {"dataset_id": None if document_id else dataset_id, "document_id": document_id}
+        self._embed_executor.submit(self._run_embed, job.id, key, include_current, scope)
+        return job
+
     # ---- Read state ----
 
     def get(self, job_id: str) -> ParseJob | None:
@@ -159,9 +200,10 @@ class ParseJobManager:
         return list(reversed(jobs))[:limit]
 
     def active_for_document(self, document_id: str) -> ParseJob | None:
+        """Job parse/tải lên đang chạy của tài liệu (job nhúng không chặn xoá/chuyển/parse)."""
         with self._lock:
             for job in self._jobs.values():
-                if job.document_id == document_id and job.status in ACTIVE_STATUSES:
+                if job.document_id == document_id and job.kind != "embed" and job.status in ACTIVE_STATUSES:
                     return job
         return None
 
@@ -232,6 +274,19 @@ class ParseJobManager:
                 dataset_id=(result.get("dataset_id") if isinstance(result, dict) else None),
             )
 
+    def _run_embed(self, job_id: str, key: str, include_current: bool, scope: dict[str, str | None]) -> None:
+        self._mark_running(job_id, "Đang chuẩn bị mô hình nhúng")
+        try:
+            result = self._pipeline.embed_chunks(
+                include_current=include_current,
+                on_progress=self._progress_callback(job_id),
+                **scope,
+            )
+        except Exception as exc:  # noqa: BLE001 - embedder unavailable, API and DB failures.
+            self._finish(job_id, key, status="failed", error=_error_text(exc))
+            return
+        self._finish(job_id, key, status="succeeded", result=result)
+
     def _progress_callback(self, job_id: str):
         def report(percent: int, message: str) -> None:
             self._update_progress(job_id, percent, message)
@@ -245,6 +300,8 @@ class ParseJobManager:
         if active_id:
             active = self._jobs.get(active_id)
             label = active.file_name if active and active.file_name else "tài liệu này"
+            if active is not None and active.kind == "embed":
+                raise ParseJobConflict(f"“{label}” đang được nhúng; hãy chờ job hiện tại xong.")
             raise ParseJobConflict(f"“{label}” đang được parse; hãy chờ job hiện tại xong.")
         job_id = uuid.uuid4().hex
         self._active_keys[key] = job_id
@@ -275,7 +332,7 @@ class ParseJobManager:
         self._jobs[job_id] = job
         return job
 
-    def _mark_running(self, job_id: str) -> None:
+    def _mark_running(self, job_id: str, message: str = "Đang khởi động parser") -> None:
         with self._lock:
             job = self._jobs.get(job_id)
             if job is not None:
@@ -284,7 +341,7 @@ class ParseJobManager:
                     status="running",
                     started_at=_now(),
                     progress=max(job.progress, 2),
-                    progress_message="Đang khởi động parser",
+                    progress_message=message,
                 )
 
     def _update_progress(self, job_id: str, percent: int, message: str) -> None:
@@ -323,7 +380,9 @@ class ParseJobManager:
                     document_id=document_id or job.document_id,
                     dataset_id=dataset_id or job.dataset_id,
                     progress=100 if succeeded else job.progress,
-                    progress_message="Hoàn tất" if succeeded else "Parse thất bại",
+                    progress_message="Hoàn tất"
+                    if succeeded
+                    else ("Nhúng thất bại" if job.kind == "embed" else "Parse thất bại"),
                 )
             self._active_keys.pop(key, None)
             self._prune_locked()

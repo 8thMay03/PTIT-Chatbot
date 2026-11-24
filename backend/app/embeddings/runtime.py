@@ -2,8 +2,10 @@
 
 - Không tạo gì lúc import: thiếu key thì app vẫn khởi động, ``status()`` báo
   ``not_configured`` và route cần embedding trả 503.
-- Đã ``ready`` thì ghim: đổi provider/model/key lúc chạy không thay mô hình đang dùng
-  (tránh trộn hai không gian vector); cần khởi động lại.
+- Đã ``ready`` thì ghim: đổi settings embedding lúc chạy không thay mô hình đang dùng.
+  Chỉ ``load()`` (chọn/sửa profile embedding) thay mô hình ngay; mỗi mô hình có chữ ký
+  (``embedding_signature``) ghi cùng vector, nên đoạn của mô hình cũ được nhận ra để nhúng
+  lại và không bị trộn vào tìm kiếm.
 - Chưa ``ready`` thì nhớ lỗi theo dấu vân tay cấu hình (provider, model, key, Base URL, số chiều):
   cấu hình giữ nguyên → trả lại lỗi đã nhớ, không thử tải lại mỗi request; cấu hình đổi
   (lưu key qua /config, chọn profile) → tạo lại ở lần dùng kế tiếp, không cần restart.
@@ -18,7 +20,7 @@ import logging
 import threading
 
 from app.core.config import settings
-from app.embeddings.embedder import EmbeddingUnavailableError
+from app.embeddings.embedder import EmbeddingUnavailableError, embedding_signature
 from app.embeddings.models import EmbeddingModel
 
 logger = logging.getLogger(__name__)
@@ -47,6 +49,8 @@ class EmbeddingRuntime:
         self._lock = threading.Lock()
         self._model: EmbeddingModel | None = None
         self._dimensions: int | None = None
+        # Chữ ký không gian vector của mô hình đang dùng (ghi cùng vector vào DB).
+        self._signature: str | None = None
         # Dấu vân tay của lần tạo gần nhất: (provider, model, sha256(key), base_url,
         # embedding_dimension, vector_dim).
         self._fingerprint: tuple | None = None
@@ -57,10 +61,10 @@ class EmbeddingRuntime:
         """Mô hình đang dùng; tạo ở lần gọi đầu. Ném ``EmbeddingUnavailableError`` nếu không dùng được."""
         return self._acquire()[0]
 
-    def _acquire(self) -> tuple[EmbeddingModel, int]:
+    def _acquire(self) -> tuple[EmbeddingModel, int, str]:
         with self._lock:
             if self._model is not None:
-                return self._model, self._dimensions
+                return self._model, self._dimensions, self._signature
             fingerprint = _settings_fingerprint()
             if self._failure is not None and fingerprint == self._fingerprint:
                 error_cls, reason = self._failure
@@ -73,7 +77,7 @@ class EmbeddingRuntime:
                 logger.warning("Mô hình nhúng chưa sẵn sàng: %s", exc.reason)
                 raise
             self._install(model, fingerprint)
-            return model, self._dimensions
+            return model, self._dimensions, self._signature
 
     def load(self) -> EmbeddingModel:
         """Tạo mô hình theo settings hiện tại và thay mô hình đang dùng (áp profile embedding).
@@ -98,6 +102,13 @@ class EmbeddingRuntime:
         with self._lock:
             return self._model is not None
 
+    def signature(self) -> str | None:
+        """Chữ ký của mô hình đang dùng (tạo nếu chưa có); ``None`` nếu không dùng được."""
+        try:
+            return self._acquire()[2]
+        except EmbeddingUnavailableError:
+            return None
+
     def status(self) -> dict:
         """``{state, reason, provider, model}``; ``state`` là ready | not_configured | error."""
         try:
@@ -120,6 +131,7 @@ class EmbeddingRuntime:
                 return
             self._model = None
             self._dimensions = None
+            self._signature = None
             self._failure = (EmbeddingUnavailableError, reason)
         logger.error("Tắt mô hình nhúng: %s", reason)
 
@@ -133,12 +145,14 @@ class EmbeddingRuntime:
         with self._lock:
             self._model = None
             self._dimensions = None
+            self._signature = None
             self._fingerprint = None
             self._failure = None
 
     def _install(self, model: EmbeddingModel, fingerprint: tuple) -> None:
         self._model = model
         self._dimensions = fingerprint[-1]
+        self._signature = embedding_signature()
         self._fingerprint = fingerprint
         self._failure = None
 
@@ -162,13 +176,18 @@ class RuntimeEmbeddingModel(EmbeddingModel):
         self.runtime = runtime
 
     def embed(self, texts: list[str]) -> list[list[float]]:
-        return self._embed(texts, query=False)
+        return self.embed_with_signature(texts)[0]
 
     def embed_query(self, texts: list[str]) -> list[list[float]]:
-        return self._embed(texts, query=True)
+        return self.embed_with_signature(texts, query=True)[0]
 
-    def _embed(self, texts: list[str], *, query: bool) -> list[list[float]]:
-        model, dimensions = self.runtime._acquire()
+    def current_signature(self) -> str:
+        """Chữ ký mô hình đang dùng; ném ``EmbeddingUnavailableError`` nếu không dùng được."""
+        return self.runtime._acquire()[2]
+
+    def embed_with_signature(self, texts: list[str], *, query: bool = False) -> tuple[list[list[float]], str]:
+        """Vector kèm chữ ký của đúng mô hình đã tạo chúng (mô hình có thể bị đổi giữa hai lần gọi)."""
+        model, dimensions, signature = self.runtime._acquire()
         vectors = model.embed_query(texts) if query else model.embed(texts)
         reason = None
         if len(vectors) != len(texts):
@@ -180,7 +199,20 @@ class RuntimeEmbeddingModel(EmbeddingModel):
         if reason is not None:
             self.runtime.mark_failed(model, reason)
             raise EmbeddingUnavailableError(reason)
-        return vectors
+        return vectors, signature
+
+
+def embed_signed(
+    model: EmbeddingModel, texts: list[str], *, query: bool = False
+) -> tuple[list[list[float]], str | None]:
+    """Nhúng ``texts`` và trả chữ ký mô hình; mô hình không phải runtime (fake, script) → ``None``.
+
+    Chữ ký ``None`` nghĩa là không biết không gian vector: đoạn ghi NULL, truy vấn không lọc.
+    """
+    signed = getattr(model, "embed_with_signature", None)
+    if signed is not None:
+        return signed(texts, query=query)
+    return (model.embed_query(texts) if query else model.embed(texts)), None
 
 
 embedding_runtime = EmbeddingRuntime()

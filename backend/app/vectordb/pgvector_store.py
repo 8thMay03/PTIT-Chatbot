@@ -62,9 +62,17 @@ class PgVectorStore:
             session.commit()
 
     def search(
-        self, query_embedding: list[float], top_k: int, dataset_ids: list[str] | None = None
+        self,
+        query_embedding: list[float],
+        top_k: int,
+        dataset_ids: list[str] | None = None,
+        embedding_signature: str | None = None,
     ) -> list[dict]:
-        """Perform cosine similarity search against stored chunk embeddings."""
+        """Perform cosine similarity search against stored chunk embeddings.
+
+        ``embedding_signature``: chữ ký mô hình đã nhúng câu hỏi; chỉ so với vector cùng chữ ký
+        (vector của mô hình khác nằm trong không gian khác). ``None`` thì không lọc.
+        """
         if top_k <= 0 or not query_embedding:
             return []
 
@@ -74,7 +82,8 @@ class PgVectorStore:
             bind = session.get_bind()
             is_postgres = bind.dialect.name == "postgresql" if bind else False
 
-            needs_filter = dataset_ids is not None or _needs_dataset_filter(session)
+            filter_signature = embedding_signature is not None and _has_foreign_vectors(session, embedding_signature)
+            needs_filter = dataset_ids is not None or filter_signature or _needs_dataset_filter(session)
             if not needs_filter:
                 # Đường nhanh: không join để baseline và query plan HNSW không đổi.
                 if is_postgres:
@@ -129,6 +138,8 @@ class PgVectorStore:
                 .where(Dataset.enabled.is_(True))
                 .where(Document.dataset_id.in_(allowed))
             )
+            if filter_signature:
+                query = query.where(Chunk.embedding_signature == embedding_signature)
             if is_postgres:
                 cosine_distance = Chunk.embedding.cosine_distance(query_embedding)
                 _enable_iterative_scan(session)
@@ -166,6 +177,20 @@ def _enable_iterative_scan(session: Session) -> bool:
     except DBAPIError:
         return False
     return True
+
+
+def _has_foreign_vectors(session, signature: str) -> bool:
+    """Còn vector không thuộc mô hình ``signature`` (đổi mô hình nhúng mà chưa nhúng lại hết)?
+
+    Không có thì giữ đường truy vấn nhanh (không join, query plan HNSW như cũ).
+    """
+    foreign = session.scalar(
+        select(Chunk.id)
+        .where(Chunk.embedding.is_not(None))
+        .where(or_(Chunk.embedding_signature.is_(None), Chunk.embedding_signature != signature))
+        .limit(1)
+    )
+    return foreign is not None
 
 
 def _needs_dataset_filter(session) -> bool:

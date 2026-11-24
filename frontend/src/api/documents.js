@@ -113,6 +113,14 @@ export function chunk(documentId) {
   });
 }
 
+/** Xếp job nền nhúng lại vector của một tài liệu (không chia đoạn lại). */
+export function embed(documentId, { all = false } = {}) {
+  return request(`documents/${documentId}/embed`, {
+    method: "POST",
+    query: { all: all ? "true" : undefined },
+  });
+}
+
 export function parsersForFile(fileName) {
   return request("parsers", { query: { file_name: fileName } });
 }

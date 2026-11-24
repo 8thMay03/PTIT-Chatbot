@@ -3,6 +3,9 @@
 The parse step (parser + normalization, or a manual edit) writes documents.parsed_text
 and leaves existing chunks serving retrieval. The chunk step splits that stored text,
 embeds the chunks and replaces the document's index. Only a full rebuild runs both.
+The embed step (``embed_chunks``) only refreshes the vectors of existing chunks, e.g.
+after switching the embedding model; every vector is stored with the signature of the
+model that produced it.
 """
 
 import logging
@@ -13,16 +16,18 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import undefer
 
 from app.core.config import PROJECT_ROOT, settings
-from app.db.models import Document
+from app.db.models import Chunk as ChunkRow, Document
 from app.db.repositories import (
     ChunkRecord,
     DatasetConflict,
     DatasetNotFound,
     DocumentRecord,
+    adopt_unsigned_vectors as _adopt_unsigned_vectors,
     apply_document_move,
     delete_dataset_records,
     delete_document,
@@ -39,9 +44,10 @@ from app.db.repositories import (
     save_parsed_document,
     serialize_document,
     serialize_markdown,
+    stale_chunk_condition,
 )
 from app.db.session import SessionLocal, init_db
-from app.embeddings import EmbeddingModel, runtime_embedding_model
+from app.embeddings import EmbeddingModel, embed_signed, embedding_runtime, runtime_embedding_model
 from app.ingestion.chunker import (
     Chunk,
     ParentChildChunk,
@@ -74,6 +80,10 @@ from app.vectordb import VectorStore, create_vector_store
 
 
 logger = logging.getLogger("app.ingestion")
+
+# Số đoạn mỗi lần gọi mô hình khi nhúng lại: đủ nhỏ để báo tiến độ đều và commit từng phần
+# (client API tự chia lô nhỏ hơn theo giới hạn từng dịch vụ).
+EMBED_BATCH_SIZE = 64
 
 
 class DocumentStateError(RuntimeError):
@@ -434,6 +444,70 @@ class IngestionPipeline:
             "collection": self.vector_store.collection_name,
         }
 
+    # ---- Embed step ----
+
+    def embed_chunks(
+        self,
+        *,
+        dataset_id: str | None = None,
+        document_id: str | None = None,
+        include_current: bool = False,
+        on_progress: ProgressCallback | None = None,
+    ) -> dict:
+        """Nhúng lại vector của các đoạn hiện có bằng mô hình đang chạy, không chia đoạn lại.
+
+        Mặc định chỉ nhúng đoạn cần nhúng (chưa có vector, hoặc vector của mô hình khác);
+        ``include_current`` nhúng lại cả đoạn đã khớp. Phạm vi: một tài liệu, một dataset hoặc
+        toàn kho. Ghi theo từng lô; đoạn bị chia đoạn lại hoặc xoá trong lúc chạy (nội dung
+        khác lúc đọc) được bỏ qua để không gắn vector của văn bản cũ cho đoạn mới.
+        """
+        init_db()
+        signature = _current_signature(self.embedding_model)
+        query = select(ChunkRow.id, ChunkRow.document_id, ChunkRow.text, ChunkRow.search_text).order_by(
+            ChunkRow.document_id, ChunkRow.chunk_index
+        )
+        if dataset_id is not None:
+            query = query.join(Document, ChunkRow.document_id == Document.id).where(Document.dataset_id == dataset_id)
+        if document_id is not None:
+            query = query.where(ChunkRow.document_id == document_id)
+        if not include_current:
+            query = query.where(stale_chunk_condition(signature))
+        with SessionLocal() as session:
+            rows = session.execute(query).all()
+
+        total = len(rows)
+        updated = 0
+        documents: set[str] = set()
+        for start in range(0, total, EMBED_BATCH_SIZE):
+            batch = rows[start : start + EMBED_BATCH_SIZE]
+            payload = [
+                {"id": row.id, "text": row.text, "search_text": row.search_text or row.text, "metadata": {}}
+                for row in batch
+            ]
+            vectors, batch_signature = embed_signed(
+                self.embedding_model, [_embedding_input(item) for item in payload]
+            )
+            written: list[tuple[dict, list[float]]] = []
+            with SessionLocal() as session:
+                for row, item, vector in zip(batch, payload, vectors):
+                    result = session.execute(
+                        update(ChunkRow)
+                        .where(ChunkRow.id == row.id, ChunkRow.text == row.text, ChunkRow.search_text == row.search_text)
+                        .values(embedding=vector, embedding_signature=batch_signature)
+                    )
+                    if result.rowcount:
+                        written.append((item, vector))
+                        documents.add(row.document_id)
+                session.commit()
+            updated += len(written)
+            if written and self._uses_external_store():
+                self.vector_store.add([item for item, _ in written], [vector for _, vector in written])
+            if on_progress is not None:
+                done = start + len(batch)
+                on_progress(done * 100 // total, f"Đã nhúng {done}/{total} đoạn")
+
+        return {"documents": len(documents), "chunks": updated, "skipped": total - updated}
+
     # ---- Removal ----
 
     def delete_ingested_document(self, document_id: str) -> dict | None:
@@ -640,8 +714,13 @@ class IngestionPipeline:
     ) -> tuple[list[ChunkRecord], list[list[float]]]:
         if not chunks_payload:
             return chunk_records, []
-        embeddings = self.embedding_model.embed([_embedding_input(item) for item in chunks_payload])
-        return [replace(record, embedding=emb) for record, emb in zip(chunk_records, embeddings)], embeddings
+        embeddings, signature = embed_signed(
+            self.embedding_model, [_embedding_input(item) for item in chunks_payload]
+        )
+        return [
+            replace(record, embedding=emb, embedding_signature=signature)
+            for record, emb in zip(chunk_records, embeddings)
+        ], embeddings
 
     def _uses_external_store(self) -> bool:
         # pgvector stores embeddings in the chunk rows written above.
@@ -654,6 +733,34 @@ class IngestionPipeline:
             self.vector_store.delete(old_ids)
         if chunks_payload and embeddings:
             self.vector_store.add(chunks_payload, embeddings)
+
+
+def _current_signature(model: EmbeddingModel) -> str | None:
+    """Chữ ký mô hình sẽ nhúng (runtime: tạo nếu chưa có, lỗi thì ném); mô hình khác → None."""
+    current = getattr(model, "current_signature", None)
+    return current() if callable(current) else None
+
+
+def adopt_unsigned_vectors() -> int:
+    """Lúc khởi động: gán chữ ký mô hình đang chạy cho vector chưa có chữ ký.
+
+    Vector tạo trước migration 0009 không có chữ ký; coi chúng là của mô hình đang chạy lúc
+    nâng cấp để không bắt nhúng lại toàn bộ. Embedder chưa chạy được thì để nguyên: các đoạn
+    đó được tính là cần nhúng. Không bao giờ ném.
+    """
+    signature = embedding_runtime.signature()
+    if signature is None:
+        return 0
+    try:
+        with SessionLocal() as session:
+            adopted = _adopt_unsigned_vectors(session, signature)
+            session.commit()
+    except SQLAlchemyError as exc:
+        logger.warning("Không gán được chữ ký embedding cho đoạn cũ: %s", exc)
+        return 0
+    if adopted:
+        logger.info("Gán chữ ký embedding %s cho %d đoạn cũ.", signature, adopted)
+    return adopted
 
 
 def _load_sources() -> list[SourceDocument]:

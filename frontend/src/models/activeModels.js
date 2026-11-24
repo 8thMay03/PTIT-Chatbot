@@ -50,7 +50,7 @@ function embeddingSummary(registry) {
   const env = registry?.env_defaults?.embedding ?? {};
   let status = { tone: "ok", label: "Đang chạy" };
   if (runtime.load_error) status = { tone: "warn", label: "Lỗi khi nạp" };
-  else if (runtime.restart_required) status = { tone: "warn", label: "Chờ khởi động lại" };
+  else if (runtime.restart_required) status = { tone: "warn", label: "Chưa áp dụng" };
   if (profile) {
     return {
       name: profile.name,

@@ -44,3 +44,12 @@ export function chunk(datasetId, { signal } = {}) {
 export function parse(datasetId, { signal } = {}) {
   return request(`datasets/${datasetId}/parse`, { method: "POST", signal });
 }
+
+/** Xếp job nền nhúng lại vector của dataset; `all` = cả đoạn đã khớp mô hình đang chạy. */
+export function embed(datasetId, { all = false, signal } = {}) {
+  return request(`datasets/${datasetId}/embed`, {
+    method: "POST",
+    query: { all: all ? "true" : undefined },
+    signal,
+  });
+}

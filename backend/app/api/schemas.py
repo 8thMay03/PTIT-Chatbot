@@ -96,6 +96,8 @@ class DocumentItem(BaseModel):
     markdown_edited: bool = False
     parsed_at: datetime | None = None
     chunk_count: int = 0
+    # Đoạn chưa có vector của mô hình nhúng đang chạy: chỉ tìm được bằng BM25 tới khi nhúng lại.
+    stale_chunk_count: int = 0
     size_bytes: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -106,8 +108,16 @@ class DocumentDetail(DocumentItem):
     full_text: str | None = None
 
 
+class EmbedJobResult(BaseModel):
+    """Kết quả job nhúng lại: số tài liệu/đoạn đã ghi vector, số đoạn bỏ qua (đã đổi nội dung)."""
+
+    documents: int = 0
+    chunks: int = 0
+    skipped: int = 0
+
+
 class ParseJobItem(BaseModel):
-    """Progress and result of a background parse run."""
+    """Progress and result of a background parse or embed (``kind == "embed"``) run."""
 
     id: str
     kind: str
@@ -120,7 +130,7 @@ class ParseJobItem(BaseModel):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     error: str | None = None
-    result: DocumentItem | None = None
+    result: DocumentItem | EmbedJobResult | None = None
     progress: int = 0
     progress_message: str | None = None
 
@@ -187,6 +197,9 @@ class DatasetItem(BaseModel):
     document_count: int = 0
     chunk_count: int = 0
     pending_count: int = 0
+    # Tài liệu/đoạn chưa có vector của mô hình nhúng đang chạy.
+    stale_document_count: int = 0
+    stale_chunk_count: int = 0
     size_bytes: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -728,3 +741,15 @@ class ConversationDetail(ConversationItem):
 
 class RenameConversationRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
+
+
+class EmbeddingStatusResponse(BaseModel):
+    """Mô hình nhúng đang chạy và số đoạn còn vector của mô hình khác (cần nhúng lại)."""
+
+    state: str
+    provider: str | None = None
+    model: str | None = None
+    reason: str | None = None
+    total_chunks: int = 0
+    stale_chunks: int = 0
+    stale_documents: int = 0

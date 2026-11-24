@@ -25,7 +25,7 @@ const EMPTY_DRAFT = {
 
 const GROUP_DESCRIPTIONS = {
   answer: "Điều chỉnh cách chatbot tìm tài liệu và trả lời sinh viên. Áp dụng sau khi lưu.",
-  models: "Mô hình cho từng khâu trả lời. Đổi mô hình có hiệu lực ngay, riêng mô hình nhúng cần khởi động lại.",
+  models: "Mô hình cho từng khâu trả lời. Đổi mô hình có hiệu lực ngay; đổi mô hình nhúng thì cần nhúng lại tài liệu.",
   personal: "Chọn chế độ hiển thị phù hợp với bạn.",
 };
 
