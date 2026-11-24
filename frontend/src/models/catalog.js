@@ -369,6 +369,54 @@ export function canTestConnection(kind, provider) {
   return kind === "llm" || (kind === "reranker" && API_RERANKER_PROVIDERS.includes(provider));
 }
 
+/**
+ * Nhà cung cấp lấy được danh sách mô hình (khớp `SUPPORTED` trong app/core/provider_models.py).
+ * Giá trị: Base URL `"required"`, `"optional"`, hoặc `null` = URL cố định của hãng.
+ */
+const MODEL_LIST_BASE_URL = {
+  llm: { openai: "optional", gemini: null, openai_compatible: "required" },
+  embedding: { openai: null, gemini: null, cohere: null, openai_compatible: "required" },
+  reranker: { cohere: null, pinecone: null, tei: "required", rerank_api: "required" },
+};
+
+/** Ô "Mô hình" có nút "Tải danh sách" lấy mô hình khả dụng từ nhà cung cấp. */
+export function canListModels(kind, provider) {
+  return Object.hasOwn(MODEL_LIST_BASE_URL[kind] ?? {}, provider);
+}
+
+/** Lý do chưa lấy được danh sách (thiếu/sai Base URL, thiếu khoá bắt buộc); `null` = gọi được. */
+export function listModelsBlocker(kind, draft, { hasStoredKey = false } = {}) {
+  const mode = MODEL_LIST_BASE_URL[kind]?.[draft.provider];
+  const baseUrl = String(draft.base_url ?? "").trim();
+  if (mode === "required" && !baseUrl) return "Nhập Base URL trước.";
+  if (mode && baseUrl && !URL_PATTERN.test(baseUrl)) return "Base URL phải bắt đầu bằng http:// hoặc https://.";
+  const keepsStoredKey = hasStoredKey && !draft.clearApiKey;
+  if (keyRule(kind, draft.provider)?.required && !draft.apiKey.trim() && !keepsStoredKey) {
+    return "Nhập API key trước.";
+  }
+  return null;
+}
+
+/** Các giá trị quyết định danh sách: đổi bất kỳ giá trị nào thì danh sách cũ không còn đúng. */
+export function modelListSignature(kind, draft) {
+  const mode = MODEL_LIST_BASE_URL[kind]?.[draft.provider];
+  const baseUrl = mode ? String(draft.base_url ?? "").trim() : "";
+  return JSON.stringify([kind, draft.provider, baseUrl, draft.apiKey.trim(), Boolean(draft.clearApiKey)]);
+}
+
+/** Payload POST /model-profiles/list-models: không nhập khoá thì máy chủ dùng khoá đã lưu của profile. */
+export function buildListModelsPayload(kind, draft, profileId) {
+  const trimmed = (value) => String(value ?? "").trim() || null;
+  return {
+    kind,
+    provider: draft.provider,
+    base_url: MODEL_LIST_BASE_URL[kind]?.[draft.provider] ? trimmed(draft.base_url) : null,
+    api_key: trimmed(draft.apiKey),
+    // "Xoá khoá đã lưu": không dùng khoá đó nữa (nhà cung cấp có khoá `.env` thì máy chủ dùng khoá `.env`).
+    profile_id: draft.clearApiKey ? null : (profileId ?? null),
+  };
+}
+
 /** Nhà cung cấp gửi nội dung đoạn tài liệu ra dịch vụ ngoài: hộp thoại ghi chú cho admin. */
 export function sendsDocumentsToService(kind, provider) {
   if (kind === "embedding") return provider !== "sentence-transformers";

@@ -24,22 +24,35 @@ import {
   KINDS,
   KNOWN_EMBEDDING_DIMENSIONS,
   buildEmbeddingTestPayload,
+  buildListModelsPayload,
   buildPayload,
   buildRerankerTestPayload,
   buildTestPayload,
+  canListModels,
   canTestConnection,
   compatiblePresets,
   draftFromProfile,
   emptyDraft,
   isDraftDirty,
   keyRule,
+  listModelsBlocker,
+  modelListSignature,
   profileModelLabel,
   providerFields,
   providerName,
   sendsDocumentsToService,
   validateDraft,
 } from "./catalog";
-import { ApiKeyField, ChoiceGroup, KIND_ICONS, ProviderIcon, StatusPill, TextField, useWarnBeforeUnload } from "./fields";
+import {
+  ApiKeyField,
+  ChoiceGroup,
+  KIND_ICONS,
+  ModelField,
+  ProviderIcon,
+  StatusPill,
+  TextField,
+  useWarnBeforeUnload,
+} from "./fields";
 import ProfileDialog from "./ProfileDialog";
 
 const ENV_KEY_LABELS = {
@@ -70,6 +83,23 @@ const SERVICE_DATA_NOTES = {
   embedding: "Nội dung các đoạn tài liệu (khi nạp) và câu hỏi của sinh viên được gửi tới dịch vụ này.",
   reranker: "Nội dung các đoạn tài liệu được gửi tới dịch vụ này.",
 };
+
+const IDLE_LISTING = { status: "idle", models: [], message: null, signature: null };
+
+/** Đổi một trường của bản nháp; mô hình nhúng quen thuộc thì tự điền số chiều. */
+function applyDraftChange(kind, current, name, value) {
+  const next = { ...current, [name]: value };
+  // Tự điền số chiều nếu ô đang trống hoặc đang là số tự điền trước đó.
+  if (kind === "embedding" && name === "model") {
+    const known = KNOWN_EMBEDDING_DIMENSIONS[value.trim()];
+    const previousKnown = KNOWN_EMBEDDING_DIMENSIONS[current.model.trim()];
+    if (known && (!current.dimension || current.dimension === String(previousKnown ?? ""))) {
+      next.dimension = String(known);
+    }
+  }
+  if (name === "apiKey" && value.trim()) next.clearApiKey = false;
+  return next;
+}
 
 /** Id của ô nhập theo tên lỗi (`apiKey` là ô khoá). */
 function fieldInputId(idPrefix, name) {
@@ -215,6 +245,10 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  // Danh sách mô hình lấy từ nhà cung cấp; chỉ hiện khi khớp provider/Base URL/khoá hiện tại.
+  const [listing, setListing] = useState(IDLE_LISTING);
+  const [modelMode, setModelMode] = useState("select");
+  const listRequestRef = useRef(0);
   const rootRef = useRef(null);
   const idPrefix = `mdl-${kind}-form`;
 
@@ -224,26 +258,69 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
   const errors = useMemo(() => validateDraft(kind, draft, { hasStoredKey }), [kind, draft, hasStoredKey]);
   const dirty = isDraftDirty(kind, draft, initial);
   useWarnBeforeUnload(dirty);
+  const listable = canListModels(kind, draft.provider);
+  const listSignature = modelListSignature(kind, draft);
+  const currentListing = listable && listing.signature === listSignature ? listing : IDLE_LISTING;
 
   useEffect(() => {
     rootRef.current?.querySelector("input")?.focus({ preventScroll: true });
   }, []);
 
   function update(name, value) {
-    setDraft((current) => {
-      const next = { ...current, [name]: value };
-      // Mô hình nhúng quen thuộc: tự điền số chiều nếu ô đang trống hoặc đang là số tự điền trước đó.
-      if (kind === "embedding" && name === "model") {
-        const known = KNOWN_EMBEDDING_DIMENSIONS[value.trim()];
-        const previousKnown = KNOWN_EMBEDDING_DIMENSIONS[current.model.trim()];
-        if (known && (!current.dimension || current.dimension === String(previousKnown ?? ""))) {
-          next.dimension = String(known);
-        }
-      }
-      if (name === "apiKey" && value.trim()) next.clearApiKey = false;
-      return next;
-    });
+    setDraft((current) => applyDraftChange(kind, current, name, value));
     setTestResult(null);
+  }
+
+  /**
+   * Lấy danh sách mô hình từ nhà cung cấp. `auto` (rời ô Base URL/khoá): bỏ qua im lặng nếu
+   * thiếu thông tin hoặc đã tải cho đúng cấu hình này.
+   */
+  async function loadModels({ auto = false } = {}) {
+    if (!listable) return;
+    const signature = listSignature;
+    const blocker = listModelsBlocker(kind, draft, { hasStoredKey });
+    if (blocker) {
+      if (!auto) setListing({ status: "error", models: [], message: blocker, signature });
+      return;
+    }
+    if (listing.signature === signature && (listing.status === "loading" || (auto && listing.status !== "idle"))) {
+      return;
+    }
+    const requestId = ++listRequestRef.current;
+    setListing({ status: "loading", models: [], message: null, signature });
+    try {
+      const result = await modelProfilesApi.listModels(buildListModelsPayload(kind, draft, profile?.id));
+      if (requestId !== listRequestRef.current) return;
+      if (!result.success) {
+        setListing({ status: "error", models: [], message: result.message, signature });
+        return;
+      }
+      const models = result.models ?? [];
+      setListing({ status: "ok", models, message: result.message, signature });
+      setModelMode("select");
+      // Máy chủ chỉ phục vụ một mô hình (HF TEI…): điền luôn nếu ô đang trống.
+      // Bỏ qua nếu admin đã đổi provider/Base URL/khoá trong lúc chờ.
+      if (models.length === 1) {
+        setDraft((current) =>
+          current.model.trim() || modelListSignature(kind, current) !== signature
+            ? current
+            : applyDraftChange(kind, current, "model", models[0])
+        );
+      }
+    } catch (err) {
+      if (requestId !== listRequestRef.current) return;
+      setListing({
+        status: "error",
+        models: [],
+        message: errorMessage(err, "Máy chủ từ chối yêu cầu."),
+        signature,
+      });
+    }
+  }
+
+  /** Rời ô Base URL hoặc ô khoá có giá trị: tự lấy danh sách. */
+  function autoLoadModels(value) {
+    if (String(value ?? "").trim()) loadModels({ auto: true });
   }
 
   function ensureValid() {
@@ -408,20 +485,39 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
         )}
 
         <div className="mdl-grid">
-          {fields.map((field) => (
-            <TextField
-              key={`${draft.provider}-${field.name}`}
-              id={`${idPrefix}-${field.name}`}
-              field={field}
-              value={draft[field.name]}
-              onChange={(value) => update(field.name, value)}
-              error={
-                showErrors || ((field.url || field.number) && String(draft[field.name]).trim())
-                  ? errors[field.name]
-                  : undefined
-              }
-            />
-          ))}
+          {fields.map((field) => {
+            const fieldError =
+              showErrors || ((field.url || field.number) && String(draft[field.name]).trim())
+                ? errors[field.name]
+                : undefined;
+            if (field.name === "model" && listable) {
+              return (
+                <ModelField
+                  key={`${draft.provider}-${field.name}`}
+                  id={`${idPrefix}-${field.name}`}
+                  field={field}
+                  value={draft.model}
+                  onChange={(value) => update("model", value)}
+                  error={fieldError}
+                  listing={currentListing}
+                  onLoad={() => loadModels()}
+                  mode={modelMode}
+                  onModeChange={setModelMode}
+                />
+              );
+            }
+            return (
+              <TextField
+                key={`${draft.provider}-${field.name}`}
+                id={`${idPrefix}-${field.name}`}
+                field={field}
+                value={draft[field.name]}
+                onChange={(value) => update(field.name, value)}
+                onBlur={field.name === "base_url" && listable ? (event) => autoLoadModels(event.target.value) : undefined}
+                error={fieldError}
+              />
+            );
+          })}
         </div>
 
         {showDimWarning && (
@@ -462,6 +558,7 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
             required={Boolean(rule.required)}
             error={showErrors ? errors.apiKey : undefined}
             envKeyLabel={ENV_KEY_LABELS[kind]?.[draft.provider]}
+            onBlur={listable ? (event) => autoLoadModels(event.target.value) : undefined}
             clearKey={draft.clearApiKey}
             onClearKeyChange={(clearApiKey) => setDraft((current) => ({ ...current, clearApiKey }))}
           />

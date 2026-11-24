@@ -525,6 +525,31 @@ def resolve_embedding_test_key(
     return None
 
 
+def resolve_list_models_key(
+    session: Session, kind: str, provider: str, profile_id: str | None, api_key: str | None
+) -> str | None:
+    """Khoá dùng cho POST /model-profiles/list-models: nhập tay > khoá profile > khoá `.env`.
+
+    Khoá profile chỉ lấy khi profile cùng loại và cùng nhà cung cấp. Khoá `.env` chỉ dùng cho
+    nhà cung cấp mà mô hình đang chạy cũng dự phòng bằng nó (LLM OpenAI/Gemini, embedding OpenAI).
+    """
+    key = _clean(api_key)
+    if key:
+        return key
+    if profile_id:
+        row = _get(session, profile_id)
+        if row.kind != kind:
+            raise ConfigValidationError("Cấu hình này không thuộc loại mô hình được chọn.")
+        key = _profile_key_or_422(row) if row.provider == provider else None
+        if key:
+            return key
+    if kind == "llm" and provider in _LLM_ENV_KEY_FALLBACK:
+        return _INITIAL_SETTINGS[_LLM_KEY_FIELDS[provider]]
+    if kind == "embedding" and provider == "openai":
+        return _INITIAL_SETTINGS["embedding_api_key"] or _INITIAL_SETTINGS["openai_api_key"]
+    return None
+
+
 # ==========================================
 # Khởi động
 # ==========================================

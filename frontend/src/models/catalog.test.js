@@ -2,14 +2,18 @@ import { describe, expect, it } from "vitest";
 import {
   KINDS,
   buildEmbeddingTestPayload,
+  buildListModelsPayload,
   buildPayload,
   buildRerankerTestPayload,
   buildTestPayload,
+  canListModels,
   canTestConnection,
   draftFromProfile,
   emptyDraft,
   isDraftDirty,
   keyRule,
+  listModelsBlocker,
+  modelListSignature,
   sendsDocumentsToService,
   validateDraft,
 } from "./catalog";
@@ -212,5 +216,38 @@ describe("catalog kho mô hình", () => {
       api_key: null,
       profile_id: "p1",
     });
+  });
+
+  it("lấy danh sách mô hình: nhà cung cấp hỗ trợ, điều kiện gọi và payload", () => {
+    const listable = (kind) => KINDS[kind].providers.map((item) => item.key).filter((key) => canListModels(kind, key));
+    expect(listable("llm")).toEqual(["openai", "gemini", "openai_compatible"]);
+    expect(listable("embedding")).toEqual(["openai", "cohere", "gemini", "openai_compatible"]);
+    expect(listable("reranker")).toEqual(["cohere", "pinecone", "tei", "rerank_api"]);
+
+    const compatible = { ...emptyDraft("llm"), provider: "openai_compatible" };
+    expect(listModelsBlocker("llm", compatible)).toBe("Nhập Base URL trước.");
+    expect(listModelsBlocker("llm", { ...compatible, base_url: "localhost:11434" })).toMatch(/http/);
+    expect(listModelsBlocker("llm", { ...compatible, base_url: "http://localhost:11434/v1" })).toBeNull();
+    // OpenAI: Base URL tuỳ chọn, để trống thì máy chủ dùng khoá `.env`.
+    expect(listModelsBlocker("llm", emptyDraft("llm"))).toBeNull();
+
+    const cohere = { ...emptyDraft("reranker"), provider: "cohere" };
+    expect(listModelsBlocker("reranker", cohere)).toBe("Nhập API key trước.");
+    expect(listModelsBlocker("reranker", cohere, { hasStoredKey: true })).toBeNull();
+    expect(listModelsBlocker("reranker", { ...cohere, clearApiKey: true }, { hasStoredKey: true })).toBe(
+      "Nhập API key trước."
+    );
+
+    // Hãng có URL cố định không gửi Base URL; "Xoá khoá đã lưu" thì không gửi id profile.
+    expect(buildListModelsPayload("reranker", { ...cohere, base_url: "https://evil.example", apiKey: " k " }, "p1")).toEqual(
+      { kind: "reranker", provider: "cohere", base_url: null, api_key: "k", profile_id: "p1" }
+    );
+    expect(buildListModelsPayload("llm", { ...emptyDraft("llm"), clearApiKey: true }, "p1").profile_id).toBeNull();
+
+    // Chữ ký đổi khi Base URL/khoá đổi, không đổi khi sửa tên mô hình.
+    const signature = modelListSignature("llm", { ...compatible, base_url: "http://a/v1" });
+    expect(modelListSignature("llm", { ...compatible, base_url: "http://a/v1", model: "x" })).toBe(signature);
+    expect(modelListSignature("llm", { ...compatible, base_url: "http://b/v1" })).not.toBe(signature);
+    expect(modelListSignature("llm", { ...compatible, base_url: "http://a/v1", apiKey: "k" })).not.toBe(signature);
   });
 });

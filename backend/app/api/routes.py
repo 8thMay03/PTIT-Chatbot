@@ -51,6 +51,8 @@ from app.api.schemas import (
     DocumentMarkdown,
     FullConfigResponse,
     IngestResponse,
+    ListProviderModelsRequest,
+    ListProviderModelsResponse,
     LoginRequest,
     ModelRegistryResponse,
     MoveDocumentsRequest,
@@ -69,7 +71,7 @@ from app.api.schemas import (
     UpdateMarkdownRequest,
     UpdateModelProfileRequest,
 )
-from app.core import auth, model_profiles, rate_limit, user_auth
+from app.core import auth, model_profiles, provider_models, rate_limit, user_auth
 from app.core.auth import require_admin
 from app.core.config import (
     PROJECT_ROOT,
@@ -766,6 +768,42 @@ def test_model_profile_embedding(
         latency_ms=latency_ms,
         sample_output=f"Vector {size} chiều{padding}.",
     )
+
+
+@router.post(
+    "/model-profiles/list-models",
+    response_model=ListProviderModelsResponse,
+    dependencies=[Depends(require_admin)],
+)
+def list_provider_models(
+    request: ListProviderModelsRequest,
+    session: Session = Depends(get_config_store_session),
+) -> ListProviderModelsResponse:
+    """Hỏi nhà cung cấp danh sách mô hình khả dụng cho hộp thoại thêm/sửa; không lưu gì."""
+    kind, provider = request.kind, request.provider.strip().lower()
+    if not provider_models.is_supported(kind, provider):
+        raise HTTPException(status_code=422, detail="Nhà cung cấp này không hỗ trợ lấy danh sách mô hình.")
+    mode = provider_models.base_url_mode(kind, provider)
+    # Hãng có URL cố định: bỏ Base URL client gửi để khoá không đi tới host khác.
+    base_url = (request.base_url or "").strip() or None if mode else None
+    if mode == "required" and not base_url:
+        raise HTTPException(status_code=422, detail="Nhập Base URL trước.")
+    try:
+        # Kiểm URL trước khi lấy khoá: khoá đã lưu không bao giờ bị gửi tới host lạ.
+        validate_llm_url(base_url)
+        api_key = model_profiles.resolve_list_models_key(session, kind, provider, request.profile_id, request.api_key)
+    except model_profiles.ProfileNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ConfigValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    try:
+        models = provider_models.list_models(kind, provider, api_key=api_key, base_url=base_url)
+    except provider_models.ModelListError as exc:
+        return ListProviderModelsResponse(success=False, message=provider_models.error_message(exc))
+    if not models:
+        return ListProviderModelsResponse(success=True, message="Máy chủ không trả về mô hình phù hợp nào.")
+    return ListProviderModelsResponse(success=True, models=models)
 
 
 @router.put(

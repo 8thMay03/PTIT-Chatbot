@@ -8,6 +8,8 @@ import {
   Cpu,
   Eye,
   EyeOff,
+  ListRestart,
+  Loader2,
   MessageSquareText,
   Server,
   TreePine,
@@ -191,7 +193,7 @@ export function ChoiceGroup({ kind, name, legend, options, value, onChange }) {
   );
 }
 
-export function TextField({ id, field, value, onChange, error }) {
+export function TextField({ id, field, value, onChange, onBlur, error }) {
   const listId = field.suggestions ? `${id}-suggestions` : undefined;
   const hintId = `${id}-hint`;
   const describedBy = [error ? `${id}-error` : null, field.hint ? hintId : null].filter(Boolean).join(" ");
@@ -214,6 +216,7 @@ export function TextField({ id, field, value, onChange, error }) {
         aria-invalid={Boolean(error)}
         aria-describedby={describedBy || undefined}
         onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
       />
       {listId && (
         <datalist id={listId}>
@@ -226,6 +229,116 @@ export function TextField({ id, field, value, onChange, error }) {
         <span className="mdl-field-error" id={`${id}-error`}>
           {error}
         </span>
+      )}
+      {field.hint && (
+        <span className="mdl-field-hint" id={hintId}>
+          {field.hint}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Ô "Mô hình" lấy được danh sách từ nhà cung cấp. Đã tải danh sách thì chọn trong ô chọn,
+ * vẫn chuyển được sang gõ tay (máy chủ có thể không liệt kê đủ mô hình dùng được).
+ *
+ * `listing`: `{ status: "idle" | "loading" | "ok" | "error", models, message }`.
+ * `mode`: `"select"` hoặc `"text"`; chỉ có tác dụng khi đã có danh sách.
+ */
+export function ModelField({ id, field, value, onChange, error, listing, onLoad, mode, onModeChange }) {
+  const { status, models = [], message } = listing;
+  const hasList = status === "ok" && models.length > 0;
+  const useSelect = hasList && mode === "select";
+  const trimmed = value.trim();
+  const statusId = `${id}-list-status`;
+  const hintId = `${id}-hint`;
+  const describedBy = [error ? `${id}-error` : null, status !== "idle" ? statusId : null, field.hint ? hintId : null]
+    .filter(Boolean)
+    .join(" ");
+  // Gõ tay: gợi ý gồm mô hình đã tải rồi tới gợi ý có sẵn.
+  const suggestions = [...new Set([...(hasList ? models : []), ...(field.suggestions ?? [])])];
+  const listId = suggestions.length ? `${id}-suggestions` : undefined;
+  const inputProps = {
+    id,
+    className: `mdl-input ${error ? "is-invalid" : ""}`,
+    value,
+    "aria-invalid": Boolean(error),
+    "aria-describedby": describedBy || undefined,
+    onChange: (event) => onChange(event.target.value),
+  };
+
+  let statusNode = null;
+  if (status === "loading") {
+    statusNode = (
+      <span className="mdl-field-hint" id={statusId} role="status">
+        Đang lấy danh sách mô hình…
+      </span>
+    );
+  } else if (status === "error") {
+    statusNode = (
+      <span className="mdl-field-error" id={statusId} role="alert">
+        Không tải được danh sách mô hình: {message} Vẫn nhập tên mô hình bằng tay được.
+      </span>
+    );
+  } else if (status === "ok") {
+    statusNode = (
+      <span className="mdl-field-hint" id={statusId} role="status">
+        {hasList ? `Đã tải ${models.length} mô hình từ nhà cung cấp.` : message || "Không có mô hình nào."}
+      </span>
+    );
+  }
+
+  return (
+    <div className="mdl-field">
+      <div className="mdl-field-label-row">
+        <label htmlFor={id}>{field.label}</label>
+        <button type="button" className="mdl-link-btn mdl-list-btn" onClick={onLoad} disabled={status === "loading"}>
+          {status === "loading" ? <Loader2 size={13} className="spin" /> : <ListRestart size={13} />}
+          {status === "loading" ? "Đang tải..." : hasList ? "Tải lại danh sách" : "Tải danh sách"}
+        </button>
+      </div>
+      {useSelect ? (
+        <select {...inputProps}>
+          <option value="">— Chọn trong {models.length} mô hình —</option>
+          {trimmed && !models.includes(trimmed) && <option value={value}>{trimmed} (không có trong danh sách)</option>}
+          {models.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          {...inputProps}
+          type="text"
+          placeholder={field.placeholder}
+          list={listId}
+          spellCheck={false}
+          autoComplete="off"
+        />
+      )}
+      {!useSelect && listId && (
+        <datalist id={listId}>
+          {suggestions.map((item) => (
+            <option key={item} value={item} />
+          ))}
+        </datalist>
+      )}
+      {error && (
+        <span className="mdl-field-error" id={`${id}-error`}>
+          {error}
+        </span>
+      )}
+      {statusNode}
+      {hasList && (
+        <button
+          type="button"
+          className="mdl-link-btn mdl-list-mode"
+          onClick={() => onModeChange(useSelect ? "text" : "select")}
+        >
+          {useSelect ? "Nhập tên khác" : `Chọn trong danh sách (${models.length})`}
+        </button>
       )}
       {field.hint && (
         <span className="mdl-field-hint" id={hintId}>
@@ -250,6 +363,7 @@ export function ApiKeyField({
   clearKey,
   onClearKeyChange,
   envKeyLabel,
+  onBlur,
   error,
 }) {
   const [visible, setVisible] = useState(false);
@@ -288,6 +402,7 @@ export function ApiKeyField({
           aria-invalid={Boolean(error)}
           aria-describedby={describedBy}
           onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
         />
         <button
           type="button"

@@ -23,7 +23,7 @@ function baseConfig() {
 }
 
 /** Máy chủ giả giữ kho mô hình trong bộ nhớ, theo hợp đồng /api/model-profiles. */
-function createFakeServer({ profiles = [], active = {}, runtime = {} } = {}) {
+function createFakeServer({ profiles = [], active = {}, runtime = {}, listModels } = {}) {
   const state = {
     profiles: [...profiles],
     active: { llm: null, embedding: null, reranker: null, ...active },
@@ -67,6 +67,9 @@ function createFakeServer({ profiles = [], active = {}, runtime = {} } = {}) {
     }
     if (path === "model-profiles/test-reranker") {
       return jsonResponse({ success: true, message: "Kết nối thành công tới Rerank API.", latency_ms: 42 });
+    }
+    if (path === "model-profiles/list-models") {
+      return jsonResponse(listModels ? listModels(body) : { success: true, message: null, models: [] });
     }
     if (path === "model-profiles/activate") {
       state.active[body.kind] = body.profile_id;
@@ -512,5 +515,142 @@ describe("ModelsView — kho mô hình theo loại", () => {
     });
     // Backend vẫn chạy cấu hình .env cho tới khi khởi động lại.
     expect(panel.querySelector(".mdl-row.is-env").textContent).toContain("Đang chạy");
+  });
+
+  async function blur(input) {
+    await act(async () => {
+      input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    });
+  }
+
+  it("LLM tương thích OpenAI: rời ô Base URL thì tự tải danh sách, chọn mô hình trong ô chọn rồi lưu", async () => {
+    const { fetchMock } = createFakeServer({
+      listModels: () => ({ success: true, message: null, models: ["llama3.1:8b", "qwen2.5:7b"] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await render();
+    const panel = container.querySelector("#mdl-panel-llm");
+    await click(buttonByText(panel, "Thêm mô hình"));
+    await waitFor(() => dialog()?.querySelector("#mdl-llm-form-model"));
+    await click(dialog().querySelector('input[type="radio"][value="openai_compatible"]'));
+    const baseUrl = await waitFor(() => dialog().querySelector("#mdl-llm-form-base_url"));
+
+    // Ô trống: rời ô không gọi máy chủ.
+    await blur(baseUrl);
+    expect(requestsTo(fetchMock, "/model-profiles/list-models", "POST")).toHaveLength(0);
+
+    await changeInput(baseUrl, "http://localhost:11434/v1");
+    await blur(baseUrl);
+    const select = await waitFor(() => dialog().querySelector("select#mdl-llm-form-model"));
+    const [[, listOptions]] = requestsTo(fetchMock, "/model-profiles/list-models", "POST");
+    expect(JSON.parse(listOptions.body)).toEqual({
+      kind: "llm",
+      provider: "openai_compatible",
+      base_url: "http://localhost:11434/v1",
+      api_key: null,
+      profile_id: null,
+    });
+    expect([...select.options].map((option) => option.value)).toEqual(["", "llama3.1:8b", "qwen2.5:7b"]);
+    expect(dialog().textContent).toContain("Đã tải 2 mô hình từ nhà cung cấp.");
+
+    // Rời ô lần nữa với cùng cấu hình: không tải lại.
+    await blur(baseUrl);
+    expect(requestsTo(fetchMock, "/model-profiles/list-models", "POST")).toHaveLength(1);
+
+    await changeInput(select, "qwen2.5:7b");
+    // Chuyển sang gõ tay vẫn giữ giá trị và gợi ý từ danh sách.
+    await click(buttonByText(dialog(), "Nhập tên khác"));
+    const input = dialog().querySelector("input#mdl-llm-form-model");
+    expect(input.value).toBe("qwen2.5:7b");
+    expect([...dialog().querySelectorAll("#mdl-llm-form-model-suggestions option")].map((o) => o.value)).toContain(
+      "llama3.1:8b"
+    );
+    await click(buttonByText(dialog(), "Chọn trong danh sách (2)"));
+    expect(dialog().querySelector("select#mdl-llm-form-model").value).toBe("qwen2.5:7b");
+
+    await click(buttonByText(dialog(), "Thêm vào kho"));
+    await waitFor(() => rowByName(panel, "qwen2.5:7b"));
+    const [[, createOptions]] = requestsTo(fetchMock, "/model-profiles", "POST").filter(([url]) =>
+      String(url).endsWith("/model-profiles")
+    );
+    expect(JSON.parse(createOptions.body)).toMatchObject({ provider: "openai_compatible", model: "qwen2.5:7b" });
+  });
+
+  it("đổi Base URL thì ẩn danh sách cũ; lỗi từ nhà cung cấp hiện cạnh ô và vẫn gõ tay được", async () => {
+    const { fetchMock } = createFakeServer({
+      listModels: (body) =>
+        body.base_url === "http://localhost:8000/v1"
+          ? { success: false, message: "HTTP 401. Kiểm tra API key.", models: [] }
+          : { success: true, message: null, models: ["qwen2.5:7b"] },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await render();
+    await click(buttonByText(container.querySelector("#mdl-panel-llm"), "Thêm mô hình"));
+    await waitFor(() => dialog()?.querySelector("#mdl-llm-form-model"));
+    await click(dialog().querySelector('input[type="radio"][value="openai_compatible"]'));
+    const baseUrl = await waitFor(() => dialog().querySelector("#mdl-llm-form-base_url"));
+
+    // Bấm tay khi chưa có Base URL: báo thiếu, không gọi máy chủ.
+    await click(buttonByText(dialog(), "Tải danh sách"));
+    expect(dialog().textContent).toContain("Nhập Base URL trước.");
+    expect(requestsTo(fetchMock, "/model-profiles/list-models", "POST")).toHaveLength(0);
+
+    await changeInput(baseUrl, "http://localhost:11434/v1");
+    await click(buttonByText(dialog(), "Tải danh sách"));
+    // Máy chủ chỉ có một mô hình: điền luôn vào ô đang trống.
+    await waitFor(() => dialog().querySelector("select#mdl-llm-form-model")?.value === "qwen2.5:7b");
+
+    await changeInput(baseUrl, "http://localhost:8000/v1");
+    expect(dialog().querySelector("select#mdl-llm-form-model")).toBeNull();
+    expect(dialog().querySelector("input#mdl-llm-form-model").value).toBe("qwen2.5:7b");
+
+    await click(buttonByText(dialog(), "Tải danh sách"));
+    await waitFor(() => dialog().querySelector("#mdl-llm-form-model-list-status[role=alert]"));
+    expect(dialog().textContent).toContain("Không tải được danh sách mô hình: HTTP 401. Kiểm tra API key.");
+    expect(dialog().querySelector("input#mdl-llm-form-model")).not.toBeNull();
+  });
+
+  it("sửa profile: tải danh sách bằng khoá đã lưu; khoá bắt buộc thì báo thiếu khoá; Azure không có nút tải", async () => {
+    const { fetchMock } = createFakeServer({
+      profiles: [
+        { id: "r1", kind: "reranker", name: "Cohere", provider: "cohere", model: "rerank-v3.5", has_api_key: true },
+      ],
+      listModels: () => ({ success: true, message: null, models: ["rerank-v3.5", "rerank-v4.0-pro"] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await render("reranker");
+    const panel = container.querySelector("#mdl-panel-reranker");
+    await click(panel.querySelector('button[aria-label="Sửa Cohere"]'));
+    await waitFor(() => dialog()?.querySelector("#mdl-reranker-form-model"));
+
+    await click(buttonByText(dialog(), "Tải danh sách"));
+    const select = await waitFor(() => dialog().querySelector("select#mdl-reranker-form-model"));
+    expect(select.value).toBe("rerank-v3.5");
+    const [[, listOptions]] = requestsTo(fetchMock, "/model-profiles/list-models", "POST");
+    expect(JSON.parse(listOptions.body)).toEqual({
+      kind: "reranker",
+      provider: "cohere",
+      base_url: null,
+      api_key: null,
+      profile_id: "r1",
+    });
+
+    // Đổi sang Pinecone (khoá Cohere không dùng được): thiếu khoá, không gọi máy chủ.
+    await click(dialog().querySelector('input[type="radio"][value="pinecone"]'));
+    await click(buttonByText(dialog(), "Tải danh sách"));
+    expect(dialog().textContent).toContain("Nhập API key trước.");
+    expect(requestsTo(fetchMock, "/model-profiles/list-models", "POST")).toHaveLength(1);
+
+    // Cross-Encoder chạy cục bộ: không có nút tải.
+    await click(dialog().querySelector('input[type="radio"][value="cross-encoder"]'));
+    expect(buttonByText(dialog(), "Tải danh sách")).toBeUndefined();
+    await click(buttonByText(dialog(), "Huỷ"));
+
+    await render("llm");
+    await click(buttonByText(container.querySelector("#mdl-panel-llm"), "Thêm mô hình"));
+    await waitFor(() => dialog()?.querySelector("#mdl-llm-form-model"));
+    expect(buttonByText(dialog(), "Tải danh sách")).not.toBeUndefined();
+    await click(dialog().querySelector('input[type="radio"][value="azure"]'));
+    expect(buttonByText(dialog(), "Tải danh sách")).toBeUndefined();
   });
 });
