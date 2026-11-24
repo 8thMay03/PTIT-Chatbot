@@ -4,7 +4,7 @@
   ``not_configured`` và route cần embedding trả 503.
 - Đã ``ready`` thì ghim: đổi provider/model/key lúc chạy không thay mô hình đang dùng
   (tránh trộn hai không gian vector); cần khởi động lại.
-- Chưa ``ready`` thì nhớ lỗi theo dấu vân tay cấu hình (provider, model, key, số chiều):
+- Chưa ``ready`` thì nhớ lỗi theo dấu vân tay cấu hình (provider, model, key, Base URL, số chiều):
   cấu hình giữ nguyên → trả lại lỗi đã nhớ, không thử tải lại mỗi request; cấu hình đổi
   (lưu key qua /config, chọn profile) → tạo lại ở lần dùng kế tiếp, không cần restart.
 - ``runtime_embedding_model`` kiểm số chiều mỗi lần ``embed``; sai thì chuyển ``error``
@@ -28,9 +28,18 @@ READY = "ready"
 
 def _settings_fingerprint() -> tuple:
     provider = (settings.embedding_provider or "").strip().lower()
-    key = (settings.embedding_api_key or settings.openai_api_key) if provider == "openai" else None
+    key = settings.embedding_api_key
+    if provider == "openai":
+        key = key or settings.openai_api_key
     key_hash = hashlib.sha256(key.encode("utf-8")).hexdigest() if key else None
-    return (provider, settings.embedding_model, key_hash, settings.vector_dim)
+    return (
+        provider,
+        settings.embedding_model,
+        key_hash,
+        settings.embedding_base_url,
+        settings.embedding_dimension,
+        settings.vector_dim,
+    )
 
 
 class EmbeddingRuntime:
@@ -38,7 +47,8 @@ class EmbeddingRuntime:
         self._lock = threading.Lock()
         self._model: EmbeddingModel | None = None
         self._dimensions: int | None = None
-        # Dấu vân tay của lần tạo gần nhất: (provider, model, sha256(key), vector_dim).
+        # Dấu vân tay của lần tạo gần nhất: (provider, model, sha256(key), base_url,
+        # embedding_dimension, vector_dim).
         self._fingerprint: tuple | None = None
         # Lỗi của lần tạo gần nhất: (lớp lỗi, lý do). Ném bản mới mỗi lần để traceback không dồn.
         self._failure: tuple[type[EmbeddingUnavailableError], str] | None = None
@@ -128,7 +138,7 @@ class EmbeddingRuntime:
 
     def _install(self, model: EmbeddingModel, fingerprint: tuple) -> None:
         self._model = model
-        self._dimensions = fingerprint[3]
+        self._dimensions = fingerprint[-1]
         self._fingerprint = fingerprint
         self._failure = None
 
@@ -152,8 +162,14 @@ class RuntimeEmbeddingModel(EmbeddingModel):
         self.runtime = runtime
 
     def embed(self, texts: list[str]) -> list[list[float]]:
+        return self._embed(texts, query=False)
+
+    def embed_query(self, texts: list[str]) -> list[list[float]]:
+        return self._embed(texts, query=True)
+
+    def _embed(self, texts: list[str], *, query: bool) -> list[list[float]]:
         model, dimensions = self.runtime._acquire()
-        vectors = model.embed(texts)
+        vectors = model.embed_query(texts) if query else model.embed(texts)
         reason = None
         if len(vectors) != len(texts):
             reason = f"Mô hình nhúng trả {len(vectors)} vector cho {len(texts)} đoạn văn bản."

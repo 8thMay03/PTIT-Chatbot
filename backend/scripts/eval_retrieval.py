@@ -309,17 +309,27 @@ class CachedEmbeddingModel:
                 print(f"Cảnh báo: bỏ qua cache hỏng {cache_file}: {exc}", file=sys.stderr)
 
     @staticmethod
-    def cache_key(provider: str, model: str, text: str) -> str:
-        material = f"{provider}\x00{model}\x00{text}".encode("utf-8")
+    def cache_key(provider: str, model: str, text: str, query: bool = False) -> str:
+        # Mô hình nhúng câu hỏi khác đoạn tài liệu: tách khoá cache của câu hỏi. Mô hình
+        # không phân biệt giữ khoá cũ để cache đã có vẫn dùng được.
+        marker = "\x00query" if query else ""
+        material = f"{provider}\x00{model}\x00{text}{marker}".encode("utf-8")
         return hashlib.sha256(material).hexdigest()
 
     def embed(self, texts: list[str]) -> list[list[float]]:
+        return self._embed(texts, query=False)
+
+    def embed_query(self, texts: list[str]) -> list[list[float]]:
+        return self._embed(texts, query=True)
+
+    def _embed(self, texts: list[str], *, query: bool) -> list[list[float]]:
         if not texts:
             return []
+        query = query and bool(getattr(self.inner, "distinguishes_queries", False))
         results: list[list[float] | None] = [None] * len(texts)
         missing: list[tuple[int, str, str]] = []
         for index, text in enumerate(texts):
-            key = self.cache_key(self.provider, self.model, text)
+            key = self.cache_key(self.provider, self.model, text, query)
             cached = self._cache.get(key)
             if cached is not None:
                 results[index] = cached
@@ -328,7 +338,8 @@ class CachedEmbeddingModel:
                 missing.append((index, key, text))
 
         if missing:
-            vectors = self.inner.embed([text for _, _, text in missing])
+            inner_embed = getattr(self.inner, "embed_query", self.inner.embed) if query else self.inner.embed
+            vectors = inner_embed([text for _, _, text in missing])
             if len(vectors) != len(missing):
                 raise RuntimeError(
                     f"Embedding model trả về {len(vectors)} vector cho {len(missing)} văn bản"
@@ -504,7 +515,7 @@ def build_retrieval_fn(
             raise ValueError("Chế độ vector cần embedding model")
 
         def retrieve_vector(query: str) -> list[dict]:
-            query_embedding = embedding_model.embed([query])[0]
+            query_embedding = embedding_model.embed_query([query])[0]
             return collapse_parent_results(
                 vector_store.search(query_embedding, top_k=candidate_count), top_k=top_k
             )
@@ -641,7 +652,7 @@ def evaluate(mode: str, cases: list[dict], top_k: int, cache_file: Path) -> dict
         embedding_model = CachedEmbeddingModel(inner, settings.embedding_provider, model_name, cache_file)
         warm_texts = warm_cache_texts(mode, [case["question"] for case in cases])
         if warm_texts:
-            embedding_model.embed(warm_texts)
+            embedding_model.embed_query(warm_texts)
         embedding_block.update(
             {
                 "provider": settings.embedding_provider,

@@ -332,7 +332,15 @@ class EmbeddingConfigPayload(BaseModel):
 
 class AvailableProviders(BaseModel):
     llm: list[str] = ["openai", "gemini", "azure", "openai_compatible", "anthropic", "deepseek", "cohere", "qwen"]
-    embedding: list[str] = ["openai", "sentence-transformers", "cohere", "gemini"]
+    embedding: list[str] = [
+        "openai",
+        "sentence-transformers",
+        "voyage",
+        "cohere",
+        "gemini",
+        "jina",
+        "openai_compatible",
+    ]
     reranker: list[str] = ["heuristic", "cross-encoder", "rerank_api"]
 
 
@@ -476,6 +484,16 @@ class TestModelProfileRerankerRequest(BaseModel):
     base_url: str | None = Field(default=None, max_length=2048)
     api_key: str | None = Field(default=None, max_length=4096)
     # Không nhập api_key thì dùng khoá đã lưu của profile reranker này.
+    profile_id: str | None = None
+
+
+class TestModelProfileEmbeddingRequest(BaseModel):
+    provider: str = Field(max_length=50)
+    model: str | None = Field(default=None, max_length=255)
+    base_url: str | None = Field(default=None, max_length=2048)
+    dimension: int | None = Field(default=None, ge=1)
+    api_key: str | None = Field(default=None, max_length=4096)
+    # Không nhập api_key thì dùng khoá đã lưu của profile embedding này.
     profile_id: str | None = None
 
 

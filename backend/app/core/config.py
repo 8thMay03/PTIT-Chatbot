@@ -87,8 +87,14 @@ class Settings(BaseSettings):
     # tụt (hybrid hit@4 0.820 so với 0.850) nên mặc định là "text"; BM25 luôn
     # dùng search_text.
     embedding_input_field: str = Field(default="text", alias="EMBEDDING_INPUT_FIELD")
-    # Khoá riêng cho embedding OpenAI (profile embedding có khoá); trống thì dùng OPENAI_API_KEY.
+    # Khoá của embedding (profile embedding có khoá). Chỉ provider openai dự phòng bằng
+    # OPENAI_API_KEY khi trống; Voyage/Cohere/Gemini/Jina bắt buộc khoá này.
     embedding_api_key: str | None = Field(default=None, alias="EMBEDDING_API_KEY")
+    # Base URL tới trước /embeddings, chỉ dùng cho provider openai_compatible (qua allowlist).
+    embedding_base_url: str | None = Field(default=None, alias="EMBEDDING_BASE_URL")
+    # Số chiều mô hình nhúng trả về; trống = VECTOR_DIM. Ít hơn VECTOR_DIM thì vector được
+    # đệm 0 cho đủ số chiều cột vector (khoảng cách cosine không đổi).
+    embedding_dimension: int | None = Field(default=None, ge=1, alias="EMBEDDING_DIMENSION")
 
     # Profile trong kho mô hình (app.core.model_profiles) đang được chọn cho từng khâu.
     # None = dùng cấu hình `.env` (LLM, embedding) hoặc heuristic (reranker). Chỉ admin
@@ -343,6 +349,8 @@ _RESET_EXCLUDED_FIELDS = frozenset(
         "embedding_provider",
         "embedding_model",
         "embedding_api_key",
+        "embedding_base_url",
+        "embedding_dimension",
     }
 )
 
@@ -406,7 +414,13 @@ def _default_llm_url_allowlist() -> list[str]:
     vì PUT /config có thể đã đổi giá trị các trường này sau khi khởi động.
     """
     entries = ["https://api.openai.com", *_BUILTIN_RERANK_API_ORIGINS]
-    for field in ("openai_base_url", "openai_compatible_base_url", "azure_openai_endpoint", "reranker_base_url"):
+    for field in (
+        "openai_base_url",
+        "openai_compatible_base_url",
+        "azure_openai_endpoint",
+        "reranker_base_url",
+        "embedding_base_url",
+    ):
         parsed = _parse_origin(str(_INITIAL_SETTINGS.get(field) or ""))
         if parsed is not None:
             entries.append(_origin_string(*parsed))
@@ -583,7 +597,15 @@ def get_runtime_config_dict() -> dict:
         },
         "available_providers": {
             "llm": ["openai", "gemini", "azure", "openai_compatible", "anthropic", "deepseek", "cohere", "qwen"],
-            "embedding": ["openai", "sentence-transformers", "cohere", "gemini"],
+            "embedding": [
+                "openai",
+                "sentence-transformers",
+                "voyage",
+                "cohere",
+                "gemini",
+                "jina",
+                "openai_compatible",
+            ],
             "reranker": ["heuristic", "cross-encoder", "rerank_api"],
         },
     }

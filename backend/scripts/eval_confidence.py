@@ -489,7 +489,7 @@ def run(
     embedding = CachedEmbeddingModel(inner, settings.embedding_provider, model_name, cache_file)
     warm = warm_cache_texts("full", [case["question"] for case in cases])
     if warm:
-        embedding.embed(warm)
+        embedding.embed_query(warm)
     trace: dict = {}
     retrieval_fn = build_retrieval_fn("full", top_k, embedding, trace=trace)
     thresholds = thresholds_from_settings()

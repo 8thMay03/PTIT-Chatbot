@@ -48,6 +48,8 @@ def _embedding_settings(monkeypatch):
     monkeypatch.setattr(settings, "embedding_provider", "openai")
     monkeypatch.setattr(settings, "embedding_model", "text-embedding-3-small")
     monkeypatch.setattr(settings, "embedding_api_key", None)
+    monkeypatch.setattr(settings, "embedding_base_url", None)
+    monkeypatch.setattr(settings, "embedding_dimension", None)
     monkeypatch.setattr(settings, "openai_api_key", None)
     monkeypatch.setattr(settings, "vector_dim", VECTOR_COLUMN_DIM)
 
@@ -89,7 +91,7 @@ def test_openai_with_key_creates_model_without_network(monkeypatch) -> None:
 def test_openai_client_failure_reason_has_no_sdk_message(monkeypatch) -> None:
     monkeypatch.setattr(settings, "embedding_api_key", SECRET_KEY)
 
-    def broken(model_name, api_key):
+    def broken(model_name, api_key, dimensions=None):
         raise RuntimeError(f"bad key {api_key}")
 
     monkeypatch.setattr(embedder, "OpenAIEmbeddingModel", broken)
@@ -124,7 +126,7 @@ def test_sentence_transformers_dimension_must_match_vector_dim(monkeypatch) -> N
     assert f"VECTOR_DIM={VECTOR_COLUMN_DIM}" in info.value.reason
 
 
-@pytest.mark.parametrize("provider", ["cohere", "gemini", "lạ"])
+@pytest.mark.parametrize("provider", ["anthropic", "lạ"])
 def test_unsupported_provider_is_error(monkeypatch, provider) -> None:
     monkeypatch.setattr(settings, "embedding_provider", provider)
     with pytest.raises(EmbeddingUnavailableError) as info:
@@ -163,7 +165,7 @@ def test_runtime_is_lazy_and_reports_not_configured() -> None:
 
 
 def test_runtime_unsupported_provider_status_is_error(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "embedding_provider", "cohere")
+    monkeypatch.setattr(settings, "embedding_provider", "anthropic")
     status = EmbeddingRuntime().status()
     assert status["state"] == "error"
     assert "chưa được hỗ trợ" in status["reason"]

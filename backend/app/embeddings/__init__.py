@@ -1,12 +1,15 @@
-from app.embeddings.embedder import (
+from app.embeddings.api_clients import ApiEmbeddingModel
+from app.embeddings.embedder import create_embedding_model
+from app.embeddings.errors import (
+    EmbeddingAPIError,
     EmbeddingNotConfiguredError,
     EmbeddingUnavailableError,
-    create_embedding_model,
 )
 from app.embeddings.models import (
     EmbeddingModel,
     HashEmbeddingModel,
     OpenAIEmbeddingModel,
+    PaddedEmbeddingModel,
     SentenceTransformerEmbeddingModel,
 )
 from app.embeddings.runtime import (
@@ -16,12 +19,15 @@ from app.embeddings.runtime import (
 )
 
 __all__ = [
+    "ApiEmbeddingModel",
+    "EmbeddingAPIError",
     "EmbeddingModel",
     "EmbeddingNotConfiguredError",
     "EmbeddingRuntime",
     "EmbeddingUnavailableError",
     "HashEmbeddingModel",
     "OpenAIEmbeddingModel",
+    "PaddedEmbeddingModel",
     "SentenceTransformerEmbeddingModel",
     "create_embedding_model",
     "embedding_runtime",

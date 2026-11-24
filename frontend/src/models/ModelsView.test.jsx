@@ -57,6 +57,14 @@ function createFakeServer({ profiles = [], active = {}, runtime = {} } = {}) {
       state.profiles.push({ id: `p${nextId++}`, kind, ...rest, has_api_key: Boolean(apiKey) });
       return jsonResponse(snapshot(), 201);
     }
+    if (path === "model-profiles/test-embedding") {
+      return jsonResponse({
+        success: true,
+        message: "Kết nối thành công tới Voyage AI (voyage-3.5).",
+        latency_ms: 87,
+        sample_output: "Vector 1024 chiều; được đệm 0 tới VECTOR_DIM=1536 khi lưu.",
+      });
+    }
     if (path === "model-profiles/test-reranker") {
       return jsonResponse({ success: true, message: "Kết nối thành công tới Rerank API.", latency_ms: 42 });
     }
@@ -333,6 +341,68 @@ describe("ModelsView — kho mô hình theo loại", () => {
     expect(rowByName(panel, "rerank-v3.5").textContent).toContain("Rerank API");
   });
 
+  it("embedding: thêm Voyage AI với khoá bắt buộc, số chiều tự điền, ghi chú đệm 0 và kiểm tra kết nối", async () => {
+    const { fetchMock } = createFakeServer();
+    vi.stubGlobal("fetch", fetchMock);
+    await render("embedding");
+    const panel = container.querySelector("#mdl-panel-embedding");
+
+    await click(buttonByText(panel, "Thêm mô hình"));
+    await waitFor(() => dialog()?.querySelector("#mdl-embedding-form-model"));
+    // Sentence-Transformers chạy cục bộ: không khoá, không kiểm tra kết nối, không ghi chú gửi dữ liệu.
+    await click(dialog().querySelector('input[type="radio"][value="sentence-transformers"]'));
+    await waitFor(() => !dialog().querySelector("#mdl-embedding-form-key"));
+    expect(buttonByText(dialog(), "Kiểm tra kết nối")).toBeUndefined();
+    expect(dialog().textContent).not.toContain("được gửi tới dịch vụ này");
+
+    await click(dialog().querySelector('input[type="radio"][value="voyage"]'));
+    await waitFor(() => dialog().querySelector("#mdl-embedding-form-key"));
+    expect(dialog().querySelector("#mdl-embedding-form-base_url")).toBeNull();
+    expect(dialog().textContent).toContain("Bắt buộc");
+    expect(dialog().textContent).toContain("câu hỏi của sinh viên được gửi tới dịch vụ này");
+    await changeInput(dialog().querySelector("#mdl-embedding-form-model"), "voyage-3.5");
+    expect(dialog().querySelector("#mdl-embedding-form-dimension").value).toBe("1024");
+    expect(dialog().textContent).toContain("được thêm số 0 cho đủ");
+
+    // Thiếu khoá: không gửi gì, báo lỗi ở ô khoá.
+    await click(buttonByText(dialog(), "Thêm vào kho"));
+    await waitFor(() => dialog().querySelector("#mdl-embedding-form-key-error"));
+    expect(requestsTo(fetchMock, "/model-profiles", "POST")).toHaveLength(0);
+
+    await changeInput(dialog().querySelector("#mdl-embedding-form-key"), "pa-secret-789");
+    await click(buttonByText(dialog(), "Kiểm tra kết nối"));
+    await waitFor(() => dialog().querySelector(".mdl-test-result.is-ok"));
+    const [[, testOptions]] = requestsTo(fetchMock, "/model-profiles/test-embedding", "POST");
+    expect(JSON.parse(testOptions.body)).toEqual({
+      provider: "voyage",
+      model: "voyage-3.5",
+      base_url: null,
+      dimension: 1024,
+      api_key: "pa-secret-789",
+      profile_id: null,
+    });
+    expect(dialog().textContent).toContain("Vector 1024 chiều");
+
+    await click(buttonByText(dialog(), "Thêm vào kho"));
+    await waitFor(() => rowByName(panel, "voyage-3.5"));
+    const [[, createOptions]] = requestsTo(fetchMock, "/model-profiles", "POST").filter(([url]) =>
+      String(url).endsWith("/model-profiles")
+    );
+    expect(JSON.parse(createOptions.body)).toEqual({
+      kind: "embedding",
+      name: "voyage-3.5",
+      provider: "voyage",
+      model: "voyage-3.5",
+      dimension: 1024,
+      api_key: "pa-secret-789",
+    });
+    expect(document.body.innerHTML).not.toContain("pa-secret-789");
+    const row = rowByName(panel, "voyage-3.5");
+    expect(row.textContent).toContain("Voyage AI · voyage-3.5 · 1024 chiều");
+    expect(row.textContent).not.toContain("Vượt VECTOR_DIM");
+    expect(panel.querySelector('button[aria-label="Dùng voyage-3.5"]').disabled).toBe(false);
+  });
+
   it("xoá mô hình không dùng sau khi xác nhận", async () => {
     const { state, fetchMock } = createFakeServer({
       profiles: [{ id: "r1", kind: "reranker", name: "BGE", provider: "cross-encoder", model: "BAAI/bge-reranker-base" }],
@@ -370,7 +440,7 @@ describe("ModelsView — kho mô hình theo loại", () => {
 
     expect(panel.querySelector('button[aria-label="Dùng Small"]').disabled).toBe(false);
     expect(panel.querySelector('button[aria-label="Dùng Large"]').disabled).toBe(true);
-    expect(rowByName(panel, "Large").textContent).toContain("Khác VECTOR_DIM");
+    expect(rowByName(panel, "Large").textContent).toContain("Vượt VECTOR_DIM");
 
     // Huỷ ở hộp xác nhận thì không gọi API.
     await click(panel.querySelector('button[aria-label="Dùng Small"]'));

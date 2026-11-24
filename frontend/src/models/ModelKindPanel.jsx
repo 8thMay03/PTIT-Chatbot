@@ -21,13 +21,14 @@ import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
 import { ENV_ROW_NAME, normalizeEnvLlmProvider } from "./activeModels";
 import {
-  COMPATIBLE_PRESETS,
   KINDS,
   KNOWN_EMBEDDING_DIMENSIONS,
+  buildEmbeddingTestPayload,
   buildPayload,
   buildRerankerTestPayload,
   buildTestPayload,
   canTestConnection,
+  compatiblePresets,
   draftFromProfile,
   emptyDraft,
   isDraftDirty,
@@ -59,8 +60,20 @@ async function storeRegistry(queryClient, registry) {
   await queryClient.invalidateQueries({ queryKey: queryKeys.config });
 }
 
+/** Mô hình nhiều chiều hơn kho vector không chọn dùng được; ít chiều hơn thì vector được đệm 0. */
 function dimensionMismatch(kind, profile, vectorDim) {
-  return kind === "embedding" && profile.dimension != null && profile.dimension !== vectorDim;
+  return kind === "embedding" && profile.dimension != null && vectorDim != null && profile.dimension > vectorDim;
+}
+
+/** Ghi chú dữ liệu gửi ra dịch vụ ngoài trong hộp thoại. */
+const SERVICE_DATA_NOTES = {
+  embedding: "Nội dung các đoạn tài liệu (khi nạp) và câu hỏi của sinh viên được gửi tới dịch vụ này.",
+  reranker: "Nội dung các đoạn tài liệu được gửi tới dịch vụ này.",
+};
+
+/** Id của ô nhập theo tên lỗi (`apiKey` là ô khoá). */
+function fieldInputId(idPrefix, name) {
+  return `${idPrefix}-${name === "apiKey" ? "key" : name}`;
 }
 
 /** Hàng đầu danh sách: cấu hình `.env` của máy chủ (reranker: Heuristic có sẵn). */
@@ -207,7 +220,8 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
 
   const fields = providerFields(kind, draft.provider);
   const rule = keyRule(kind, draft.provider);
-  const errors = useMemo(() => validateDraft(kind, draft), [kind, draft]);
+  const hasStoredKey = Boolean(profile?.has_api_key) && profile?.provider === draft.provider;
+  const errors = useMemo(() => validateDraft(kind, draft, { hasStoredKey }), [kind, draft, hasStoredKey]);
   const dirty = isDraftDirty(kind, draft, initial);
   useWarnBeforeUnload(dirty);
 
@@ -235,8 +249,8 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
   function ensureValid() {
     if (Object.keys(errors).length === 0) return true;
     setShowErrors(true);
-    const first = ["name", ...fields.map((field) => field.name)].find((name) => errors[name]);
-    rootRef.current?.querySelector(`#${idPrefix}-${first}`)?.focus();
+    const first = ["name", ...fields.map((field) => field.name), "apiKey"].find((name) => errors[name]);
+    rootRef.current?.querySelector(`#${fieldInputId(idPrefix, first)}`)?.focus();
     return false;
   }
 
@@ -245,10 +259,11 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
     setTesting(true);
     setTestResult(null);
     try {
-      const result =
-        kind === "reranker"
-          ? await modelProfilesApi.testReranker(buildRerankerTestPayload(draft, profile?.id))
-          : await modelProfilesApi.testLlm(buildTestPayload(draft, profile?.id));
+      let result;
+      if (kind === "reranker") result = await modelProfilesApi.testReranker(buildRerankerTestPayload(draft, profile?.id));
+      else if (kind === "embedding")
+        result = await modelProfilesApi.testEmbedding(buildEmbeddingTestPayload(draft, profile?.id));
+      else result = await modelProfilesApi.testLlm(buildTestPayload(draft, profile?.id));
       setTestResult(result);
     } catch (err) {
       setTestResult({ success: false, message: errorMessage(err, "Máy chủ từ chối yêu cầu kiểm tra.") });
@@ -281,7 +296,9 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
 
   const vectorDim = registry.embedding_runtime?.vector_dim;
   const dimensionValue = Number(draft.dimension);
-  const showDimWarning = kind === "embedding" && draft.dimension && !errors.dimension && dimensionValue !== vectorDim;
+  const hasDimension = kind === "embedding" && draft.dimension && !errors.dimension && vectorDim != null;
+  const showDimWarning = hasDimension && dimensionValue > vectorDim;
+  const showDimPadding = hasDimension && dimensionValue < vectorDim;
   const kindLabel = KINDS[kind].label;
   const isActiveProfile = isEdit && registry.active?.[kind] === profile.id;
   let description = "Mô hình được lưu vào kho; bấm “Dùng” trong danh sách để chọn làm mô hình đang dùng.";
@@ -364,18 +381,23 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
         {draft.provider === "openai_compatible" && (
           <div className="mdl-presets" role="group" aria-label="Điền nhanh địa chỉ máy chủ">
             <span>Điền nhanh:</span>
-            {COMPATIBLE_PRESETS.map((preset) => (
+            {compatiblePresets(kind).map((preset) => (
               <button
                 key={preset.key}
                 type="button"
                 className="mdl-preset"
                 aria-pressed={draft.base_url === preset.baseUrl}
                 onClick={() => {
-                  setDraft((current) => ({
-                    ...current,
-                    base_url: preset.baseUrl,
-                    model: preset.model || current.model,
-                  }));
+                  setDraft((current) => {
+                    const model = preset.model || current.model;
+                    const known = kind === "embedding" ? KNOWN_EMBEDDING_DIMENSIONS[model] : undefined;
+                    return {
+                      ...current,
+                      base_url: preset.baseUrl,
+                      model,
+                      ...(known && !current.dimension ? { dimension: String(known) } : {}),
+                    };
+                  });
                   setTestResult(null);
                 }}
               >
@@ -406,8 +428,18 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
           <div className="inline-alert is-warning">
             <AlertTriangle size={16} />
             <span>
-              Mô hình có {dimensionValue} chiều, khác <code>VECTOR_DIM</code> ({vectorDim}) của kho vector: lưu được
-              nhưng chưa chọn làm mô hình đang dùng được.
+              Mô hình có {dimensionValue} chiều, nhiều hơn <code>VECTOR_DIM</code> ({vectorDim}) của kho vector: lưu
+              được nhưng chưa chọn làm mô hình đang dùng được. Chọn số chiều nhỏ hơn nếu mô hình hỗ trợ.
+            </span>
+          </div>
+        )}
+
+        {showDimPadding && (
+          <div className="inline-alert is-info" role="note">
+            <Info size={16} />
+            <span>
+              Vector {dimensionValue} chiều được thêm số 0 cho đủ <code>VECTOR_DIM</code> ({vectorDim}) khi lưu; kết
+              quả tìm kiếm không đổi.
             </span>
           </div>
         )}
@@ -415,7 +447,7 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
         {sendsDocumentsToService(kind, draft.provider) && (
           <div className="inline-alert is-info" role="note">
             <Info size={16} />
-            <span>Nội dung các đoạn tài liệu được gửi tới dịch vụ này.</span>
+            <span>{SERVICE_DATA_NOTES[kind]}</span>
           </div>
         )}
 
@@ -425,8 +457,10 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
             id={`${idPrefix}-key`}
             value={draft.apiKey}
             onChange={(value) => update("apiKey", value)}
-            hasKey={Boolean(profile?.has_api_key) && profile?.provider === draft.provider}
+            hasKey={hasStoredKey}
             envFallback={rule.envFallback}
+            required={Boolean(rule.required)}
+            error={showErrors ? errors.apiKey : undefined}
             envKeyLabel={ENV_KEY_LABELS[kind]?.[draft.provider]}
             clearKey={draft.clearApiKey}
             onClearKeyChange={(clearApiKey) => setDraft((current) => ({ ...current, clearApiKey }))}
@@ -446,7 +480,7 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
                 <p className="mdl-test-meta">
                   {testResult.latency_ms != null && <>Thời gian phản hồi: {Math.round(testResult.latency_ms)} ms</>}
                   {testResult.sample_output &&
-                    (kind === "reranker" ? (
+                    (kind !== "llm" ? (
                       <> · {testResult.sample_output}</>
                     ) : (
                       <> · Mô hình trả lời: “{testResult.sample_output}”</>
@@ -603,7 +637,7 @@ export default function ModelKindPanel({ kind, registry, config, active = true }
                         <KeyRound size={11} /> Đã lưu khoá
                       </StatusPill>
                     )}
-                    {mismatch && <StatusPill tone="warn">Khác VECTOR_DIM</StatusPill>}
+                    {mismatch && <StatusPill tone="warn">Vượt VECTOR_DIM</StatusPill>}
                   </>
                 }
                 useButton={
@@ -655,8 +689,8 @@ export default function ModelKindPanel({ kind, registry, config, active = true }
           <p className="mdl-list-foot">
             <Info size={14} aria-hidden="true" />
             <span>
-              Kho vector dùng <code>VECTOR_DIM = {vectorDim}</code>: mô hình khác số chiều lưu được nhưng không chọn dùng
-              được. Script dòng lệnh (<code>scripts/ingest.py</code>) vẫn dùng embedding trong <code>.env</code>.
+              Kho vector dùng <code>VECTOR_DIM = {vectorDim}</code>: mô hình ít chiều hơn được thêm số 0 cho đủ, mô hình
+              nhiều chiều hơn lưu được nhưng không chọn dùng được. Script dòng lệnh (<code>scripts/ingest.py</code>) vẫn dùng embedding trong <code>.env</code>.
             </span>
           </p>
         )}

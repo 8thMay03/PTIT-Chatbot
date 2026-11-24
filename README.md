@@ -28,7 +28,7 @@ Thay vì để mô hình trả lời hoàn toàn từ kiến thức có sẵn, c
 | Frontend | React 18, Vite 5, Lucide React |
 | Backend API | Python 3.10+, FastAPI, Uvicorn, Pydantic |
 | LLM | Đa provider: OpenAI (`gpt-4.1-mini`), Google Gemini, Azure OpenAI, OpenAI-Compatible (Ollama, vLLM) |
-| Embedding | OpenAI `text-embedding-3-small`; hỗ trợ Sentence Transformers hoặc hash embedding |
+| Embedding | OpenAI `text-embedding-3-small`; hỗ trợ Voyage AI, Cohere, Google Gemini, Jina AI, máy chủ tương thích OpenAI (Mistral, Ollama, vLLM, HF TEI), Sentence Transformers hoặc hash embedding. Mô hình ít hơn 1536 chiều được đệm 0 cho vừa cột vector |
 | Vector database | **`pgvector`** (Tích hợp trực tiếp trong PostgreSQL 16 với HNSW Index) |
 | Keyword retrieval | BM25 với `rank-bm25` |
 | Data storage & Migration | PostgreSQL 16 với `pgvector` (Production) / SQLite (Dev), SQLAlchemy 2.0, Alembic, Psycopg 3 |
