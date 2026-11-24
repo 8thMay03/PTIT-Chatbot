@@ -319,7 +319,7 @@ export const KINDS = {
     label: "Mô hình nhúng (Embedding)",
     title: "Nhúng văn bản (Embedding)",
     description:
-      "Mô hình biến câu hỏi và các đoạn tài liệu thành vector để tìm theo ngữ nghĩa. Đổi mô hình có hiệu lực sau khi khởi động lại backend và cần nạp lại toàn bộ tài liệu.",
+      "Mô hình biến câu hỏi và các đoạn tài liệu thành vector để tìm theo ngữ nghĩa. Đổi mô hình có hiệu lực ngay và cần nhúng lại toàn bộ tài liệu.",
     providers: EMBEDDING_PROVIDERS,
   },
   reranker: {

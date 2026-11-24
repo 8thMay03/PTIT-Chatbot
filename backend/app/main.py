@@ -10,6 +10,7 @@ from app.core.config_store import load_persisted_config
 from app.core.model_profiles import load_selected_embedding_at_startup
 from app.db import init_db
 from app.embeddings import embedding_runtime
+from app.ingestion import pipeline as ingestion_pipeline_module
 
 
 @asynccontextmanager
@@ -22,6 +23,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     # và route cần embedding trả 503.
     load_selected_embedding_at_startup()
     embedding_runtime.warm_up()
+    # Vector tạo trước khi có chữ ký embedding được coi là của mô hình vừa khởi động.
+    ingestion_pipeline_module.adopt_unsigned_vectors()
     yield
 
 

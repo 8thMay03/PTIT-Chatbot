@@ -22,6 +22,7 @@ __all__ = [
     "EmbeddingNotConfiguredError",
     "EmbeddingUnavailableError",
     "create_embedding_model",
+    "embedding_signature",
     "model_dimensions",
 ]
 
@@ -29,6 +30,21 @@ __all__ = [
 def model_dimensions() -> int:
     """Số chiều mô hình nhúng trả về: ``EMBEDDING_DIMENSION``, trống thì ``VECTOR_DIM``."""
     return settings.embedding_dimension or settings.vector_dim
+
+
+def embedding_signature() -> str:
+    """Chữ ký không gian vector của cấu hình embedding hiện tại: ``provider:model:số chiều``.
+
+    Base URL chỉ có nghĩa với ``openai_compatible`` (máy chủ khác có thể phục vụ mô hình khác
+    cùng tên) nên được nối thêm ``@base_url``. Khoá API không đổi không gian vector nên không
+    nằm trong chữ ký.
+    """
+    provider = (settings.embedding_provider or "").strip().lower()
+    signature = f"{provider}:{(settings.embedding_model or '').strip()}:{model_dimensions()}"
+    base_url = (settings.embedding_base_url or "").strip().rstrip("/")
+    if provider == "openai_compatible" and base_url:
+        signature = f"{signature}@{base_url}"
+    return signature
 
 
 def create_embedding_model() -> EmbeddingModel:

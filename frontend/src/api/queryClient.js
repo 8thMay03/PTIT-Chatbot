@@ -19,6 +19,7 @@ export const queryKeys = {
   config: ["config"],
   health: ["health"],
   modelProfiles: ["model-profiles"],
+  embeddingStatus: ["embeddings", "status"],
   documents: ["documents"],
   datasets: ["datasets"],
   datasetList: ["datasets", "list"],

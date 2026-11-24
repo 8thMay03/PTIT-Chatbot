@@ -39,7 +39,7 @@ describe("activeModelSummary", () => {
     expect(summary.status).toEqual({ tone: "warn", label: "Thiếu API key" });
   });
 
-  it("embedding: lỗi nạp ưu tiên hơn chờ khởi động lại", () => {
+  it("embedding: lỗi nạp ưu tiên hơn lựa chọn chưa áp dụng", () => {
     const pending = registry({
       active: { embedding: "e1" },
       embedding_runtime: { profile_id: null, restart_required: true, load_error: null },
@@ -47,7 +47,7 @@ describe("activeModelSummary", () => {
     expect(activeModelSummary("embedding", pending)).toEqual({
       name: "bge-m3",
       meta: "Sentence-Transformers · 1024 chiều",
-      status: { tone: "warn", label: "Chờ khởi động lại" },
+      status: { tone: "warn", label: "Chưa áp dụng" },
     });
     const failed = registry({ embedding_runtime: { restart_required: true, load_error: "OOM" } });
     expect(activeModelSummary("embedding", failed).status.label).toBe("Lỗi khi nạp");

@@ -49,6 +49,8 @@ from app.api.schemas import (
     DocumentItem,
     DocumentListResponse,
     DocumentMarkdown,
+    EmbeddingStatusResponse,
+    EmbedJobResult,
     FullConfigResponse,
     IngestResponse,
     ListProviderModelsRequest,
@@ -95,11 +97,13 @@ from app.db.repositories import (
     add_message,
     add_message_sources,
     claim_anonymous_conversations,
+    count_stale_chunks_by_document,
     create_dataset,
     create_user,
     delete_conversation,
     delete_conversations_for_owner,
     delete_dataset_records,
+    embedding_coverage,
     ensure_conversation,
     get_conversation,
     get_conversation_messages,
@@ -883,9 +887,13 @@ def get_documents(
 
         if session.get(_Dataset, dataset_id) is None:
             raise HTTPException(status_code=404, detail="Không tìm thấy dataset.")
+    rows = list_documents(session, dataset_id=dataset_id)
+    stale = count_stale_chunks_by_document(
+        session, embedding_runtime.signature(), document_ids=[document.id for document, _count in rows]
+    )
     documents = [
-        DocumentItem(**_document_payload(document, chunk_count))
-        for document, chunk_count in list_documents(session, dataset_id=dataset_id)
+        DocumentItem(**_document_payload(document, chunk_count, stale.get(document.id, 0)))
+        for document, chunk_count in rows
     ]
     return DocumentListResponse(documents=documents)
 
@@ -918,7 +926,10 @@ def get_document(document_id: str, session: Session = Depends(get_session)) -> D
         except Exception:
             pass
 
-    return DocumentDetail(**_document_payload(document, chunk_count), preview=preview, full_text=full_text)
+    stale = count_stale_chunks_by_document(session, embedding_runtime.signature(), document_ids=[document.id])
+    return DocumentDetail(
+        **_document_payload(document, chunk_count, stale.get(document.id, 0)), preview=preview, full_text=full_text
+    )
 
 
 def _legacy_document_text(session: Session, document, source_p: Path | None) -> tuple[str | None, str | None]:
@@ -1193,7 +1204,7 @@ def _dataset_error_to_http(exc: Exception) -> HTTPException:
 @router.get("/datasets", response_model=DatasetListResponse, dependencies=[Depends(require_admin)])
 def list_datasets_api(session: Session = Depends(get_session)) -> DatasetListResponse:
     return DatasetListResponse(
-        datasets=[DatasetItem(**item) for item in list_datasets_with_stats(session)]
+        datasets=[DatasetItem(**item) for item in list_datasets_with_stats(session, embedding_runtime.signature())]
     )
 
 
@@ -1209,13 +1220,13 @@ def create_dataset_api(
     except IntegrityError as exc:
         session.rollback()
         raise HTTPException(status_code=409, detail="Dataset đã tồn tại.") from exc
-    payload = get_dataset_with_stats(session, dataset.id)
+    payload = get_dataset_with_stats(session, dataset.id, embedding_runtime.signature())
     return DatasetItem(**payload)
 
 
 @router.get("/datasets/{dataset_id}", response_model=DatasetItem, dependencies=[Depends(require_admin)])
 def get_dataset_api(dataset_id: str, session: Session = Depends(get_session)) -> DatasetItem:
-    payload = get_dataset_with_stats(session, dataset_id)
+    payload = get_dataset_with_stats(session, dataset_id, embedding_runtime.signature())
     if payload is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy dataset.")
     return DatasetItem(**payload)
@@ -1248,7 +1259,7 @@ def update_dataset_api(
     if was_enabled is not None and was_enabled != dataset.enabled:
         # BM25 giữ snapshot chunk của các dataset đang bật.
         invalidate_bm25_cache()
-    payload = get_dataset_with_stats(session, dataset.id)
+    payload = get_dataset_with_stats(session, dataset.id, embedding_runtime.signature())
     return DatasetItem(**payload)
 
 
@@ -1289,6 +1300,88 @@ def parse_dataset_api(dataset_id: str) -> DatasetParseResponse:
     )
 
 
+# ==========================================
+# Nhúng lại vector (task reembed-documents)
+# ==========================================
+def _require_embedding() -> None:
+    """Embedder phải chạy được trước khi xếp job nhúng: báo lỗi ngay thay vì job thất bại sau."""
+    try:
+        embedding_runtime.get()
+    except EmbeddingUnavailableError as exc:
+        raise _embedding_unavailable(exc) from exc
+
+
+def _enqueue_embed(**options) -> ParseJobItem:
+    _require_embedding()
+    try:
+        job = parse_jobs.enqueue_embed(**options)
+    except ParseJobConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _parse_job_payload(job)
+
+
+@router.get("/embeddings/status", response_model=EmbeddingStatusResponse, dependencies=[Depends(require_admin)])
+def embedding_status(session: Session = Depends(get_session)) -> EmbeddingStatusResponse:
+    status = embedding_runtime.status()
+    coverage = embedding_coverage(session, embedding_runtime.signature())
+    return EmbeddingStatusResponse(
+        state=status["state"],
+        provider=status["provider"],
+        model=status["model"],
+        reason=status["reason"],
+        **coverage,
+    )
+
+
+@router.post(
+    "/embeddings/reembed", response_model=ParseJobItem, status_code=202, dependencies=[Depends(require_admin)]
+)
+def reembed_all(include_current: bool = Query(default=False, alias="all")) -> ParseJobItem:
+    """Nhúng lại toàn kho bằng mô hình đang chạy; mặc định chỉ đoạn cần nhúng (``all=true``: mọi đoạn)."""
+    return _enqueue_embed(label="Toàn bộ tài liệu", include_current=include_current)
+
+
+@router.post(
+    "/datasets/{dataset_id}/embed", response_model=ParseJobItem, status_code=202, dependencies=[Depends(require_admin)]
+)
+def embed_dataset_api(
+    dataset_id: str,
+    include_current: bool = Query(default=False, alias="all"),
+    session: Session = Depends(get_session),
+) -> ParseJobItem:
+    from app.db.models import Dataset as _Dataset
+
+    dataset = session.get(_Dataset, dataset_id)
+    if dataset is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dataset.")
+    return _enqueue_embed(label=dataset.name, dataset_id=dataset_id, include_current=include_current)
+
+
+@router.post(
+    "/documents/{document_id}/embed",
+    response_model=ParseJobItem,
+    status_code=202,
+    dependencies=[Depends(require_admin)],
+)
+def embed_document_api(
+    document_id: str,
+    include_current: bool = Query(default=False, alias="all"),
+    session: Session = Depends(get_session),
+) -> ParseJobItem:
+    row = get_document_with_chunk_count(session, document_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu.")
+    document, chunk_count = row
+    if chunk_count == 0:
+        raise HTTPException(status_code=409, detail="Tài liệu chưa có đoạn nào; hãy chia đoạn trước.")
+    return _enqueue_embed(
+        label=Path(document.source_path).name,
+        document_id=document.id,
+        dataset_id=document.dataset_id,
+        include_current=include_current,
+    )
+
+
 def _parse_job_payload(job: ParseJob) -> ParseJobItem:
     return ParseJobItem(
         id=job.id,
@@ -1302,16 +1395,16 @@ def _parse_job_payload(job: ParseJob) -> ParseJobItem:
         started_at=job.started_at,
         finished_at=job.finished_at,
         error=job.error,
-        result=job.result,
+        result=EmbedJobResult(**job.result) if job.kind == "embed" and job.result else job.result,
         progress=job.progress,
         progress_message=job.progress_message,
     )
 
 
-def _document_payload(document, chunk_count: int) -> dict:
+def _document_payload(document, chunk_count: int, stale_chunk_count: int = 0) -> dict:
     path = resolve_source_path(document.source_path)
     size_bytes = path.stat().st_size if path is not None and path.is_file() else None
-    return serialize_document(document, chunk_count, size_bytes)
+    return serialize_document(document, chunk_count, size_bytes, stale_chunk_count)
 
 
 # ==========================================

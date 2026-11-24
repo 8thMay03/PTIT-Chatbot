@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from pathlib import Path
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.db.models import (
@@ -153,7 +153,9 @@ def serialize_dataset(
     chunk_count: int,
     pending_count: int,
     size_bytes: int | None,
+    coverage: dict | None = None,
 ) -> dict:
+    coverage = coverage or {}
     return {
         "id": dataset.id,
         "name": dataset.name,
@@ -162,28 +164,95 @@ def serialize_dataset(
         "document_count": document_count,
         "chunk_count": chunk_count,
         "pending_count": pending_count,
+        "stale_document_count": coverage.get("stale_documents", 0),
+        "stale_chunk_count": coverage.get("stale_chunks", 0),
         "size_bytes": size_bytes,
         "created_at": dataset.created_at,
         "updated_at": dataset.updated_at,
     }
 
 
-def list_datasets_with_stats(session: Session) -> list[dict]:
+def list_datasets_with_stats(session: Session, signature: str | None = None) -> list[dict]:
+    """``signature``: chữ ký mô hình nhúng đang chạy, để đếm đoạn cần nhúng lại."""
     payloads: list[dict] = []
     for dataset in list_datasets(session):
         doc_count, chunk_count, pending_count, size_bytes = get_dataset_stats(session, dataset.id)
+        coverage = embedding_coverage(session, signature, dataset_id=dataset.id)
         payloads.append(
-            serialize_dataset(dataset, doc_count, chunk_count, pending_count, size_bytes)
+            serialize_dataset(dataset, doc_count, chunk_count, pending_count, size_bytes, coverage)
         )
     return payloads
 
 
-def get_dataset_with_stats(session: Session, dataset_id: str) -> dict | None:
+def get_dataset_with_stats(session: Session, dataset_id: str, signature: str | None = None) -> dict | None:
     dataset = session.get(Dataset, dataset_id)
     if dataset is None:
         return None
     doc_count, chunk_count, pending_count, size_bytes = get_dataset_stats(session, dataset.id)
-    return serialize_dataset(dataset, doc_count, chunk_count, pending_count, size_bytes)
+    coverage = embedding_coverage(session, signature, dataset_id=dataset.id)
+    return serialize_dataset(dataset, doc_count, chunk_count, pending_count, size_bytes, coverage)
+
+
+def stale_chunk_condition(signature: str | None):
+    """Đoạn cần nhúng (lại) so với mô hình có chữ ký ``signature``.
+
+    Chưa có vector, chưa có chữ ký (dữ liệu cũ chưa được gán) hoặc chữ ký khác. Không biết
+    mô hình đang chạy (``None``) thì chỉ tính đoạn chưa có vector.
+    """
+    if signature is None:
+        return Chunk.embedding.is_(None)
+    return or_(
+        Chunk.embedding.is_(None),
+        Chunk.embedding_signature.is_(None),
+        Chunk.embedding_signature != signature,
+    )
+
+
+def count_stale_chunks_by_document(
+    session: Session,
+    signature: str | None,
+    *,
+    dataset_id: str | None = None,
+    document_ids: list[str] | None = None,
+) -> dict[str, int]:
+    """Số đoạn cần nhúng lại của từng tài liệu (tài liệu không có đoạn nào cần thì vắng mặt)."""
+    if document_ids is not None and not document_ids:
+        return {}
+    query = (
+        select(Chunk.document_id, func.count(Chunk.id))
+        .where(stale_chunk_condition(signature))
+        .group_by(Chunk.document_id)
+    )
+    if dataset_id is not None:
+        query = query.join(Document, Chunk.document_id == Document.id).where(Document.dataset_id == dataset_id)
+    if document_ids is not None:
+        query = query.where(Chunk.document_id.in_(document_ids))
+    return {document_id: count for document_id, count in session.execute(query)}
+
+
+def embedding_coverage(session: Session, signature: str | None, *, dataset_id: str | None = None) -> dict:
+    """``{total_chunks, stale_chunks, stale_documents}`` của một dataset hoặc toàn kho."""
+    total_query = select(func.count(Chunk.id))
+    if dataset_id is not None:
+        total_query = total_query.join(Document, Chunk.document_id == Document.id).where(
+            Document.dataset_id == dataset_id
+        )
+    stale = count_stale_chunks_by_document(session, signature, dataset_id=dataset_id)
+    return {
+        "total_chunks": session.scalar(total_query) or 0,
+        "stale_chunks": sum(stale.values()),
+        "stale_documents": len(stale),
+    }
+
+
+def adopt_unsigned_vectors(session: Session, signature: str) -> int:
+    """Gán ``signature`` cho vector chưa có chữ ký (dữ liệu trước migration 0009); trả số đoạn."""
+    result = session.execute(
+        update(Chunk)
+        .where(Chunk.embedding.is_not(None), Chunk.embedding_signature.is_(None))
+        .values(embedding_signature=signature)
+    )
+    return result.rowcount or 0
 
 
 def get_enabled_dataset_ids(session: Session) -> list[str]:
@@ -221,6 +290,7 @@ class ChunkRecord:
     token_count: int | None = None
     metadata: dict | None = None
     embedding: list[float] | None = None
+    embedding_signature: str | None = None
 
 
 def replace_knowledge_base(
@@ -397,6 +467,7 @@ def _chunk_model(chunk: ChunkRecord) -> Chunk:
         token_count=chunk.token_count,
         vector_id=chunk.vector_id,
         embedding=chunk.embedding,
+        embedding_signature=chunk.embedding_signature if chunk.embedding is not None else None,
         chunk_metadata=chunk.metadata,
     )
 
@@ -508,7 +579,9 @@ def get_document_chunks(
     )
 
 
-def serialize_document(document: Document, chunk_count: int, size_bytes: int | None = None) -> dict:
+def serialize_document(
+    document: Document, chunk_count: int, size_bytes: int | None = None, stale_chunk_count: int = 0
+) -> dict:
     metadata = document.document_metadata if isinstance(getattr(document, "document_metadata", None), dict) else (getattr(document, "document_metadata", None) or {})
     # Tương thích test cũ dùng SimpleNamespace chưa có dataset_id.
     dataset_id = getattr(document, "dataset_id", None)
@@ -528,6 +601,8 @@ def serialize_document(document: Document, chunk_count: int, size_bytes: int | N
         # Set only once Markdown is stored, so clients know whether it can be edited or chunked.
         "parsed_at": document.parsed_at,
         "chunk_count": chunk_count,
+        # Đoạn chưa có vector của mô hình nhúng đang chạy (chỉ tìm được bằng BM25).
+        "stale_chunk_count": stale_chunk_count,
         "size_bytes": size_bytes,
         "created_at": document.created_at,
         "updated_at": document.updated_at,

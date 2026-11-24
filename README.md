@@ -212,6 +212,8 @@ Ingest tách thành hai bước để có thể kiểm tra, sửa Markdown và c
 1. **Parse**: parser (+ chuẩn hóa heading) tạo Markdown và lưu vào `documents.parsed_text`; tài liệu chuyển trạng thái `parsed`. Các đoạn cũ (nếu có) vẫn phục vụ hỏi đáp cho tới khi chia đoạn lại. Parse lại ra đúng nội dung cũ thì tài liệu giữ `active`.
 2. **Chia đoạn**: đọc `parsed_text`, chia đoạn, tạo embeddings rồi thay toàn bộ đoạn của tài liệu trong một transaction; trạng thái chuyển `active`. Bước này không đọc file gốc hay gọi parser. Nếu Markdown bị parse lại/sửa trong lúc đang chia đoạn, API trả 409 và giữ nguyên các đoạn cũ.
 
+Mỗi vector được lưu kèm chữ ký mô hình đã tạo nó (`chunks.embedding_signature` = `provider:model:số chiều`, thêm `@base_url` với máy chủ tương thích OpenAI). Chọn mô hình nhúng khác trong **Cài đặt → Mô hình** có hiệu lực ngay. Sau đó các đoạn có vector của mô hình cũ, hoặc chưa có vector, được tính là **cần nhúng lại**. Chúng bị bỏ khỏi tìm kiếm vector (vẫn tìm được bằng BM25) cho tới khi admin bấm **Nhúng**. Có nút nhúng cho cả dataset, cho từng tài liệu và **Nhúng lại toàn bộ** ở danh sách dataset hoặc trang Mô hình. Bước nhúng chỉ tạo lại vector cho đoạn hiện có, không parse hay chia đoạn lại. Nó chạy thành job nền `kind=embed` (cùng `GET /api/parse-jobs`) và ghi từng lô 64 đoạn. Đoạn bị chia đoạn lại trong lúc job chạy được bỏ qua. Lần khởi động đầu sau migration `0009`, vector cũ chưa có chữ ký được gán chữ ký của mô hình đang chạy.
+
 Upload (`POST /api/documents`) **chỉ parse** và dừng ở `parsed`: mở tài liệu, kiểm tra bản Markdown rồi bấm **Chia đoạn**. Upload được kiểm tra định dạng/dung lượng và ghi vào vùng tạm ngoài `DOCUMENTS_PATH` trước khi trả response; sau đó parse chạy nền. File nguồn chỉ được publish vào kho và ghi DB khi parse thành công; nếu conversion hoặc transaction PostgreSQL thất bại, file cũ và dữ liệu đã lưu được giữ nguyên.
 
 Parse lại (`POST /api/documents/{id}/parse`) và parse upload đều chạy trong **một worker nền tuần tự**. API trả `202` kèm job ngay thay vì chờ Docling/LlamaParse, nên giao diện không bị khóa khi PDF lớn đang xử lý. Trạng thái job được đọc qua `GET /api/parse-jobs`; giao diện poll khi còn job `queued`/`running`, hiển thị banner và spinner riêng cho tài liệu đang parse, tự tải lại danh sách/chi tiết khi xong. Chỉ thao tác ghi trên đúng tài liệu đang parse bị khóa; tài liệu khác vẫn xem, parse, chia đoạn hoặc sửa Markdown được. Job trả thêm `progress` (0–100) và `progress_message`: Docling báo theo số trang đã xử lý, LlamaParse báo theo pha/thời gian chờ (cloud không trả bộ đếm trang), parser text báo theo pha. Giao diện hiển thị thanh tiến trình ở banner job nền, cột trạng thái của bảng và màn chi tiết. Job state nằm trong bộ nhớ process: restart backend làm mất báo cáo tiến độ (job đang chạy không tiếp tục), nhưng `parsed_text`/chunk đã commit vẫn còn. Cấu hình hiện tại chạy một uvicorn worker; nếu chạy nhiều worker, mỗi process có hàng đợi riêng và client phải đọc trạng thái từ process đã nhận job. Bước chia đoạn và nạp lại toàn bộ vẫn chạy đồng bộ.
@@ -228,13 +230,17 @@ Khi parser đọc sai, nút **Sửa Markdown** (ở từng dòng trong danh sác
 | `POST /api/documents/{id}/chunk` | Chia đoạn + embed một tài liệu |
 | `GET /api/documents?dataset_id=` | Danh sách (lọc theo dataset khi có tham số; không tham số trả mọi tài liệu như cũ); `DocumentItem.dataset_id` |
 | `POST /api/documents/move` (`{document_ids[1..500], dataset_id}`) | Chuyển tài liệu sang dataset khác, giữ nguyên id/chunk/embedding; trùng tên ở đích → 409 |
-| `GET /api/datasets` | Danh sách dataset kèm thống kê (`document_count`, `chunk_count`, `pending_count`, `size_bytes`), sắp theo tên |
+| `GET /api/datasets` | Danh sách dataset kèm thống kê (`document_count`, `chunk_count`, `pending_count`, `stale_document_count`, `stale_chunk_count`, `size_bytes`), sắp theo tên |
 | `POST /api/datasets` (`{name[1..100], description?}`) | Tạo dataset; trùng tên (không phân biệt hoa/thường) → 409 |
 | `GET /api/datasets/{id}` | Chi tiết dataset kèm thống kê |
 | `PATCH /api/datasets/{id}` (`{name?, description?, enabled?, clear_description?}`) | Sửa tên/mô tả/bật-tắt; trùng tên → 409 |
 | `DELETE /api/datasets/{id}` | Xóa dataset + tài liệu/chunk/file nguồn; còn job parse → 409 |
 | `POST /api/datasets/{id}/chunk` | Chia đoạn lại toàn bộ dataset |
 | `POST /api/datasets/{id}/parse` | Parse lại toàn bộ dataset (job nền, bỏ qua Markdown sửa tay) |
+| `POST /api/datasets/{id}/embed?all=` | Nhúng lại vector của dataset (job nền `embed`); mặc định chỉ đoạn cần nhúng, `all=true` nhúng mọi đoạn |
+| `POST /api/documents/{id}/embed?all=` | Nhúng lại vector của một tài liệu (job nền); tài liệu chưa có đoạn → 409 |
+| `POST /api/embeddings/reembed?all=` | Nhúng lại toàn kho (job nền); embedder chưa sẵn sàng → 503, trùng phạm vi đang chạy → 409 |
+| `GET /api/embeddings/status` | Mô hình nhúng đang chạy và `total_chunks`, `stale_chunks`, `stale_documents` (đoạn/tài liệu cần nhúng lại) |
 | `POST /api/retrieval/test` (`{query, top_k, dataset_ids?}`) | Thử retrieval, lọc theo dataset khi có `dataset_ids` |
 | `POST /api/ingest/chunk` | Chia đoạn lại mọi tài liệu từ Markdown đã lưu, ví dụ sau khi đổi `CHUNK_SIZE`; trả thêm `skipped` |
 | `POST /api/ingest` | Nạp lại toàn bộ: parse + chia đoạn mọi file trong `DOCUMENTS_PATH` (đồng bộ, giữ `dataset_id` + `id`) |

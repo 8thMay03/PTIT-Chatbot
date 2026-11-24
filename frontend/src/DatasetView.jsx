@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowUpDown,
+  Binary,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -22,8 +23,14 @@ import {
 } from "lucide-react";
 import { describeError, datasetsApi, documentsApi, errorMessage, queryKeys } from "./api";
 import { formatDate, formatSize } from "./lib/format";
-import { canEditMarkdown, documentStatus, needsChunking, NO_MARKDOWN_HINT } from "./lib/documentStatus";
-import { isActiveParseJob, parseJobLabel } from "./lib/parseJobs";
+import {
+  canEditMarkdown,
+  documentStatus,
+  needsChunking,
+  needsEmbedding,
+  NO_MARKDOWN_HINT,
+} from "./lib/documentStatus";
+import { embedJobCoversDataset, isActiveParseJob, isEmbedJob, parseJobLabel } from "./lib/parseJobs";
 import useParseJobs from "./lib/useParseJobs";
 import DocumentView from "./DocumentView";
 import ParserSelectionModal, { parserBaseName, parserTitle } from "./components/ParserSelectionModal";
@@ -91,6 +98,9 @@ export default function DatasetView({ dataset, onBack }) {
   const [editDatasetOpen, setEditDatasetOpen] = useState(false);
   const [confirmParseAll, setConfirmParseAll] = useState(false);
   const [confirmChunkAll, setConfirmChunkAll] = useState(false);
+  const [confirmEmbedAll, setConfirmEmbedAll] = useState(false);
+  const [embedSubmitting, setEmbedSubmitting] = useState(false);
+  const [embeddingDocId, setEmbeddingDocId] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadTarget, setUploadTarget] = useState(null);
   const [uploadProgress, setUploadProgress] = useState("");
@@ -112,10 +122,33 @@ export default function DatasetView({ dataset, onBack }) {
   const refreshDocuments = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.documents });
     queryClient.invalidateQueries({ queryKey: queryKeys.datasets });
+    queryClient.invalidateQueries({ queryKey: queryKeys.embeddingStatus });
   }, [queryClient]);
 
   const handleParseJobFinished = useCallback(
     (job) => {
+      if (isEmbedJob(job)) {
+        if (datasetId && !embedJobCoversDataset(job, datasetId)) return;
+        const label = parseJobLabel(job);
+        if (job.status === "succeeded") {
+          const chunks = job.result?.chunks ?? 0;
+          const skipped = job.result?.skipped ?? 0;
+          if (skipped > 0) {
+            toast.warning(
+              `Đã nhúng ${chunks} đoạn của “${label}”; bỏ qua ${skipped} đoạn vừa được chia đoạn lại trong lúc nhúng.`
+            );
+          } else {
+            toast.success(
+              chunks > 0 ? `Đã nhúng ${chunks} đoạn của “${label}”.` : `“${label}” không còn đoạn nào cần nhúng.`
+            );
+          }
+          refreshDocuments();
+        } else if (job.status === "failed") {
+          toast.error(`Nhúng “${label}” thất bại: ${job.error || "lỗi không xác định"}`);
+          refreshDocuments();
+        }
+        return;
+      }
       // Banner job chỉ đếm job của dataset đang mở.
       if (datasetId && job.dataset_id && job.dataset_id !== datasetId) return;
       if (datasetId && job.document_id && !documents.some((d) => d.id === job.document_id)) {
@@ -143,14 +176,31 @@ export default function DatasetView({ dataset, onBack }) {
     onFinished: handleParseJobFinished,
   });
   const activeParseJobs = useMemo(() => {
-    if (!datasetId) return parseJobs.filter(isActiveParseJob);
+    const parsing = parseJobs.filter((job) => isActiveParseJob(job) && !isEmbedJob(job));
+    if (!datasetId) return parsing;
     const docIds = new Set(documents.map((d) => d.id));
-    return parseJobs.filter(
-      (job) =>
-        isActiveParseJob(job) &&
-        (job.dataset_id === datasetId || (job.document_id && docIds.has(job.document_id)))
+    return parsing.filter(
+      (job) => job.dataset_id === datasetId || (job.document_id && docIds.has(job.document_id))
     );
   }, [parseJobs, datasetId, documents]);
+  // Job nhúng lại vector của dataset này (cả job toàn kho); chạy nền, không khóa thao tác khác.
+  const activeEmbedJobs = useMemo(
+    () => parseJobs.filter((job) => isActiveParseJob(job) && embedJobCoversDataset(job, datasetId)),
+    [parseJobs, datasetId]
+  );
+  const embedJobByDocument = useMemo(() => {
+    const map = new Map();
+    for (const job of activeEmbedJobs) {
+      if (job.document_id) map.set(job.document_id, job);
+    }
+    return map;
+  }, [activeEmbedJobs]);
+  const datasetEmbedActive = embedSubmitting || activeEmbedJobs.some((job) => !job.document_id);
+  const runningEmbedJob =
+    activeEmbedJobs.find((job) => job.status === "running") ?? activeEmbedJobs[0] ?? null;
+  const staleDocuments = dataset?.stale_document_count ?? documents.filter(needsEmbedding).length;
+  const staleChunks =
+    dataset?.stale_chunk_count ?? documents.reduce((sum, doc) => sum + (doc.stale_chunk_count ?? 0), 0);
   const parseJobByDocument = useMemo(() => {
     const map = new Map();
     for (const job of activeParseJobs) {
@@ -449,6 +499,37 @@ export default function DatasetView({ dataset, onBack }) {
     }
   }
 
+  // Nhúng lại chỉ thay vector của các đoạn hiện có bằng mô hình nhúng đang dùng.
+  // Còn tài liệu cần nhúng thì chỉ nhúng chúng; không còn thì nhúng lại toàn bộ dataset.
+  async function embedDataset() {
+    if (!datasetId || datasetEmbedActive) return;
+    setEmbedSubmitting(true);
+    try {
+      const job = await datasetsApi.embed(datasetId, { all: staleDocuments === 0 });
+      trackParseJobs(job);
+      toast.success(`Đang nhúng vector cho “${datasetName}” ở chế độ nền. Bạn có thể tiếp tục làm việc khác.`);
+    } catch (err) {
+      toast.error(errorMessage(err, "Không bắt đầu được job nhúng."));
+    } finally {
+      setEmbedSubmitting(false);
+      setConfirmEmbedAll(false);
+    }
+  }
+
+  async function embedDocument(doc) {
+    if (!doc || embeddingDocId || embedJobByDocument.has(doc.id) || datasetEmbedActive) return;
+    setEmbeddingDocId(doc.id);
+    try {
+      const job = await documentsApi.embed(doc.id, { all: !needsEmbedding(doc) });
+      trackParseJobs(job);
+      toast.success(`Đang nhúng “${parseJobLabel(job)}” ở chế độ nền.`);
+    } catch (err) {
+      toast.error(errorMessage(err, "Không bắt đầu được job nhúng."));
+    } finally {
+      setEmbeddingDocId(null);
+    }
+  }
+
   async function chunkDocument(doc) {
     if (!doc || pipelineBusy || parseJobByDocument.has(doc.id)) return;
     setChunkingDocId(doc.id);
@@ -554,6 +635,7 @@ export default function DatasetView({ dataset, onBack }) {
   const datasetStats = dataset
     ? `${dataset.document_count ?? documents.length} tài liệu · ${dataset.chunk_count ?? 0} đoạn` +
       ((dataset.pending_count ?? 0) > 0 ? ` · ${dataset.pending_count} chờ chia đoạn` : "") +
+      (staleDocuments > 0 ? ` · ${staleDocuments} cần nhúng lại` : "") +
       (dataset.size_bytes != null ? ` · ${formatSize(dataset.size_bytes)}` : "")
     : "";
 
@@ -611,6 +693,27 @@ export default function DatasetView({ dataset, onBack }) {
                 <Pencil size={14} />
                 <span>Sửa</span>
               </button>
+              <button
+                type="button"
+                className={`btn-outline-dataset ${staleDocuments > 0 && !datasetEmbedActive ? "is-attention" : ""}`}
+                title={
+                  staleDocuments > 0
+                    ? `Nhúng vector cho ${staleDocuments} tài liệu chưa khớp mô hình nhúng đang dùng (không chia đoạn lại)`
+                    : "Nhúng lại vector mọi tài liệu trong dataset bằng mô hình nhúng đang dùng (không chia đoạn lại)"
+                }
+                onClick={() => setConfirmEmbedAll(true)}
+                disabled={datasetEmbedActive || (dataset?.chunk_count ?? 0) === 0}
+              >
+                {datasetEmbedActive ? <Loader2 size={14} className="spin" /> : <Binary size={14} />}
+                <span>
+                  {datasetEmbedActive
+                    ? "Đang nhúng..."
+                    : staleDocuments > 0
+                      ? `Nhúng ${staleDocuments} tài liệu`
+                      : "Nhúng lại dataset"}
+                </span>
+              </button>
+
               <button
                 type="button"
                 className="btn-outline-dataset"
@@ -694,6 +797,38 @@ export default function DatasetView({ dataset, onBack }) {
                     }
                   />
                 )}
+              </div>
+            </div>
+          )}
+
+          {staleDocuments > 0 && !datasetEmbedActive && (
+            <div className="inline-alert is-warning embed-stale-banner" role="status" style={{ marginBottom: 12 }}>
+              <AlertTriangle size={16} />
+              <span>
+                {staleDocuments} tài liệu ({staleChunks} đoạn) chưa có vector của mô hình nhúng đang dùng — thường do
+                vừa đổi mô hình nhúng. Các đoạn này chỉ tìm được bằng từ khóa cho tới khi được nhúng lại.
+              </span>
+              <button type="button" className="btn-outline-dataset" onClick={() => setConfirmEmbedAll(true)}>
+                <Binary size={14} />
+                <span>Nhúng ngay</span>
+              </button>
+            </div>
+          )}
+
+          {runningEmbedJob && (
+            <div className="inline-alert is-info parse-jobs-banner" role="status" style={{ marginBottom: 12 }}>
+              <Loader2 size={16} className="spin" />
+              <div className="parse-jobs-banner-body">
+                <span>
+                  Đang nhúng vector nền{activeEmbedJobs.length > 1 ? ` (${activeEmbedJobs.length} job)` : ""}. Tìm kiếm
+                  vẫn hoạt động; đoạn chưa nhúng xong chỉ tìm được bằng từ khóa.
+                </span>
+                <ParseProgress
+                  progress={runningEmbedJob.progress}
+                  message={runningEmbedJob.progress_message}
+                  label={parseJobLabel(runningEmbedJob)}
+                  indeterminate={runningEmbedJob.status === "queued" || !runningEmbedJob.progress}
+                />
               </div>
             </div>
           )}
@@ -800,8 +935,11 @@ export default function DatasetView({ dataset, onBack }) {
                     const parseJob = parseJobByDocument.get(doc.id);
                     const isParsing = Boolean(parseJob);
                     const isChunking = chunkingDocId === doc.id;
+                    const embedJob = embedJobByDocument.get(doc.id);
+                    const isEmbedding = Boolean(embedJob) || embeddingDocId === doc.id;
                     const rowBusy = pipelineBusy || isParsing || isChunking;
                     const status = documentStatus(doc);
+                    const hasChunks = (doc.chunk_count ?? 0) > 0;
 
                     return (
                       <tr key={doc.id} className={isSelected ? "is-selected-row" : ""}>
@@ -851,6 +989,19 @@ export default function DatasetView({ dataset, onBack }) {
                                 indeterminate={parseJob.status === "queued" || !parseJob.progress}
                               />
                             </div>
+                          ) : embedJob ? (
+                            <div className="doc-status-stack">
+                              <span className="doc-status-badge is-parsing" title="Đang nhúng lại vector trong nền">
+                                Đang nhúng
+                              </span>
+                              <ParseProgress
+                                compact
+                                progress={embedJob.progress}
+                                message={embedJob.progress_message}
+                                label="Tiến trình"
+                                indeterminate={embedJob.status === "queued" || !embedJob.progress}
+                              />
+                            </div>
                           ) : (
                             <span className={`doc-status-badge is-${status.key}`} title={status.hint}>
                               {status.label}
@@ -891,6 +1042,24 @@ export default function DatasetView({ dataset, onBack }) {
                               disabled={rowBusy}
                             >
                               {isChunking ? <Loader2 size={14} className="spin" /> : <Scissors size={14} />}
+                            </button>
+                            <button
+                              type="button"
+                              className={`act-btn ${needsEmbedding(doc) && !isEmbedding ? "is-attention" : ""}`}
+                              title={
+                                isEmbedding
+                                  ? `Đang nhúng ${fileName} trong nền`
+                                  : !hasChunks
+                                    ? "Chia đoạn trước khi nhúng"
+                                    : needsEmbedding(doc)
+                                      ? `Nhúng ${doc.stale_chunk_count} đoạn chưa khớp mô hình nhúng của ${fileName}`
+                                      : `Nhúng lại vector ${fileName}`
+                              }
+                              aria-label={`Nhúng ${fileName}`}
+                              onClick={() => embedDocument(doc)}
+                              disabled={rowBusy || isEmbedding || datasetEmbedActive || !hasChunks}
+                            >
+                              {isEmbedding ? <Loader2 size={14} className="spin" /> : <Binary size={14} />}
                             </button>
                             <button
                               type="button"
@@ -1090,6 +1259,35 @@ export default function DatasetView({ dataset, onBack }) {
             >
               {datasetChunking ? <Loader2 size={15} className="spin" /> : <Scissors size={15} />}
               Chia đoạn lại
+            </button>
+          </>
+        }
+      />
+
+      {/* Nhúng lại vector của dataset (xác nhận, không chia đoạn lại) */}
+      <Modal
+        open={confirmEmbedAll}
+        onClose={() => !embedSubmitting && setConfirmEmbedAll(false)}
+        title={
+          staleDocuments > 0
+            ? `Nhúng ${staleDocuments} tài liệu của “${datasetName}”?`
+            : `Nhúng lại toàn bộ dataset “${datasetName}”?`
+        }
+        description={
+          (staleDocuments > 0
+            ? `Sẽ tạo vector bằng mô hình nhúng đang dùng cho ${staleChunks} đoạn của ${staleDocuments} tài liệu chưa khớp mô hình. `
+            : `Mọi đoạn đã khớp mô hình nhúng đang dùng; sẽ tạo lại vector cho toàn bộ ${dataset?.chunk_count ?? 0} đoạn. `) +
+          "Đoạn văn bản giữ nguyên (không parse hay chia đoạn lại). Job chạy nền và có thể tốn phí gọi API nhúng."
+        }
+        icon={<Binary size={20} />}
+        actions={
+          <>
+            <button type="button" className="ghost-btn" onClick={() => setConfirmEmbedAll(false)} disabled={embedSubmitting}>
+              Hủy
+            </button>
+            <button type="button" className="primary-btn" onClick={embedDataset} disabled={datasetEmbedActive}>
+              {embedSubmitting ? <Loader2 size={15} className="spin" /> : <Binary size={15} />}
+              {staleDocuments > 0 ? "Nhúng" : "Nhúng lại"}
             </button>
           </>
         }

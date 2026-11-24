@@ -43,6 +43,8 @@ function createFakeServer({ profiles = [], active = {}, runtime = {}, listModels
     },
     secret_encryption_enabled: true,
   };
+  // GET /embeddings/status: đổi embedding thì mọi đoạn cần nhúng lại tới khi gọi /embeddings/reembed.
+  const embedding = { state: "ready", provider: "openai", model: "text-embedding-3-small", total_chunks: 40, stale_chunks: 0, stale_documents: 0 };
   let nextId = 1;
   const snapshot = () => structuredClone(state);
 
@@ -73,8 +75,19 @@ function createFakeServer({ profiles = [], active = {}, runtime = {}, listModels
     }
     if (path === "model-profiles/activate") {
       state.active[body.kind] = body.profile_id;
-      if (body.kind === "embedding") state.embedding_runtime.restart_required = body.profile_id !== null;
+      if (body.kind === "embedding") {
+        // Embedding áp ngay; vector cũ thuộc mô hình trước nên cần nhúng lại.
+        state.embedding_runtime.profile_id = body.profile_id;
+        Object.assign(embedding, { stale_chunks: 40, stale_documents: 3 });
+      }
       return jsonResponse(snapshot());
+    }
+    if (path === "embeddings/status") return jsonResponse({ ...embedding });
+    if (path === "embeddings/reembed" && method === "POST") {
+      return jsonResponse(
+        { id: "job-embed", kind: "embed", status: "queued", file_name: "Toàn bộ tài liệu", created_at: "2026-11-24T00:00:00Z", progress: 0 },
+        202
+      );
     }
     const match = path.match(/^model-profiles\/(.+)$/);
     if (match && method === "DELETE") {
@@ -208,7 +221,7 @@ describe("ModelsView — kho mô hình theo loại", () => {
     expect(cards[0].querySelector(".mdl-kind-name").textContent).toBe("Cấu hình máy chủ");
     expect(cards[0].querySelector(".mdl-kind-meta").textContent).toBe("OpenAI · gpt-4.1-mini");
     expect(cards[1].querySelector(".mdl-kind-name").textContent).toBe("bge-m3");
-    expect(cards[1].querySelector(".mdl-pill").textContent).toBe("Chờ khởi động lại");
+    expect(cards[1].querySelector(".mdl-pill").textContent).toBe("Chưa áp dụng");
     expect(cards[2].querySelector(".mdl-kind-name").textContent).toBe("Heuristic");
     expect(cards[2].querySelector(".mdl-pill").textContent).toBe("Đang bật");
 
@@ -490,7 +503,7 @@ describe("ModelsView — kho mô hình theo loại", () => {
     expect(requestsTo(fetchMock, "/model-profiles/r1", "DELETE")).toHaveLength(1);
   });
 
-  it("embedding: khoá Dùng khi sai số chiều, hỏi xác nhận rồi báo cần khởi động lại", async () => {
+  it("embedding: khoá Dùng khi sai số chiều, hỏi xác nhận, áp ngay rồi nhắc nhúng lại toàn bộ", async () => {
     const { fetchMock } = createFakeServer({
       profiles: [
         { id: "e1", kind: "embedding", name: "Small", provider: "openai", model: "text-embedding-3-small", dimension: 1536 },
@@ -510,7 +523,7 @@ describe("ModelsView — kho mô hình theo loại", () => {
     const cancel = await waitFor(() =>
       [...document.querySelectorAll(".modal button")].find((item) => item.textContent.trim() === "Huỷ")
     );
-    expect(document.querySelector(".modal").textContent).toContain("Nạp lại toàn bộ");
+    expect(document.querySelector(".modal").textContent).toContain("nhúng lại");
     await click(cancel);
     expect(requestsTo(fetchMock, "/model-profiles/activate", "POST")).toHaveLength(0);
 
@@ -519,14 +532,19 @@ describe("ModelsView — kho mô hình theo loại", () => {
       [...document.querySelectorAll(".modal button")].find((item) => item.textContent.trim() === "Chọn mô hình này")
     );
     await click(confirm);
-    await waitFor(() => panel.textContent.includes("khởi động lại backend"));
+    const banner = await waitFor(() => panel.querySelector(".embed-stale-banner"));
+    expect(banner.textContent).toContain("3 tài liệu (40/40 đoạn)");
+    expect(panel.textContent).not.toContain("khởi động lại backend");
     expect(rowByName(panel, "Small").textContent).toContain("Đã chọn");
+    expect(rowByName(panel, "Small").textContent).toContain("Đang chạy");
     expect(JSON.parse(requestsTo(fetchMock, "/model-profiles/activate", "POST")[0][1].body)).toEqual({
       kind: "embedding",
       profile_id: "e1",
     });
-    // Backend vẫn chạy cấu hình .env cho tới khi khởi động lại.
-    expect(panel.querySelector(".mdl-row.is-env").textContent).toContain("Đang chạy");
+    expect(panel.querySelector(".mdl-row.is-env").textContent).not.toContain("Đang chạy");
+
+    await click(buttonByText(banner, "Nhúng lại toàn bộ"));
+    await waitFor(() => requestsTo(fetchMock, "/embeddings/reembed", "POST").length === 1);
   });
 
   async function blur(input) {

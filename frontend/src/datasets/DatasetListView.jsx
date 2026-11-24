@@ -1,9 +1,11 @@
-import React, { useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Loader2, Plus, RefreshCw, Scissors, Search, Settings2, X } from "lucide-react";
-import { datasetsApi, documentsApi, errorMessage, queryKeys } from "../api";
+import React, { useCallback, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, Binary, Loader2, Plus, RefreshCw, Scissors, Search, Settings2, X } from "lucide-react";
+import { datasetsApi, documentsApi, embeddingsApi, errorMessage, queryKeys } from "../api";
 import Modal from "../components/Modal";
+import ParseProgress from "../components/ParseProgress";
 import { useToast } from "../components/Toast";
+import { isEmbedJob, parseJobLabel } from "../lib/parseJobs";
 import useParseJobs from "../lib/useParseJobs";
 import DatasetCard from "./DatasetCard";
 import DatasetFormModal from "./DatasetFormModal";
@@ -20,15 +22,61 @@ export default function DatasetListView({ datasets, loading, loadError, onOpen }
   const [maintBusy, setMaintBusy] = useState(null);
   // Thao tác bảo trì đang chờ xác nhận: "rechunk" | "reindex" | null.
   const [pendingMaintenance, setPendingMaintenance] = useState(null);
-  // Bảo trì toàn kho ghi đè mọi tài liệu; backend không chặn khi job parse nền
-  // (upload/parse) còn chạy nên giao diện phải chờ các job đó xong.
-  const { jobs: activeParseJobs, track: trackParseJobs } = useParseJobs();
-  const backgroundBusy = activeParseJobs.length > 0;
+  const [confirmReembed, setConfirmReembed] = useState(false);
+  const [reembedSubmitting, setReembedSubmitting] = useState(false);
 
-  const refresh = () => {
+  const refresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.datasets });
     queryClient.invalidateQueries({ queryKey: queryKeys.documents });
-  };
+    queryClient.invalidateQueries({ queryKey: queryKeys.embeddingStatus });
+  }, [queryClient]);
+
+  const handleJobFinished = useCallback(
+    (job) => {
+      if (!isEmbedJob(job)) return;
+      if (job.status === "succeeded") {
+        toast.success(`Đã nhúng ${job.result?.chunks ?? 0} đoạn (${parseJobLabel(job)}).`);
+      } else if (job.status === "failed") {
+        toast.error(`Nhúng “${parseJobLabel(job)}” thất bại: ${job.error || "lỗi không xác định"}`);
+      }
+      refresh();
+    },
+    [toast, refresh]
+  );
+
+  // Bảo trì toàn kho ghi đè mọi tài liệu; backend không chặn khi job parse nền
+  // (upload/parse) còn chạy nên giao diện phải chờ các job đó xong. Job nhúng chỉ
+  // thay vector và bỏ qua đoạn vừa bị chia đoạn lại nên không cần chờ.
+  const { jobs: activeJobs, track: trackParseJobs } = useParseJobs({ onFinished: handleJobFinished });
+  const activeParseJobs = activeJobs.filter((job) => !isEmbedJob(job));
+  const activeEmbedJobs = activeJobs.filter(isEmbedJob);
+  const runningEmbedJob = activeEmbedJobs.find((job) => job.status === "running") ?? activeEmbedJobs[0] ?? null;
+  const backgroundBusy = activeParseJobs.length > 0;
+
+  // Đổi mô hình nhúng làm mọi vector cũ không còn dùng được: nhắc nhúng lại toàn kho.
+  const embeddingStatusQuery = useQuery({
+    queryKey: queryKeys.embeddingStatus,
+    queryFn: ({ signal }) => embeddingsApi.status({ signal }),
+  });
+  const embeddingStatus = embeddingStatusQuery.data;
+  const staleChunks = embeddingStatus?.stale_chunks ?? 0;
+  const staleDocuments = embeddingStatus?.stale_documents ?? 0;
+  const reembedActive = reembedSubmitting || activeEmbedJobs.some((job) => !job.dataset_id && !job.document_id);
+
+  async function reembedAll() {
+    if (reembedActive) return;
+    setReembedSubmitting(true);
+    try {
+      const job = await embeddingsApi.reembedAll();
+      trackParseJobs(job);
+      toast.success("Đang nhúng lại toàn bộ tài liệu ở chế độ nền. Bạn có thể tiếp tục làm việc khác.");
+    } catch (err) {
+      toast.error(errorMessage(err, "Không bắt đầu được job nhúng lại."));
+    } finally {
+      setReembedSubmitting(false);
+      setConfirmReembed(false);
+    }
+  }
 
   const toggleMutation = useMutation({
     mutationFn: ({ id, enabled }) => datasetsApi.update(id, { enabled }),
@@ -55,7 +103,7 @@ export default function DatasetListView({ datasets, loading, loadError, onOpen }
       const payload = await documentsApi.parseJobs({ activeOnly: true });
       const jobs = payload?.jobs ?? [];
       trackParseJobs(jobs);
-      return jobs;
+      return jobs.filter((job) => !isEmbedJob(job));
     } catch {
       return [];
     }
@@ -192,6 +240,37 @@ export default function DatasetListView({ datasets, loading, loadError, onOpen }
             </div>
           </header>
 
+          {staleChunks > 0 && !reembedActive && (
+            <div className="inline-alert is-warning embed-stale-banner" role="status" style={{ marginBottom: 12 }}>
+              <AlertTriangle size={16} />
+              <span>
+                Cần nhúng lại tài liệu: {staleDocuments} tài liệu ({staleChunks}/{embeddingStatus?.total_chunks ?? staleChunks}{" "}
+                đoạn) chưa có vector của mô hình nhúng đang dùng
+                {embeddingStatus?.model ? ` (${embeddingStatus.model})` : ""}, thường do vừa đổi mô hình nhúng. Các đoạn
+                này chỉ tìm được bằng từ khóa cho tới khi được nhúng lại.
+              </span>
+              <button type="button" className="btn-outline-dataset is-attention" onClick={() => setConfirmReembed(true)}>
+                <Binary size={14} />
+                <span>Nhúng lại toàn bộ</span>
+              </button>
+            </div>
+          )}
+
+          {runningEmbedJob && (
+            <div className="inline-alert is-info parse-jobs-banner" role="status" style={{ marginBottom: 12 }}>
+              <Loader2 size={16} className="spin" />
+              <div className="parse-jobs-banner-body">
+                <span>Đang nhúng vector nền. Tìm kiếm vẫn hoạt động trong lúc chạy.</span>
+                <ParseProgress
+                  progress={runningEmbedJob.progress}
+                  message={runningEmbedJob.progress_message}
+                  label={parseJobLabel(runningEmbedJob)}
+                  indeterminate={runningEmbedJob.status === "queued" || !runningEmbedJob.progress}
+                />
+              </div>
+            </div>
+          )}
+
           {showWarning && (
             <div className="inline-alert is-warning" role="alert" style={{ marginBottom: 12 }}>
               <AlertTriangle size={16} />
@@ -259,6 +338,28 @@ export default function DatasetListView({ datasets, loading, loadError, onOpen }
         dataset={deleting}
         onClose={() => setDeleting(null)}
         onDeleted={() => { setDeleting(null); refresh(); }}
+      />
+      <Modal
+        open={confirmReembed}
+        onClose={() => !reembedSubmitting && setConfirmReembed(false)}
+        title="Nhúng lại toàn bộ tài liệu?"
+        description={
+          `Sẽ tạo vector bằng mô hình nhúng đang dùng cho ${staleChunks} đoạn của ${staleDocuments} tài liệu ` +
+          "(mọi dataset, kể cả dataset đang tắt). Đoạn văn bản giữ nguyên, không parse hay chia đoạn lại. " +
+          "Job chạy nền và có thể tốn phí gọi API nhúng."
+        }
+        icon={<Binary size={20} />}
+        actions={
+          <>
+            <button type="button" className="ghost-btn" onClick={() => setConfirmReembed(false)} disabled={reembedSubmitting}>
+              Hủy
+            </button>
+            <button type="button" className="primary-btn" onClick={reembedAll} disabled={reembedActive}>
+              {reembedSubmitting ? <Loader2 size={15} className="spin" /> : <Binary size={15} />}
+              Nhúng lại toàn bộ
+            </button>
+          </>
+        }
       />
       {/* Bảo trì toàn kho: luôn hỏi lại trước khi chạy lại pipeline cho mọi tài liệu. */}
       <Modal

@@ -195,21 +195,23 @@ def test_load_selected_embedding_applies_all_fields(admin_client, config_store_d
     assert registry["embedding_runtime"]["profile_id"] == profile["id"]
     assert registry["embedding_runtime"]["restart_required"] is False
 
-    # Đổi số chiều của profile đang chạy → cần khởi động lại.
-    admin_client.put(
+    # Đổi số chiều của profile đang chạy → tạo lại embedder ngay (D-01 reembed-documents).
+    response = admin_client.put(
         f"/api/model-profiles/{profile['id']}",
         json={"name": "Ollama", "provider": "openai_compatible", "model": "nomic-embed-text", "dimension": 512,
               "base_url": LOCAL_URL},
     )
-    assert admin_client.get("/api/model-profiles").json()["embedding_runtime"]["restart_required"] is True
+    assert response.status_code == 200, response.text
+    assert seen["dimension"] == 512
+    assert admin_client.get("/api/model-profiles").json()["embedding_runtime"]["restart_required"] is False
 
 
 def test_load_failure_restores_previous_settings(admin_client, config_store_db, monkeypatch) -> None:
     from app.embeddings import EmbeddingUnavailableError
 
-    before = tuple(getattr(settings, field) for field in model_profiles._EMBEDDING_SETTINGS_FIELDS)
     profile = _voyage(admin_client)
     _activate(admin_client, profile["id"])
+    before = tuple(getattr(settings, field) for field in model_profiles._EMBEDDING_SETTINGS_FIELDS)
 
     def broken():
         raise EmbeddingUnavailableError("Không dùng được.")
