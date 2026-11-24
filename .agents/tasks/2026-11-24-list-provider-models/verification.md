@@ -69,6 +69,21 @@
 - Trạng thái: `passed`.
 - Bằng chứng: đầu ra lệnh trong phiên.
 
+### V-05 — AC-05
+
+- Người thực hiện / thời gian: claude-agent / `2026-11-24T22:44:10+07:00`.
+- Loại: test tự động, build, kiểm tra thủ công bằng ảnh chụp.
+- Thư mục chạy: `frontend/`.
+- Lệnh / thao tác: `npx vitest run`; `npx vite build`; chụp hộp thoại thêm LLM (tương thích OpenAI, đã tải danh sách) ở
+  1280 px sáng và 390 px tối.
+- Kỳ vọng: hộp thoại thêm mới không có mô tả đầu, mô tả thẻ nhà cung cấp, gợi ý ô khoá; test cũ sửa theo nội dung mới
+  vẫn qua; bố cục thẻ nhà cung cấp một dòng không vỡ.
+- Kết quả thực tế: `47 files, 407 passed`; build `✓ built`. Ảnh: tiêu đề hộp thoại không có dòng mô tả, thẻ nhà cung cấp
+  chỉ có biểu tượng + tên, dưới ô mô hình chỉ còn link "Nhập tên khác", dưới ô khoá không còn chữ.
+- Trạng thái: `passed`.
+- Bằng chứng: test "thêm LLM qua hộp thoại…" kiểm `.mdl-dialog-heading p`, `.mdl-choice-text span`,
+  `#mdl-llm-form-key-hint` không tồn tại; ảnh trong scratchpad phiên (không commit).
+
 ## Lỗi, kiểm tra lại và phần chưa xác minh
 
 - Chưa gọi API thật của OpenAI/Gemini/Cohere/Pinecone/TEI/Ollama (không có khoá/máy chủ trong phiên); định dạng dựa
@@ -79,6 +94,6 @@
 
 ## Kết luận
 
-- Tiêu chí đã đạt: AC-01, AC-02, AC-03, AC-04.
+- Tiêu chí đã đạt: AC-01, AC-02, AC-03, AC-04, AC-05.
 - Tiêu chí chưa đạt/chưa xác minh: không có (gọi API thật ghi ở trên, ngoài AC).
 - Đề xuất: review và mở PR.

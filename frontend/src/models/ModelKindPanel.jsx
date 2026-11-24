@@ -40,7 +40,6 @@ import {
   profileModelLabel,
   providerFields,
   providerName,
-  sendsDocumentsToService,
   validateDraft,
 } from "./catalog";
 import {
@@ -77,12 +76,6 @@ async function storeRegistry(queryClient, registry) {
 function dimensionMismatch(kind, profile, vectorDim) {
   return kind === "embedding" && profile.dimension != null && vectorDim != null && profile.dimension > vectorDim;
 }
-
-/** Ghi chú dữ liệu gửi ra dịch vụ ngoài trong hộp thoại. */
-const SERVICE_DATA_NOTES = {
-  embedding: "Nội dung các đoạn tài liệu (khi nạp) và câu hỏi của sinh viên được gửi tới dịch vụ này.",
-  reranker: "Nội dung các đoạn tài liệu được gửi tới dịch vụ này.",
-};
 
 const IDLE_LISTING = { status: "idle", models: [], message: null, signature: null };
 
@@ -375,17 +368,15 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
   const dimensionValue = Number(draft.dimension);
   const hasDimension = kind === "embedding" && draft.dimension && !errors.dimension && vectorDim != null;
   const showDimWarning = hasDimension && dimensionValue > vectorDim;
-  const showDimPadding = hasDimension && dimensionValue < vectorDim;
   const kindLabel = KINDS[kind].label;
   const isActiveProfile = isEdit && registry.active?.[kind] === profile.id;
-  let description = "Mô hình được lưu vào kho; bấm “Dùng” trong danh sách để chọn làm mô hình đang dùng.";
-  if (isEdit) {
-    description = isActiveProfile
-      ? "Đây là mô hình đang dùng: lưu xong hệ thống áp dụng ngay."
-      : "Thay đổi được lưu vào kho.";
-    if (isActiveProfile && kind === "embedding") {
-      description = "Đây là mô hình đã chọn: thay đổi có hiệu lực sau khi khởi động lại backend.";
-    }
+  // Chỉ báo khi lưu có hệ quả ngay với mô hình đang dùng.
+  let description;
+  if (isActiveProfile) {
+    description =
+      kind === "embedding"
+        ? "Mô hình đã chọn: thay đổi có hiệu lực sau khi khởi động lại backend."
+        : "Mô hình đang dùng: lưu xong áp dụng ngay.";
   }
   const busy = saving || testing;
 
@@ -423,37 +414,24 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
       <div className="mdl-stack" ref={rootRef}>
         <TextField
           id={`${idPrefix}-name`}
-          field={{
-            label: "Tên hiển thị",
-            placeholder: "Mặc định là tên mô hình",
-            hint: "Tên dùng trong danh sách mô hình, không trùng trong cùng loại.",
-          }}
+          field={{ label: "Tên hiển thị", placeholder: "Mặc định là tên mô hình" }}
           value={draft.name}
           onChange={(value) => update("name", value)}
           error={showErrors ? errors.name : undefined}
         />
 
-        {KINDS[kind].providers.length > 1 ? (
-          <ChoiceGroup
-            kind={kind}
-            name={`${idPrefix}-provider`}
-            legend="Nhà cung cấp"
-            options={KINDS[kind].providers}
-            value={draft.provider}
-            onChange={(provider) => {
-              setDraft((current) => ({ ...current, provider }));
-              setShowErrors(false);
-              setTestResult(null);
-            }}
-          />
-        ) : (
-          <p className="mdl-provider-note">
-            <ProviderIcon kind={kind} provider={draft.provider} size={16} />
-            <span>
-              <strong>{KINDS[kind].providers[0].name}</strong> — {KINDS[kind].providers[0].description}
-            </span>
-          </p>
-        )}
+        <ChoiceGroup
+          kind={kind}
+          name={`${idPrefix}-provider`}
+          legend="Nhà cung cấp"
+          options={KINDS[kind].providers}
+          value={draft.provider}
+          onChange={(provider) => {
+            setDraft((current) => ({ ...current, provider }));
+            setShowErrors(false);
+            setTestResult(null);
+          }}
+        />
 
         {draft.provider === "openai_compatible" && (
           <div className="mdl-presets" role="group" aria-label="Điền nhanh địa chỉ máy chủ">
@@ -530,22 +508,7 @@ function ProfileEditor({ kind, profile, registry, hidden, onClose }) {
           </div>
         )}
 
-        {showDimPadding && (
-          <div className="inline-alert is-info" role="note">
-            <Info size={16} />
-            <span>
-              Vector {dimensionValue} chiều được thêm số 0 cho đủ <code>VECTOR_DIM</code> ({vectorDim}) khi lưu; kết
-              quả tìm kiếm không đổi.
-            </span>
-          </div>
-        )}
 
-        {sendsDocumentsToService(kind, draft.provider) && (
-          <div className="inline-alert is-info" role="note">
-            <Info size={16} />
-            <span>{SERVICE_DATA_NOTES[kind]}</span>
-          </div>
-        )}
 
         {rule && (
           <ApiKeyField

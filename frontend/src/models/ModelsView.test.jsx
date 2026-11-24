@@ -227,6 +227,10 @@ describe("ModelsView — kho mô hình theo loại", () => {
     const modelInput = await waitFor(() => dialog()?.querySelector("#mdl-llm-form-model"));
     expect(dialog().getAttribute("role")).toBe("dialog");
     expect(document.activeElement).toBe(dialog().querySelector("#mdl-llm-form-name"));
+    // Hộp thoại thêm mới không có mô tả phụ: không mô tả đầu hộp thoại, nhà cung cấp hay ô khoá.
+    expect(dialog().querySelector(".mdl-dialog-heading p")).toBeNull();
+    expect(dialog().querySelector(".mdl-choice-text span")).toBeNull();
+    expect(dialog().querySelector("#mdl-llm-form-key-hint")).toBeNull();
     await changeInput(modelInput, "gpt-4.1");
     await changeInput(dialog().querySelector("#mdl-llm-form-key"), "sk-secret-123");
     await click(buttonByText(dialog(), "Thêm vào kho"));
@@ -294,7 +298,7 @@ describe("ModelsView — kho mô hình theo loại", () => {
     expect(dialog()).toBeNull();
   });
 
-  it("reranker: thêm Rerank API có Base URL, khoá tuỳ chọn, ghi chú gửi dữ liệu và kiểm tra kết nối", async () => {
+  it("reranker: thêm Rerank API có Base URL, khoá tuỳ chọn và kiểm tra kết nối", async () => {
     const { fetchMock } = createFakeServer();
     vi.stubGlobal("fetch", fetchMock);
     await render("reranker");
@@ -309,7 +313,6 @@ describe("ModelsView — kho mô hình theo loại", () => {
 
     await click(dialog().querySelector('input[type="radio"][value="rerank_api"]'));
     await waitFor(() => dialog().querySelector("#mdl-reranker-form-base_url"));
-    expect(dialog().textContent).toContain("Nội dung các đoạn tài liệu được gửi tới dịch vụ này.");
     expect(dialog().textContent).toContain("Không bắt buộc");
     await changeInput(dialog().querySelector("#mdl-reranker-form-base_url"), "https://api.cohere.com/v2");
     await changeInput(dialog().querySelector("#mdl-reranker-form-model"), "rerank-v3.5");
@@ -356,7 +359,6 @@ describe("ModelsView — kho mô hình theo loại", () => {
     await waitFor(() => dialog().querySelector("#mdl-reranker-form-key"));
     expect(dialog().querySelector("#mdl-reranker-form-base_url")).toBeNull();
     expect(dialog().textContent).toContain("Bắt buộc");
-    expect(dialog().textContent).toContain("Nội dung các đoạn tài liệu được gửi tới dịch vụ này.");
     await changeInput(dialog().querySelector("#mdl-reranker-form-model"), "rerank-2.5");
 
     // Thiếu khoá: không gửi gì, báo lỗi ở ô khoá.
@@ -392,7 +394,7 @@ describe("ModelsView — kho mô hình theo loại", () => {
     expect(rowByName(panel, "rerank-2.5").textContent).toContain("Voyage AI");
   });
 
-  it("embedding: thêm Voyage AI với khoá bắt buộc, số chiều tự điền, ghi chú đệm 0 và kiểm tra kết nối", async () => {
+  it("embedding: thêm Voyage AI với khoá bắt buộc, số chiều tự điền và kiểm tra kết nối", async () => {
     const { fetchMock } = createFakeServer();
     vi.stubGlobal("fetch", fetchMock);
     await render("embedding");
@@ -400,20 +402,17 @@ describe("ModelsView — kho mô hình theo loại", () => {
 
     await click(buttonByText(panel, "Thêm mô hình"));
     await waitFor(() => dialog()?.querySelector("#mdl-embedding-form-model"));
-    // Sentence-Transformers chạy cục bộ: không khoá, không kiểm tra kết nối, không ghi chú gửi dữ liệu.
+    // Sentence-Transformers chạy cục bộ: không khoá, không kiểm tra kết nối.
     await click(dialog().querySelector('input[type="radio"][value="sentence-transformers"]'));
     await waitFor(() => !dialog().querySelector("#mdl-embedding-form-key"));
     expect(buttonByText(dialog(), "Kiểm tra kết nối")).toBeUndefined();
-    expect(dialog().textContent).not.toContain("được gửi tới dịch vụ này");
 
     await click(dialog().querySelector('input[type="radio"][value="voyage"]'));
     await waitFor(() => dialog().querySelector("#mdl-embedding-form-key"));
     expect(dialog().querySelector("#mdl-embedding-form-base_url")).toBeNull();
     expect(dialog().textContent).toContain("Bắt buộc");
-    expect(dialog().textContent).toContain("câu hỏi của sinh viên được gửi tới dịch vụ này");
     await changeInput(dialog().querySelector("#mdl-embedding-form-model"), "voyage-3.5");
     expect(dialog().querySelector("#mdl-embedding-form-dimension").value).toBe("1024");
-    expect(dialog().textContent).toContain("được thêm số 0 cho đủ");
 
     // Thiếu khoá: không gửi gì, báo lỗi ở ô khoá.
     await click(buttonByText(dialog(), "Thêm vào kho"));
@@ -551,7 +550,6 @@ describe("ModelsView — kho mô hình theo loại", () => {
       profile_id: null,
     });
     expect([...select.options].map((option) => option.value)).toEqual(["", "llama3.1:8b", "qwen2.5:7b"]);
-    expect(dialog().textContent).toContain("Đã tải 2 mô hình từ nhà cung cấp.");
 
     // Rời ô lần nữa với cùng cấu hình: không tải lại.
     await blur(baseUrl);
@@ -606,7 +604,7 @@ describe("ModelsView — kho mô hình theo loại", () => {
 
     await click(buttonByText(dialog(), "Tải danh sách"));
     await waitFor(() => dialog().querySelector("#mdl-llm-form-model-list-status[role=alert]"));
-    expect(dialog().textContent).toContain("Không tải được danh sách mô hình: HTTP 401. Kiểm tra API key.");
+    expect(dialog().textContent).toContain("Không tải được danh sách: HTTP 401. Kiểm tra API key.");
     expect(dialog().querySelector("input#mdl-llm-form-model")).not.toBeNull();
   });
 

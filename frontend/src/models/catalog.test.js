@@ -14,7 +14,6 @@ import {
   keyRule,
   listModelsBlocker,
   modelListSignature,
-  sendsDocumentsToService,
   validateDraft,
 } from "./catalog";
 
@@ -33,8 +32,6 @@ describe("catalog kho mô hình", () => {
     expect(keyRule("reranker", "cross-encoder")).toBeNull();
     expect(canTestConnection("reranker", "rerank_api")).toBe(true);
     expect(canTestConnection("reranker", "cross-encoder")).toBe(false);
-    expect(sendsDocumentsToService("reranker", "rerank_api")).toBe(true);
-    expect(sendsDocumentsToService("reranker", "cross-encoder")).toBe(false);
 
     const empty = { ...emptyDraft("reranker"), provider: "rerank_api" };
     expect(validateDraft("reranker", empty)).toEqual({ base_url: "Nhập base url.", model: "Nhập mô hình." });
@@ -64,7 +61,6 @@ describe("catalog kho mô hình", () => {
     ["cohere", "jina", "voyage", "pinecone"].forEach((provider) => {
       expect(keyRule("reranker", provider)).toEqual({ envFallback: false, required: true });
       expect(canTestConnection("reranker", provider)).toBe(true);
-      expect(sendsDocumentsToService("reranker", provider)).toBe(true);
     });
     expect(keyRule("reranker", "tei")).toEqual({ envFallback: false });
 
@@ -111,8 +107,6 @@ describe("catalog kho mô hình", () => {
     expect(canTestConnection("embedding", "cohere")).toBe(true);
     expect(canTestConnection("embedding", "openai")).toBe(true);
     expect(canTestConnection("embedding", "sentence-transformers")).toBe(false);
-    expect(sendsDocumentsToService("embedding", "gemini")).toBe(true);
-    expect(sendsDocumentsToService("embedding", "sentence-transformers")).toBe(false);
 
     const voyage = { ...emptyDraft("embedding"), provider: "voyage", model: "voyage-3.5", dimension: "1024" };
     expect(validateDraft("embedding", voyage)).toEqual({ apiKey: "Nhập API key." });

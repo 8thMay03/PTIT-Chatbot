@@ -45,6 +45,27 @@ S-01 và S-02 đã tích hợp trên nhánh `feat/list-provider-models` (tách t
 - Kiểm tra đã chạy: V-03, V-04.
 - Còn lại/blocker: không có.
 
+### S-03 — claude-agent
+
+- Cập nhật lúc: `2026-11-24T22:44:10+07:00`.
+- Đã làm (tiêu chí: giữ cảnh báo/lỗi và gợi ý tránh lỗi cấu hình mà admin không tự thấy; bỏ phần giải thích điều hiển nhiên):
+  - `catalog.js`: bỏ `description` của mọi nhà cung cấp; bỏ 15 gợi ý trường (Base URL OpenAI, Sentence-Transformers,
+    Cross-Encoder, số chiều Voyage/Cohere/Gemini/Jina/tương thích, Base URL tương thích/Rerank API/TEI về allowlist —
+    lỗi allowlist đã hiện khi lưu/kiểm tra, câu "quá 8 giây thì dùng heuristic" lặp ở mọi reranker). Giữ: tên deployment
+    Azure ≠ tên mô hình; giới hạn 100 đoạn của Pinecone và 32 đoạn của TEI (vượt thì âm thầm rơi về heuristic), đã rút
+    gọn. Bỏ `sendsDocumentsToService` (không còn dùng).
+  - `fields.jsx`: thẻ nhà cung cấp chỉ còn tên; bỏ gợi ý "Khoá được mã hoá…" của ô khoá; `ModelField` bỏ dòng "Đang lấy
+    danh sách…"/"Đã tải N mô hình…" (nút và ô chọn đã thể hiện), rút gọn lỗi thành "Không tải được danh sách: …", bỏ
+    hậu tố "(không có trong danh sách)".
+  - `ModelKindPanel.jsx`: bỏ mô tả đầu hộp thoại khi thêm mới/sửa mô hình không dùng; còn khi sửa mô hình đang dùng
+    ("lưu xong áp dụng ngay" / embedding "có hiệu lực sau khi khởi động lại backend"). Bỏ gợi ý tên hiển thị, ghi chú
+    "…được gửi tới dịch vụ này", ghi chú đệm 0; giữ cảnh báo số chiều lớn hơn `VECTOR_DIM`. Bỏ nhánh một nhà cung cấp
+    (mọi loại đều có nhiều nhà cung cấp; nhánh này đọc `description`).
+  - `models.css`: bỏ `.mdl-provider-note` và style dòng mô tả thẻ nhà cung cấp.
+  - Giữ nguyên các hộp thoại xác nhận (xoá mô hình, đổi embedding): mô tả nêu hệ quả không hoàn tác/cần nạp lại.
+- Kiểm tra đã chạy: V-05.
+- Còn lại/blocker: không có.
+
 ## Trao đổi giữa agents
 
 Không có (một agent).

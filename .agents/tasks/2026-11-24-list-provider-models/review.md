@@ -3,7 +3,7 @@
 - Reviewer: `claude-agent`.
 - Hình thức: `self_review`.
 - Trạng thái: `approved`.
-- Bản được review: working tree nhánh `feat/list-provider-models` (S-01, S-02 và sửa R-03), toàn bộ diff so với `25d8a32`.
+- Bản được review: nhánh `feat/list-provider-models` (S-01, S-02, sửa R-03 và S-03), toàn bộ diff so với `25d8a32`.
 - Cập nhật lúc: `2026-11-24T22:33:18+07:00`.
 
 ## Phạm vi và cơ sở đánh giá
@@ -66,6 +66,9 @@ thích; endpoint chỉ cho admin.
 
 - `2026-11-24T22:33:18+07:00` — claude-agent — working tree S-01 + S-02 — `changes_requested` (R-03); R-01, R-02 deferred.
 - `2026-11-24T22:33:18+07:00` — claude-agent — working tree sau sửa R-03 — `approved`.
+- `2026-11-24T22:44:10+07:00` — claude-agent — S-03 (diff so với `9e65a5a`) — `approved`, không có nhận xét mới. Đã đọc:
+  mọi chỗ còn dùng `description`/`hint`/`hintId` (không còn `aria-describedby` trỏ tới id đã bỏ), không còn import
+  thừa (`sendsDocumentsToService`), cảnh báo `VECTOR_DIM` và lỗi tải danh sách vẫn hiện.
 
 ## Kết luận
 

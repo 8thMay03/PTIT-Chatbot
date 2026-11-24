@@ -11,54 +11,30 @@ export const URL_PATTERN = /^https?:\/\/\S+$/i;
 const FIELD_NAMES = ["model", "base_url", "endpoint", "deployment_name", "api_version", "dimension"];
 
 export const LLM_PROVIDERS = [
-  { key: "openai", name: "OpenAI", description: "API chính thức của OpenAI." },
-  { key: "gemini", name: "Google Gemini", description: "Gemini qua Google AI Studio." },
-  { key: "azure", name: "Azure OpenAI", description: "Deployment OpenAI trên Azure." },
-  {
-    key: "openai_compatible",
-    name: "Tương thích OpenAI",
-    description: "Ollama, vLLM, DeepSeek, Qwen… qua endpoint /v1.",
-  },
+  { key: "openai", name: "OpenAI" },
+  { key: "gemini", name: "Google Gemini" },
+  { key: "azure", name: "Azure OpenAI" },
+  { key: "openai_compatible", name: "Tương thích OpenAI" },
 ];
 
 export const EMBEDDING_PROVIDERS = [
-  { key: "openai", name: "OpenAI", description: "Gọi API embeddings của OpenAI." },
-  {
-    key: "sentence-transformers",
-    name: "Sentence-Transformers",
-    description: "Mô hình Hugging Face chạy cục bộ trên máy chủ.",
-  },
-  { key: "voyage", name: "Voyage AI", description: "API embeddings của Voyage AI (voyage-3.5, voyage-3-large…)." },
-  { key: "cohere", name: "Cohere", description: "API Embed v2 của Cohere (embed-v4.0, embed-multilingual-v3.0)." },
-  { key: "gemini", name: "Google Gemini", description: "gemini-embedding-001 qua Google AI Studio." },
-  { key: "jina", name: "Jina AI", description: "API embeddings của Jina AI (jina-embeddings-v3)." },
-  {
-    key: "openai_compatible",
-    name: "Tương thích OpenAI",
-    description: "Mistral, Ollama, vLLM, HF TEI… qua endpoint /embeddings.",
-  },
+  { key: "openai", name: "OpenAI" },
+  { key: "sentence-transformers", name: "Sentence-Transformers" },
+  { key: "voyage", name: "Voyage AI" },
+  { key: "cohere", name: "Cohere" },
+  { key: "gemini", name: "Google Gemini" },
+  { key: "jina", name: "Jina AI" },
+  { key: "openai_compatible", name: "Tương thích OpenAI" },
 ];
 
 export const RERANKER_PROVIDERS = [
-  {
-    key: "cross-encoder",
-    name: "Cross-Encoder",
-    description: "Chấm điểm từng cặp câu hỏi–đoạn, chạy cục bộ. Chính xác hơn heuristic, chậm hơn.",
-  },
-  { key: "cohere", name: "Cohere", description: "API Rerank của Cohere (rerank-v3.5, rerank-v4.0…), đa ngôn ngữ." },
-  { key: "jina", name: "Jina AI", description: "API Reranker của Jina AI (jina-reranker-v3, v2 multilingual)." },
-  { key: "voyage", name: "Voyage AI", description: "API Rerank của Voyage AI (rerank-2.5, rerank-2.5-lite)." },
-  { key: "pinecone", name: "Pinecone", description: "Rerank qua Pinecone Inference (bge-reranker-v2-m3, Cohere)." },
-  {
-    key: "tei",
-    name: "HF TEI",
-    description: "Máy chủ Text Embeddings Inference tự host chạy mô hình reranker (BGE, GTE).",
-  },
-  {
-    key: "rerank_api",
-    name: "Rerank API",
-    description: "Endpoint /rerank chuẩn Cohere bất kỳ (vLLM, Infinity, LiteLLM…) qua Base URL.",
-  },
+  { key: "cross-encoder", name: "Cross-Encoder" },
+  { key: "cohere", name: "Cohere" },
+  { key: "jina", name: "Jina AI" },
+  { key: "voyage", name: "Voyage AI" },
+  { key: "pinecone", name: "Pinecone" },
+  { key: "tei", name: "HF TEI" },
+  { key: "rerank_api", name: "Rerank API" },
 ];
 
 /** Reranker gọi dịch vụ ngoài (khớp `API_RERANK_PROVIDERS` ở backend). */
@@ -128,13 +104,7 @@ const FIELDS = {
         placeholder: "gpt-4.1-mini",
         suggestions: ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"],
       },
-      {
-        name: "base_url",
-        label: "Base URL",
-        url: true,
-        placeholder: "https://api.openai.com/v1",
-        hint: "Để trống nếu gọi thẳng OpenAI. Chỉ điền khi đi qua proxy hoặc gateway riêng.",
-      },
+      { name: "base_url", label: "Base URL", url: true, placeholder: "https://api.openai.com/v1" },
     ],
     gemini: [
       {
@@ -184,7 +154,6 @@ const FIELDS = {
           "intfloat/multilingual-e5-large",
           "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
         ],
-        hint: "Tên mô hình trên Hugging Face; máy chủ tải về ở lần khởi động đầu tiên dùng mô hình.",
       },
       { ...DIMENSION_FIELD, placeholder: "1024" },
     ],
@@ -194,11 +163,7 @@ const FIELDS = {
         placeholder: "voyage-3.5",
         suggestions: ["voyage-3.5", "voyage-3.5-lite", "voyage-3-large", "voyage-multilingual-2"],
       },
-      {
-        ...DIMENSION_FIELD,
-        placeholder: "1024",
-        hint: "voyage-3.5 và voyage-3-large trả được 256, 512, 1024 hoặc 2048 chiều; voyage-multilingual-2 cố định 1024.",
-      },
+      { ...DIMENSION_FIELD, placeholder: "1024" },
     ],
     cohere: [
       {
@@ -206,11 +171,7 @@ const FIELDS = {
         placeholder: "embed-v4.0",
         suggestions: ["embed-v4.0", "embed-multilingual-v3.0", "embed-multilingual-light-v3.0"],
       },
-      {
-        ...DIMENSION_FIELD,
-        placeholder: "1536",
-        hint: "embed-v4.0 trả được 256, 512, 1024 hoặc 1536 chiều; mô hình v3 có số chiều cố định.",
-      },
+      { ...DIMENSION_FIELD, placeholder: "1536" },
     ],
     gemini: [
       {
@@ -218,11 +179,7 @@ const FIELDS = {
         placeholder: "gemini-embedding-001",
         suggestions: ["gemini-embedding-001", "text-embedding-004"],
       },
-      {
-        ...DIMENSION_FIELD,
-        placeholder: "1536",
-        hint: "gemini-embedding-001 khuyến nghị 768, 1536 hoặc 3072 chiều.",
-      },
+      { ...DIMENSION_FIELD, placeholder: "1536" },
     ],
     jina: [
       {
@@ -230,27 +187,12 @@ const FIELDS = {
         placeholder: "jina-embeddings-v3",
         suggestions: ["jina-embeddings-v3"],
       },
-      {
-        ...DIMENSION_FIELD,
-        placeholder: "1024",
-        hint: "jina-embeddings-v3 trả tối đa 1024 chiều.",
-      },
+      { ...DIMENSION_FIELD, placeholder: "1024" },
     ],
     openai_compatible: [
-      {
-        name: "base_url",
-        label: "Base URL",
-        required: true,
-        url: true,
-        placeholder: "http://localhost:11434/v1",
-        hint: "Địa chỉ tới trước /embeddings. Host phải nằm trong LLM_BASE_URL_ALLOWLIST.",
-      },
+      { name: "base_url", label: "Base URL", required: true, url: true, placeholder: "http://localhost:11434/v1" },
       { ...MODEL_FIELD, placeholder: "bge-m3", suggestions: ["bge-m3", "nomic-embed-text", "mistral-embed"] },
-      {
-        ...DIMENSION_FIELD,
-        placeholder: "1024",
-        hint: "Đúng số chiều máy chủ trả về; hệ thống không gửi tham số số chiều tới máy chủ tương thích.",
-      },
+      { ...DIMENSION_FIELD, placeholder: "1024" },
     ],
   },
   reranker: {
@@ -264,23 +206,14 @@ const FIELDS = {
           "BAAI/bge-reranker-base",
           "BAAI/bge-reranker-v2-m3",
         ],
-        hint: "Tên mô hình trên Hugging Face. Lần dùng đầu tiên máy chủ sẽ tải mô hình về; nếu không tải được, hệ thống tự quay về heuristic.",
       },
     ],
     rerank_api: [
-      {
-        name: "base_url",
-        label: "Base URL",
-        required: true,
-        url: true,
-        placeholder: "https://api.cohere.com/v2",
-        hint: "Địa chỉ tới trước /rerank, ví dụ https://api.jina.ai/v1 hoặc http://localhost:8000/v1. Cohere (api.cohere.com) và Jina (api.jina.ai) được phép sẵn; host khác phải nằm trong LLM_BASE_URL_ALLOWLIST.",
-      },
+      { name: "base_url", label: "Base URL", required: true, url: true, placeholder: "https://api.cohere.com/v2" },
       {
         ...MODEL_FIELD,
         placeholder: "rerank-v3.5",
         suggestions: ["rerank-v3.5", "rerank-multilingual-v3.0", "jina-reranker-v2-base-multilingual", "BAAI/bge-reranker-v2-m3"],
-        hint: "Dịch vụ lỗi hoặc quá 8 giây thì câu hỏi đó dùng heuristic.",
       },
     ],
     cohere: [
@@ -288,7 +221,6 @@ const FIELDS = {
         ...MODEL_FIELD,
         placeholder: "rerank-v3.5",
         suggestions: ["rerank-v3.5", "rerank-v4.0-pro", "rerank-v4.0-fast", "rerank-multilingual-v3.0"],
-        hint: "Các mô hình này đều hỗ trợ tiếng Việt. Dịch vụ lỗi hoặc quá 8 giây thì câu hỏi đó dùng heuristic.",
       },
     ],
     jina: [
@@ -296,7 +228,6 @@ const FIELDS = {
         ...MODEL_FIELD,
         placeholder: "jina-reranker-v3",
         suggestions: ["jina-reranker-v3", "jina-reranker-v2-base-multilingual"],
-        hint: "Dịch vụ lỗi hoặc quá 8 giây thì câu hỏi đó dùng heuristic.",
       },
     ],
     voyage: [
@@ -304,7 +235,6 @@ const FIELDS = {
         ...MODEL_FIELD,
         placeholder: "rerank-2.5",
         suggestions: ["rerank-2.5", "rerank-2.5-lite"],
-        hint: "rerank-2.5 và rerank-2.5-lite đa ngôn ngữ. Dịch vụ lỗi hoặc quá 8 giây thì câu hỏi đó dùng heuristic.",
       },
     ],
     pinecone: [
@@ -312,23 +242,16 @@ const FIELDS = {
         ...MODEL_FIELD,
         placeholder: "bge-reranker-v2-m3",
         suggestions: ["bge-reranker-v2-m3", "cohere-rerank-4-fast"],
-        hint: "bge-reranker-v2-m3 nhận tối đa 100 đoạn mỗi lần (Top-K × hệ số ứng viên); cohere-rerank-4-fast cần gói Standard.",
+        hint: "bge-reranker-v2-m3 nhận tối đa 100 đoạn mỗi lần (Top-K × hệ số ứng viên).",
       },
     ],
     tei: [
-      {
-        name: "base_url",
-        label: "Base URL",
-        required: true,
-        url: true,
-        placeholder: "http://localhost:8080",
-        hint: "Địa chỉ máy chủ TEI, tới trước /rerank. Host phải nằm trong LLM_BASE_URL_ALLOWLIST.",
-      },
+      { name: "base_url", label: "Base URL", required: true, url: true, placeholder: "http://localhost:8080" },
       {
         ...MODEL_FIELD,
         placeholder: "BAAI/bge-reranker-v2-m3",
         suggestions: ["BAAI/bge-reranker-v2-m3", "BAAI/bge-reranker-base", "Alibaba-NLP/gte-multilingual-reranker-base"],
-        hint: "Mô hình máy chủ TEI đang chạy (--model-id), chỉ để hiển thị. TEI mặc định nhận tối đa 32 đoạn mỗi lần (--max-client-batch-size).",
+        hint: "TEI mặc định nhận tối đa 32 đoạn mỗi lần (--max-client-batch-size).",
       },
     ],
   },
@@ -415,12 +338,6 @@ export function buildListModelsPayload(kind, draft, profileId) {
     // "Xoá khoá đã lưu": không dùng khoá đó nữa (nhà cung cấp có khoá `.env` thì máy chủ dùng khoá `.env`).
     profile_id: draft.clearApiKey ? null : (profileId ?? null),
   };
-}
-
-/** Nhà cung cấp gửi nội dung đoạn tài liệu ra dịch vụ ngoài: hộp thoại ghi chú cho admin. */
-export function sendsDocumentsToService(kind, provider) {
-  if (kind === "embedding") return provider !== "sentence-transformers";
-  return kind === "reranker" && API_RERANKER_PROVIDERS.includes(provider);
 }
 
 export const KINDS = {

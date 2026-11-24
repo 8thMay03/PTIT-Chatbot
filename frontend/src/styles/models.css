@@ -455,10 +455,6 @@
   font-size: var(--text-sm);
 }
 
-.mdl-dialog .mdl-choice-text span {
-  font-size: var(--text-xs);
-}
-
 .mdl-dialog .mdl-grid {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
@@ -493,19 +489,6 @@
 .mdl-icon-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
-}
-
-.mdl-provider-note {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-}
-
-.mdl-provider-note strong {
-  color: var(--text);
 }
 
 .mdl-link-btn {

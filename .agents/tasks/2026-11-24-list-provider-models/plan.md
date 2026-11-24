@@ -24,6 +24,17 @@
 - Phụ thuộc: S-01 (hợp đồng endpoint).
 - Người nhận: verifier.
 
+### S-03 — Frontend: bỏ mô tả thừa trong hộp thoại mô hình
+
+- Agent: `claude-agent`
+- Trạng thái: `done`
+- Mục tiêu: AC-05.
+- Phạm vi file được sửa: `frontend/src/models/catalog.js`, `frontend/src/models/catalog.test.js`,
+  `frontend/src/models/fields.jsx`, `frontend/src/models/ModelKindPanel.jsx`, `frontend/src/models/ModelsView.test.jsx`,
+  `frontend/src/styles/models.css`.
+- Phụ thuộc: S-02.
+- Người nhận: verifier.
+
 ## Hợp đồng dùng chung
 
 - `POST /api/model-profiles/list-models` (admin). Request: `{kind, provider, base_url?, api_key?, profile_id?}`.

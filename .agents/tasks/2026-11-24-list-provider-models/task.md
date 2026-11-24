@@ -51,6 +51,9 @@ Sentence-Transformers/Cross-Encoder chạy cục bộ. Các nhà cung cấp này
   provider/Base URL/khoá thì ẩn danh sách cũ; lỗi hiện cạnh ô; máy chủ chỉ có một mô hình thì tự điền; nhà cung cấp
   không hỗ trợ không có nút.
 - [x] AC-04: Toàn bộ test backend và frontend qua; build frontend qua.
+- [x] AC-05 (bổ sung): Hộp thoại thêm/sửa mô hình bỏ mô tả không cần thiết: mô tả nhà cung cấp, gợi ý ô khoá, gợi ý tên
+  hiển thị, mô tả đầu hộp thoại (trừ khi sửa mô hình đang dùng), ghi chú gửi dữ liệu, ghi chú đệm 0, gợi ý trường chỉ giải
+  thích điều hiển nhiên, dòng "Đã tải N mô hình". Giữ cảnh báo/lỗi và gợi ý tránh lỗi cấu hình không tự thấy được.
 
 ## Tài liệu và phụ thuộc
 
@@ -74,3 +77,5 @@ Sentence-Transformers/Cross-Encoder chạy cục bộ. Các nhà cung cấp này
 - `2026-11-24T22:33:18+07:00` — claude-agent: tạo task; không hỗ trợ Azure/Voyage/Jina/mô hình cục bộ; danh sách là gợi
   ý, không thay ô gõ tay.
 - `2026-11-24T22:33:18+07:00` — claude-agent: mọi AC đạt, review approved; chuyển `done`.
+- `2026-11-24T22:44:10+07:00` — claude-agent: người dùng yêu cầu xoá mô tả thừa trong hộp thoại, chọn làm tiếp trên nhánh
+  này (gộp chung PR); thêm AC-05, S-03; mở lại rồi đóng sau verification/review.

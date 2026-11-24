@@ -176,7 +176,7 @@ export function ChoiceGroup({ kind, name, legend, options, value, onChange }) {
     <fieldset className="mdl-choice-group">
       <legend>{legend}</legend>
       <div className="mdl-choices">
-        {options.map(({ key, name: label, description }) => (
+        {options.map(({ key, name: label }) => (
           <label key={key} className={`mdl-choice ${value === key ? "is-selected" : ""}`}>
             <input type="radio" name={name} value={key} checked={value === key} onChange={() => onChange(key)} />
             <span className="mdl-choice-icon" aria-hidden="true">
@@ -184,7 +184,6 @@ export function ChoiceGroup({ kind, name, legend, options, value, onChange }) {
             </span>
             <span className="mdl-choice-text">
               <strong>{label}</strong>
-              <span>{description}</span>
             </span>
           </label>
         ))}
@@ -253,7 +252,7 @@ export function ModelField({ id, field, value, onChange, error, listing, onLoad,
   const trimmed = value.trim();
   const statusId = `${id}-list-status`;
   const hintId = `${id}-hint`;
-  const describedBy = [error ? `${id}-error` : null, status !== "idle" ? statusId : null, field.hint ? hintId : null]
+  const describedBy = [error ? `${id}-error` : null, status === "error" ? statusId : null, field.hint ? hintId : null]
     .filter(Boolean)
     .join(" ");
   // Gõ tay: gợi ý gồm mô hình đã tải rồi tới gợi ý có sẵn.
@@ -268,23 +267,18 @@ export function ModelField({ id, field, value, onChange, error, listing, onLoad,
     onChange: (event) => onChange(event.target.value),
   };
 
+  // Chỉ báo khi không có gì để chọn; tải thành công thì ô chọn đã đủ rõ.
   let statusNode = null;
-  if (status === "loading") {
-    statusNode = (
-      <span className="mdl-field-hint" id={statusId} role="status">
-        Đang lấy danh sách mô hình…
-      </span>
-    );
-  } else if (status === "error") {
+  if (status === "error") {
     statusNode = (
       <span className="mdl-field-error" id={statusId} role="alert">
-        Không tải được danh sách mô hình: {message} Vẫn nhập tên mô hình bằng tay được.
+        Không tải được danh sách: {message}
       </span>
     );
-  } else if (status === "ok") {
+  } else if (status === "ok" && !hasList) {
     statusNode = (
       <span className="mdl-field-hint" id={statusId} role="status">
-        {hasList ? `Đã tải ${models.length} mô hình từ nhà cung cấp.` : message || "Không có mô hình nào."}
+        {message || "Không có mô hình nào."}
       </span>
     );
   }
@@ -301,7 +295,7 @@ export function ModelField({ id, field, value, onChange, error, listing, onLoad,
       {useSelect ? (
         <select {...inputProps}>
           <option value="">— Chọn trong {models.length} mô hình —</option>
-          {trimmed && !models.includes(trimmed) && <option value={value}>{trimmed} (không có trong danh sách)</option>}
+          {trimmed && !models.includes(trimmed) && <option value={value}>{trimmed}</option>}
           {models.map((item) => (
             <option key={item} value={item}>
               {item}
@@ -367,8 +361,6 @@ export function ApiKeyField({
   error,
 }) {
   const [visible, setVisible] = useState(false);
-  const hintId = `${id}-hint`;
-  const describedBy = [error ? `${id}-error` : null, hintId].filter(Boolean).join(" ");
   const keepsStoredKey = hasKey && !clearKey;
   let placeholder = "Dán API key";
   if (keepsStoredKey) placeholder = "Để trống để giữ khoá đã lưu";
@@ -400,7 +392,7 @@ export function ApiKeyField({
           autoComplete="new-password"
           spellCheck={false}
           aria-invalid={Boolean(error)}
-          aria-describedby={describedBy}
+          aria-describedby={error ? `${id}-error` : undefined}
           onChange={(event) => onChange(event.target.value)}
           onBlur={onBlur}
         />
@@ -419,9 +411,6 @@ export function ApiKeyField({
           {error}
         </span>
       )}
-      <span className="mdl-field-hint" id={hintId}>
-        Khoá được mã hoá trước khi lưu trên máy chủ, không lưu trong trình duyệt và không bao giờ hiển thị lại.
-      </span>
       {hasKey && !required && (
         <button
           type="button"
