@@ -91,6 +91,10 @@
   profile: …Azure không có nút tải" kiểm 4 ô Azure không có `placeholder` và không còn `.mdl-field-hint`.
 - Chạy lại `2026-11-24T22:51:56+07:00` sau khi dọn reranker: `npx vitest run` → `47 files, 407 passed`; `npx vite build` → `✓ built`; test
   "reranker: thêm Rerank API…" duyệt 6 nhà cung cấp API, kiểm ô không có `placeholder` và không có `.mdl-field-hint`.
+- Chạy lại `2026-11-24T22:56:57+07:00` sau khi cập nhật gợi ý Voyage: lần đầu `npx vitest run` có 1 test hết thời gian chờ trong
+  `SettingsView.test.jsx` (không liên quan thay đổi); chạy riêng file đó `10 passed`, chạy lại toàn bộ `47 files, 408
+  passed`; `npx vite build` → `✓ built`. Test mới trong `catalog.test.js` kiểm gợi ý Voyage và số chiều tự điền. Chưa gọi
+  thử `rerank-3`/`voyage-4` với khoá thật.
 
 ## Lỗi, kiểm tra lại và phần chưa xác minh
 

@@ -76,6 +76,9 @@ export const KNOWN_EMBEDDING_DIMENSIONS = {
   "intfloat/multilingual-e5-base": 768,
   "intfloat/multilingual-e5-large": 1024,
   "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2": 384,
+  "voyage-4-large": 1024,
+  "voyage-4": 1024,
+  "voyage-4-lite": 1024,
   "voyage-3.5": 1024,
   "voyage-3.5-lite": 1024,
   "voyage-3-large": 1024,
@@ -144,7 +147,7 @@ const FIELDS = {
     voyage: [
       {
         ...MODEL_FIELD,
-        suggestions: ["voyage-3.5", "voyage-3.5-lite", "voyage-3-large", "voyage-multilingual-2"],
+        suggestions: ["voyage-4-large", "voyage-4", "voyage-4-lite", "voyage-3.5", "voyage-3-large", "voyage-multilingual-2"],
       },
       { ...DIMENSION_FIELD, placeholder: "1024" },
     ],
@@ -204,7 +207,7 @@ const FIELDS = {
       { ...MODEL_FIELD, suggestions: ["jina-reranker-v3", "jina-reranker-v2-base-multilingual"] },
     ],
     voyage: [
-      { ...MODEL_FIELD, suggestions: ["rerank-2.5", "rerank-2.5-lite"] },
+      { ...MODEL_FIELD, suggestions: ["rerank-3", "rerank-3-lite", "rerank-2.5", "rerank-2.5-lite"] },
     ],
     pinecone: [
       { ...MODEL_FIELD, suggestions: ["bge-reranker-v2-m3", "cohere-rerank-4-fast"] },

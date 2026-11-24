@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   KINDS,
+  KNOWN_EMBEDDING_DIMENSIONS,
   buildEmbeddingTestPayload,
   buildListModelsPayload,
   buildPayload,
@@ -14,6 +15,7 @@ import {
   keyRule,
   listModelsBlocker,
   modelListSignature,
+  providerFields,
   validateDraft,
 } from "./catalog";
 
@@ -243,5 +245,14 @@ describe("catalog kho mô hình", () => {
     expect(modelListSignature("llm", { ...compatible, base_url: "http://a/v1", model: "x" })).toBe(signature);
     expect(modelListSignature("llm", { ...compatible, base_url: "http://b/v1" })).not.toBe(signature);
     expect(modelListSignature("llm", { ...compatible, base_url: "http://a/v1", apiKey: "k" })).not.toBe(signature);
+  });
+
+  it("Voyage: gợi ý theo dòng mô hình hiện hành (voyage-4, rerank-3) và tự điền số chiều", () => {
+    const suggestions = (kind) => providerFields(kind, "voyage").find((field) => field.name === "model").suggestions;
+    expect(suggestions("embedding").slice(0, 3)).toEqual(["voyage-4-large", "voyage-4", "voyage-4-lite"]);
+    expect(suggestions("reranker").slice(0, 2)).toEqual(["rerank-3", "rerank-3-lite"]);
+    for (const model of ["voyage-4-large", "voyage-4", "voyage-4-lite"]) {
+      expect(KNOWN_EMBEDDING_DIMENSIONS[model]).toBe(1024);
+    }
   });
 });

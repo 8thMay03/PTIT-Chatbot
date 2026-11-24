@@ -76,6 +76,15 @@ S-01 và S-02 đã tích hợp trên nhánh `feat/list-provider-models` (tách t
   điền sẵn vào ô API version khi thêm mới (`emptyDraft`) giữ nguyên — đó là giá trị, không phải placeholder.
 - Bổ sung `2026-11-24T22:51:56+07:00` (yêu cầu người dùng, "tương tự cho Reranker"): bỏ gợi ý giới hạn 100 đoạn (Pinecone) và 32 đoạn (HF
   TEI), placeholder Base URL của Rerank API và HF TEI. Hộp thoại reranker không còn placeholder hay gợi ý dưới ô nào.
+- Bổ sung `2026-11-24T22:56:57+07:00` (người dùng hỏi Voyage có liệt kê mô hình không → "làm đi"): đã đối chiếu tài liệu Voyage — API không có
+  endpoint liệt kê mô hình (chỉ `/v1/embeddings`, `/v1/contextualizedembeddings`, `/v1/multimodalembeddings`, `/v1/rerank`,
+  files, batches), nên giữ không hỗ trợ "Tải danh sách". Cập nhật gợi ý có sẵn theo dòng hiện hành: embedding
+  `voyage-4-large`, `voyage-4`, `voyage-4-lite` (mặc định 1024, đổi được 256/512/1024/2048; thêm vào
+  `KNOWN_EMBEDDING_DIMENSIONS`), giữ `voyage-3.5`, `voyage-3-large`, `voyage-multilingual-2`; reranker `rerank-3`,
+  `rerank-3-lite`, giữ `rerank-2.5`, `rerank-2.5-lite`. Backend không đổi: dòng voyage-4 không nằm trong
+  `_FIXED_DIMENSION_MODELS` nên vẫn gửi `output_dimension` (đúng). `.env.example`: ví dụ số chiều đổi sang voyage-4.
+  Ghi chú: trang API reference (cập nhật 2025-12-10) còn ghi `rerank-2.5` là khuyến nghị, trang hướng dẫn
+  (docs.voyageai.com/docs/reranker) ghi `rerank-3` là hiện hành và dùng trong ví dụ curl.
 - Còn lại/blocker: không có.
 
 ## Trao đổi giữa agents

@@ -76,6 +76,8 @@ thích; endpoint chỉ cho admin.
 - `2026-11-24T22:50:49+07:00` — claude-agent — dọn gợi ý/placeholder Azure — `approved`, không có nhận xét mới.
 - `2026-11-24T22:51:56+07:00` — claude-agent — dọn gợi ý/placeholder reranker — `approved`. Ghi nhận: giới hạn số đoạn của Pinecone/TEI
   không còn hiển thị; vượt giới hạn thì câu hỏi rơi về heuristic (hành vi cũ, không đổi).
+- `2026-11-24T22:56:57+07:00` — claude-agent — cập nhật gợi ý Voyage — `approved`, không có nhận xét mới; giữ tên cũ trong
+  `KNOWN_EMBEDDING_DIMENSIONS` để profile đã lưu vẫn tự điền số chiều.
 
 ## Kết luận
 
