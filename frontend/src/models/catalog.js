@@ -188,7 +188,7 @@ const FIELDS = {
       },
     ],
     rerank_api: [
-      { name: "base_url", label: "Base URL", required: true, url: true, placeholder: "https://api.cohere.com/v2" },
+      { name: "base_url", label: "Base URL", required: true, url: true },
       {
         ...MODEL_FIELD,
         suggestions: ["rerank-v3.5", "rerank-multilingual-v3.0", "jina-reranker-v2-base-multilingual", "BAAI/bge-reranker-v2-m3"],
@@ -201,30 +201,19 @@ const FIELDS = {
       },
     ],
     jina: [
-      {
-        ...MODEL_FIELD,
-        suggestions: ["jina-reranker-v3", "jina-reranker-v2-base-multilingual"],
-      },
+      { ...MODEL_FIELD, suggestions: ["jina-reranker-v3", "jina-reranker-v2-base-multilingual"] },
     ],
     voyage: [
-      {
-        ...MODEL_FIELD,
-        suggestions: ["rerank-2.5", "rerank-2.5-lite"],
-      },
+      { ...MODEL_FIELD, suggestions: ["rerank-2.5", "rerank-2.5-lite"] },
     ],
     pinecone: [
-      {
-        ...MODEL_FIELD,
-        suggestions: ["bge-reranker-v2-m3", "cohere-rerank-4-fast"],
-        hint: "bge-reranker-v2-m3 nhận tối đa 100 đoạn mỗi lần (Top-K × hệ số ứng viên).",
-      },
+      { ...MODEL_FIELD, suggestions: ["bge-reranker-v2-m3", "cohere-rerank-4-fast"] },
     ],
     tei: [
-      { name: "base_url", label: "Base URL", required: true, url: true, placeholder: "http://localhost:8080" },
+      { name: "base_url", label: "Base URL", required: true, url: true },
       {
         ...MODEL_FIELD,
         suggestions: ["BAAI/bge-reranker-v2-m3", "BAAI/bge-reranker-base", "Alibaba-NLP/gte-multilingual-reranker-base"],
-        hint: "TEI mặc định nhận tối đa 32 đoạn mỗi lần (--max-client-batch-size).",
       },
     ],
   },

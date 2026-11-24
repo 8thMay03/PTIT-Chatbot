@@ -74,6 +74,8 @@ S-01 và S-02 đã tích hợp trên nhánh `feat/list-provider-models` (tách t
 - Bổ sung `2026-11-24T22:50:49+07:00` (yêu cầu người dùng): Azure OpenAI bỏ gợi ý "Tên deployment đã tạo trên Azure, không phải tên mô hình
   gốc." và placeholder của Tên deployment, API version (Endpoint đã bỏ trước đó). Giá trị mặc định `2024-02-15-preview`
   điền sẵn vào ô API version khi thêm mới (`emptyDraft`) giữ nguyên — đó là giá trị, không phải placeholder.
+- Bổ sung `2026-11-24T22:51:56+07:00` (yêu cầu người dùng, "tương tự cho Reranker"): bỏ gợi ý giới hạn 100 đoạn (Pinecone) và 32 đoạn (HF
+  TEI), placeholder Base URL của Rerank API và HF TEI. Hộp thoại reranker không còn placeholder hay gợi ý dưới ô nào.
 - Còn lại/blocker: không có.
 
 ## Trao đổi giữa agents

@@ -318,6 +318,14 @@ describe("ModelsView — kho mô hình theo loại", () => {
 
     await click(dialog().querySelector('input[type="radio"][value="rerank_api"]'));
     await waitFor(() => dialog().querySelector("#mdl-reranker-form-base_url"));
+    // Mọi nhà cung cấp reranker: không placeholder, không gợi ý dưới ô.
+    for (const provider of ["cohere", "jina", "voyage", "pinecone", "tei", "rerank_api"]) {
+      await click(dialog().querySelector(`input[type="radio"][value="${provider}"]`));
+      for (const input of dialog().querySelectorAll(".mdl-grid input, #mdl-reranker-form-key")) {
+        expect(input.hasAttribute("placeholder")).toBe(false);
+      }
+      expect(dialog().querySelector(".mdl-field-hint")).toBeNull();
+    }
     expect(dialog().textContent).toContain("Không bắt buộc");
     await changeInput(dialog().querySelector("#mdl-reranker-form-base_url"), "https://api.cohere.com/v2");
     await changeInput(dialog().querySelector("#mdl-reranker-form-model"), "rerank-v3.5");

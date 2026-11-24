@@ -89,6 +89,8 @@
   test "thêm LLM qua hộp thoại…" kiểm hộp thoại OpenAI không chứa ".env" và hiện "Không bắt buộc".
 - Chạy lại `2026-11-24T22:50:49+07:00` sau khi dọn Azure: `npx vitest run` → `47 files, 407 passed`; `npx vite build` → `✓ built`; test "sửa
   profile: …Azure không có nút tải" kiểm 4 ô Azure không có `placeholder` và không còn `.mdl-field-hint`.
+- Chạy lại `2026-11-24T22:51:56+07:00` sau khi dọn reranker: `npx vitest run` → `47 files, 407 passed`; `npx vite build` → `✓ built`; test
+  "reranker: thêm Rerank API…" duyệt 6 nhà cung cấp API, kiểm ô không có `placeholder` và không có `.mdl-field-hint`.
 
 ## Lỗi, kiểm tra lại và phần chưa xác minh
 
