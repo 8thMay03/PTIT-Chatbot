@@ -290,8 +290,8 @@ def test_gemini_generate_stream_deltas_splits_thought_parts(monkeypatch) -> None
         (REASONING_DELTA, "Tìm điều học phí"),
         (CONTENT_DELTA, "Học phí [1]"),
     ]
-    # includeThoughts chỉ được thêm khi cờ bật.
-    assert captured["payload"]["generationConfig"]["includeThoughts"] is True
+    # includeThoughts chỉ được thêm khi cờ bật, và nằm trong thinkingConfig.
+    assert captured["payload"]["generationConfig"]["thinkingConfig"] == {"includeThoughts": True}
 
 
 def test_gemini_generate_stream_deltas_omits_include_thoughts_when_disabled(monkeypatch) -> None:
@@ -311,7 +311,57 @@ def test_gemini_generate_stream_deltas_omits_include_thoughts_when_disabled(monk
     deltas = list(provider.generate_stream_deltas([{"role": "user", "content": "Học phí"}]))
 
     assert [(d.kind, d.text) for d in deltas] == [(CONTENT_DELTA, "Học phí [1]")]
+    assert "thinkingConfig" not in captured["payload"]["generationConfig"]
     assert "includeThoughts" not in captured["payload"]["generationConfig"]
+
+
+@pytest.mark.parametrize(
+    ("model_name", "effort", "expected"),
+    [
+        ("gemini-2.5-flash", "low", {"includeThoughts": True, "thinkingBudget": 1024}),
+        ("gemini-2.5-pro", "high", {"includeThoughts": True, "thinkingBudget": 24576}),
+        ("gemini-3-pro-preview", "medium", {"includeThoughts": True, "thinkingLevel": "medium"}),
+    ],
+)
+def test_gemini_maps_reasoning_effort_to_thinking_config(monkeypatch, model_name, effort, expected) -> None:
+    monkeypatch.setattr("app.llm.providers.gemini_provider.settings.llm_reasoning_stream_enabled", True)
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["payload"] = json.loads(request.content.decode("utf-8"))
+        return _sse_response(['data: {"candidates": [{"content": {"parts": [{"text": "Học phí [1]"}]}}]}\n'])
+
+    provider = _gemini_with_transport(handler, model_name=model_name)
+    list(provider.generate_stream_deltas([{"role": "user", "content": "Học phí"}], reasoning_effort=effort))
+
+    generation_config = captured["payload"]["generationConfig"]
+    assert generation_config["thinkingConfig"] == expected
+    assert "reasoning_effort" not in generation_config
+
+
+def test_gemini_generate_without_reasoning_effort_sends_no_thinking_config() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["payload"] = json.loads(request.content.decode("utf-8"))
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "OK"}]}}]})
+
+    provider = _gemini_with_transport(handler, model_name="gemini-2.5-flash")
+    assert provider.generate([{"role": "user", "content": "Học phí"}]) == "OK"
+    assert "thinkingConfig" not in captured["payload"]["generationConfig"]
+
+
+def test_openai_provider_forwards_reasoning_effort() -> None:
+    provider = OpenAIProvider(api_key="test-key", model_name="gpt-5-mini")
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.return_value = iter(
+        [SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="Học phí"))])]
+    )
+    provider._client = fake_client
+
+    list(provider.generate_stream_deltas([{"role": "user", "content": "Học phí"}], reasoning_effort="high"))
+
+    assert fake_client.chat.completions.create.call_args.kwargs["reasoning_effort"] == "high"
 
 
 class ReasoningMockProvider(MockCustomProvider):
@@ -338,6 +388,71 @@ def test_stream_answer_with_llm_filters_reasoning_out() -> None:
     chunks = list(stream_answer_with_llm("Học phí?", TEMPERATURE_CONTEXTS, provider=ReasoningMockProvider()))
 
     assert chunks == ["Câu trả lời [1]"]
+
+
+class EffortRecordingProvider(MockCustomProvider):
+    """Ghi kwargs của từng lời gọi; ``reject_effort`` mô phỏng model trả 400 cho tham số này."""
+
+    def __init__(self, reject_effort: bool = False, status_code: int = 400) -> None:
+        super().__init__(response_text="Câu trả lời [1]")
+        self.reject_effort = reject_effort
+        self.status_code = status_code
+        self.calls: list[dict] = []
+
+    def _check(self, kwargs) -> None:
+        self.calls.append(dict(kwargs))
+        if self.reject_effort and "reasoning_effort" in kwargs:
+            raise LLMProviderError("unsupported parameter", status_code=self.status_code, retryable=False)
+
+    def generate(self, messages, temperature=0.0, max_tokens=None, **kwargs) -> str:
+        self._check(kwargs)
+        return self.response_text
+
+    def generate_stream_deltas(self, messages, temperature=0.2, max_tokens=None, **kwargs):
+        self._check(kwargs)
+        yield StreamDelta(kind=CONTENT_DELTA, text=self.response_text)
+
+
+def test_stream_answer_deltas_passes_reasoning_effort_only_when_set() -> None:
+    provider = EffortRecordingProvider()
+    list(stream_answer_deltas_with_llm("Học phí?", TEMPERATURE_CONTEXTS, provider=provider))
+    list(stream_answer_deltas_with_llm("Học phí?", TEMPERATURE_CONTEXTS, provider=provider, reasoning_effort="low"))
+
+    assert "reasoning_effort" not in provider.calls[0]
+    assert provider.calls[1]["reasoning_effort"] == "low"
+
+
+@pytest.mark.parametrize("status_code", [400, 422])
+def test_stream_answer_deltas_retries_without_rejected_reasoning_effort(status_code) -> None:
+    provider = EffortRecordingProvider(reject_effort=True, status_code=status_code)
+
+    deltas = list(
+        stream_answer_deltas_with_llm("Học phí?", TEMPERATURE_CONTEXTS, provider=provider, reasoning_effort="high")
+    )
+
+    assert [(d.kind, d.text) for d in deltas] == [(CONTENT_DELTA, "Câu trả lời [1]")]
+    assert [("reasoning_effort" in call) for call in provider.calls] == [True, False]
+
+
+def test_stream_answer_deltas_does_not_retry_other_errors_without_effort() -> None:
+    provider = EffortRecordingProvider(reject_effort=True, status_code=401)
+
+    deltas = list(
+        stream_answer_deltas_with_llm("Học phí?", TEMPERATURE_CONTEXTS, provider=provider, reasoning_effort="high")
+    )
+
+    # 401 không phải lỗi tham số: không gửi lại, trả câu dự phòng extractive như cũ.
+    assert len(provider.calls) == 1
+    assert deltas[0].text.startswith("Mô hình ngôn ngữ đang tạm thời gặp sự cố")
+
+
+def test_answer_with_llm_retries_without_rejected_reasoning_effort() -> None:
+    provider = EffortRecordingProvider(reject_effort=True)
+
+    answer = answer_with_llm("Học phí?", TEMPERATURE_CONTEXTS, provider=provider, reasoning_effort="medium")
+
+    assert answer == "Câu trả lời [1]"
+    assert [("reasoning_effort" in call) for call in provider.calls] == [True, False]
 
 
 def test_llm_factory_resolves_providers(monkeypatch) -> None:

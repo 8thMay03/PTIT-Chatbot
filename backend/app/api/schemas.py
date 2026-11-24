@@ -24,6 +24,8 @@ class ChatRequest(BaseModel):
     conversation_id: str | None = None
     user_id: str | None = None
     top_k: int | None = None
+    # Mức suy luận khi sinh câu trả lời (`app.llm.REASONING_EFFORTS`); bỏ trống thì model tự quyết.
+    reasoning_effort: Literal["low", "medium", "high"] | None = None
 
     @field_validator("message")
     @classmethod

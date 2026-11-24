@@ -45,4 +45,15 @@ describe("streamChat", () => {
       top_k: 6,
     });
   });
+
+  it("gửi reasoning_effort khi caller chọn mức, bỏ trống thì không gửi", async () => {
+    const fetchMock = vi.fn(() => ndjsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await drain(streamChat({ message: "Học phí?", reasoningEffort: "high" }));
+    await drain(streamChat({ message: "Học phí?", reasoningEffort: undefined }));
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).reasoning_effort).toBe("high");
+    expect("reasoning_effort" in JSON.parse(fetchMock.mock.calls[1][1].body)).toBe(false);
+  });
 });

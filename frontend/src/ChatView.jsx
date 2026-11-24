@@ -27,6 +27,7 @@ import {
   queryKeys,
 } from "./api";
 import MarkdownView, { preloadMarkdownView } from "./components/LazyMarkdownView";
+import ReasoningEffortPicker from "./components/ReasoningEffortPicker";
 import ReasoningPanel from "./components/ReasoningPanel";
 import { sourcesLabel } from "./lib/citations";
 import { isApplePlatform, isSubmitKey } from "./lib/keyboard";
@@ -191,6 +192,10 @@ const ChatView = forwardRef(function ChatView(
     errorContext,
     enterToSend = true,
     keepReasoningOpen = false,
+    // Mức suy luận ("auto" | "low" | "medium" | "high"). App sinh viên truyền từ tùy chọn
+    // đã lưu; không truyền (app admin) thì giữ trong phiên.
+    reasoningEffort,
+    onReasoningEffortChange,
   },
   ref
 ) {
@@ -207,6 +212,9 @@ const ChatView = forwardRef(function ChatView(
   const [liveStatus, setLiveStatus] = useState("");
   // Lượt bị từ chối trước khi lưu (429/422/413, mất mạng): báo ngay tại khung nhập.
   const [composerAlert, setComposerAlert] = useState(null);
+  const [sessionEffort, setSessionEffort] = useState("auto");
+  const effort = reasoningEffort ?? sessionEffort;
+  const changeEffort = onReasoningEffortChange ?? setSessionEffort;
 
   const messagesRef = useRef(null);
   const textareaRef = useRef(null);
@@ -442,6 +450,7 @@ const ChatView = forwardRef(function ChatView(
       for await (const eventData of chatApi.streamChat({
         message: text,
         conversationId,
+        reasoningEffort: effort === "auto" ? undefined : effort,
         signal: controller.signal,
       })) {
         if (eventData.type === "start") {
@@ -817,6 +826,7 @@ const ChatView = forwardRef(function ChatView(
             aria-invalid={tooLong || undefined}
             aria-describedby={showCounter ? "chat-input-counter" : undefined}
           />
+          <ReasoningEffortPicker value={effort} onChange={changeEffort} />
           {loading ? (
             <button
               type="button"

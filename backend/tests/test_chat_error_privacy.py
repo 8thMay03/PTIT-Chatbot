@@ -156,7 +156,7 @@ def test_stream_unexpected_internal_error_ends_with_generic_error_event(api_db, 
     monkeypatch.setattr(
         routes,
         "stream_answer_deltas_with_llm",
-        lambda question, contexts, history=None, provider=None, budget=None: iter(
+        lambda question, contexts, history=None, provider=None, budget=None, reasoning_effort=None: iter(
             [StreamDelta(kind=CONTENT_DELTA, text="Học phí [1]")]
         ),
     )
@@ -190,7 +190,7 @@ def test_each_stream_turn_gets_its_own_request_id(api_db, monkeypatch) -> None:
     monkeypatch.setattr(
         routes,
         "stream_answer_deltas_with_llm",
-        lambda question, contexts, history=None, provider=None, budget=None: iter(
+        lambda question, contexts, history=None, provider=None, budget=None, reasoning_effort=None: iter(
             [StreamDelta(kind=CONTENT_DELTA, text="Học phí [1]")]
         ),
     )
@@ -205,7 +205,7 @@ def test_each_stream_turn_gets_its_own_request_id(api_db, monkeypatch) -> None:
 # AC-04: /api/chat
 # ==========================================
 def test_chat_unexpected_error_returns_503_generic_detail(api_db, monkeypatch, caplog) -> None:
-    def failing_answer(message, top_k, history, budget=None):
+    def failing_answer(message, top_k, history, budget=None, reasoning_effort=None):
         raise RuntimeError(SECRET)
 
     monkeypatch.setattr(routes.rag_chain, "answer", failing_answer)
@@ -229,7 +229,7 @@ def test_chat_success_has_request_id_header(api_db, monkeypatch) -> None:
     monkeypatch.setattr(
         routes.rag_chain,
         "answer",
-        lambda message, top_k, history, budget=None: {"answer": "Trả lời", "sources": [], "contexts": [], "retrieval_debug": {}},
+        lambda message, top_k, history, budget=None, reasoning_effort=None: {"answer": "Trả lời", "sources": [], "contexts": [], "retrieval_debug": {}},
     )
 
     response = TestClient(app).post("/api/chat", json={"message": "Học phí?"})

@@ -29,6 +29,23 @@ _FALLBACK_INTROS = {
     FALLBACK_UNAVAILABLE: "Mô hình ngôn ngữ đang tạm thời gặp sự cố nên mình trả về các đoạn liên quan nhất:",
 }
 
+# Model không hỗ trợ mức suy luận (ví dụ gpt-4.1-mini với `reasoning_effort`, Gemini
+# 2.0 với `thinkingConfig`) trả 400/422: gửi lại một lần không kèm tham số đó.
+_UNSUPPORTED_PARAM_STATUS = frozenset({400, 422})
+
+
+def _effort_kwargs(reasoning_effort: str | None) -> dict[str, str]:
+    return {"reasoning_effort": reasoning_effort} if reasoning_effort else {}
+
+
+def _rejected_effort(exc: Exception, reasoning_effort: str | None) -> bool:
+    if not reasoning_effort or error_status_code(exc) not in _UNSUPPORTED_PARAM_STATUS:
+        return False
+    logger.info(
+        "LLM rejected reasoning_effort=%s (%s); retrying without it.", reasoning_effort, describe_error(exc)
+    )
+    return True
+
 
 def answer_with_llm(
     question: str,
@@ -36,7 +53,9 @@ def answer_with_llm(
     history: list[dict[str, str]] | None = None,
     provider: BaseLLMProvider | None = None,
     budget: LLMBudget | None = None,
+    reasoning_effort: str | None = None,
 ) -> str:
+    """``reasoning_effort``: một giá trị của ``REASONING_EFFORTS``; None = model tự quyết."""
     if not contexts:
         return NO_CONTEXT_ANSWER
 
@@ -49,7 +68,14 @@ def answer_with_llm(
         {"role": "user", "content": build_context_prompt(question, contexts, history)},
     ]
     try:
-        answer = llm.generate(messages, temperature=settings.llm_temperature, budget=budget)
+        try:
+            answer = llm.generate(
+                messages, temperature=settings.llm_temperature, budget=budget, **_effort_kwargs(reasoning_effort)
+            )
+        except Exception as exc:
+            if not _rejected_effort(exc, reasoning_effort):
+                raise
+            answer = llm.generate(messages, temperature=settings.llm_temperature, budget=budget)
     except Exception as exc:
         logger.warning("LLM generation failed: %s. Falling back to extractive answer.", describe_error(exc))
         return _extractive_answer(contexts, FALLBACK_UNAVAILABLE)
@@ -63,8 +89,12 @@ def stream_answer_deltas_with_llm(
     history: list[dict[str, str]] | None = None,
     provider: BaseLLMProvider | None = None,
     budget: LLMBudget | None = None,
+    reasoning_effort: str | None = None,
 ) -> Iterator[StreamDelta]:
     """Yield typed answer deltas (content + reasoning) as they arrive.
+
+    ``reasoning_effort`` như ở ``answer_with_llm``; model từ chối tham số này trước
+    token đầu tiên thì stream lại không kèm nó.
 
     - Lỗi trước token đầu tiên: yield câu trả lời dự phòng extractive (giống ``answer_with_llm``).
     - Lỗi sau khi đã stream một phần: raise :class:`LLMStreamError` để caller (ví dụ
@@ -85,9 +115,18 @@ def stream_answer_deltas_with_llm(
     ]
     emitted = 0
     try:
-        for delta in llm.generate_stream_deltas(messages, temperature=settings.llm_temperature, budget=budget):
-            emitted += 1
-            yield delta
+        try:
+            for delta in llm.generate_stream_deltas(
+                messages, temperature=settings.llm_temperature, budget=budget, **_effort_kwargs(reasoning_effort)
+            ):
+                emitted += 1
+                yield delta
+        except Exception as exc:
+            if emitted or not _rejected_effort(exc, reasoning_effort):
+                raise
+            for delta in llm.generate_stream_deltas(messages, temperature=settings.llm_temperature, budget=budget):
+                emitted += 1
+                yield delta
     except Exception as exc:
         if emitted == 0:
             logger.warning(
@@ -111,10 +150,11 @@ def stream_answer_with_llm(
     history: list[dict[str, str]] | None = None,
     provider: BaseLLMProvider | None = None,
     budget: LLMBudget | None = None,
+    reasoning_effort: str | None = None,
 ) -> Iterator[str]:
     """Yield answer text deltas only (reasoning deltas are filtered out)."""
     for delta in stream_answer_deltas_with_llm(
-        question, contexts, history=history, provider=provider, budget=budget
+        question, contexts, history=history, provider=provider, budget=budget, reasoning_effort=reasoning_effort
     ):
         if delta.kind == CONTENT_DELTA:
             yield delta.text

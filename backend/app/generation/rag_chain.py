@@ -79,8 +79,12 @@ class RagChain:
         llm_provider: BaseLLMProvider | None = None,
         dataset_ids: list[str] | None = None,
         budget: LLMBudget | None = None,
+        reasoning_effort: str | None = None,
     ) -> dict:
-        """``budget``: deadline chung cho mọi lời gọi LLM của lượt (None = không giới hạn)."""
+        """``budget``: deadline chung cho mọi lời gọi LLM của lượt (None = không giới hạn).
+
+        ``reasoning_effort`` chỉ áp dụng cho bước sinh câu trả lời, không cho rewrite/multi-query.
+        """
         safe_history = filter_safe_history(history)
         result = self.retrieve_context(
             question, top_k=top_k, history=safe_history, dataset_ids=dataset_ids, budget=budget
@@ -102,7 +106,12 @@ class RagChain:
 
         provider = llm_provider or self.llm_provider
         answer = answer_with_llm(
-            question, result["contexts"], history=safe_history, provider=provider, budget=budget
+            question,
+            result["contexts"],
+            history=safe_history,
+            provider=provider,
+            budget=budget,
+            reasoning_effort=reasoning_effort,
         )
         # Câu từ chối không kèm nguồn: khối "nguồn" dưới câu từ chối là trích dẫn giả.
         return {

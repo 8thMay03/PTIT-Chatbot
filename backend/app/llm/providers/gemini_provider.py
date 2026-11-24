@@ -24,6 +24,11 @@ logger = logging.getLogger(__name__)
 
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
+# Gemini 2.5 đặt mức suy luận bằng số token (`thinkingBudget`); cùng mức với lớp
+# tương thích OpenAI của Gemini khi đổi `reasoning_effort`. Gemini 3 trở đi dùng
+# `thinkingLevel` nhận thẳng "low"/"medium"/"high".
+_THINKING_BUDGETS = {"low": 1024, "medium": 8192, "high": 24576}
+
 
 class GeminiProvider(BaseLLMProvider):
     """LLM provider for Google Gemini API."""
@@ -89,6 +94,11 @@ class GeminiProvider(BaseLLMProvider):
         }
         if max_tokens is not None:
             generation_config["maxOutputTokens"] = max_tokens
+        thinking_config = self._thinking_config(
+            kwargs.pop("reasoning_effort", None), kwargs.pop("includeThoughts", None)
+        )
+        if thinking_config:
+            generation_config["thinkingConfig"] = thinking_config
         generation_config.update(kwargs)
 
         payload: dict[str, Any] = {
@@ -98,6 +108,18 @@ class GeminiProvider(BaseLLMProvider):
         if system_instruction:
             payload["systemInstruction"] = system_instruction
         return payload
+
+    def _thinking_config(self, reasoning_effort: str | None, include_thoughts: bool | None) -> dict[str, Any]:
+        """``generationConfig.thinkingConfig``; rỗng khi không cần gửi."""
+        config: dict[str, Any] = {}
+        if include_thoughts is not None:
+            config["includeThoughts"] = include_thoughts
+        if reasoning_effort in _THINKING_BUDGETS:
+            if self.model_name.startswith(("gemini-1", "gemini-2")):
+                config["thinkingBudget"] = _THINKING_BUDGETS[reasoning_effort]
+            else:
+                config["thinkingLevel"] = reasoning_effort
+        return config
 
     def _get_http_client(self) -> httpx.Client:
         if not self.is_configured():
@@ -217,8 +239,8 @@ class GeminiProvider(BaseLLMProvider):
         """Stream content plus thought summaries on thinking models (2.5+).
 
         Thought parts (``{"text": ..., "thought": true}``) become reasoning
-        deltas; the rest are content deltas. ``includeThoughts`` chỉ gửi khi
-        cờ bật vì model cũ (1.5) có thể từ chối field này.
+        deltas; the rest are content deltas. ``thinkingConfig.includeThoughts``
+        chỉ gửi khi cờ bật vì model cũ (1.5) có thể từ chối field này.
         """
         if settings.llm_reasoning_stream_enabled:
             kwargs.setdefault("includeThoughts", True)

@@ -274,6 +274,71 @@ describe("ChatView", () => {
     });
   });
 
+  describe("chọn mức suy luận ở khung nhập", () => {
+    function trigger() {
+      return container.querySelector(".effort-trigger");
+    }
+
+    function menuItem(label) {
+      return [...document.querySelectorAll('.effort-menu [role="menuitemradio"]')].find(
+        (item) => item.querySelector(".effort-menu-label").textContent === label
+      );
+    }
+
+    it("mặc định Tự động và không gửi reasoning_effort", async () => {
+      const { chatBodies } = createBackend();
+      expect(trigger().getAttribute("aria-label")).toBe("Mức suy luận: Tự động");
+
+      await ask("Học phí?");
+      await waitFor(() => chatBodies.length === 1);
+      expect("reasoning_effort" in chatBodies[0]).toBe(false);
+    });
+
+    it("chọn Cao trong menu thì câu hỏi sau gửi reasoning_effort=high (app admin giữ trong phiên)", async () => {
+      const { chatBodies } = createBackend();
+      click(trigger());
+      expect(trigger().getAttribute("aria-expanded")).toBe("true");
+      // Menu mở thì focus vào mức đang chọn.
+      expect(document.activeElement).toBe(menuItem("Tự động"));
+
+      click(menuItem("Cao"));
+      expect(document.querySelector(".effort-menu")).toBeNull();
+      expect(trigger().getAttribute("aria-label")).toBe("Mức suy luận: Cao");
+      expect(document.activeElement).toBe(trigger());
+
+      await ask("Học phí?");
+      await waitFor(() => chatBodies.length === 1);
+      expect(chatBodies[0].reasoning_effort).toBe("high");
+    });
+
+    it("app sinh viên: hiển thị giá trị được truyền và báo thay đổi qua onReasoningEffortChange", () => {
+      const onReasoningEffortChange = vi.fn();
+      renderChat(
+        <ChatView
+          ref={chatRef}
+          onConversationSaved={onConversationSaved}
+          reasoningEffort="low"
+          onReasoningEffortChange={onReasoningEffortChange}
+        />
+      );
+      expect(trigger().getAttribute("aria-label")).toBe("Mức suy luận: Thấp");
+
+      click(trigger());
+      expect(menuItem("Thấp").getAttribute("aria-checked")).toBe("true");
+      click(menuItem("Trung bình"));
+      expect(onReasoningEffortChange).toHaveBeenCalledWith("medium");
+    });
+
+    it("Esc đóng menu và trả focus về nút", () => {
+      click(trigger());
+      act(() => {
+        menuItem("Tự động").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      });
+      expect(document.querySelector(".effort-menu")).toBeNull();
+      expect(document.activeElement).toBe(trigger());
+    });
+  });
+
   describe("gửi tin", () => {
     it("body không có top_k (AC-03)", async () => {
       const { chatBodies } = createBackend();

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Tùy chọn của sinh viên trên trang chat (nhóm "Chung" trong hộp thoại Cài đặt):
- * cỡ chữ, gửi bằng Enter, giữ mở quá trình suy luận. Lưu trên thiết bị bằng một
+ * cỡ chữ, gửi bằng Enter, giữ mở quá trình suy luận; cùng mức suy luận chọn ngay
+ * ở khung nhập. Lưu trên thiết bị bằng một
  * khoá localStorage dạng JSON có `version`; giá trị lạ hoặc storage bị chặn thì
  * dùng mặc định. Giao diện sáng/tối vẫn do `lib/theme.js` giữ.
  */
@@ -12,10 +13,17 @@ export const PREFERENCES_VERSION = 1;
 /** "sm" | "md" | "lg"; "md" là cỡ chữ trước khi có tùy chọn này. */
 export const FONT_SCALES = ["sm", "md", "lg"];
 
+/**
+ * Mức suy luận ("thinking effort") khi sinh câu trả lời. "auto" không gửi gì để
+ * model tự quyết; các mức còn lại gửi thành `reasoning_effort` của `/chat/stream`.
+ */
+export const REASONING_EFFORTS = ["auto", "low", "medium", "high"];
+
 export const DEFAULT_PREFERENCES = Object.freeze({
   fontScale: "md",
   enterToSend: true,
   keepReasoningOpen: false,
+  reasoningEffort: "auto",
 });
 
 /** Giữ từng trường hợp lệ, trường thiếu/sai kiểu về mặc định. */
@@ -29,6 +37,9 @@ export function normalizePreferences(raw) {
       typeof value.keepReasoningOpen === "boolean"
         ? value.keepReasoningOpen
         : DEFAULT_PREFERENCES.keepReasoningOpen,
+    reasoningEffort: REASONING_EFFORTS.includes(value.reasoningEffort)
+      ? value.reasoningEffort
+      : DEFAULT_PREFERENCES.reasoningEffort,
   };
 }
 

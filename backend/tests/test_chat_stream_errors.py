@@ -72,7 +72,7 @@ async def test_stream_providers_error_before_first_token_returns_extractive_fall
     stored_messages: list[dict] = []
     _prepare(monkeypatch, stored_messages)
 
-    def fake_stream(question, contexts, history=None, provider=None, budget=None):
+    def fake_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         # Mô phỏng `stream_answer_deltas_with_llm` khi provider lỗi trước token
         # đầu tiên: toàn bộ câu trả lời dự phòng được yield như một delta thường.
         yield StreamDelta(kind=CONTENT_DELTA, text=EXTRACTIVE_FALLBACK)
@@ -93,11 +93,36 @@ async def test_stream_providers_error_before_first_token_returns_extractive_fall
     assert "error" not in assistant["metadata"]
 
 
+async def test_stream_forwards_reasoning_effort_to_generation(monkeypatch) -> None:
+    stored_messages: list[dict] = []
+    _prepare(monkeypatch, stored_messages)
+    received: list[str | None] = []
+
+    def fake_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
+        received.append(reasoning_effort)
+        yield StreamDelta(kind=CONTENT_DELTA, text="Học phí [1]")
+
+    monkeypatch.setattr(routes, "stream_answer_deltas_with_llm", fake_stream)
+
+    for effort in ("high", None):
+        response = routes.chat_stream(
+            ChatRequest(message="Học phí?", reasoning_effort=effort), session_factory=_fake_session_factory
+        )
+        await _read_events(response)
+
+    assert received == ["high", None]
+
+
+def test_chat_request_rejects_unknown_reasoning_effort() -> None:
+    with pytest.raises(ValueError):
+        ChatRequest(message="Học phí?", reasoning_effort="max")
+
+
 async def test_stream_providers_error_after_tokens_emits_error_event_without_fallback(monkeypatch) -> None:
     stored_messages: list[dict] = []
     _prepare(monkeypatch, stored_messages)
 
-    def fake_stream(question, contexts, history=None, provider=None, budget=None):
+    def fake_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         yield StreamDelta(kind=CONTENT_DELTA, text="Học ")
         yield StreamDelta(kind=CONTENT_DELTA, text="phí ")
         raise LLMStreamError("LLM streaming failed: boom")
@@ -143,7 +168,7 @@ async def test_stream_emits_step_events_and_persists_timeline(monkeypatch) -> No
     monkeypatch.setattr(
         routes,
         "stream_answer_deltas_with_llm",
-        lambda question, contexts, history=None, provider=None, budget=None: iter(
+        lambda question, contexts, history=None, provider=None, budget=None, reasoning_effort=None: iter(
             [StreamDelta(kind=CONTENT_DELTA, text="Trả lời [1]")]
         ),
     )
@@ -175,7 +200,7 @@ async def test_stream_emits_reasoning_events_and_persists_reasoning(monkeypatch)
     _prepare(monkeypatch, stored_messages)
     monkeypatch.setattr(routes.settings, "llm_reasoning_stream_enabled", True)
 
-    def fake_stream(question, contexts, history=None, provider=None, budget=None):
+    def fake_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         yield StreamDelta(kind=REASONING_DELTA, text="Người dùng hỏi học phí, ")
         yield StreamDelta(kind=REASONING_DELTA, text="tìm trong kho điều học phí.")
         yield StreamDelta(kind=CONTENT_DELTA, text="Trả lời [1]")
@@ -206,7 +231,7 @@ async def test_stream_hides_reasoning_when_disabled(monkeypatch) -> None:
     _prepare(monkeypatch, stored_messages)
     monkeypatch.setattr(routes.settings, "llm_reasoning_stream_enabled", False)
 
-    def fake_stream(question, contexts, history=None, provider=None, budget=None):
+    def fake_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         yield StreamDelta(kind=REASONING_DELTA, text="Suy luận bí mật")
         yield StreamDelta(kind=CONTENT_DELTA, text="Trả lời [1]")
 
@@ -226,7 +251,7 @@ async def _stream_answer(monkeypatch, llm_answer: str) -> tuple[dict, dict]:
     stored_messages: list[dict] = []
     _prepare(monkeypatch, stored_messages)
 
-    def fake_stream(question, contexts, history=None, provider=None, budget=None):
+    def fake_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         yield StreamDelta(kind=CONTENT_DELTA, text=llm_answer)
 
     monkeypatch.setattr(routes, "stream_answer_deltas_with_llm", fake_stream)

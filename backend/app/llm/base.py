@@ -29,6 +29,12 @@ class LLMMessage:
 CONTENT_DELTA = "content"
 REASONING_DELTA = "reasoning"
 
+# Mức suy luận ("thinking effort") người dùng chọn cho câu trả lời, đặt tên theo
+# `reasoning_effort` của OpenAI. Truyền vào provider qua kwarg ``reasoning_effort``;
+# không truyền thì model tự quyết. Provider OpenAI/Azure/tương thích OpenAI gửi
+# nguyên tham số; Gemini đổi thành ``thinkingConfig``.
+REASONING_EFFORTS = ("low", "medium", "high")
+
 
 @dataclass
 class StreamDelta:

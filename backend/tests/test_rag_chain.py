@@ -118,7 +118,7 @@ def test_rag_chain_retrieves_with_rewritten_query_but_answers_original_question(
     answered_questions = []
     monkeypatch.setattr(
         "app.generation.rag_chain.answer_with_llm",
-        lambda question, contexts, history=None, provider=None, budget=None: answered_questions.append(question) or "Câu trả lời [1]",
+        lambda question, contexts, history=None, provider=None, budget=None, reasoning_effort=None: answered_questions.append(question) or "Câu trả lời [1]",
     )
 
     result = RagChain(
@@ -142,7 +142,7 @@ def test_rag_chain_can_disable_reranker(monkeypatch) -> None:
     monkeypatch.setattr("app.generation.rag_chain.settings.reranker_enabled", False)
     monkeypatch.setattr(
         "app.generation.rag_chain.answer_with_llm",
-        lambda question, contexts, history=None, provider=None, budget=None: "Câu trả lời [1]",
+        lambda question, contexts, history=None, provider=None, budget=None, reasoning_effort=None: "Câu trả lời [1]",
     )
 
     RagChain(
@@ -430,7 +430,7 @@ def test_corrected_question_drives_retrieval_and_original_drives_answer(correcti
     answered = []
     monkeypatch.setattr(
         "app.generation.rag_chain.answer_with_llm",
-        lambda question, contexts, history=None, provider=None, budget=None: answered.append(question) or "Trả lời [1]",
+        lambda question, contexts, history=None, provider=None, budget=None, reasoning_effort=None: answered.append(question) or "Trả lời [1]",
     )
     retriever = CapturingRetriever()
     chain, llm = _correcting_chain("Cho mình hỏi học phí một tín chỉ là bao nhiêu?", retriever)

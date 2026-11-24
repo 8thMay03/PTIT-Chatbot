@@ -73,7 +73,7 @@ def calls(monkeypatch) -> dict[str, int]:
     """Retrieval/LLM giả cho cả hai route; đếm số lần được gọi."""
     counter = {"answer": 0, "retrieve": 0, "llm": 0}
 
-    def fake_answer(message, top_k, history, budget=None):
+    def fake_answer(message, top_k, history, budget=None, reasoning_effort=None):
         counter["answer"] += 1
         return {"answer": "Trả lời", "sources": [], "contexts": [], "retrieval_debug": {}}
 
@@ -82,7 +82,7 @@ def calls(monkeypatch) -> dict[str, int]:
         yield {"step": "retrieve", "detail": {}, "elapsed_ms": 1}
         yield {"result": dict(RETRIEVAL_RESULT)}
 
-    def fake_stream(question, contexts, history=None, provider=None, budget=None):
+    def fake_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         counter["llm"] += 1
         yield StreamDelta(kind=CONTENT_DELTA, text="Học phí PTIT [1]")
 
@@ -292,7 +292,7 @@ def _start_blocked_stream(monkeypatch, sid: str, make_client=None):
     release = threading.Event()
     result: dict = {}
 
-    def blocking_stream(question, contexts, history=None, provider=None, budget=None):
+    def blocking_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         llm_started.set()
         assert release.wait(10)
         yield StreamDelta(kind=CONTENT_DELTA, text="Học phí PTIT [1]")
@@ -347,7 +347,7 @@ def test_busy_rejection_does_not_consume_owner_quota(api_db, calls, monkeypatch)
 
 
 def test_slot_released_after_sync_chat_error(api_db, monkeypatch) -> None:
-    def failing_answer(message, top_k, history, budget=None):
+    def failing_answer(message, top_k, history, budget=None, reasoning_effort=None):
         raise RuntimeError("llm down")
 
     monkeypatch.setattr(routes.rag_chain, "answer", failing_answer)
@@ -360,7 +360,7 @@ def test_slot_released_after_sync_chat_error(api_db, monkeypatch) -> None:
 
 
 def test_slot_released_after_llm_stream_error(api_db, calls, monkeypatch) -> None:
-    def failing_stream(question, contexts, history=None, provider=None, budget=None):
+    def failing_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         yield StreamDelta(kind=CONTENT_DELTA, text="Học ")
         raise LLMStreamError("provider dropped")
 
@@ -388,7 +388,7 @@ def test_slot_released_after_retrieval_error(api_db, monkeypatch) -> None:
 
 
 def test_slot_released_after_unexpected_stream_failure(api_db, calls, monkeypatch) -> None:
-    def broken_stream(question, contexts, history=None, provider=None, budget=None):
+    def broken_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         raise ValueError("unexpected")
         yield  # pragma: no cover
 
@@ -472,7 +472,7 @@ async def _asgi_stream(sid: str, disconnect_when, send_error: BaseException | No
 async def test_slot_released_after_client_disconnect(api_db, calls, monkeypatch) -> None:
     llm_closed = threading.Event()
 
-    def slow_stream(question, contexts, history=None, provider=None, budget=None):
+    def slow_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         try:
             for part in ["Học ", "phí ", "PTIT ", "là ", "bao ", "nhiêu"]:
                 yield StreamDelta(kind=CONTENT_DELTA, text=part)
