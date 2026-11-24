@@ -213,7 +213,7 @@ def test_chat_stream_holds_no_connection_while_llm_streams(chat_db, monkeypatch)
         observed.append(("retrieval", counter.checked_out))
         yield {"result": dict(RETRIEVAL_RESULT)}
 
-    def fake_stream(question, contexts, history=None, provider=None, budget=None):
+    def fake_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         for text_part in ["Học ", "phí ", "PTIT [1]"]:
             observed.append(("llm", counter.checked_out))
             yield StreamDelta(kind=CONTENT_DELTA, text=text_part)
@@ -241,7 +241,7 @@ def test_chat_sync_holds_no_connection_while_answering(chat_db, monkeypatch) -> 
     factory, counter = chat_db
     observed: list[int] = []
 
-    def fake_answer(message, top_k, history, budget=None):
+    def fake_answer(message, top_k, history, budget=None, reasoning_effort=None):
         observed.append(counter.checked_out)
         return {
             "answer": "Trả lời [1]",
@@ -271,7 +271,7 @@ def test_concurrent_streams_do_not_exhaust_small_pool(small_pool_db, fake_retrie
     factory, counter = small_pool_db
     stream_count = 10
 
-    def slow_stream(question, contexts, history=None, provider=None, budget=None):
+    def slow_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         yield StreamDelta(kind=CONTENT_DELTA, text="Học phí ")
         time.sleep(2)
         yield StreamDelta(kind=CONTENT_DELTA, text="PTIT [1]")
@@ -328,7 +328,7 @@ async def test_interrupted_stream_saves_partial_answer(chat_db, fake_retrieval, 
     llm_closed = threading.Event()
     parts = ["Học ", "phí ", "PTIT ", "là ", "bao ", "nhiêu"]
 
-    def slow_stream(question, contexts, history=None, provider=None, budget=None):
+    def slow_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         try:
             for text_part in parts:
                 produced.append(text_part)
@@ -374,7 +374,7 @@ async def test_disconnect_during_send_saves_without_gc(chat_db, fake_retrieval, 
     factory, counter = chat_db
     llm_closed = threading.Event()
 
-    def slow_stream(question, contexts, history=None, provider=None, budget=None):
+    def slow_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         try:
             for text_part in ["Học ", "phí ", "PTIT ", "là ", "bao ", "nhiêu"]:
                 yield StreamDelta(kind=CONTENT_DELTA, text=text_part)
@@ -411,7 +411,7 @@ async def test_llm_stream_error_is_saved_before_error_event(chat_db, fake_retrie
     """R-06: client ngắt ngay khi nhận event `error` -> vẫn lưu lỗi `llm_stream`, không phải `interrupted`."""
     factory, _ = chat_db
 
-    def failing_stream(question, contexts, history=None, provider=None, budget=None):
+    def failing_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         yield StreamDelta(kind=CONTENT_DELTA, text="Học phí ")
         raise LLMStreamError("LLM streaming failed: boom")
 
@@ -444,7 +444,7 @@ async def test_interrupted_answer_is_excluded_from_next_turn_history(chat_db, fa
     factory, _ = chat_db
     monkeypatch.setattr(routes.settings, "conversation_memory_enabled", True)
 
-    def slow_stream(question, contexts, history=None, provider=None, budget=None):
+    def slow_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         for text_part in ["Câu ", "trả ", "lời ", "dở ", "dang"]:
             yield StreamDelta(kind=CONTENT_DELTA, text=text_part)
             time.sleep(0.2)
@@ -460,7 +460,7 @@ async def test_interrupted_answer_is_excluded_from_next_turn_history(chat_db, fa
 
     captured_history: list[list[dict]] = []
 
-    def fake_answer(message, top_k, history, budget=None):
+    def fake_answer(message, top_k, history, budget=None, reasoning_effort=None):
         captured_history.append(history)
         return {"answer": "Trả lời", "sources": [], "contexts": [], "retrieval_debug": {}}
 
@@ -492,7 +492,7 @@ async def test_disconnect_before_delta_keeps_question(chat_db, monkeypatch) -> N
         time.sleep(0.3)
         yield {"result": dict(RETRIEVAL_RESULT)}
 
-    def fake_stream(question, contexts, history=None, provider=None, budget=None):
+    def fake_stream(question, contexts, history=None, provider=None, budget=None, reasoning_effort=None):
         llm_calls.append(question)
         yield StreamDelta(kind=CONTENT_DELTA, text="không được gọi")
 
@@ -578,7 +578,7 @@ def test_empty_error_answer_is_excluded_from_next_turn_history(chat_db, monkeypa
 
     captured_history: list[list[dict]] = []
 
-    def fake_answer(message, top_k, history, budget=None):
+    def fake_answer(message, top_k, history, budget=None, reasoning_effort=None):
         captured_history.append(history)
         return {"answer": "Trả lời", "sources": [], "contexts": [], "retrieval_debug": {}}
 
@@ -597,7 +597,7 @@ def test_empty_error_answer_is_excluded_from_next_turn_history(chat_db, monkeypa
 def test_chat_sync_answer_error_keeps_question_and_status(chat_db, monkeypatch) -> None:
     factory, _ = chat_db
 
-    def failing_answer(message, top_k, history, budget=None):
+    def failing_answer(message, top_k, history, budget=None, reasoning_effort=None):
         raise RuntimeError("retrieval exploded")
 
     monkeypatch.setattr(routes.rag_chain, "answer", failing_answer)
@@ -625,7 +625,7 @@ def test_chat_rejects_other_session_conversation_without_writing(chat_db, monkey
     monkeypatch.setattr(
         routes.rag_chain,
         "answer",
-        lambda message, top_k, history, budget=None: {"answer": "Trả lời", "sources": [], "contexts": [], "retrieval_debug": {}},
+        lambda message, top_k, history, budget=None, reasoning_effort=None: {"answer": "Trả lời", "sources": [], "contexts": [], "retrieval_debug": {}},
     )
     owner = _client_with_sid(_new_sid())
     conversation_id = owner.post("/api/chat", json={"message": "Câu hỏi?"}).json()["conversation_id"]
@@ -645,7 +645,7 @@ def test_stream_logs_answer_save_failure(chat_db, fake_retrieval, monkeypatch, c
     monkeypatch.setattr(
         routes,
         "stream_answer_deltas_with_llm",
-        lambda question, contexts, history=None, provider=None, budget=None: iter([StreamDelta(kind=CONTENT_DELTA, text="Trả lời")]),
+        lambda question, contexts, history=None, provider=None, budget=None, reasoning_effort=None: iter([StreamDelta(kind=CONTENT_DELTA, text="Trả lời")]),
     )
     original_add_message = routes.add_message
 

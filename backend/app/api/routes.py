@@ -1581,7 +1581,11 @@ def chat(
         try:
             budget = LLMBudget(settings.llm_turn_deadline_seconds)
             result = rag_chain.answer(
-                request.message, top_k=request.effective_top_k, history=turn.history, budget=budget
+                request.message,
+                top_k=request.effective_top_k,
+                history=turn.history,
+                budget=budget,
+                reasoning_effort=request.reasoning_effort,
             )
         except Exception as exc:
             # Câu hỏi đã được lưu ở pha (a): ghi câu trả lời lỗi để giữ cặp hỏi - đáp, rồi
@@ -1690,7 +1694,13 @@ def _iter_chat_stream_events(
     if not retrieval["guardrail_allowed"]:
         stream: Iterator[StreamDelta] = iter([StreamDelta(kind=CONTENT_DELTA, text=OUT_OF_SCOPE_ANSWER)])
     elif retrieval["strong_context"]:
-        stream = stream_answer_deltas_with_llm(request.message, contexts, history=turn.history, budget=budget)
+        stream = stream_answer_deltas_with_llm(
+            request.message,
+            contexts,
+            history=turn.history,
+            budget=budget,
+            reasoning_effort=request.reasoning_effort,
+        )
     else:
         stream = iter([StreamDelta(kind=CONTENT_DELTA, text=NO_CONTEXT_ANSWER)])
 

@@ -272,6 +272,8 @@ export default function App() {
             errorContext={STUDENT_ERROR_CONTEXT}
             enterToSend={preferences.enterToSend}
             keepReasoningOpen={preferences.keepReasoningOpen}
+            reasoningEffort={preferences.reasoningEffort}
+            onReasoningEffortChange={(value) => preferences.setPreference("reasoningEffort", value)}
           />
         </div>
       </main>

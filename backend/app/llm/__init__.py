@@ -1,6 +1,7 @@
 from app.llm.base import (
     CONTENT_DELTA,
     REASONING_DELTA,
+    REASONING_EFFORTS,
     BaseLLMProvider,
     LLMConfigurationError,
     LLMDeadlineExceeded,
@@ -34,6 +35,7 @@ __all__ = [
     "OpenAICompatibleProvider",
     "OpenAIProvider",
     "REASONING_DELTA",
+    "REASONING_EFFORTS",
     "StreamDelta",
     "describe_error",
     "get_llm_provider",

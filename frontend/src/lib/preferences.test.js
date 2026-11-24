@@ -45,14 +45,17 @@ afterEach(() => {
 
 describe("normalizePreferences", () => {
   it("giữ trường hợp lệ, trường lạ về mặc định", () => {
-    expect(normalizePreferences({ fontScale: "lg", enterToSend: false, keepReasoningOpen: true })).toEqual({
+    expect(
+      normalizePreferences({ fontScale: "lg", enterToSend: false, keepReasoningOpen: true, reasoningEffort: "high" })
+    ).toEqual({
       fontScale: "lg",
       enterToSend: false,
       keepReasoningOpen: true,
+      reasoningEffort: "high",
     });
-    expect(normalizePreferences({ fontScale: "xl", enterToSend: "no", keepReasoningOpen: 1 })).toEqual(
-      DEFAULT_PREFERENCES
-    );
+    expect(
+      normalizePreferences({ fontScale: "xl", enterToSend: "no", keepReasoningOpen: 1, reasoningEffort: "max" })
+    ).toEqual(DEFAULT_PREFERENCES);
     expect(normalizePreferences(null)).toEqual(DEFAULT_PREFERENCES);
   });
 });
@@ -63,14 +66,23 @@ describe("readPreferences / writePreferences", () => {
   });
 
   it("ghi rồi đọc lại đúng, kèm version", () => {
-    expect(writePreferences({ fontScale: "sm", enterToSend: false, keepReasoningOpen: true })).toBe(true);
-    expect(JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY))).toEqual({
-      version: 1,
-      fontScale: "sm",
+    const saved = { fontScale: "sm", enterToSend: false, keepReasoningOpen: true, reasoningEffort: "medium" };
+    expect(writePreferences(saved)).toBe(true);
+    expect(JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY))).toEqual({ version: 1, ...saved });
+    expect(readPreferences()).toEqual(saved);
+  });
+
+  it("bản lưu trước khi có mức suy luận: giữ các trường cũ, mức suy luận là Tự động", () => {
+    localStorage.setItem(
+      PREFERENCES_STORAGE_KEY,
+      JSON.stringify({ version: 1, fontScale: "lg", enterToSend: false, keepReasoningOpen: true })
+    );
+    expect(readPreferences()).toEqual({
+      fontScale: "lg",
       enterToSend: false,
       keepReasoningOpen: true,
+      reasoningEffort: "auto",
     });
-    expect(readPreferences()).toEqual({ fontScale: "sm", enterToSend: false, keepReasoningOpen: true });
   });
 
   it("JSON hỏng hoặc version khác thì trả mặc định", () => {

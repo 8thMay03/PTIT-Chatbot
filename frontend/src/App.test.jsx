@@ -295,6 +295,7 @@ describe("App sinh viên", () => {
       fontScale: "lg",
       enterToSend: false,
       keepReasoningOpen: true,
+      reasoningEffort: "auto",
     });
 
     // Tải lại trang: mount lại App, tùy chọn còn nguyên.
