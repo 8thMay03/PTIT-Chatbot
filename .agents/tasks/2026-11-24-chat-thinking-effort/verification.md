@@ -72,7 +72,9 @@
 ### V-06 — Thử với model thật
 
 - Trạng thái: `not_run`.
-- Lý do: container backend đang chạy bản `dev` cũ; không gọi API nhà cung cấp bằng khóa của người dùng khi chưa hỏi.
+- Lý do: không gọi API nhà cung cấp bằng khóa của người dùng khi chưa hỏi. (Đính chính 2026-11-24T23:40+07:00: ghi
+  chú trước nói container backend chạy bản `dev` cũ là sai — container bind-mount `backend/app` và chạy `--reload`,
+  nên chạy code của nhánh đang checkout.)
 
 ## Lỗi, kiểm tra lại và phần chưa xác minh
 
