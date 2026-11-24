@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   KINDS,
+  buildEmbeddingTestPayload,
   buildPayload,
   buildRerankerTestPayload,
   buildTestPayload,
@@ -45,6 +46,57 @@ describe("catalog kho mô hình", () => {
       api_key: null,
       profile_id: "r1",
     });
+  });
+
+  it("embedding qua API: khoá bắt buộc với hãng, tuỳ chọn với tương thích OpenAI", () => {
+    expect(KINDS.embedding.providers.map((item) => item.key)).toEqual([
+      "openai",
+      "sentence-transformers",
+      "voyage",
+      "cohere",
+      "gemini",
+      "jina",
+      "openai_compatible",
+    ]);
+    expect(keyRule("embedding", "voyage")).toEqual({ envFallback: false, required: true });
+    expect(keyRule("embedding", "openai_compatible")).toEqual({ envFallback: false });
+    expect(keyRule("embedding", "sentence-transformers")).toBeNull();
+    expect(canTestConnection("embedding", "cohere")).toBe(true);
+    expect(canTestConnection("embedding", "openai")).toBe(true);
+    expect(canTestConnection("embedding", "sentence-transformers")).toBe(false);
+    expect(sendsDocumentsToService("embedding", "gemini")).toBe(true);
+    expect(sendsDocumentsToService("embedding", "sentence-transformers")).toBe(false);
+
+    const voyage = { ...emptyDraft("embedding"), provider: "voyage", model: "voyage-3.5", dimension: "1024" };
+    expect(validateDraft("embedding", voyage)).toEqual({ apiKey: "Nhập API key." });
+    expect(validateDraft("embedding", voyage, { hasStoredKey: true })).toEqual({});
+    expect(validateDraft("embedding", { ...voyage, clearApiKey: true }, { hasStoredKey: true })).toEqual({
+      apiKey: "Nhập API key.",
+    });
+    expect(validateDraft("embedding", { ...voyage, apiKey: "pa-x" })).toEqual({});
+
+    const compatible = { ...emptyDraft("embedding"), provider: "openai_compatible", model: "bge-m3", dimension: "1024" };
+    expect(validateDraft("embedding", compatible)).toEqual({ base_url: "Nhập base url." });
+    const filled = { ...compatible, base_url: " http://localhost:11434/v1 " };
+    expect(validateDraft("embedding", filled)).toEqual({});
+    expect(buildPayload("embedding", filled)).toEqual({
+      kind: "embedding",
+      name: "bge-m3",
+      provider: "openai_compatible",
+      base_url: "http://localhost:11434/v1",
+      model: "bge-m3",
+      dimension: 1024,
+    });
+    expect(buildEmbeddingTestPayload(filled, "e1")).toEqual({
+      provider: "openai_compatible",
+      model: "bge-m3",
+      base_url: "http://localhost:11434/v1",
+      dimension: 1024,
+      api_key: null,
+      profile_id: "e1",
+    });
+    // Base URL còn sót trong bản nháp không gửi kèm nhà cung cấp có URL cố định.
+    expect(buildEmbeddingTestPayload({ ...voyage, base_url: "http://x" }, null).base_url).toBeNull();
   });
 
   it("bắt trường bắt buộc, URL và số chiều theo nhà cung cấp", () => {

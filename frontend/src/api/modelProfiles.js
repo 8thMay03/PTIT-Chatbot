@@ -38,6 +38,15 @@ export function testReranker(payload) {
   });
 }
 
+/** Nhúng một câu mẫu qua API, báo số chiều nhận được; máy chủ chờ tối đa 15 giây. */
+export function testEmbedding(payload) {
+  return request("model-profiles/test-embedding", {
+    method: "POST",
+    body: payload,
+    timeout: 30_000,
+  });
+}
+
 export function testLlm(payload) {
   return request("model-profiles/test-llm", {
     method: "POST",

@@ -28,6 +28,15 @@ export const EMBEDDING_PROVIDERS = [
     name: "Sentence-Transformers",
     description: "Mô hình Hugging Face chạy cục bộ trên máy chủ.",
   },
+  { key: "voyage", name: "Voyage AI", description: "API embeddings của Voyage AI (voyage-3.5, voyage-3-large…)." },
+  { key: "cohere", name: "Cohere", description: "API Embed v2 của Cohere (embed-v4.0, embed-multilingual-v3.0)." },
+  { key: "gemini", name: "Google Gemini", description: "gemini-embedding-001 qua Google AI Studio." },
+  { key: "jina", name: "Jina AI", description: "API embeddings của Jina AI (jina-embeddings-v3)." },
+  {
+    key: "openai_compatible",
+    name: "Tương thích OpenAI",
+    description: "Mistral, Ollama, vLLM, HF TEI… qua endpoint /embeddings.",
+  },
 ];
 
 export const RERANKER_PROVIDERS = [
@@ -55,7 +64,21 @@ export const COMPATIBLE_PRESETS = [
   },
 ];
 
-// Số chiều của các mô hình nhúng phổ biến: chọn mô hình thì tự điền số chiều.
+/** Điền nhanh máy chủ embedding tương thích OpenAI (Base URL tới trước /embeddings). */
+export const EMBEDDING_COMPATIBLE_PRESETS = [
+  { key: "ollama", label: "Ollama", baseUrl: "http://localhost:11434/v1", model: "bge-m3" },
+  { key: "vllm", label: "vLLM", baseUrl: "http://localhost:8000/v1", model: "" },
+  { key: "tei", label: "HF TEI", baseUrl: "http://localhost:8080/v1", model: "" },
+  { key: "mistral", label: "Mistral", baseUrl: "https://api.mistral.ai/v1", model: "mistral-embed" },
+];
+
+/** Nút điền nhanh của nhà cung cấp tương thích OpenAI theo loại mô hình. */
+export function compatiblePresets(kind) {
+  return kind === "embedding" ? EMBEDDING_COMPATIBLE_PRESETS : COMPATIBLE_PRESETS;
+}
+
+// Số chiều của các mô hình nhúng phổ biến: chọn mô hình thì tự điền số chiều. Mô hình đổi
+// được số chiều (Voyage, Cohere v4, Gemini, Jina v3) điền số vừa với VECTOR_DIM 1536.
 export const KNOWN_EMBEDDING_DIMENSIONS = {
   "text-embedding-3-small": 1536,
   "text-embedding-3-large": 3072,
@@ -64,7 +87,22 @@ export const KNOWN_EMBEDDING_DIMENSIONS = {
   "intfloat/multilingual-e5-base": 768,
   "intfloat/multilingual-e5-large": 1024,
   "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2": 384,
+  "voyage-3.5": 1024,
+  "voyage-3.5-lite": 1024,
+  "voyage-3-large": 1024,
+  "voyage-multilingual-2": 1024,
+  "embed-v4.0": 1536,
+  "embed-multilingual-v3.0": 1024,
+  "embed-multilingual-light-v3.0": 384,
+  "gemini-embedding-001": 1536,
+  "text-embedding-004": 768,
+  "jina-embeddings-v3": 1024,
+  "mistral-embed": 1024,
+  "bge-m3": 1024,
+  "nomic-embed-text": 768,
 };
+
+const DIMENSION_FIELD = { name: "dimension", label: "Số chiều vector", required: true, number: true };
 
 const MODEL_FIELD = { name: "model", label: "Mô hình", required: true };
 
@@ -121,7 +159,7 @@ const FIELDS = {
         placeholder: "text-embedding-3-small",
         suggestions: ["text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002"],
       },
-      { name: "dimension", label: "Số chiều vector", required: true, number: true, placeholder: "1536" },
+      { ...DIMENSION_FIELD, placeholder: "1536" },
     ],
     "sentence-transformers": [
       {
@@ -135,7 +173,71 @@ const FIELDS = {
         ],
         hint: "Tên mô hình trên Hugging Face; máy chủ tải về ở lần khởi động đầu tiên dùng mô hình.",
       },
-      { name: "dimension", label: "Số chiều vector", required: true, number: true, placeholder: "1024" },
+      { ...DIMENSION_FIELD, placeholder: "1024" },
+    ],
+    voyage: [
+      {
+        ...MODEL_FIELD,
+        placeholder: "voyage-3.5",
+        suggestions: ["voyage-3.5", "voyage-3.5-lite", "voyage-3-large", "voyage-multilingual-2"],
+      },
+      {
+        ...DIMENSION_FIELD,
+        placeholder: "1024",
+        hint: "voyage-3.5 và voyage-3-large trả được 256, 512, 1024 hoặc 2048 chiều; voyage-multilingual-2 cố định 1024.",
+      },
+    ],
+    cohere: [
+      {
+        ...MODEL_FIELD,
+        placeholder: "embed-v4.0",
+        suggestions: ["embed-v4.0", "embed-multilingual-v3.0", "embed-multilingual-light-v3.0"],
+      },
+      {
+        ...DIMENSION_FIELD,
+        placeholder: "1536",
+        hint: "embed-v4.0 trả được 256, 512, 1024 hoặc 1536 chiều; mô hình v3 có số chiều cố định.",
+      },
+    ],
+    gemini: [
+      {
+        ...MODEL_FIELD,
+        placeholder: "gemini-embedding-001",
+        suggestions: ["gemini-embedding-001", "text-embedding-004"],
+      },
+      {
+        ...DIMENSION_FIELD,
+        placeholder: "1536",
+        hint: "gemini-embedding-001 khuyến nghị 768, 1536 hoặc 3072 chiều.",
+      },
+    ],
+    jina: [
+      {
+        ...MODEL_FIELD,
+        placeholder: "jina-embeddings-v3",
+        suggestions: ["jina-embeddings-v3"],
+      },
+      {
+        ...DIMENSION_FIELD,
+        placeholder: "1024",
+        hint: "jina-embeddings-v3 trả tối đa 1024 chiều.",
+      },
+    ],
+    openai_compatible: [
+      {
+        name: "base_url",
+        label: "Base URL",
+        required: true,
+        url: true,
+        placeholder: "http://localhost:11434/v1",
+        hint: "Địa chỉ tới trước /embeddings. Host phải nằm trong LLM_BASE_URL_ALLOWLIST.",
+      },
+      { ...MODEL_FIELD, placeholder: "bge-m3", suggestions: ["bge-m3", "nomic-embed-text", "mistral-embed"] },
+      {
+        ...DIMENSION_FIELD,
+        placeholder: "1024",
+        hint: "Đúng số chiều máy chủ trả về; hệ thống không gửi tham số số chiều tới máy chủ tương thích.",
+      },
     ],
   },
   reranker: {
@@ -172,7 +274,7 @@ const FIELDS = {
 };
 
 /**
- * Khoá API: `required` = không có khoá (kể cả khoá `.env`) thì mô hình không chạy;
+ * Khoá API: `required` = phải có khoá đã lưu hoặc nhập mới (máy chủ từ chối nếu thiếu);
  * `envFallback` = để trống thì máy chủ dùng khoá trong `.env`.
  */
 const KEY_RULES = {
@@ -182,17 +284,26 @@ const KEY_RULES = {
     azure: { envFallback: true },
     openai_compatible: { envFallback: false },
   },
-  embedding: { openai: { envFallback: true } },
+  embedding: {
+    openai: { envFallback: true },
+    voyage: { envFallback: false, required: true },
+    cohere: { envFallback: false, required: true },
+    gemini: { envFallback: false, required: true },
+    jina: { envFallback: false, required: true },
+    openai_compatible: { envFallback: false },
+  },
   reranker: { rerank_api: { envFallback: false } },
 };
 
 /** Nhà cung cấp có nút "Kiểm tra kết nối" trong hộp thoại thêm/sửa. */
 export function canTestConnection(kind, provider) {
+  if (kind === "embedding") return provider !== "sentence-transformers";
   return kind === "llm" || (kind === "reranker" && provider === "rerank_api");
 }
 
 /** Nhà cung cấp gửi nội dung đoạn tài liệu ra dịch vụ ngoài: hộp thoại ghi chú cho admin. */
 export function sendsDocumentsToService(kind, provider) {
+  if (kind === "embedding") return provider !== "sentence-transformers";
   return kind === "reranker" && provider === "rerank_api";
 }
 
@@ -260,8 +371,11 @@ export function draftFromProfile(profile) {
   return draft;
 }
 
-/** Lỗi theo tên trường; `{}` = hợp lệ. */
-export function validateDraft(kind, draft) {
+/**
+ * Lỗi theo tên trường (`apiKey` cho ô khoá); `{}` = hợp lệ.
+ * `hasStoredKey`: profile đang sửa đã có khoá của đúng nhà cung cấp này.
+ */
+export function validateDraft(kind, draft, { hasStoredKey = false } = {}) {
   const errors = {};
   providerFields(kind, draft.provider).forEach((field) => {
     const value = String(draft[field.name] ?? "").trim();
@@ -272,6 +386,9 @@ export function validateDraft(kind, draft) {
       errors[field.name] = "Phải là số nguyên dương.";
   });
   if (draft.name.trim().length > 100) errors.name = "Tối đa 100 ký tự.";
+  if (keyRule(kind, draft.provider)?.required && !draft.apiKey.trim() && !(hasStoredKey && !draft.clearApiKey)) {
+    errors.apiKey = "Nhập API key.";
+  }
   return errors;
 }
 
@@ -319,6 +436,20 @@ export function buildRerankerTestPayload(draft, profileId) {
     provider: draft.provider,
     model: trimmed(draft.model),
     base_url: trimmed(draft.base_url),
+    api_key: trimmed(draft.apiKey),
+    profile_id: profileId ?? null,
+  };
+}
+
+/** Payload POST /model-profiles/test-embedding: không nhập khoá thì máy chủ dùng khoá đã lưu của profile. */
+export function buildEmbeddingTestPayload(draft, profileId) {
+  const trimmed = (value) => String(value ?? "").trim() || null;
+  const dimension = trimmed(draft.dimension);
+  return {
+    provider: draft.provider,
+    model: trimmed(draft.model),
+    base_url: draft.provider === "openai_compatible" ? trimmed(draft.base_url) : null,
+    dimension: dimension ? Number(dimension) : null,
     api_key: trimmed(draft.apiKey),
     profile_id: profileId ?? null,
   };

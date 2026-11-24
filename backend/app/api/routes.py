@@ -63,6 +63,7 @@ from app.api.schemas import (
     TestLLMRequest,
     TestLLMResponse,
     TestModelProfileLLMRequest,
+    TestModelProfileEmbeddingRequest,
     TestModelProfileRerankerRequest,
     UpdateConfigRequest,
     UpdateMarkdownRequest,
@@ -118,7 +119,20 @@ from app.db.repositories import (
     update_dataset,
     update_message_metadata,
 )
-from app.embeddings import EmbeddingUnavailableError, embedding_runtime
+from app.embeddings import (
+    EmbeddingAPIError,
+    EmbeddingUnavailableError,
+    OpenAIEmbeddingModel,
+    embedding_runtime,
+)
+from app.embeddings.api_clients import (
+    API_PROVIDERS,
+    KEY_REQUIRED_PROVIDERS,
+    PROVIDER_LABELS,
+    QUERY_TIMEOUT_SECONDS,
+    EmbeddingAPIConfig,
+    embed_texts,
+)
 from app.generation.citations import public_citations
 from app.generation.llm import (
     _normalize_answer_citations,
@@ -637,6 +651,107 @@ def test_model_profile_reranker(
         message=f"Kết nối thành công tới Rerank API ({model}).",
         latency_ms=latency_ms,
         sample_output=f"Điểm liên quan {scores}",
+    )
+
+
+# Câu mẫu cho "Kiểm tra kết nối" embedding (nhúng như một câu hỏi).
+_EMBEDDING_TEST_TEXT = "Học phí một tín chỉ là bao nhiêu?"
+_EMBEDDING_TEST_PROVIDERS = ("openai", *API_PROVIDERS)
+_EMBEDDING_TEST_LABELS = {"openai": "OpenAI", **PROVIDER_LABELS}
+_EMBEDDING_TEST_HINTS = {
+    401: " Kiểm tra API key.",
+    403: " Kiểm tra API key.",
+    404: " Kiểm tra tên mô hình và Base URL (nhập tới trước /embeddings).",
+    429: " Dịch vụ đang giới hạn tần suất; thử lại sau.",
+}
+
+
+def _embed_test_sample(provider: str, model: str, api_key: str | None, base_url: str | None, dimension: int | None):
+    """Nhúng câu mẫu; trả về (vector, None) hoặc (None, thông báo lỗi an toàn)."""
+    label = f"{_EMBEDDING_TEST_LABELS[provider]} ({model})"
+    try:
+        if provider == "openai":
+            openai_model = OpenAIEmbeddingModel(model, api_key, dimensions=dimension)
+            openai_model.client = openai_model.client.with_options(timeout=QUERY_TIMEOUT_SECONDS, max_retries=0)
+            vectors = openai_model.embed_query([_EMBEDDING_TEST_TEXT])
+        else:
+            config = EmbeddingAPIConfig(provider, model, api_key, base_url, dimension)
+            vectors = embed_texts(config, [_EMBEDDING_TEST_TEXT], input_type="query")
+    except EmbeddingAPIError as exc:
+        return None, f"{exc.reason}{_EMBEDDING_TEST_HINTS.get(exc.status_code, '')}"
+    except EmbeddingUnavailableError as exc:
+        return None, exc.reason
+    except Exception as exc:
+        # Lỗi SDK OpenAI: chỉ dùng tên lớp và mã HTTP, chuỗi lỗi thô có thể chứa một phần khoá.
+        status_code = getattr(exc, "status_code", None)
+        detail = f"HTTP {status_code}" if isinstance(status_code, int) else type(exc).__name__
+        hint = _EMBEDDING_TEST_HINTS.get(status_code, "")
+        return None, f"Lỗi khi gọi embedding {label}: {detail}.{hint}"
+    if not vectors or not vectors[0]:
+        return None, f"Lỗi khi gọi embedding {label}: response sai định dạng."
+    return vectors[0], None
+
+
+@router.post(
+    "/model-profiles/test-embedding",
+    response_model=TestLLMResponse,
+    dependencies=[Depends(require_admin)],
+)
+def test_model_profile_embedding(
+    request: TestModelProfileEmbeddingRequest,
+    session: Session = Depends(get_config_store_session),
+) -> TestLLMResponse:
+    """Nhúng một câu mẫu bằng mô hình qua API và báo số chiều nhận được; không lưu gì."""
+    provider = request.provider.strip().lower()
+    if provider not in _EMBEDDING_TEST_PROVIDERS:
+        raise HTTPException(status_code=422, detail="Chỉ kiểm tra kết nối được cho mô hình nhúng qua API.")
+    model = (request.model or "").strip()
+    if not model:
+        raise HTTPException(status_code=422, detail="Thiếu tên mô hình.")
+    base_url = (request.base_url or "").strip() or None if provider == "openai_compatible" else None
+    if provider == "openai_compatible" and not base_url:
+        raise HTTPException(status_code=422, detail="Thiếu Base URL.")
+    try:
+        # Kiểm URL trước khi lấy khoá: khoá đã lưu không bao giờ bị gửi tới host lạ.
+        validate_llm_url(base_url)
+        api_key = model_profiles.resolve_embedding_test_key(session, provider, request.profile_id, request.api_key)
+    except model_profiles.ProfileNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ConfigValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not api_key and (provider in KEY_REQUIRED_PROVIDERS or provider == "openai"):
+        raise HTTPException(status_code=422, detail="Thiếu API key.")
+
+    start_time = time.perf_counter()
+    vector, error = _embed_test_sample(provider, model, api_key, base_url, request.dimension)
+    latency_ms = round((time.perf_counter() - start_time) * 1000, 1)
+    if vector is None:
+        return TestLLMResponse(success=False, message=error, latency_ms=latency_ms)
+
+    size = len(vector)
+    vector_dim = settings.vector_dim
+    label = f"{_EMBEDDING_TEST_LABELS[provider]} ({model})"
+    if request.dimension and size != request.dimension:
+        return TestLLMResponse(
+            success=False,
+            message=(
+                f"Kết nối được tới {label} nhưng dịch vụ trả vector {size} chiều, "
+                f"khác số chiều đã nhập ({request.dimension})."
+            ),
+            latency_ms=latency_ms,
+        )
+    if size > vector_dim:
+        return TestLLMResponse(
+            success=False,
+            message=f"Kết nối được tới {label} nhưng vector có {size} chiều, nhiều hơn VECTOR_DIM={vector_dim}.",
+            latency_ms=latency_ms,
+        )
+    padding = f"; được đệm 0 tới VECTOR_DIM={vector_dim} khi lưu" if size < vector_dim else ""
+    return TestLLMResponse(
+        success=True,
+        message=f"Kết nối thành công tới {label}.",
+        latency_ms=latency_ms,
+        sample_output=f"Vector {size} chiều{padding}.",
     )
 
 

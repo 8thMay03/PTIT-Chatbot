@@ -3,7 +3,7 @@
 - CRUD profile; API key chỉ lưu dạng bản mã, response chỉ có `has_api_key`.
 - Chọn profile LLM/reranker có hiệu lực ngay, còn sau restart; sửa profile đang dùng
   thì áp lại; không xoá được profile đang dùng.
-- Embedding: chọn chỉ lưu lựa chọn; áp lúc khởi động; số chiều phải bằng VECTOR_DIM.
+- Embedding: chọn chỉ lưu lựa chọn; áp lúc khởi động; số chiều không lớn hơn VECTOR_DIM.
   Embedder chưa chạy được thì áp ngay: tests/test_safe_embedding_startup.py.
 
 Bảng chạy trên SQLite tạm (fixture ``config_store_db`` trong conftest).

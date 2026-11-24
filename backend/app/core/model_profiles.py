@@ -10,7 +10,8 @@ profile đang được chọn (``settings.<kind>_profile_id``):
 - Embedding: embedder (``app.embeddings.embedding_runtime``) quyết định số chiều vector
   và được ghim khi đã chạy được, nên chọn/sửa profile chỉ lưu ``embedding_profile_id``;
   ``load_selected_embedding`` áp nó ở lần khởi động sau. Ngoại lệ: embedder chưa chạy
-  được (thiếu key, lỗi tải) thì áp ngay, không cần restart. Số chiều phải bằng ``VECTOR_DIM``.
+  được (thiếu key, lỗi tải) thì áp ngay, không cần restart. Số chiều không được lớn hơn
+  ``VECTOR_DIM``; ít hơn thì vector được đệm 0 (D-02).
 
 API key chỉ lưu dạng bản mã (app.core.config_crypto) và không bao giờ trả về client.
 Lỗi bất kỳ để DB và settings đang chạy như trước thao tác.
@@ -50,6 +51,11 @@ _PROVIDER_FIELDS: dict[tuple[str, str], dict[str, bool]] = {
     ("llm", "openai_compatible"): {"base_url": True, "model": True},
     ("embedding", "openai"): {"model": True, "dimension": True},
     ("embedding", "sentence-transformers"): {"model": True, "dimension": True},
+    ("embedding", "voyage"): {"model": True, "dimension": True},
+    ("embedding", "cohere"): {"model": True, "dimension": True},
+    ("embedding", "gemini"): {"model": True, "dimension": True},
+    ("embedding", "jina"): {"model": True, "dimension": True},
+    ("embedding", "openai_compatible"): {"base_url": True, "model": True, "dimension": True},
     ("reranker", "cross-encoder"): {"model": True},
     ("reranker", "rerank_api"): {"base_url": True, "model": True},
 }
@@ -57,7 +63,13 @@ PROVIDERS: dict[str, tuple[str, ...]] = {
     kind: tuple(provider for (k, provider) in _PROVIDER_FIELDS if k == kind) for kind in KINDS
 }
 # Profile được phép có API key (cross-encoder và sentence-transformers chạy cục bộ).
-_KEYED = {("llm", p) for p in PROVIDERS["llm"]} | {("embedding", "openai"), ("reranker", "rerank_api")}
+_KEYED = (
+    {("llm", p) for p in PROVIDERS["llm"]}
+    | {("embedding", p) for p in PROVIDERS["embedding"] if p != "sentence-transformers"}
+    | {("reranker", "rerank_api")}
+)
+# Profile bắt buộc có API key: embedding qua API của từng hãng không dự phòng khoá `.env` (D-04).
+_KEY_REQUIRED = {("embedding", p) for p in ("voyage", "cohere", "gemini", "jina")}
 _URL_FIELDS = ("base_url", "endpoint")
 _PARAM_FIELDS = ("base_url", "endpoint", "deployment_name", "api_version", "dimension")
 _FIELD_LABELS = {
@@ -206,7 +218,7 @@ def _active_ids() -> dict[str, str | None]:
 
 
 def _embedding_fingerprint(row: ModelProfile) -> tuple:
-    return (row.provider, row.model, row.encrypted_api_key)
+    return (row.provider, row.model, row.encrypted_api_key, tuple(sorted((row.params or {}).items())))
 
 
 def registry_state(session: Session) -> dict:
@@ -324,10 +336,10 @@ def _apply_reranker(row: ModelProfile | None) -> None:
 
 def _check_embedding_dimension(row: ModelProfile) -> None:
     dimension = (row.params or {}).get("dimension")
-    if dimension != settings.vector_dim:
+    if not isinstance(dimension, int) or dimension > settings.vector_dim:
         raise ConfigValidationError(
-            f"'{row.name}' có {dimension} chiều nhưng kho vector dùng VECTOR_DIM={settings.vector_dim}. "
-            "Đổi VECTOR_DIM và tạo lại bảng vector trước khi dùng mô hình này."
+            f"'{row.name}' có {dimension} chiều, nhiều hơn VECTOR_DIM={settings.vector_dim} của kho vector. "
+            "Chọn số chiều nhỏ hơn (nếu mô hình hỗ trợ) hoặc đổi VECTOR_DIM và tạo lại bảng vector."
         )
 
 
@@ -353,6 +365,8 @@ def create_profile(session: Session, kind: str, data: dict) -> ModelProfile:
     api_key = _clean(data.get("api_key"))
     if api_key and (kind, provider) not in _KEYED:
         raise ConfigValidationError("Mô hình chạy cục bộ này không dùng API key.")
+    if not api_key and (kind, provider) in _KEY_REQUIRED:
+        raise ConfigValidationError("Nhập API key cho mô hình này.")
     row = ModelProfile(
         id=uuid.uuid4().hex,
         kind=kind,
@@ -384,6 +398,8 @@ def update_profile(session: Session, profile_id: str, data: dict) -> ModelProfil
         encrypted = None
     else:
         encrypted = row.encrypted_api_key
+    if encrypted is None and (row.kind, provider) in _KEY_REQUIRED:
+        raise ConfigValidationError("Nhập API key cho mô hình này.")
 
     try:
         row.name = name
@@ -477,9 +493,40 @@ def resolve_reranker_test_key(session: Session, profile_id: str | None, api_key:
     return _profile_key_or_422(row)
 
 
+def resolve_embedding_test_key(
+    session: Session, provider: str, profile_id: str | None, api_key: str | None
+) -> str | None:
+    """Khoá dùng cho POST /model-profiles/test-embedding: nhập tay > khoá profile embedding
+    > khoá `.env` (chỉ provider openai, giống embedder đang chạy)."""
+    key = _clean(api_key)
+    if key:
+        return key
+    if profile_id:
+        row = _get(session, profile_id)
+        if row.kind != "embedding":
+            raise ConfigValidationError("Cấu hình này không phải mô hình nhúng.")
+        # Khoá của profile chỉ gửi tới đúng nhà cung cấp của nó.
+        key = _profile_key_or_422(row) if row.provider == provider else None
+        if key:
+            return key
+    if provider == "openai":
+        return _INITIAL_SETTINGS["embedding_api_key"] or _INITIAL_SETTINGS["openai_api_key"]
+    return None
+
+
 # ==========================================
 # Khởi động
 # ==========================================
+# Trường settings mà profile embedding đặt khi được áp.
+_EMBEDDING_SETTINGS_FIELDS = (
+    "embedding_provider",
+    "embedding_model",
+    "embedding_api_key",
+    "embedding_base_url",
+    "embedding_dimension",
+)
+
+
 def _set_running_embedding(profile_id: str | None, fingerprint: tuple | None, error: str | None = None) -> None:
     _running_embedding["profile_id"] = profile_id
     _running_embedding["fingerprint"] = fingerprint
@@ -502,8 +549,11 @@ def load_selected_embedding(session: Session) -> bool:
         logger.warning("Không thấy profile embedding đã chọn (%s); dùng embedding trong .env.", profile_id)
         _set_running_embedding(None, None, "Không tìm thấy cấu hình embedding đã chọn.")
         return False
+    params = row.params or {}
     try:
         _check_embedding_dimension(row)
+        # Allowlist có thể đã bị thu hẹp sau khi lưu profile.
+        validate_llm_url(params.get("base_url"))
         key = _decrypt_key(row)
     except (ConfigValidationError, SecretDecryptionError, SecretEncryptionUnavailable) as exc:
         logger.warning("Không dùng được embedding '%s': %s Dùng embedding trong .env.", row.name, exc)
@@ -512,15 +562,16 @@ def load_selected_embedding(session: Session) -> bool:
 
     from app.embeddings import EmbeddingUnavailableError, embedding_runtime
 
-    previous = (settings.embedding_provider, settings.embedding_model, settings.embedding_api_key)
-    settings.embedding_provider = row.provider
-    settings.embedding_model = row.model
-    settings.embedding_api_key = key
+    previous = tuple(getattr(settings, field) for field in _EMBEDDING_SETTINGS_FIELDS)
+    values = (row.provider, row.model, key, params.get("base_url"), params.get("dimension"))
+    for field, value in zip(_EMBEDDING_SETTINGS_FIELDS, values):
+        setattr(settings, field, value)
     try:
         embedding_runtime.load()
     except EmbeddingUnavailableError as exc:
         # `reason` không chứa chuỗi lỗi thô của SDK nên an toàn để ghi log và hiện cho admin.
-        settings.embedding_provider, settings.embedding_model, settings.embedding_api_key = previous
+        for field, value in zip(_EMBEDDING_SETTINGS_FIELDS, previous):
+            setattr(settings, field, value)
         logger.warning("Không tạo được embedding '%s' (%s); dùng embedding trong .env.", row.name, exc.reason)
         _set_running_embedding(None, None, exc.reason)
         return False

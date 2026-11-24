@@ -234,7 +234,7 @@ def dump_locators(dataset_path: Path, top_k: int, cache_file: Path, limit: int |
     embedding_model = CachedEmbeddingModel(inner, settings.embedding_provider, model_name, cache_file)
     warm_texts = warm_cache_texts("full", [case["question"] for case in cases])
     if warm_texts:
-        embedding_model.embed(warm_texts)
+        embedding_model.embed_query(warm_texts)
     retrieval_fn = build_retrieval_fn("full", top_k, embedding_model)
 
     results: list[dict] = []
