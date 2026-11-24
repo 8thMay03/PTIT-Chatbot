@@ -325,8 +325,9 @@
   animation: mdl-dialog-fade var(--duration) var(--ease);
 }
 
-/* inset 0 + margin auto + height fit-content: căn giữa cả hai chiều, cao theo nội
-   dung, quá cao thì phần thân tự cuộn. */
+/* inset 0 + margin auto: căn giữa cả hai chiều. Kích thước cố định để hộp thoại không
+   co giãn khi đổi nhà cung cấp (mỗi nhà cung cấp có số trường khác nhau); nội dung
+   dài hơn thì phần thân tự cuộn. */
 .mdl-dialog {
   position: fixed;
   inset: 0;
@@ -334,8 +335,7 @@
   display: flex;
   flex-direction: column;
   width: min(640px, calc(100% - 32px));
-  height: fit-content;
-  max-height: calc(100dvh - 48px);
+  height: min(800px, calc(100dvh - 48px));
   margin: auto;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -426,6 +426,8 @@
   min-height: 0;
   padding: 18px 20px 24px;
   overflow-y: auto;
+  /* Chừa chỗ thanh cuộn sẵn: nội dung không bị hẹp lại khi bắt đầu phải cuộn. */
+  scrollbar-gutter: stable;
 }
 
 .mdl-dialog-foot {
