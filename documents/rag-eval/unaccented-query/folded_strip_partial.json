@@ -1,9 +1,9 @@
 {
  "schema_version": 3,
- "created_at": "2026-11-25T22:00:12+07:00",
- "elapsed_seconds": 15.61,
+ "created_at": "2026-11-25T22:37:45+07:00",
+ "elapsed_seconds": 14.906,
  "git": {
-  "commit": "bb80179c68e5c02234fa6cec8db61552c86022fa",
+  "commit": "2bcdc842cb834000e6c668bf844c052032d52599",
   "branch": "feat/unaccented-query-retrieval",
   "dirty": true
  },
@@ -744,7 +744,7 @@
     "reason": "disabled",
     "text": "So dien thoại liên he cơ sở TP. Hồ Chi Minh la gì?",
     "llm_output": "",
-    "elapsed_ms": 0.2
+    "elapsed_ms": 0.0
    },
    "gate": {
     "strong": true,
@@ -1074,7 +1074,7 @@
     "reason": "disabled",
     "text": "4 đơn vi thành viên ban dau thuoc tập doan nào?",
     "llm_output": "",
-    "elapsed_ms": 0.1
+    "elapsed_ms": 0.0
    },
    "gate": {
     "strong": true,
@@ -21435,7 +21435,7 @@
      "elapsed_ms": {
       "median": 0.0,
       "p95": 0.0,
-      "max": 0.2
+      "max": 0.0
      }
     }
    },
@@ -21481,7 +21481,7 @@
      "elapsed_ms": {
       "median": 0.0,
       "p95": 0.0,
-      "max": 0.2
+      "max": 0.0
      }
     }
    },

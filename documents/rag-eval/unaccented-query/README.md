@@ -104,7 +104,7 @@ python -m scripts.eval_retrieval --mode <bm25|vector|hybrid> --dataset tests/fix
 - `HYBRID_FOLDED_VECTOR_WEIGHT=0.3`: trọng số vector trong RRF cho câu gõ thiếu dấu (câu có dấu giữ `HYBRID_VECTOR_WEIGHT`, máy đo: 0.80).
 - Gate: `bm25_folded_norm ≥ RETRIEVAL_MIN_BM25_FOLDED_NORM_SCORE` (mặc định **0.40**) thì đạt tín hiệu từ khóa và không xét `vector`; ngược lại như cũ (`bm25_norm ≥ 0.25` và cosine ≥ 0.37). Ngưỡng rerank (nếu có) vẫn áp dụng.
 
-Thời điểm đo: 2026-11-25, 21:59 – 22:00 (+07:00), git `bb80179` + working tree S-03 (`dirty=true`), cùng corpus 993 chunk, cùng cấu hình và lệnh như mục Cấu hình (không `--set` thêm; `folded_strip_all.json` có `--sweep`).
+Thời điểm đo: 2026-11-25, 22:37 – 22:38 (+07:00), git `2bcdc84` (mã S-05; `dirty=true` chỉ vì `.agents/.../review.md` của reviewer đang sửa, không có thay đổi mã), cùng corpus 993 chunk, cùng cấu hình và lệnh như mục Cấu hình (không `--set` thêm; `folded_strip_all.json` có `--sweep`). Lượt đo đầu (21:59, `bb80179` + working tree S-03) cho kết quả giống từng câu ở cả 4 bộ.
 
 ### Kết quả (`ptit_rag_300`, n=300)
 
