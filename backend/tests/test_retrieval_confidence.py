@@ -16,6 +16,7 @@ def _thresholds(
     vector: float | None = 0.37,
     rerank: float | None = None,
     vector_source: str = "calibrated",
+    folded: float | None = 0.40,
 ) -> GateThresholds:
     return GateThresholds(
         min_bm25_norm_score=bm25_norm,
@@ -24,6 +25,7 @@ def _thresholds(
         embedding_model="text-embedding-3-small",
         vector_source=vector_source,
         rerank_source="calibrated" if rerank is not None else "not_applicable",
+        min_bm25_folded_norm_score=folded,
     )
 
 
@@ -35,6 +37,7 @@ def gate_settings(monkeypatch):
     monkeypatch.setattr(target, "retrieval_min_vector_score", None)
     monkeypatch.setattr(target, "retrieval_min_bm25_norm_score", 0.25)
     monkeypatch.setattr(target, "retrieval_min_rerank_score", None)
+    monkeypatch.setattr(target, "retrieval_min_bm25_folded_norm_score", 0.40)
     monkeypatch.setattr(target, "reranker_enabled", True)
     monkeypatch.setattr(target, "reranker_provider", "heuristic")
     monkeypatch.setattr(target, "reranker_model", "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1")
@@ -53,7 +56,7 @@ def test_passes_when_every_signal_clears_its_threshold() -> None:
     assert decision.strong
     assert decision.reason == "passed"
     # Tín hiệu top-1 = max trên các context.
-    assert decision.signals == {"vector": 0.62, "bm25_norm": 0.41, "rerank": 3.2}
+    assert decision.signals == {"vector": 0.62, "bm25_norm": 0.41, "bm25_folded_norm": None, "rerank": 3.2}
 
 
 @pytest.mark.parametrize(
@@ -90,12 +93,57 @@ def test_unused_signals_are_ignored() -> None:
     assert decision.reason == "passed_uncalibrated_model"
 
 
+def test_folded_signal_passes_keyword_check_without_vector() -> None:
+    # Câu gõ thiếu dấu: bm25_norm thấp, chunk đứng đầu nhờ BM25 bỏ dấu không có điểm vector.
+    contexts = [
+        {"vector_score": None, "bm25_norm_score": 0.05, "bm25_folded_norm_score": 0.52},
+        {"vector_score": 0.30, "bm25_norm_score": None, "bm25_folded_norm_score": None},
+    ]
+
+    decision = assess_context(contexts, _thresholds())
+
+    assert decision.strong
+    assert decision.reason == "passed"
+    assert decision.signals["bm25_folded_norm"] == 0.52
+
+
+def test_folded_signal_below_threshold_fails_on_bm25_norm() -> None:
+    contexts = [{"vector_score": 0.6, "bm25_norm_score": 0.05, "bm25_folded_norm_score": 0.39}]
+
+    decision = assess_context(contexts, _thresholds())
+
+    assert not decision.strong
+    assert decision.reason == "below_bm25_norm"
+
+
+def test_folded_signal_ignored_when_threshold_disabled() -> None:
+    contexts = [{"vector_score": 0.6, "bm25_norm_score": 0.05, "bm25_folded_norm_score": 0.9}]
+
+    assert assess_context(contexts, _thresholds(folded=None)).reason == "below_bm25_norm"
+
+
+def test_folded_path_still_checks_rerank() -> None:
+    contexts = [{"bm25_norm_score": 0.05, "bm25_folded_norm_score": 0.6, "rerank_score": -3.0}]
+
+    decision = assess_context(contexts, _thresholds(rerank=-1.65))
+
+    assert not decision.strong
+    assert decision.reason == "below_rerank"
+
+
+def test_folded_threshold_comes_from_settings(gate_settings) -> None:
+    assert thresholds_from_settings().min_bm25_folded_norm_score == 0.40
+
+    gate_settings.retrieval_min_bm25_folded_norm_score = None
+    assert thresholds_from_settings().min_bm25_folded_norm_score is None
+
+
 def test_empty_context_is_weak() -> None:
     decision = assess_context([], _thresholds())
 
     assert not decision.strong
     assert decision.reason == "no_context"
-    assert decision.signals == {"vector": None, "bm25_norm": None, "rerank": None}
+    assert decision.signals == {"vector": None, "bm25_norm": None, "bm25_folded_norm": None, "rerank": None}
 
 
 def test_thresholds_use_calibrated_table_for_known_model(gate_settings) -> None:

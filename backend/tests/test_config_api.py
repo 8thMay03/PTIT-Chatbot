@@ -238,6 +238,7 @@ def calibrated_gate(monkeypatch):
     monkeypatch.setattr(settings, "retrieval_min_vector_score", None)
     monkeypatch.setattr(settings, "retrieval_min_bm25_norm_score", 0.25)
     monkeypatch.setattr(settings, "retrieval_min_bm25_score", 2.0)
+    monkeypatch.setattr(settings, "retrieval_min_bm25_folded_norm_score", 0.40)
 
 
 def test_get_config_reports_effective_gate_thresholds(calibrated_gate) -> None:
@@ -248,6 +249,7 @@ def test_get_config_reports_effective_gate_thresholds(calibrated_gate) -> None:
     assert guardrails["min_vector_score"] == VECTOR_THRESHOLDS["text-embedding-3-small"]
     assert guardrails["vector_threshold_source"] == "calibrated"
     assert guardrails["min_bm25_norm_score"] == 0.25
+    assert guardrails["min_bm25_folded_norm_score"] == 0.40
     # Trường cũ vẫn có cho UI hiện tại.
     assert guardrails["min_bm25_score"] == 2.0
 
@@ -283,6 +285,26 @@ def test_update_bm25_norm_threshold_and_raw_bm25_stays_accepted(calibrated_gate)
     assert guardrails["min_bm25_score"] == 7.5
     assert guardrails["min_vector_score"] == 0.55
     assert guardrails["vector_threshold_source"] == "override"
+
+
+def test_update_folded_bm25_threshold_is_clamped_and_null_restores_env(calibrated_gate, monkeypatch) -> None:
+    from app.core.config import _INITIAL_SETTINGS
+
+    monkeypatch.setitem(_INITIAL_SETTINGS, "retrieval_min_bm25_folded_norm_score", 0.40)
+    response = client.put("/api/config", json={"guardrails": {"min_bm25_folded_norm_score": 0.45}})
+    assert response.json()["guardrails"]["min_bm25_folded_norm_score"] == 0.45
+
+    response = client.put("/api/config", json={"guardrails": {"min_bm25_folded_norm_score": 1.7}})
+    assert response.json()["guardrails"]["min_bm25_folded_norm_score"] == 1.0
+
+    response = client.put("/api/config", json={"guardrails": {"min_bm25_folded_norm_score": -0.2}})
+    assert response.json()["guardrails"]["min_bm25_folded_norm_score"] == 0.0
+
+    # Bỏ trường thì giữ nguyên; null thì về giá trị `.env`.
+    response = client.put("/api/config", json={"guardrails": {"min_bm25_norm_score": 0.25}})
+    assert response.json()["guardrails"]["min_bm25_folded_norm_score"] == 0.0
+    response = client.put("/api/config", json={"guardrails": {"min_bm25_folded_norm_score": None}})
+    assert response.json()["guardrails"]["min_bm25_folded_norm_score"] == 0.40
 
 
 def test_null_vector_threshold_clears_override(calibrated_gate, monkeypatch) -> None:

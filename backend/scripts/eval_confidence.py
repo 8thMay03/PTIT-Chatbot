@@ -17,8 +17,9 @@ hybrid, rerank theo cấu hình; không gọi LLM) rồi ghi cho từng câu:
         --set reranker_provider=heuristic --sweep
 
 Bước sửa câu bằng LLM (``--set query_correction_enabled=true``) chạy trước rewrite như trong
-app; câu đã sửa được kiểm ``check_scope`` lần hai. ``--perturb strip_all|typo --seed N`` đo
-trên biến thể câu hỏi sinh lúc chạy (``scripts.typo_variants``), không ghi fixture mới.
+app; câu đã sửa được kiểm ``check_scope`` lần hai. ``--perturb strip_all|strip_partial|typo
+--seed N`` đo trên biến thể câu hỏi sinh lúc chạy (``scripts.typo_variants``), không ghi
+fixture mới.
 Báo cáo thêm ``summary.correction``: số câu sửa, số câu bị bỏ theo điều kiện kiểm tra đầu ra,
 thời gian sửa câu (median, p95), qua gate và hit@4 theo bộ và theo loại lỗi gõ.
 """
@@ -52,12 +53,14 @@ FIXTURES = BACKEND_DIR / "tests" / "fixtures"
 DEFAULT_ANSWERABLE = (FIXTURES / "ptit_rag_300.json", FIXTURES / "ptit_ragas_100.json")
 DEFAULT_UNANSWERABLE = FIXTURES / "ptit_no_answer_56.json"
 # v2: câu hỏi có thể là biến thể lỗi (`original_question`, `perturbations`), thêm `correction`.
-SCHEMA_VERSION = 2
-SIGNALS = ("vector", "bm25", "bm25_norm", "rerank")
+# v3: tín hiệu `bm25_folded_norm` (BM25 chỉ mục bỏ dấu), `bm25_index` của context top-1.
+SCHEMA_VERSION = 3
+SIGNALS = ("vector", "bm25", "bm25_norm", "bm25_folded_norm", "rerank")
 SIGNAL_FIELDS = {
     "vector": "vector_score",
     "bm25": "bm25_score",
     "bm25_norm": "bm25_norm_score",
+    "bm25_folded_norm": "bm25_folded_norm_score",
     "rerank": "rerank_score",
 }
 PERCENTILES = (5, 10, 25, 50, 75, 90, 95)
@@ -65,7 +68,13 @@ HIT_K = 4
 # Ràng buộc chọn ngưỡng: từ chối nhầm trên golden set chính không quá mức này.
 MAX_FALSE_REFUSAL = 0.05
 PRIMARY_DATASET = "ptit_rag_300"
-EXTRA_CONFIG_FIELDS = ("embedding_provider", "embedding_model", "retrieval_min_bm25_norm_score")
+EXTRA_CONFIG_FIELDS = (
+    "embedding_provider",
+    "embedding_model",
+    "retrieval_min_bm25_norm_score",
+    "retrieval_min_bm25_folded_norm_score",
+    "hybrid_folded_vector_weight",
+)
 # reason của bước sửa câu bị bỏ do kiểm tra đầu ra, theo điều kiện trong task.
 REJECTION_CONDITIONS = {"too_different": 1, "protected_token_changed": 2, "invalid_output": 3}
 
@@ -137,6 +146,13 @@ RULES: dict[str, tuple[RuleFn, dict[str, list[float]]]] = {
     "rerank": (
         lambda s, p: _value(s, "rerank") >= p["rerank"],
         {"rerank": _frange(-10.0, 10.0, 0.1)},
+    ),
+    # Luật gate đang cài khi không có rerank: bm25_folded_norm (chỉ có với câu gõ thiếu dấu)
+    # vượt ngưỡng thì đạt, ngược lại cần bm25_norm và sàn cosine (text-embedding-3-small).
+    "bm25_or_folded": (
+        lambda s, p: _value(s, "bm25_folded_norm") >= p["bm25_folded_norm"]
+        or (_value(s, "bm25_norm") >= p["bm25_norm"] and _value(s, "vector") >= p["vector"]),
+        {"vector": [0.37], "bm25_norm": _frange(0.20, 0.30, 0.01), "bm25_folded_norm": _frange(0.0, 0.90, 0.01)},
     ),
     # Luật gate đang cài khi reranker là cross-encoder (bỏ sàn cosine vì không đổi kết quả).
     "rerank_and_norm": (
@@ -258,6 +274,7 @@ def sweep_rule(
         "weighted": ("vector", "bm25_norm"),
         "rerank": ("rerank",),
         "rerank_and_norm": ("rerank", "bm25_norm"),
+        "bm25_or_folded": ("bm25_folded_norm",),
     }[rule]
     if not any(record["signals"].get(name) is not None for record in records for name in signal_names):
         return {"rule": rule, "available": False}
@@ -523,6 +540,7 @@ def run(
             "scope_stage": scope_stage,
             "signals": signals,
             "first_hit_rank": rank,
+            "bm25_index": contexts[0].get("bm25_index") if contexts else None,
             "gate_legacy": legacy_gate(signals, legacy_min_vector, settings.retrieval_min_bm25_score),
             "retrieved": [
                 {
@@ -562,7 +580,7 @@ def run(
             "cache_misses": embedding.cache_misses,
         },
         "reranker": {"enabled": settings.reranker_enabled, "provider": settings.reranker_provider},
-        "perturb": {"mode": perturb, "seed": seed if perturb == "typo" else None},
+        "perturb": {"mode": perturb, "seed": seed if perturb in ("typo", "strip_partial") else None},
         "llm": llm_snapshot() if settings.query_correction_enabled else None,
         "corpus": snapshot_corpus(),
         "config": config,
@@ -639,7 +657,7 @@ def print_report(report: dict, summary: dict) -> None:
             values = " / ".join(_fmt(stats[f"p{q}"]) for q in (5, 25, 50, 75, 95))
             print(f"    {name:<10} {values}   thiếu {stats['missing']}")
 
-    for name, lower, upper in (("vector", 0.0, 0.8), ("bm25_norm", 0.0, 1.0)):
+    for name, lower, upper in (("vector", 0.0, 0.8), ("bm25_norm", 0.0, 1.0), ("bm25_folded_norm", 0.0, 1.0)):
         print(f"\nHistogram {name}:")
         answerable = [r["signals"][name] for r in report["cases"] if r["answerable"] and r["signals"][name] is not None]
         unanswerable = [

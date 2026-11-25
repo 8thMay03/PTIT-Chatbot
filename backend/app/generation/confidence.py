@@ -1,9 +1,15 @@
 """Confidence gate: quyết định context truy xuất có đủ mạnh để gọi LLM hay không (RAG-18).
 
-Gate đạt khi **mọi** tín hiệu đã hiệu chỉnh đều vượt ngưỡng; tín hiệu top-1 là max
-trên các context sau rerank:
+Gate đạt khi **mọi** tín hiệu đang dùng đều vượt ngưỡng, trong đó tín hiệu từ khóa đạt bằng
+``bm25_norm`` hoặc ``bm25_folded_norm`` (đạt bằng ``bm25_folded_norm`` thì không xét ``vector``);
+tín hiệu top-1 là max trên các context sau rerank:
 
 - ``bm25_norm`` (BM25 chuẩn hóa [0, 1], không phụ thuộc kích thước kho): luôn dùng.
+- ``bm25_folded_norm`` (BM25 chuẩn hóa trên chỉ mục bỏ dấu, chỉ có với câu gõ thiếu dấu,
+  xem ``app.retrieval.bm25``): câu không đạt ``bm25_norm`` vẫn qua tín hiệu từ khóa khi giá
+  trị này vượt ``min_bm25_folded_norm_score``. Khi đó không xét ``vector``: cosine của câu
+  không dấu thấp hơn và trả chunk sai (ngưỡng hiệu chỉnh trên câu có dấu), còn chunk đứng đầu
+  nhờ BM25 thường không có điểm vector. Ngưỡng đo ở ``documents/rag-eval/unaccented-query/``.
 - ``vector`` (cosine): thang đo khác nhau giữa các embedding model nên ngưỡng gắn với
   tên model (``VECTOR_THRESHOLDS``). Model chưa hiệu chỉnh và không có ghi đè thì bỏ
   tín hiệu này, kèm cảnh báo, thay vì âm thầm dùng ngưỡng của model khác.
@@ -53,6 +59,7 @@ class GateThresholds:
     embedding_model: str
     vector_source: str  # calibrated | override | uncalibrated
     rerank_source: str  # calibrated | override | uncalibrated | not_applicable
+    min_bm25_folded_norm_score: float | None = None
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -116,11 +123,19 @@ def thresholds_from_settings() -> GateThresholds:
         embedding_model=model,
         vector_source=vector_source,
         rerank_source=rerank_source,
+        min_bm25_folded_norm_score=(
+            float(settings.retrieval_min_bm25_folded_norm_score)
+            if settings.retrieval_min_bm25_folded_norm_score is not None
+            else None
+        ),
     )
 
 
 def assess_context(contexts: list[dict], thresholds: GateThresholds) -> ConfidenceDecision:
     """Gate đạt khi mọi tín hiệu đang dùng đều vượt ngưỡng; thiếu tín hiệu tính là không đạt.
+
+    Tín hiệu từ khóa đạt khi ``bm25_norm`` hoặc ``bm25_folded_norm`` vượt ngưỡng; khi
+    ``bm25_folded_norm`` đạt thì không xét ``bm25_norm`` và ``vector``.
 
     ``reason`` khi không đạt nêu tín hiệu đầu tiên trượt (``no_context``,
     ``below_bm25_norm``, ``below_vector``, ``below_rerank``); khi đạt là ``passed`` hoặc
@@ -129,14 +144,19 @@ def assess_context(contexts: list[dict], thresholds: GateThresholds) -> Confiden
     signals = {
         "vector": _top(contexts, "vector_score"),
         "bm25_norm": _top(contexts, "bm25_norm_score"),
+        "bm25_folded_norm": _top(contexts, "bm25_folded_norm_score"),
         "rerank": _top(contexts, "rerank_score"),
     }
     if not contexts:
         return ConfidenceDecision(False, "no_context", signals)
 
+    # Chỉ câu gõ thiếu dấu mới có bm25_folded_norm; với câu đó vector không đáng tin nên
+    # không được phủ quyết khi tín hiệu bỏ dấu đã đạt.
+    min_folded = thresholds.min_bm25_folded_norm_score
+    folded_path = min_folded is not None and _reaches(signals["bm25_folded_norm"], min_folded)
     checks = (
-        ("bm25_norm", thresholds.min_bm25_norm_score),
-        ("vector", thresholds.min_vector_score),
+        ("bm25_norm", None if folded_path else thresholds.min_bm25_norm_score),
+        ("vector", None if folded_path else thresholds.min_vector_score),
         ("rerank", thresholds.min_rerank_score),
     )
     for name, minimum in checks:
@@ -148,6 +168,10 @@ def assess_context(contexts: list[dict], thresholds: GateThresholds) -> Confiden
 
     reason = "passed_uncalibrated_model" if thresholds.vector_source == "uncalibrated" else "passed"
     return ConfidenceDecision(True, reason, signals)
+
+
+def _reaches(value: float | None, minimum: float) -> bool:
+    return value is not None and value >= minimum
 
 
 def _top(contexts: list[dict], field: str) -> float | None:

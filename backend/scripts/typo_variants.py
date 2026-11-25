@@ -10,6 +10,9 @@ Hàm thuần, chỉ dùng ``random.Random`` truyền vào nên cùng seed cho c�
 - ``merge_words``: dính hai chữ liền nhau (``học phí`` → ``họcphí``).
 - ``drop_punct``: bỏ dấu câu.
 
+Chế độ ``strip_partial`` của :func:`perturb_question` chỉ áp lỗi ``strip_partial`` (bỏ dấu một
+nửa số chữ có dấu), rng theo (seed, id) như bộ lỗi gõ.
+
 Bộ lỗi gõ (:func:`make_typo_variant`): mỗi câu 1–3 loại lỗi khác nhau (trừ ``strip_all``),
 chọn trong các loại áp dụng được, ghi lại loại đã áp dụng. Chữ có chữ số hoặc viết hoa toàn bộ
 (``INT1340``, ``QLDT``) không bị gây lỗi: bộ sửa câu bắt giữ nguyên văn các chữ này.
@@ -23,7 +26,7 @@ import unicodedata
 
 from app.guardrails.normalization import strip_accents
 
-PERTURB_MODES = ("none", "strip_all", "typo")
+PERTURB_MODES = ("none", "strip_all", "strip_partial", "typo")
 TYPO_TYPES = ("wrong_tone", "telex_leftover", "strip_partial", "char_noise", "merge_words", "drop_punct")
 
 # Dấu thanh dạng tổ hợp (NFD) và phím Telex tương ứng.
@@ -234,6 +237,10 @@ def perturb_question(text: str, mode: str, seed: int, case_id: str) -> tuple[str
         return text, []
     if mode == "strip_all":
         return strip_all(text), ["strip_all"]
+    if mode == "strip_partial":
+        # Câu có dưới hai chữ có dấu không bỏ dấu một phần được: giữ nguyên, ``applied`` rỗng.
+        variant = strip_partial(text, random.Random(f"{seed}:{case_id}"))
+        return (variant, ["strip_partial"]) if variant is not None else (text, [])
     if mode == "typo":
         return make_typo_variant(text, random.Random(f"{seed}:{case_id}"))
     raise ValueError(f"perturb mode không hợp lệ: {mode!r}")
