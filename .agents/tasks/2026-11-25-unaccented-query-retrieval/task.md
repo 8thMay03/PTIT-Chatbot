@@ -5,7 +5,7 @@
 - Coordinator: `agent-backend`
 - Người yêu cầu: user
 - Tạo lúc: `2026-11-25T21:08:20+07:00`
-- Cập nhật lúc: `2026-11-25T21:30:00+07:00`
+- Cập nhật lúc: `2026-11-25T22:02:09+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -66,9 +66,11 @@ Các số đo dưới đây chạy với `QUERY_CORRECTION_ENABLED=false` và c�
 
 - Tóm tắt: S-01 xong trên nhánh `feat/unaccented-query-retrieval` (tách từ `dev` tại `b8c2ff3`): thêm chế độ đo `strip_partial`, số đo nền ở `documents/rag-eval/unaccented-query/`. Corpus hiện tại 993 chunk, khác bảng số ở mục đầu (1017 chunk); dùng số trong README mới làm mốc. Chưa sửa mã ứng dụng.
 - Blocker: không có.
-- Bước tiếp theo: `agent-backend` làm S-03. S-02 xong: BM25 riêng với câu bỏ dấu hit@4 46 → 240, nhưng hybrid chỉ 64 → 93 do nhánh vector; S-03 phải xử lý trọng số vector cho câu bỏ dấu.
+- S-03 xong (`documents/rag-eval/unaccented-query/README.md` mục "Sau S-03"): bỏ dấu qua gate 0 → 258/300, hit@4 50 → 236; bỏ dấu một phần 10 → 254, hit@4 173 → 234; câu có dấu không đổi. AC-04 lệch: 1 câu `out_of_domain` bỏ dấu lọt gate, câu không đáp án trong miền 21 (mốc 20); AC-05 lệch: 254/300 (mục tiêu 255).
+- Bước tiếp theo: user quyết định (1) chấp nhận ngưỡng 0.40 và nới AC-04/AC-05 theo số đo, hoặc làm S-04; (2) có thêm cập nhật `frontend/src/lib/gateDecision.js` vào phạm vi không. Sau đó `agent-backend` làm S-04 (nếu chọn) và S-05.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
+- 2026-11-25T22:02:09+07:00 — agent-backend: S-03 xong; AC-04 và AC-05 chưa đạt ở ngưỡng chọn (0.40), không có ngưỡng nào đạt đồng thời AC-03 và AC-04 (README). Chưa đổi tiêu chí: chờ user.
 - 2026-11-25T21:30:00+07:00 — agent-backend: user duyệt kế hoạch; tạo nhánh, chuyển `in_progress`. Baseline mới: bỏ dấu 0/300 qua gate, hit@4 50; bỏ dấu một phần 10/300, hit@4 173; câu không đáp án trong miền có dấu qua gate 20 (mốc AC-04).
 - 2026-11-25T21:08:20+07:00 — agent-backend: tạo task từ phát hiện N1. Ghi nhận lỗi đã có số đo ở task query-correction (không phải "chưa từng đo"); phần chưa có là cách sửa không phụ thuộc LLM và bộ đo `strip_partial` riêng.

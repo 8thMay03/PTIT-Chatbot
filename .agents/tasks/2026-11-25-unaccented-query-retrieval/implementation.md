@@ -2,7 +2,7 @@
 
 ## Tổng quan triển khai
 
-Nhánh `feat/unaccented-query-retrieval` (tách từ `dev` tại `b8c2ff3`). S-01, S-02 xong; S-03 … S-05 chưa bắt đầu. Gate chưa đổi nên câu không dấu vẫn trượt gate.
+Nhánh `feat/unaccented-query-retrieval` (tách từ `dev` tại `b8c2ff3`). S-01, S-02, S-03 xong. S-04 chờ quyết định; S-05 chưa bắt đầu.
 
 ## Nhật ký theo nhiệm vụ
 
@@ -44,6 +44,22 @@ Nhánh `feat/unaccented-query-retrieval` (tách từ `dev` tại `b8c2ff3`). S-0
 - Nhận định cho S-03: BM25 bỏ dấu gần bằng bản có dấu, nhưng RRF với `hybrid_vector_weight=0.8` để nhánh vector (sai với câu bỏ dấu) quyết định thứ hạng. S-03 cần đo giảm trọng số vector khi `bm25_index == folded` trước khi chọn ngưỡng; S-04 vẫn có thể cần.
 - Kiểm tra đã chạy: `pytest` backend toàn bộ `1695 passed, 24 skipped`; test retrieval liên quan `48 passed`.
 - Còn lại/blocker: không có.
+
+### S-03 — agent-backend
+
+- Cập nhật lúc: `2026-11-25T22:02:09+07:00`.
+- Đã làm:
+  - `retrieval/bm25.py`: thay quy tắc chọn chỉ mục của S-02. Chỉ mục bỏ dấu dùng khi câu **gõ thiếu dấu**: có chữ không dấu không nằm trong từ vựng chỉ mục có dấu nhưng nằm trong từ vựng chỉ mục bỏ dấu (`_missing_accents`). Lý do: quy tắc cũ đổi chunk của 13 câu có dấu khớp yếu và sẽ đưa tín hiệu bỏ dấu tới câu có dấu (mở gate cho câu không đáp án có dấu); quy tắc mới giữ 375/376 câu có dấu y như baseline (câu còn lại: `la` trong "đô la").
+  - `retrieval/retriever.py`: `_vector_weight`: BM25 xếp theo chỉ mục bỏ dấu thì RRF dùng `settings.hybrid_folded_vector_weight` (mặc định 0.3; để trống = `hybrid_vector_weight`).
+  - `generation/confidence.py`: `GateThresholds.min_bm25_folded_norm_score` (mặc định 0.40, `None` = tắt); `signals.bm25_folded_norm`; `bm25_folded_norm ≥` ngưỡng thì bỏ qua kiểm tra `bm25_norm` và `vector`, rerank vẫn xét; `reason` giữ mã cũ.
+  - `core/config.py`: `HYBRID_FOLDED_VECTOR_WEIGHT`, `RETRIEVAL_MIN_BM25_FOLDED_NORM_SCORE` (để trống = `None`); snapshot `guardrails.min_bm25_folded_norm_score`; áp dụng runtime config (kẹp [0, 1]). `config_store.py`: lưu `retrieval_min_bm25_folded_norm_score`. `api/schemas.py`: trường mới trong payload/cập nhật guardrails. `HYBRID_FOLDED_VECTOR_WEIGHT` chỉ qua env (không thêm runtime config/UI).
+  - `scripts/eval_confidence.py`: schema v3, tín hiệu `bm25_folded_norm`, `cases[].bm25_index`, histogram, luật sweep `bm25_or_folded` khớp gate mới.
+  - `.env.example`: hai biến mới.
+  - Test: `test_retrieval_confidence.py` (+5: nhánh bỏ dấu không cần vector, dưới ngưỡng, tắt ngưỡng, vẫn xét rerank, ngưỡng từ settings), `test_config_api.py` (+1, GET có trường mới), `test_config_persistence.py` (+1), `test_bm25_folded.py` (đổi 2 test theo quy tắc mới, +2: câu có dấu khớp yếu giữ chỉ mục có dấu, chữ không dấu có sẵn trong kho không kích hoạt; +1 `_vector_weight`), `test_eval_confidence.py` (tín hiệu mới), `test_bm25_normalized.py` (bỏ chỉnh ngưỡng tạm của S-02).
+- Số đo: `documents/rag-eval/unaccented-query/folded_*.json` + README mục "Sau S-03". Lưới trọng số {0.8, 0.5, 0.3, 0.0} × 4 biến thể ở `backend/storage/eval/unaccented-query/s03_*.json` (không commit).
+- Quyết định: trọng số 0.3, ngưỡng 0.40 (bảng đánh đổi trong README). Theo luật trong plan, hit@4 bỏ dấu 236 ≥ 224 nên S-04 bị hủy, nhưng AC-04/AC-05 chưa đạt nên để user quyết định.
+- Kiểm tra đã chạy: `pytest` backend toàn bộ `1704 passed, 24 skipped`.
+- Còn lại/blocker: chờ user quyết định AC-04/AC-05/S-04 và phạm vi frontend `gateDecision.js`. `rag_chain._debug_chunk` chưa có `bm25_folded_norm_score`/`bm25_index` (S-05); `retrieval_debug.confidence.signals` đã có `bm25_folded_norm` qua `assess_context`.
 
 ## Trao đổi giữa agents
 

@@ -45,7 +45,7 @@ Bật LLM sửa câu theo mặc định hoặc chỉ cho câu không dấu là h
 ### S-03 — Hiệu chỉnh ngưỡng và cập nhật gate
 
 - Agent: `agent-backend`
-- Trạng thái: `todo`
+- Trạng thái: `done` (2026-11-25, xem `implementation.md` S-03; AC-04/AC-05 chưa đạt, chờ user quyết định)
 - Mục tiêu: gate dùng được tín hiệu bỏ dấu với ngưỡng đã đo, không mở cho câu không đáp án; phục vụ `AC-03`, `AC-04`, `AC-07`.
 - Việc cần làm:
   - Đo phân bố `bm25_folded_norm_score` top-1 trên `ptit_rag_300`/`ptit_faq` (`strip_all`, `strip_partial`) và `ptit_no_answer_56` (`none`, `strip_all`) bằng `eval_confidence --sweep` (bổ sung sweep cho trường mới nếu chưa có). Chọn `RETRIEVAL_MIN_BM25_FOLDED_NORM_SCORE` theo cùng cách RAG-18: không cho thêm câu `near_miss`/`in_domain_missing` qua so với bản có dấu.
@@ -53,7 +53,7 @@ Bật LLM sửa câu theo mặc định hoặc chỉ cho câu không dấu là h
   - Điểm quyết định: nếu đo cho thấy cho phép tín hiệu bỏ dấu với **câu có dấu** làm tăng câu không đáp án qua gate (vi phạm AC-02), giới hạn tín hiệu bỏ dấu cho câu được S-02 xếp theo chỉ mục bỏ dấu (`bm25_index == folded`) và đo lại. Ghi quyết định trong `implementation.md`.
   - `config.py`: field `retrieval_min_bm25_folded_norm_score` (env + runtime config `guardrails.min_bm25_folded_norm_score`, kẹp [0, 1], hiển thị trong snapshot cấu hình như `min_bm25_norm_score`). Cập nhật docstring đầu `confidence.py` và `.env.example` nếu có mục gate.
   - Chạy lại đo đầy đủ (4 chế độ × 3 fixture), lưu `documents/rag-eval/unaccented-query/folded_<perturb>.json`, cập nhật README.
-- Phạm vi file được sửa: `backend/app/generation/confidence.py`, `backend/app/core/config.py`, `backend/scripts/eval_confidence.py`, `backend/tests/test_retrieval_confidence.py`, `backend/tests/test_eval_confidence.py`, `.env.example` (nếu có mục liên quan), `documents/rag-eval/unaccented-query/*`.
+- Phạm vi file được sửa: `backend/app/generation/confidence.py`, `backend/app/core/config.py`, `backend/scripts/eval_confidence.py`, `backend/tests/test_retrieval_confidence.py`, `backend/tests/test_eval_confidence.py`, `.env.example` (nếu có mục liên quan), `documents/rag-eval/unaccented-query/*`. Bổ sung khi làm: `backend/app/retrieval/retriever.py` (trọng số vector), `backend/app/retrieval/bm25.py` (đổi quy tắc chọn chỉ mục), `backend/app/core/config_store.py`, `backend/app/api/schemas.py` (runtime config), `backend/tests/{test_bm25_folded,test_bm25_normalized,test_config_api,test_config_persistence}.py`.
 - Phụ thuộc: S-02.
 - Đầu ra/bàn giao: ngưỡng + số đo; kết luận có cần S-04 hay không (hit@4 `strip_all` so với 224/300).
 - Người nhận: coordinator quyết định S-04.
@@ -61,7 +61,7 @@ Bật LLM sửa câu theo mặc định hoặc chỉ cho câu không dấu là h
 ### S-04 — Khôi phục dấu tất định từ corpus (chỉ làm nếu S-03 chưa đạt AC-03 về hit@4)
 
 - Agent: `agent-backend`
-- Trạng thái: `todo` (có điều kiện)
+- Trạng thái: `todo` (có điều kiện; chờ user quyết định: S-03 đạt hit@4 236 ≥ 224 nên theo luật ban đầu thì hủy, nhưng AC-04/AC-05 lệch 1 câu và S-04 là hướng có thể sửa cả hai)
 - Mục tiêu: câu không dấu có bản có dấu để embedding/reranker dùng khi không có LLM; phục vụ `AC-03`, `AC-06`.
 - Việc cần làm:
   - Module mới `backend/app/retrieval/diacritics.py`: dựng từ snapshot chunk của BM25 (dùng chung generation cache) bảng đếm `folded n-gram (1–3) → dạng có dấu`; khôi phục câu bằng quy hoạch động chọn chuỗi n-gram có tần suất cao nhất, chỉ thay chữ không dấu có trong bảng, giữ nguyên chữ có số/viết hoa toàn bộ (cùng quy tắc `protected_tokens` của `query_corrector.py`) và chữ không có trong corpus.
@@ -111,6 +111,9 @@ Bật LLM sửa câu theo mặc định hoặc chỉ cho câu không dấu là h
 5. Review, sửa nhận xét bắt buộc, đo lại phần bị ảnh hưởng; coordinator đóng task khi `approved`. Commit message tiếng Anh, ví dụ `feat: add accent-folded BM25 index for unaccented queries`.
 
 ## Rủi ro và điều chỉnh kế hoạch
+
+- 2026-11-25T22:02:09+07:00 (S-03): quy tắc chọn chỉ mục của S-02 (chuyển sang bỏ dấu khi top-1 `bm25_norm` dưới ngưỡng) được thay bằng nhận diện câu gõ thiếu dấu (chữ không dấu chỉ có trong kho ở dạng có dấu): câu có dấu không còn bị đổi chunk, và tín hiệu bỏ dấu chỉ có với câu thiếu dấu nên gate không cần điều kiện riêng. Gate không xét vector khi đạt nhờ tín hiệu bỏ dấu (số đo trong README). Thêm `HYBRID_FOLDED_VECTOR_WEIGHT`.
+- Frontend `frontend/src/lib/gateDecision.js` là bản sao luật gate (dùng ở `RetrievalTestPanel` để so ngưỡng nháp); chưa biết `bm25_folded_norm` nên sẽ hiển thị "trượt" cho câu thiếu dấu mà backend cho qua. Ngoài phạm vi task hiện tại; cần user quyết định thêm vào S-05 hay task riêng.
 
 - **Câu có dấu bị ảnh hưởng ngầm**: quy tắc fallback sang chỉ mục bỏ dấu khi điểm có dấu thấp có thể cho câu không đáp án có dấu qua gate. Chặn bằng AC-02 và điểm quyết định ở S-03.
 - **Trùng nghĩa khi bỏ dấu** (`ban`/`bản`/`bạn`, `hoc vien`): làm điểm BM25 bỏ dấu cao giả. Ngưỡng bỏ dấu đo riêng (S-03), không dùng chung 0.25; theo dõi `near_miss` bỏ dấu.
