@@ -75,14 +75,14 @@ Bật LLM sửa câu theo mặc định hoặc chỉ cho câu không dấu là h
 ### S-05 — Test fallback LLM, debug và đo cuối
 
 - Agent: `agent-backend`
-- Trạng thái: `todo`
+- Trạng thái: `done` (2026-11-25T22:39:28+07:00, xem `implementation.md` S-05)
 - Mục tiêu: chứng minh không còn phụ thuộc LLM và mọi AC có bằng chứng; phục vụ `AC-06`, `AC-07`, `AC-08`.
 - Việc cần làm:
   - Test `RAGChain` với provider LLM giả ném lỗi và với budget đã cạn: câu `hoc phi mot tin chi la bao nhieu` trên corpus fixture vẫn `strong_context=True`.
   - Kiểm `retrieval_debug.confidence.signals` có `bm25_folded_norm`, chunk debug có `bm25_index`; nếu UI admin hiển thị signals theo danh sách cố định thì báo coordinator trước khi sửa frontend.
   - Chạy `pytest` toàn bộ backend (Postgres Docker lên), chạy lại bộ đo cuối trên bản tích hợp.
   - Cập nhật `frontend/src/lib/gateDecision.js` (bản sao `assess_context`): thêm tín hiệu `bm25_folded_norm` và ngưỡng `min_bm25_folded_norm_score` (lấy từ `retrieval_debug.confidence.thresholds`), cùng luật bỏ qua `bm25_norm`/`vector` khi tín hiệu bỏ dấu đạt; test trong `frontend/src/lib/gateDecision.test.js`.
-- Phạm vi file được sửa: test backend; `backend/app/generation/rag_chain.py` chỉ nếu cần đưa trường debug; `frontend/src/lib/gateDecision.js`, `frontend/src/lib/gateDecision.test.js`.
+- Phạm vi file được sửa: test backend; `backend/app/generation/rag_chain.py` chỉ nếu cần đưa trường debug; `frontend/src/lib/gateDecision.js`, `frontend/src/lib/gateDecision.test.js`. Bổ sung khi làm: `frontend/src/settings/RetrievalTestPanel.jsx` (+ test) cho ngưỡng nháp và hiển thị tín hiệu; `backend/app/retrieval/reranker.py`, `backend/app/core/config.py`, `backend/app/api/schemas.py`, `backend/app/generation/confidence.py` để xử lý R-01…R-03.
 - Phụ thuộc: S-03 (và S-04 nếu làm).
 - Đầu ra/bàn giao: `verification.md` V-01…V-08.
 - Người nhận: reviewer.
@@ -99,8 +99,8 @@ Bật LLM sửa câu theo mặc định hoặc chỉ cho câu không dấu là h
 ## Phân công kiểm chứng và review
 
 - Verifier: `agent-backend`; phạm vi: AC-01…AC-08.
-- Reviewer: `agent-backend` hoặc agent khác do user chỉ định; phạm vi: diff S-02…S-05, số đo trong `documents/rag-eval/unaccented-query/`.
-- Hình thức review: `self_review` nếu chỉ một agent; ghi rõ.
+- Reviewer: `agent-reviewer` (phiên riêng do user mở); phạm vi: diff S-01…S-05, số đo trong `documents/rag-eval/unaccented-query/`.
+- Hình thức review: review độc lập về phiên (ghi trong `review.md`).
 - Người xử lý nhận xét: `agent-backend`.
 
 ## Thứ tự tích hợp và kiểm chứng

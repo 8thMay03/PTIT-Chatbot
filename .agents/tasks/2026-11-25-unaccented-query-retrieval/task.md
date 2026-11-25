@@ -1,11 +1,11 @@
 # Task: Truy xuất và confidence gate cho câu hỏi không dấu không phụ thuộc LLM
 
 - ID: `2026-11-25-unaccented-query-retrieval`
-- Trạng thái: `in_progress`
+- Trạng thái: `in_review`
 - Coordinator: `agent-backend`
 - Người yêu cầu: user
 - Tạo lúc: `2026-11-25T21:08:20+07:00`
-- Cập nhật lúc: `2026-11-25T22:08:26+07:00`
+- Cập nhật lúc: `2026-11-25T22:39:28+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -69,10 +69,12 @@ Các số đo dưới đây chạy với `QUERY_CORRECTION_ENABLED=false` và c�
 - Blocker: không có.
 - S-03 xong (`documents/rag-eval/unaccented-query/README.md` mục "Sau S-03"): bỏ dấu qua gate 0 → 258/300, hit@4 50 → 236; bỏ dấu một phần 10 → 254, hit@4 173 → 234; câu có dấu không đổi. AC-04 lệch: 1 câu `out_of_domain` bỏ dấu lọt gate, câu không đáp án trong miền 21 (mốc 20); AC-05 lệch: 254/300 (mục tiêu 255).
 - User đã quyết định: giữ ngưỡng 0.40, nới AC-04/AC-05 theo số đo, hủy S-04; thêm `gateDecision.js` vào S-05.
-- Bước tiếp theo: `agent-backend` làm S-05.
+- S-05 xong (commit `2bcdc84`): trường debug, test `RagChain` khi LLM sửa câu lỗi/hết budget, `gateDecision.js` + panel xem trước, R-01…R-03 đã sửa, đo cuối trên `2bcdc84` giống từng câu lượt trước. Mọi AC-01…AC-08 có bằng chứng `passed` trong `verification.md`.
+- Bước tiếp theo: `agent-reviewer` review vòng cuối trên bản mới nhất của nhánh (xem MSG-agent-backend-002); task chỉ `done` khi `review.md` kết luận `approved`.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
+- 2026-11-25T22:39:28+07:00 — agent-backend: S-05 xong, chuyển `in_review`. Phạm vi frontend mở rộng thêm `frontend/src/settings/RetrievalTestPanel.jsx` (+ test) vì ngưỡng nháp `draftGateThresholds` và danh sách tín hiệu hiển thị nằm ở đó; không đổi giao diện khác.
 - 2026-11-25T22:08:26+07:00 — user (qua agent-backend): giữ `RETRIEVAL_MIN_BM25_FOLDED_NORM_SCORE=0.40`; nới AC-04 (`out_of_domain` ≥ 13/14, trong miền ≤ 21) và AC-05 (≥ 254/300) theo số đo S-03 vì không ngưỡng nào đạt đồng thời AC-03 và AC-04 bản gốc; hủy S-04; thêm `frontend/src/lib/gateDecision.js` + test vào phạm vi S-05.
 - 2026-11-25T22:02:09+07:00 — agent-backend: S-03 xong; AC-04 và AC-05 chưa đạt ở ngưỡng chọn (0.40), không có ngưỡng nào đạt đồng thời AC-03 và AC-04 (README). Chưa đổi tiêu chí: chờ user.
 - 2026-11-25T21:30:00+07:00 — agent-backend: user duyệt kế hoạch; tạo nhánh, chuyển `in_progress`. Baseline mới: bỏ dấu 0/300 qua gate, hit@4 50; bỏ dấu một phần 10/300, hit@4 173; câu không đáp án trong miền có dấu qua gate 20 (mốc AC-04).

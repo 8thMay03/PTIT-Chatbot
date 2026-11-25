@@ -2,7 +2,7 @@
 
 ## Tổng quan triển khai
 
-Nhánh `feat/unaccented-query-retrieval` (tách từ `dev` tại `b8c2ff3`). S-01, S-02, S-03 xong. S-04 hủy (quyết định của user); S-05 chưa bắt đầu.
+Nhánh `feat/unaccented-query-retrieval` (tách từ `dev` tại `b8c2ff3`). S-01, S-02, S-03, S-05 xong; S-04 hủy (quyết định của user). Chờ review vòng cuối.
 
 ## Nhật ký theo nhiệm vụ
 
@@ -61,6 +61,21 @@ Nhánh `feat/unaccented-query-retrieval` (tách từ `dev` tại `b8c2ff3`). S-0
 - Kiểm tra đã chạy: `pytest` backend toàn bộ `1704 passed, 24 skipped`.
 - Còn lại/blocker: chờ user quyết định AC-04/AC-05/S-04 và phạm vi frontend `gateDecision.js`. `rag_chain._debug_chunk` chưa có `bm25_folded_norm_score`/`bm25_index` (S-05); `retrieval_debug.confidence.signals` đã có `bm25_folded_norm` qua `assess_context`.
 
+### S-05 — agent-backend
+
+- Cập nhật lúc: `2026-11-25T22:39:28+07:00`.
+- Đã làm:
+  - `generation/rag_chain.py`: `DEBUG_CHUNK_FIELDS` thêm `bm25_folded_norm_score`, `bm25_index` (có trong `retrieved_chunks`/`selected_chunks` của `retrieval_debug`).
+  - `tests/test_unaccented_rag_chain.py` (AC-06): `RagChain` với `Retriever` thật (BM25 hai chỉ mục trên kho 6 chunk, embedding/vector store giả không trả kết quả), `QUERY_CORRECTION_ENABLED=true`, LLM sửa câu ném lỗi (`llm_error`) hoặc `LLMBudget(0)` (`skipped_budget`): câu `hoc phi mot tin chi la bao nhieu` có `strong_context=True`, `reason=passed`, chunk đầu `bm25_index=folded`. Ca đối chứng: tắt ngưỡng bỏ dấu thì `below_bm25_norm`.
+  - Frontend (AC-07): `lib/gateDecision.js` thêm tín hiệu `bm25_folded_norm` (đánh dấu `optional`), ngưỡng `min_bm25_folded_norm_score` (mặc định 0.4), cùng luật bỏ qua `bm25_norm`/`vector` khi tín hiệu bỏ dấu đạt. `settings/RetrievalTestPanel.jsx`: `draftGateThresholds` lấy `min_bm25_folded_norm_score` từ cấu hình đã lưu (chưa có ô nháp); dòng tín hiệu bỏ dấu chỉ hiện khi câu có tín hiệu này (câu có dấu không bị thêm dòng "thiếu tín hiệu"). Test: `gateDecision.test.js` (+4 ca chép từ backend, cập nhật kỳ vọng `signals`), `RetrievalTestPanel.test.jsx` (+3).
+  - R-01: `heuristic_rerank` dùng token bỏ dấu khi câu không có dấu **hoặc** có context `bm25_index == "folded"` (khớp quy tắc BM25, gồm câu thiếu dấu một phần và trường hợp rewrite chèn chữ có dấu). Test `test_heuristic_rerank_uses_folded_terms_when_bm25_ranked_on_folded_index`.
+  - R-02: `guardrails.min_bm25_folded_norm_score: null` trả về giá trị `.env` (theo mẫu `min_rerank_score`), dòng ghi đè trong DB bị xóa; comment ghi rõ muốn tắt hẳn thì để trống env, 1.0 gần như tắt. Test PUT: kẹp [0, 1], bỏ trường giữ nguyên, `null` về `.env`; test persistence: `null` xóa dòng và giữ sau restart.
+  - R-03: câu tóm tắt docstring `confidence.py` nêu luật từ khóa `bm25_norm` hoặc `bm25_folded_norm`.
+  - Đo cuối trên `2bcdc84` (mã sạch; `dirty=true` chỉ vì `review.md` của reviewer chưa commit): 4 bộ giống từng câu lượt đo trước; thay `documents/rag-eval/unaccented-query/folded_*.json` bằng bản này, cập nhật README.
+- File thay đổi: `backend/app/{generation/rag_chain.py,generation/confidence.py,retrieval/reranker.py,core/config.py,api/schemas.py}`, `backend/tests/{test_unaccented_rag_chain.py,test_bm25_folded.py,test_config_api.py,test_config_persistence.py}`, `frontend/src/lib/gateDecision{.js,.test.js}`, `frontend/src/settings/RetrievalTestPanel{.jsx,.test.jsx}`; commit `2bcdc84`; số đo + README: commit sau.
+- Kiểm tra đã chạy: backend `pytest` toàn bộ `1708 passed, 24 skipped`; frontend `npm test` `48 files, 424 passed`; `npm run build` thành công.
+- Còn lại/blocker: không có. Chưa đo với reranker/multi-query bật (đã ghi trong README, ngoài AC).
+
 ## Trao đổi giữa agents
 
 ### MSG-agent-backend-001
@@ -71,6 +86,20 @@ Nhánh `feat/unaccented-query-retrieval` (tách từ `dev` tại `b8c2ff3`). S-0
 - Loại: `decision`.
 - Nội dung: hỏi cách xử lý AC-04/AC-05 lệch 1 câu ở ngưỡng 0.40 và có đưa `gateDecision.js` vào phạm vi không. User chọn: giữ 0.40, nới tiêu chí theo số đo, hủy S-04; thêm `gateDecision.js` vào S-05.
 - Hành động mong muốn: coordinator cập nhật `task.md`/`plan.md` (đã làm); `agent-backend` làm S-05.
+
+### MSG-agent-backend-002
+
+- Lúc: `2026-11-25T22:39:28+07:00`.
+- Từ: `agent-backend`; đến: `agent-reviewer`.
+- Nhiệm vụ: `S-05`, review vòng cuối.
+- Loại: `handoff`.
+- Tham chiếu: `review.md` vòng 1 (bản `ff058b1`, R-01…R-03). `agent-backend` không sửa `review.md`; file này đang có thay đổi chưa commit của reviewer trong working tree chung và vẫn để nguyên.
+- Nội dung:
+  - R-01 đã sửa: `backend/app/retrieval/reranker.py` `heuristic_rerank` (điều kiện bỏ dấu = câu không dấu hoặc có context `bm25_index == "folded"`); test `backend/tests/test_bm25_folded.py::test_heuristic_rerank_uses_folded_terms_when_bm25_ranked_on_folded_index`.
+  - R-02 đã sửa: `backend/app/core/config.py` (`null` → `_INITIAL_SETTINGS`), comment trong `backend/app/api/schemas.py`; test `test_config_api.py::test_update_folded_bm25_threshold_is_clamped_and_null_restores_env`, `test_config_persistence.py::test_folded_bm25_threshold_persists`. Tắt hẳn ở runtime vẫn không có (giống `min_bm25_norm_score`); đã ghi trong comment.
+  - R-03 đã sửa: docstring đầu `backend/app/generation/confidence.py`.
+  - Điều kiện approve: AC-06 (`tests/test_unaccented_rag_chain.py`), AC-07 (`DEBUG_CHUNK_FIELDS`, `gateDecision.js` + panel + test), AC-08 (pytest/npm test/build), đo cuối trên `2bcdc84`: xem `verification.md` V-06…V-08 và README.
+- Hành động mong muốn: review vòng cuối diff `ff058b1..HEAD` của nhánh `feat/unaccented-query-retrieval`, xác nhận R-01…R-03 và kết luận trong `review.md`.
 
 ## Bàn giao
 

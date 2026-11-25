@@ -1,8 +1,8 @@
 # Verification: 2026-11-25-unaccented-query-retrieval
 
 - Verifier: `agent-backend`.
-- Trạng thái tổng: `not_run` (V-01 … V-05 `passed` sau khi nới AC-04/AC-05; V-06 … V-08 chưa chạy).
-- Bản được kiểm tra: V-01 trên `b8c2ff3` + thay đổi S-01; V-02 … V-05 trên `bb80179` + working tree S-03 (commit S-03 ngay sau lượt đo).
+- Trạng thái tổng: `passed` (V-01 … V-08; AC-04, AC-05 theo bản đã nới).
+- Bản được kiểm tra: V-01 trên `b8c2ff3` + thay đổi S-01; V-02 … V-05 đo lần đầu trên `bb80179` + working tree S-03, đo lại trên `2bcdc84` (giống từng câu); V-06 … V-08 trên `2bcdc84`.
 - Môi trường: Windows 11, `backend/.venv`, Postgres (Docker), corpus D26 đã index, embedding `text-embedding-3-small`.
 
 ## Kiểm chứng tiêu chí
@@ -65,17 +65,50 @@ python -m scripts.eval_confidence \
 - Trạng thái: `failed` theo tiêu chí gốc (≥ 255); `passed` theo AC-05 đã nới (2026-11-25T22:08:26+07:00: ≥ 254); phần `typo` đạt.
 - Bằng chứng: `folded_strip_partial.json`, `folded_typo.json`.
 
-### V-06 … V-08 — AC-06 … AC-08
+### V-02 … V-05 — đo lại trên commit S-05
 
-- Trạng thái: `not_run` (chờ S-05). Ghi chú AC-08: pytest backend toàn bộ sau S-03 `1704 passed, 24 skipped`, nhưng test fallback LLM (AC-06) chưa viết.
+- Người thực hiện / thời gian: agent-backend / `2026-11-25T22:37:05+07:00` – `2026-11-25T22:38:00+07:00`.
+- Lệnh / thao tác: lệnh chuẩn × 4 biến thể trên `2bcdc84` (`dirty=true` chỉ do `review.md` của reviewer), so từng câu (`signals`, `first_hit_rank`, `gate`, `bm25_index`, chunk top-3) với lượt đo trên `bb80179`.
+- Kết quả thực tế: 0 câu khác ở cả 4 bộ; `folded_*.json` đã thay bằng bản đo trên `2bcdc84`.
+- Trạng thái: `passed` (kết quả V-02 … V-05 giữ nguyên).
+
+### V-06 — AC-06
+
+- Người thực hiện / thời gian: agent-backend / `2026-11-25T22:39:28+07:00`.
+- Loại: test tự động.
+- Thư mục chạy: `backend/`.
+- Lệnh / thao tác: `python -m pytest -q tests/test_unaccented_rag_chain.py`.
+- Kỳ vọng: `QUERY_CORRECTION_ENABLED=true`, LLM sửa câu lỗi hoặc hết budget → câu không dấu vẫn `strong_context=True`.
+- Kết quả thực tế: `3 passed` (`llm_error`, `skipped_budget`, ca đối chứng tắt ngưỡng → `below_bm25_norm`).
+- Trạng thái: `passed`.
+- Bằng chứng: `backend/tests/test_unaccented_rag_chain.py`.
+
+### V-07 — AC-07
+
+- Người thực hiện / thời gian: agent-backend / `2026-11-25T22:39:28+07:00`.
+- Loại: test tự động.
+- Lệnh / thao tác: backend `pytest tests/test_unaccented_rag_chain.py tests/test_config_api.py tests/test_config_persistence.py tests/test_retrieval_confidence.py`; frontend `npx vitest run src/lib/gateDecision.test.js src/settings/RetrievalTestPanel.test.jsx`.
+- Kỳ vọng: `retrieval_debug` có `bm25_index`, `bm25_folded_norm_score` trên chunk và `bm25_folded_norm` trong `confidence.signals`/`thresholds`; ngưỡng đặt được qua env và runtime config; `gateDecision.js` cùng quyết định với `assess_context`.
+- Kết quả thực tế: test AC-06 kiểm `selected_chunks[0].bm25_index == "folded"`, `bm25_folded_norm_score`, `confidence.signals.bm25_folded_norm`, `thresholds.min_bm25_folded_norm_score`; test config GET/PUT/persistence đạt; frontend `26 passed` gồm 4 ca gate chép từ backend và 3 ca panel.
+- Trạng thái: `passed`.
+- Bằng chứng: các file test nêu trên.
+
+### V-08 — AC-08
+
+- Người thực hiện / thời gian: agent-backend / `2026-11-25T22:39:28+07:00`.
+- Loại: test tự động + build.
+- Lệnh / thao tác: `backend`: `python -m pytest -q -p no:cacheprovider` (Postgres Docker lên); `frontend`: `npm test`, `npm run build`.
+- Kết quả thực tế: backend `1708 passed, 24 skipped`; frontend `48 files, 424 passed`; build thành công.
+- Trạng thái: `passed`.
+- Bằng chứng: output lệnh trong phiên `agent-backend`.
 
 ## Lỗi, kiểm tra lại và phần chưa xác minh
 
 - V-04, V-05 thất bại theo tiêu chí gốc (lệch 1 câu mỗi tiêu chí); user đã nới tiêu chí theo số đo, kết quả không đo lại vì không đổi mã.
-- V-06 … V-08 chưa chạy. Chưa đo với reranker/multi-query bật.
+- Chưa đo với reranker/multi-query bật (ngoài AC, ghi trong README).
 
 ## Kết luận
 
-- Tiêu chí đã đạt: AC-01 … AC-05 (AC-04, AC-05 theo bản đã nới).
-- Tiêu chí chưa đạt/chưa xác minh: AC-06 … AC-08 (chưa chạy).
-- Đề xuất: làm S-05.
+- Tiêu chí đã đạt: AC-01 … AC-08 (AC-04, AC-05 theo bản đã nới).
+- Tiêu chí chưa đạt/chưa xác minh: không có.
+- Đề xuất: bàn giao `agent-reviewer` review vòng cuối; coordinator chỉ đóng task khi `review.md` `approved`.
