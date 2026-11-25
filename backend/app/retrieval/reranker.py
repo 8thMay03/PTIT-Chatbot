@@ -274,8 +274,10 @@ def heuristic_rerank(query: str, contexts: list[dict], top_k: int) -> list[dict]
     """Rescore candidates from vector, BM25 and query-term coverage signals."""
     vector_scores = _normalize([context.get("vector_score") for context in contexts])
     bm25_scores = _normalize([context.get("bm25_score") for context in contexts])
-    # Câu không dấu: so term trên dạng bỏ dấu để "hoc phi" phủ được "học phí".
-    tokenize = _tokenize if has_accents(query) else _tokenize_folded
+    # Câu gõ thiếu dấu (BM25 đã xếp theo chỉ mục bỏ dấu, kể cả thiếu một phần) hoặc không dấu:
+    # so term trên dạng bỏ dấu để "hoc phi" phủ được "học phí".
+    folded = not has_accents(query) or any(context.get("bm25_index") == "folded" for context in contexts)
+    tokenize = _tokenize_folded if folded else _tokenize
     query_terms = set(tokenize(query))
     reranked: list[dict] = []
 

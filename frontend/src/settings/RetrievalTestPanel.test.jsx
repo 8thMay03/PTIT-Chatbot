@@ -223,6 +223,55 @@ describe("RetrievalTestPanel", () => {
     expect(container.textContent).toContain("cos 0.33 · bm25 0.40 · rerank 3.00");
   });
 
+  it("chỉ hiện tín hiệu bỏ dấu khi câu có tín hiệu này", async () => {
+    stubFetch();
+    await render({ config: baseConfig() });
+
+    await fillTextarea(container.querySelector("#retrieval-test-query"), "Học bổng?");
+    await click(buttonByText(container, "Chạy thử"));
+    await waitFor(() => container.textContent.includes("Cấu hình đã lưu:"));
+
+    expect(container.querySelector('[data-signal="bm25_folded_norm"]')).toBeNull();
+  });
+
+  it("câu gõ thiếu dấu: hiện tín hiệu bỏ dấu và bản nháp tính theo nhánh bỏ dấu", async () => {
+    const result = retrievalResult({ strong: true, reason: "passed" });
+    result.query = "hoc bong khuyen khich hoc tap la gi";
+    Object.assign(result.contexts[0], {
+      vector_score: null,
+      bm25_norm_score: 0.05,
+      bm25_folded_norm_score: 0.52,
+      rerank_score: null,
+    });
+    result.retrieval_debug.confidence.signals = {
+      vector: null,
+      bm25_norm: 0.05,
+      bm25_folded_norm: 0.52,
+      rerank: null,
+    };
+    Object.assign(result.retrieval_debug.confidence.thresholds, {
+      min_bm25_folded_norm_score: 0.4,
+      min_rerank_score: null,
+      rerank_source: "not_applicable",
+    });
+    stubFetch(result);
+    const config = baseConfig({
+      rerankerProvider: "heuristic",
+      guardrails: { min_bm25_folded_norm_score: 0.4 },
+    });
+    await render({ config, draft: draftFrom(config, { minVectorScore: 0.5 }) });
+
+    await fillTextarea(container.querySelector("#retrieval-test-query"), "hoc bong?");
+    await click(buttonByText(container, "Chạy thử"));
+    await waitFor(() => container.textContent.includes("Bản nháp:"));
+
+    const folded = container.querySelector('[data-signal="bm25_folded_norm"]');
+    expect(folded.textContent).toContain("Độ khớp từ khóa (gõ thiếu dấu)");
+    expect(folded.textContent).toContain("≥ 0.40");
+    // Ngưỡng vector nháp không đổi kết luận: nhánh bỏ dấu không xét vector.
+    expect(container.textContent).toContain("Bản nháp: ✓ Sẽ trả lời");
+  });
+
   it("tín hiệu có ngưỡng null ghi rõ không áp dụng", async () => {
     const result = retrievalResult();
     result.retrieval_debug.confidence.thresholds.min_rerank_score = null;
@@ -336,11 +385,18 @@ describe("draftGateThresholds", () => {
 
     expect(thresholds).toEqual({
       min_bm25_norm_score: 0.25,
+      min_bm25_folded_norm_score: null,
       min_vector_score: 0.37,
       min_rerank_score: null,
       vector_source: "calibrated",
       rerank_source: "not_applicable",
     });
+  });
+
+  it("ngưỡng bỏ dấu lấy từ cấu hình đã lưu", () => {
+    const config = baseConfig({ guardrails: { min_bm25_folded_norm_score: 0.45 } });
+
+    expect(draftGateThresholds(config, draftFrom(config)).min_bm25_folded_norm_score).toBe(0.45);
   });
 
   it("ngưỡng nháp có giá trị thì thành ghi đè", () => {

@@ -427,6 +427,7 @@ class UpdateGuardrailsConfig(BaseModel):
     min_vector_score: float | None = None
     min_bm25_score: float | None = None
     min_bm25_norm_score: float | None = None
+    # null = trả về giá trị `.env`; bỏ trường = giữ nguyên.
     min_bm25_folded_norm_score: float | None = None
     min_rerank_score: float | None = None
 

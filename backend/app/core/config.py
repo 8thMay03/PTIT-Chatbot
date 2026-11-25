@@ -761,7 +761,11 @@ def update_runtime_config(payload: dict) -> dict:
         settings.retrieval_min_bm25_score = float(guardrails["min_bm25_score"])
     if "min_bm25_norm_score" in guardrails and guardrails["min_bm25_norm_score"] is not None:
         settings.retrieval_min_bm25_norm_score = max(0.0, min(1.0, float(guardrails["min_bm25_norm_score"])))
-    if "min_bm25_folded_norm_score" in guardrails and guardrails["min_bm25_folded_norm_score"] is not None:
+    # null trả về giá trị `.env` (như min_rerank_score); muốn tắt hẳn tín hiệu bỏ dấu thì để
+    # trống RETRIEVAL_MIN_BM25_FOLDED_NORM_SCORE, còn 1.0 gần như tắt (cần mọi term bão hòa).
+    if "min_bm25_folded_norm_score" in guardrails and guardrails["min_bm25_folded_norm_score"] is None:
+        settings.retrieval_min_bm25_folded_norm_score = _INITIAL_SETTINGS["retrieval_min_bm25_folded_norm_score"]
+    elif "min_bm25_folded_norm_score" in guardrails:
         settings.retrieval_min_bm25_folded_norm_score = max(
             0.0, min(1.0, float(guardrails["min_bm25_folded_norm_score"]))
         )

@@ -37,6 +37,8 @@ DEBUG_CHUNK_FIELDS = (
     "vector_score",
     "bm25_score",
     "bm25_norm_score",
+    "bm25_folded_norm_score",
+    "bm25_index",
     "rrf_score",
     "rerank_score",
     "query_hits",

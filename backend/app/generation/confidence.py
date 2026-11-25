@@ -1,7 +1,8 @@
 """Confidence gate: quyết định context truy xuất có đủ mạnh để gọi LLM hay không (RAG-18).
 
-Gate đạt khi **mọi** tín hiệu đã hiệu chỉnh đều vượt ngưỡng; tín hiệu top-1 là max
-trên các context sau rerank:
+Gate đạt khi **mọi** tín hiệu đang dùng đều vượt ngưỡng, trong đó tín hiệu từ khóa đạt bằng
+``bm25_norm`` hoặc ``bm25_folded_norm`` (đạt bằng ``bm25_folded_norm`` thì không xét ``vector``);
+tín hiệu top-1 là max trên các context sau rerank:
 
 - ``bm25_norm`` (BM25 chuẩn hóa [0, 1], không phụ thuộc kích thước kho): luôn dùng.
 - ``bm25_folded_norm`` (BM25 chuẩn hóa trên chỉ mục bỏ dấu, chỉ có với câu gõ thiếu dấu,

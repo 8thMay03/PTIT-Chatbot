@@ -13,12 +13,14 @@ import {
 
 function thresholds({
   bm25 = 0.25,
+  folded = 0.4,
   vector = 0.37,
   rerank = null,
   vectorSource = "calibrated",
 } = {}) {
   return {
     min_bm25_norm_score: bm25,
+    min_bm25_folded_norm_score: folded,
     min_vector_score: vector,
     min_rerank_score: rerank,
     vector_source: vectorSource,
@@ -37,7 +39,12 @@ describe("decideGate", () => {
 
     expect(decision.strong).toBe(true);
     expect(decision.reason).toBe("passed");
-    expect(decision.signals).toEqual({ vector: 0.62, bm25_norm: 0.41, rerank: 3.2 });
+    expect(decision.signals).toEqual({
+      vector: 0.62,
+      bm25_norm: 0.41,
+      bm25_folded_norm: null,
+      rerank: 3.2,
+    });
   });
 
   it.each([
@@ -73,7 +80,46 @@ describe("decideGate", () => {
 
     expect(decision.strong).toBe(false);
     expect(decision.reason).toBe("no_context");
-    expect(decision.signals).toEqual({ vector: null, bm25_norm: null, rerank: null });
+    expect(decision.signals).toEqual({
+      vector: null,
+      bm25_norm: null,
+      bm25_folded_norm: null,
+      rerank: null,
+    });
+  });
+
+  it("câu gõ thiếu dấu đạt tín hiệu bỏ dấu thì không cần bm25_norm và vector", () => {
+    const decision = decideGate(
+      [
+        { vector_score: null, bm25_norm_score: 0.05, bm25_folded_norm_score: 0.52 },
+        { vector_score: 0.3, bm25_norm_score: null, bm25_folded_norm_score: null },
+      ],
+      thresholds()
+    );
+
+    expect(decision.strong).toBe(true);
+    expect(decision.reason).toBe("passed");
+    expect(decision.signals.bm25_folded_norm).toBe(0.52);
+  });
+
+  it("tín hiệu bỏ dấu dưới ngưỡng thì trượt ở bm25_norm", () => {
+    const context = { vector_score: 0.6, bm25_norm_score: 0.05, bm25_folded_norm_score: 0.39 };
+
+    expect(decideGate([context], thresholds()).reason).toBe("below_bm25_norm");
+  });
+
+  it("ngưỡng bỏ dấu null thì bỏ qua tín hiệu bỏ dấu", () => {
+    const context = { vector_score: 0.6, bm25_norm_score: 0.05, bm25_folded_norm_score: 0.9 };
+
+    expect(decideGate([context], thresholds({ folded: null })).reason).toBe("below_bm25_norm");
+  });
+
+  it("nhánh bỏ dấu vẫn xét rerank", () => {
+    const context = { bm25_norm_score: 0.05, bm25_folded_norm_score: 0.6, rerank_score: -3.0 };
+    const decision = decideGate([context], thresholds({ rerank: -1.65 }));
+
+    expect(decision.strong).toBe(false);
+    expect(decision.reason).toBe("below_rerank");
   });
 });
 
@@ -84,7 +130,7 @@ describe("signalsFromContexts", () => {
         { vector_score: null, bm25_norm_score: "0.4" },
         { vector_score: 0.5, bm25_norm_score: "không phải số" },
       ])
-    ).toEqual({ vector: 0.5, bm25_norm: 0.4, rerank: null });
+    ).toEqual({ vector: 0.5, bm25_norm: 0.4, bm25_folded_norm: null, rerank: null });
   });
 });
 

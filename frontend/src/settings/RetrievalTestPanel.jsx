@@ -97,6 +97,8 @@ export function draftGateThresholds(config, draft) {
     min_bm25_norm_score: Number(
       draft?.minBm25NormScore ?? guardrails.min_bm25_norm_score ?? 0.25
     ),
+    // Chưa có ô nháp: dùng ngưỡng đã lưu (null khi backend cũ không trả hoặc đã tắt).
+    min_bm25_folded_norm_score: guardrails.min_bm25_folded_norm_score ?? null,
     min_vector_score: vectorOverride ?? calibratedVector,
     min_rerank_score: rerankerApplies ? rerankOverride ?? calibratedRerank : null,
     vector_source: vectorSource,
@@ -458,7 +460,9 @@ export default function RetrievalTestPanel({
                 </p>
               )}
               <div className="retrieval-signals">
-                {GATE_SIGNALS.map((signal) => (
+                {GATE_SIGNALS.filter(
+                  (signal) => !signal.optional || (confidence?.signals?.[signal.key] ?? null) !== null
+                ).map((signal) => (
                   <SignalRow
                     key={signal.key}
                     signal={signal}

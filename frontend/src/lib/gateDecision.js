@@ -3,9 +3,10 @@
  *
  * Bản sao của `assess_context` trong `backend/app/generation/confidence.py`: gate đạt
  * khi **mọi** tín hiệu đang dùng (ngưỡng khác `null`) đều vượt ngưỡng; tín hiệu thiếu
- * tính là trượt; thứ tự kiểm tra `bm25_norm` → `vector` → `rerank`. Sửa luật ở đây thì
- * sửa cả `backend/tests/test_retrieval_confidence.py` và
- * `frontend/src/lib/gateDecision.test.js`.
+ * tính là trượt; thứ tự kiểm tra `bm25_norm` → `vector` → `rerank`. Riêng câu gõ thiếu
+ * dấu có thêm `bm25_folded_norm` (BM25 trên chỉ mục bỏ dấu): đạt ngưỡng của nó thì bỏ qua
+ * kiểm tra `bm25_norm` và `vector`. Sửa luật ở đây thì sửa cả
+ * `backend/tests/test_retrieval_confidence.py` và `frontend/src/lib/gateDecision.test.js`.
  */
 
 /**
@@ -14,6 +15,7 @@
  */
 export const DEFAULT_GATE_THRESHOLDS = {
   min_bm25_norm_score: 0.25,
+  min_bm25_folded_norm_score: 0.4,
   min_vector_score: null,
   min_rerank_score: null,
   vector_source: "calibrated",
@@ -26,6 +28,15 @@ export const GATE_SIGNALS = [
     scoreField: "bm25_norm_score",
     thresholdField: "min_bm25_norm_score",
     scale: [0, 1],
+  },
+  {
+    // Chỉ có với câu gõ thiếu dấu; `optional` = chỉ hiển thị khi có giá trị.
+    key: "bm25_folded_norm",
+    label: "Độ khớp từ khóa (gõ thiếu dấu)",
+    scoreField: "bm25_folded_norm_score",
+    thresholdField: "min_bm25_folded_norm_score",
+    scale: [0, 1],
+    optional: true,
   },
   {
     key: "vector",
@@ -55,13 +66,18 @@ function topScore(contexts, field) {
   return top;
 }
 
-/** Điểm top-1 của ba tín hiệu, đúng cách backend lấy max trên các context. */
+/** Điểm top-1 của từng tín hiệu, đúng cách backend lấy max trên các context. */
 export function signalsFromContexts(contexts) {
   return {
     vector: topScore(contexts, "vector_score"),
     bm25_norm: topScore(contexts, "bm25_norm_score"),
+    bm25_folded_norm: topScore(contexts, "bm25_folded_norm_score"),
     rerank: topScore(contexts, "rerank_score"),
   };
+}
+
+function reaches(value, minimum) {
+  return value !== null && minimum !== null && minimum !== undefined && value >= Number(minimum);
 }
 
 /**
@@ -78,9 +94,12 @@ export function decideGate(contexts, thresholds = DEFAULT_GATE_THRESHOLDS) {
     return { strong: false, reason: "no_context", signals };
   }
 
+  // Câu gõ thiếu dấu đạt tín hiệu bỏ dấu: không xét bm25_norm và vector (cosine câu không
+  // dấu không đáng tin), rerank vẫn xét.
+  const foldedPath = reaches(signals.bm25_folded_norm, limits.min_bm25_folded_norm_score);
   const checks = [
-    ["bm25_norm", limits.min_bm25_norm_score],
-    ["vector", limits.min_vector_score],
+    ["bm25_norm", foldedPath ? null : limits.min_bm25_norm_score],
+    ["vector", foldedPath ? null : limits.min_vector_score],
     ["rerank", limits.min_rerank_score],
   ];
   for (const [name, minimum] of checks) {

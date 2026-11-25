@@ -192,3 +192,19 @@ def test_retriever_uses_folded_vector_weight_only_for_folded_ranking(monkeypatch
 
     monkeypatch.setattr(settings, "hybrid_folded_vector_weight", None)
     assert _vector_weight([{"bm25_index": "folded"}]) == 0.8
+
+
+def test_heuristic_rerank_uses_folded_terms_when_bm25_ranked_on_folded_index(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "reranker_vector_weight", 0.0)
+    monkeypatch.setattr(settings, "reranker_bm25_weight", 0.0)
+    monkeypatch.setattr(settings, "reranker_lexical_weight", 1.0)
+    # Câu thiếu dấu một phần: has_accents đúng nhưng BM25 đã chọn chỉ mục bỏ dấu.
+    contexts = [
+        {"chunk_id": "other", "text": "Lịch học theo tuần.", "bm25_index": "folded"},
+        {"chunk_id": "tuition", "text": "Mức học phí tín chỉ.", "bm25_index": "folded"},
+    ]
+
+    results = heuristic_rerank("mức hoc phi tin chỉ", contexts, top_k=2)
+
+    assert results[0]["chunk_id"] == "tuition"
+    assert results[0]["rerank_score"] == pytest.approx(1.0)

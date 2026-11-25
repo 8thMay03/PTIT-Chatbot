@@ -390,6 +390,12 @@ def test_folded_bm25_threshold_persists(admin_client, config_store_db) -> None:
     _simulate_restart()
     assert settings.retrieval_min_bm25_folded_norm_score == folded
 
+    response = admin_client.put("/api/config", json={"guardrails": {"min_bm25_folded_norm_score": None}})
+    assert response.status_code == 200, response.text
+    assert "retrieval_min_bm25_folded_norm_score" not in _rows(config_store_db)
+    _simulate_restart()
+    assert settings.retrieval_min_bm25_folded_norm_score == _INITIAL_SETTINGS["retrieval_min_bm25_folded_norm_score"]
+
 
 def test_null_threshold_removes_override_row_and_survives_restart(
     admin_client, config_store_db, monkeypatch
