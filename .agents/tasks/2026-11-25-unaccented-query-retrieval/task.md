@@ -66,7 +66,7 @@ Các số đo dưới đây chạy với `QUERY_CORRECTION_ENABLED=false` và c�
 
 - Tóm tắt: S-01 xong trên nhánh `feat/unaccented-query-retrieval` (tách từ `dev` tại `b8c2ff3`): thêm chế độ đo `strip_partial`, số đo nền ở `documents/rag-eval/unaccented-query/`. Corpus hiện tại 993 chunk, khác bảng số ở mục đầu (1017 chunk); dùng số trong README mới làm mốc. Chưa sửa mã ứng dụng.
 - Blocker: không có.
-- Bước tiếp theo: `agent-backend` làm S-02.
+- Bước tiếp theo: `agent-backend` làm S-03. S-02 xong: BM25 riêng với câu bỏ dấu hit@4 46 → 240, nhưng hybrid chỉ 64 → 93 do nhánh vector; S-03 phải xử lý trọng số vector cho câu bỏ dấu.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 

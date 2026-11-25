@@ -29,7 +29,7 @@ Bật LLM sửa câu theo mặc định hoặc chỉ cho câu không dấu là h
 ### S-02 — Chỉ mục BM25 bỏ dấu và quy tắc chọn chỉ mục
 
 - Agent: `agent-backend`
-- Trạng thái: `todo`
+- Trạng thái: `done` (2026-11-25, xem `implementation.md` S-02)
 - Mục tiêu: câu thiếu dấu có xếp hạng keyword và `bm25_norm` có nghĩa; câu có dấu không đổi; phục vụ `AC-02`, `AC-03`, `AC-05`.
 - Việc cần làm:
   - `bm25.py`: thêm `_tokenize_folded(text)` = `_tokenize(strip_accents(text))` (dùng `app.guardrails.normalization.strip_accents`, đã xử lý NFC/NFD và `đ`). `_ensure_index` dựng thêm `BM25Okapi` trên token bỏ dấu cùng snapshot, cùng cơ chế `invalidate_bm25_cache` (corpus ~1000 chunk, bộ nhớ ×2 chấp nhận được).
@@ -37,7 +37,7 @@ Bật LLM sửa câu theo mặc định hoặc chỉ cho câu không dấu là h
   - Quy tắc chọn thứ hạng (bản đầu, chỉnh theo số đo S-03): câu không có dấu (`has_accents` sai) → xếp theo chỉ mục bỏ dấu; câu có dấu → xếp theo chỉ mục có dấu như hiện tại, chỉ chuyển sang bỏ dấu khi top-1 `bm25_norm_score` có dấu dưới ngưỡng gate (bắt câu bỏ dấu một phần). Câu có dấu đạt ngưỡng giữ nguyên kết quả từng byte.
   - `hybrid.py`, `retrieval/multi_query.py`: mang thêm `bm25_folded_norm_score` (max qua các truy vấn như `bm25_norm_score`) và `bm25_index`.
   - `reranker.py` `heuristic_rerank`: tính `term_coverage` trên token bỏ dấu khi câu không có dấu (chỉ ảnh hưởng thứ tự heuristic, không phải gate).
-- Phạm vi file được sửa: `backend/app/retrieval/bm25.py`, `hybrid.py`, `multi_query.py`, `reranker.py` (chỉ `heuristic_rerank`/`_tokenize`), `backend/tests/test_bm25_normalized.py` + test mới.
+- Phạm vi file được sửa: `backend/app/retrieval/bm25.py`, `hybrid.py`, `multi_query.py`, `parent_child.py` (bổ sung khi làm: gộp chunk cha phải mang trường mới), `reranker.py` (chỉ `heuristic_rerank`/`_tokenize`), `backend/tests/test_bm25_normalized.py` + test mới.
 - Phụ thuộc: S-01 xong (có baseline trước khi đổi mã).
 - Đầu ra/bàn giao: hợp đồng trường kết quả ở mục dưới; test đơn vị: `hoc phi` khớp chunk `học phí`, câu có dấu cho cùng thứ hạng/điểm như trước, chọn chỉ mục đúng ba trường hợp (có dấu đạt, có dấu dưới ngưỡng, không dấu).
 - Người nhận: `agent-backend` (S-03).
