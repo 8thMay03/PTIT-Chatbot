@@ -17,8 +17,9 @@ hybrid, rerank theo cấu hình; không gọi LLM) rồi ghi cho từng câu:
         --set reranker_provider=heuristic --sweep
 
 Bước sửa câu bằng LLM (``--set query_correction_enabled=true``) chạy trước rewrite như trong
-app; câu đã sửa được kiểm ``check_scope`` lần hai. ``--perturb strip_all|typo --seed N`` đo
-trên biến thể câu hỏi sinh lúc chạy (``scripts.typo_variants``), không ghi fixture mới.
+app; câu đã sửa được kiểm ``check_scope`` lần hai. ``--perturb strip_all|strip_partial|typo
+--seed N`` đo trên biến thể câu hỏi sinh lúc chạy (``scripts.typo_variants``), không ghi
+fixture mới.
 Báo cáo thêm ``summary.correction``: số câu sửa, số câu bị bỏ theo điều kiện kiểm tra đầu ra,
 thời gian sửa câu (median, p95), qua gate và hit@4 theo bộ và theo loại lỗi gõ.
 """
@@ -562,7 +563,7 @@ def run(
             "cache_misses": embedding.cache_misses,
         },
         "reranker": {"enabled": settings.reranker_enabled, "provider": settings.reranker_provider},
-        "perturb": {"mode": perturb, "seed": seed if perturb == "typo" else None},
+        "perturb": {"mode": perturb, "seed": seed if perturb in ("typo", "strip_partial") else None},
         "llm": llm_snapshot() if settings.query_correction_enabled else None,
         "corpus": snapshot_corpus(),
         "config": config,

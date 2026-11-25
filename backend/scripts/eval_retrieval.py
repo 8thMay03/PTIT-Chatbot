@@ -28,8 +28,8 @@ Ví dụ::
     python -m scripts.eval_retrieval --compare a.json b.json
     python -m scripts.eval_retrieval --mode full --perturb typo --seed 20261121
 
-``--perturb strip_all|typo`` đo trên biến thể câu hỏi sinh lúc chạy (``scripts.typo_variants``,
-seed cố định) mà không ghi fixture mới.
+``--perturb strip_all|strip_partial|typo`` đo trên biến thể câu hỏi sinh lúc chạy
+(``scripts.typo_variants``, seed cố định) mà không ghi fixture mới.
 """
 
 from __future__ import annotations
@@ -752,7 +752,7 @@ def evaluate_with_dataset(
         "path": str(dataset_path),
         "cases": len(cases),
         "sha256": dataset_sha256(dataset_path),
-        "perturb": {"mode": perturb, "seed": seed if perturb == "typo" else None},
+        "perturb": {"mode": perturb, "seed": seed if perturb in ("typo", "strip_partial") else None},
     }
     return report, dataset_path
 
@@ -978,9 +978,12 @@ def add_perturb_arguments(parser: argparse.ArgumentParser) -> None:
         "--perturb",
         choices=PERTURB_MODES,
         default="none",
-        help="Biến thể câu hỏi sinh lúc chạy: bỏ hết dấu hoặc 1–3 lỗi gõ mỗi câu (không ghi fixture).",
+        help=(
+            "Biến thể câu hỏi sinh lúc chạy: bỏ hết dấu, bỏ dấu một nửa số chữ có dấu "
+            "hoặc 1–3 lỗi gõ mỗi câu (không ghi fixture)."
+        ),
     )
-    parser.add_argument("--seed", type=int, default=DEFAULT_PERTURB_SEED, help="Seed cho --perturb typo.")
+    parser.add_argument("--seed", type=int, default=DEFAULT_PERTURB_SEED, help="Seed cho --perturb strip_partial|typo.")
 
 
 def resolve_output(output: Path | None, mode: str) -> Path:

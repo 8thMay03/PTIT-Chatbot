@@ -121,6 +121,31 @@ def test_perturb_question_is_deterministic_per_seed_and_id() -> None:
         perturb_question(question, "unknown", 42, "case-1")
 
 
+def test_perturb_question_strip_partial_mode() -> None:
+    question = "Điều kiện xét học bổng khuyến khích học tập là gì?"
+
+    variant, applied = perturb_question(question, "strip_partial", 42, "case-1")
+    assert applied == ["strip_partial"]
+    assert variant != question and variant != strip_accents(question)
+    assert strip_accents(variant) == strip_accents(question)
+    assert perturb_question(question, "strip_partial", 42, "case-1") == (variant, applied)
+    # Dưới hai chữ có dấu: không bỏ dấu một phần được, giữ nguyên câu.
+    assert perturb_question("GPA la bao nhiêu", "strip_partial", 42, "case-2") == ("GPA la bao nhiêu", [])
+
+
+def test_strip_partial_set_on_golden_fixture_keeps_mixed_accents() -> None:
+    cases = json.loads((FIXTURES / "ptit_rag_300.json").read_text(encoding="utf-8"))
+    applied_count = 0
+    for case in cases:
+        variant, applied = perturb_question(case["question"], "strip_partial", 20261121, case["id"])
+        assert strip_accents(variant) == strip_accents(case["question"])
+        if applied:
+            applied_count += 1
+            assert variant != case["question"] and variant != strip_accents(case["question"])
+
+    assert applied_count >= 290
+
+
 def test_typo_set_on_golden_fixture_covers_every_type() -> None:
     cases = json.loads((FIXTURES / "ptit_rag_300.json").read_text(encoding="utf-8"))
     counts: Counter[str] = Counter()
