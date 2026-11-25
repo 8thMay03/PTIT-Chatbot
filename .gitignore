@@ -15,4 +15,5 @@ frontend/dist/
 !.agents/**
 .agents/skills
 .claude/
-.agents/tasks/
+.agents/tasks/*
+!.agents/tasks/_template/
