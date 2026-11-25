@@ -380,6 +380,17 @@ def test_gate_thresholds_persist_without_freezing_echoed_vector_value(
     assert settings.retrieval_min_bm25_norm_score == norm
 
 
+def test_folded_bm25_threshold_persists(admin_client, config_store_db) -> None:
+    folded = _different("retrieval_min_bm25_folded_norm_score", 0.45, 0.5)
+
+    response = admin_client.put("/api/config", json={"guardrails": {"min_bm25_folded_norm_score": folded}})
+    assert response.status_code == 200, response.text
+
+    assert _rows(config_store_db)["retrieval_min_bm25_folded_norm_score"].value == folded
+    _simulate_restart()
+    assert settings.retrieval_min_bm25_folded_norm_score == folded
+
+
 def test_null_threshold_removes_override_row_and_survives_restart(
     admin_client, config_store_db, monkeypatch
 ) -> None:

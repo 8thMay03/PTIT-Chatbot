@@ -80,6 +80,7 @@ PERSISTED_FIELDS = SECRET_FIELDS | frozenset(
         "retrieval_min_vector_score",
         "retrieval_min_bm25_score",
         "retrieval_min_bm25_norm_score",
+        "retrieval_min_bm25_folded_norm_score",
         "retrieval_min_rerank_score",
         "llm_profile_id",
         "reranker_profile_id",

@@ -333,6 +333,8 @@ class GuardrailsConfigPayload(BaseModel):
     # Deprecated: gate không còn dùng BM25 thô, giữ cho client cũ.
     min_bm25_score: float = 2.0
     min_bm25_norm_score: float = 0.25
+    # Ngưỡng BM25 chỉ mục bỏ dấu cho câu gõ thiếu dấu; None khi tắt.
+    min_bm25_folded_norm_score: float | None = 0.40
     min_rerank_score: float | None = None
     vector_threshold_source: str = "calibrated"
     calibrated_min_vector_score: float | None = None
@@ -425,6 +427,7 @@ class UpdateGuardrailsConfig(BaseModel):
     min_vector_score: float | None = None
     min_bm25_score: float | None = None
     min_bm25_norm_score: float | None = None
+    min_bm25_folded_norm_score: float | None = None
     min_rerank_score: float | None = None
 
 

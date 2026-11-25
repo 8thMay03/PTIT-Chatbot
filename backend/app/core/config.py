@@ -146,6 +146,12 @@ class Settings(BaseSettings):
         alias="MIN_CHILD_CHUNK_CHARS",
     )
     hybrid_vector_weight: float = Field(default=0.65, ge=0, le=1, alias="HYBRID_VECTOR_WEIGHT")
+    # Trọng số vector trong RRF khi BM25 xếp theo chỉ mục bỏ dấu (câu gõ thiếu dấu): embedding
+    # câu không dấu trả chunk sai nên giảm phần vector (documents/rag-eval/unaccented-query/).
+    # Để trống = dùng HYBRID_VECTOR_WEIGHT.
+    hybrid_folded_vector_weight: float | None = Field(
+        default=0.3, ge=0, le=1, alias="HYBRID_FOLDED_VECTOR_WEIGHT"
+    )
     hybrid_candidate_multiplier: int = Field(default=4, ge=1, alias="HYBRID_CANDIDATE_MULTIPLIER")
     hybrid_rrf_k: int = Field(default=60, ge=1, alias="HYBRID_RRF_K")
     # Confidence gate (RAG-18, app.generation.confidence). Ngưỡng vector/rerank để trống thì
@@ -155,6 +161,11 @@ class Settings(BaseSettings):
         default=0.25, ge=0, le=1, alias="RETRIEVAL_MIN_BM25_NORM_SCORE"
     )
     retrieval_min_rerank_score: float | None = Field(default=None, alias="RETRIEVAL_MIN_RERANK_SCORE")
+    # BM25 chuẩn hóa trên chỉ mục bỏ dấu (chỉ có với câu gõ thiếu dấu): câu không đạt
+    # bm25_norm vẫn qua tín hiệu từ khóa khi giá trị này vượt ngưỡng. Để trống = không dùng.
+    retrieval_min_bm25_folded_norm_score: float | None = Field(
+        default=0.40, ge=0, le=1, alias="RETRIEVAL_MIN_BM25_FOLDED_NORM_SCORE"
+    )
     # Deprecated: BM25 thô phụ thuộc kích thước kho, gate không còn dùng; giữ để đọc cấu hình cũ.
     retrieval_min_bm25_score: float = Field(default=2.0, ge=0, alias="RETRIEVAL_MIN_BM25_SCORE")
     query_rewrite_use_llm: bool = Field(default=False, alias="QUERY_REWRITE_USE_LLM")
@@ -253,7 +264,13 @@ class Settings(BaseSettings):
     # Số khóa owner/IP tối đa giữ trong bộ nhớ cho mỗi limiter; vượt thì bỏ khóa ít dùng nhất.
     chat_rate_limit_max_keys: int = Field(default=100000, ge=1, alias="CHAT_RATE_LIMIT_MAX_KEYS")
 
-    @field_validator("retrieval_min_vector_score", "retrieval_min_rerank_score", mode="before")
+    @field_validator(
+        "retrieval_min_vector_score",
+        "retrieval_min_rerank_score",
+        "retrieval_min_bm25_folded_norm_score",
+        "hybrid_folded_vector_weight",
+        mode="before",
+    )
     @classmethod
     def _blank_threshold_is_unset(cls, value: object) -> object:
         """`RETRIEVAL_MIN_VECTOR_SCORE=` để trống nghĩa là dùng bảng hiệu chỉnh theo model."""
@@ -582,6 +599,7 @@ def get_runtime_config_dict() -> dict:
             "min_vector_score": gate.min_vector_score,
             "min_bm25_score": settings.retrieval_min_bm25_score,
             "min_bm25_norm_score": gate.min_bm25_norm_score,
+            "min_bm25_folded_norm_score": gate.min_bm25_folded_norm_score,
             "min_rerank_score": gate.min_rerank_score,
             "vector_threshold_source": gate.vector_source,
             # Giá trị bảng hiệu chỉnh (None nếu model chưa có): UI dùng cho "Dùng giá trị hiệu chỉnh".
@@ -743,6 +761,10 @@ def update_runtime_config(payload: dict) -> dict:
         settings.retrieval_min_bm25_score = float(guardrails["min_bm25_score"])
     if "min_bm25_norm_score" in guardrails and guardrails["min_bm25_norm_score"] is not None:
         settings.retrieval_min_bm25_norm_score = max(0.0, min(1.0, float(guardrails["min_bm25_norm_score"])))
+    if "min_bm25_folded_norm_score" in guardrails and guardrails["min_bm25_folded_norm_score"] is not None:
+        settings.retrieval_min_bm25_folded_norm_score = max(
+            0.0, min(1.0, float(guardrails["min_bm25_folded_norm_score"]))
+        )
     if "min_rerank_score" in guardrails and guardrails["min_rerank_score"] is None:
         settings.retrieval_min_rerank_score = _INITIAL_SETTINGS["retrieval_min_rerank_score"]
     elif "min_rerank_score" in guardrails:

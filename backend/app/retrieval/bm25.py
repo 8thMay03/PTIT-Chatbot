@@ -7,10 +7,9 @@ from threading import RLock
 from rank_bm25 import BM25Okapi
 from sqlalchemy import select
 
-from app.core.config import settings
 from app.db.models import Chunk
 from app.db.session import SessionLocal
-from app.guardrails.normalization import has_accents, strip_accents
+from app.guardrails.normalization import strip_accents
 from app.ingestion.legal_units import copy_legal_metadata
 
 
@@ -29,10 +28,11 @@ class BM25Search:
     """Keyword retrieval backed by a lazily built, reusable in-memory index.
 
     Hai chỉ mục trên cùng snapshot: có dấu (token ``casefold``) và bỏ dấu (token qua
-    ``strip_accents``). Câu có dấu xếp theo chỉ mục có dấu như trước; câu không dấu, hoặc
-    câu có dấu mà top-1 ``bm25_norm_score`` dưới ngưỡng gate (thường là câu bỏ dấu một
-    phần), xếp theo chỉ mục bỏ dấu. Không dùng một chỉ mục bỏ dấu duy nhất vì bỏ dấu gộp
-    các từ khác nghĩa (``học viện``/``học viên``) và đổi điểm của mọi câu có dấu.
+    ``strip_accents``). Câu được coi là thiếu dấu khi có chữ không dấu mà kho chỉ chứa ở
+    dạng có dấu (``hoc``, ``phi``: có trong chỉ mục bỏ dấu, không có trong chỉ mục có dấu);
+    câu thiếu dấu, kể cả thiếu một phần, xếp theo chỉ mục bỏ dấu, mọi câu khác xếp theo chỉ
+    mục có dấu như trước. Không dùng một chỉ mục bỏ dấu duy nhất vì bỏ dấu gộp các từ khác
+    nghĩa (``học viện``/``học viên``) và đổi điểm của mọi câu có dấu.
 
     Mỗi kết quả có ``bm25_norm_score`` (luôn theo chỉ mục có dấu), ``bm25_folded_norm_score``
     (chỉ mục bỏ dấu, ``None`` khi không dùng) và ``bm25_index`` (chỉ mục quyết định thứ hạng,
@@ -73,8 +73,7 @@ class BM25Search:
             index = "accented"
             folded_scores: dict | None = None
             folded_bound = 0.0
-            top_norm = normalize_bm25_score(ranked[0][1], accented_bound) if ranked else 0.0
-            if not has_accents(query) or top_norm < settings.retrieval_min_bm25_norm_score:
+            if self._missing_accents(query_terms):
                 folded_scores, folded_bound = self._score_all(
                     self._folded_scorer, _tokenize_folded(query)
                 )
@@ -97,6 +96,15 @@ class BM25Search:
                 result["bm25_index"] = index
                 results.append(result)
             return results
+
+    def _missing_accents(self, query_terms: list[str]) -> bool:
+        """Có chữ không dấu chỉ xuất hiện trong kho ở dạng có dấu (câu gõ thiếu dấu)."""
+        accented_vocabulary = self._scorer.idf
+        folded_vocabulary = self._folded_scorer.idf
+        return any(
+            term not in accented_vocabulary and term in folded_vocabulary and strip_accents(term) == term
+            for term in query_terms
+        )
 
     def _score_all(self, scorer: BM25Okapi, query_terms: list[str]) -> tuple[dict, float]:
         """Điểm thô > 0 theo chunk_id trên toàn index và cận trên của query."""

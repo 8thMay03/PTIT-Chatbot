@@ -31,10 +31,18 @@ class Retriever:
             vector_results,
             keyword_results,
             top_k=candidate_count,
-            vector_weight=settings.hybrid_vector_weight,
+            vector_weight=_vector_weight(keyword_results),
             rank_constant=settings.hybrid_rrf_k,
         )
         return collapse_parent_results(fused_children, top_k=top_k)
+
+
+def _vector_weight(keyword_results: list[dict]) -> float:
+    """BM25 xếp theo chỉ mục bỏ dấu (câu thiếu dấu) thì dùng trọng số vector riêng nếu đặt."""
+    folded = bool(keyword_results) and keyword_results[0].get("bm25_index") == "folded"
+    if folded and settings.hybrid_folded_vector_weight is not None:
+        return settings.hybrid_folded_vector_weight
+    return settings.hybrid_vector_weight
 
 
 retriever = Retriever()

@@ -23,11 +23,6 @@ TUITION = "5"
 REGISTRATION = "6"
 
 
-@pytest.fixture(autouse=True)
-def default_threshold(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "retrieval_min_bm25_norm_score", 0.25)
-
-
 def _search_over(monkeypatch, texts: list[str] = TEXTS, dataset_ids: list[str] | None = None) -> BM25Search:
     search = BM25Search()
     chunks = [
@@ -81,9 +76,9 @@ def test_accented_query_above_threshold_keeps_accented_ranking(monkeypatch) -> N
     assert {result["bm25_folded_norm_score"] for result in results} == {None}
 
 
-def test_accented_query_below_threshold_falls_back_to_folded_index(monkeypatch) -> None:
+def test_partially_unaccented_query_uses_folded_index(monkeypatch) -> None:
     search = _search_over(monkeypatch)
-    # Bỏ dấu một phần: chỉ "học" và "chỉ" còn dấu nên chỉ mục có dấu cho điểm thấp.
+    # Bỏ dấu một phần: "phi", "mot", "tin" chỉ có trong kho ở dạng có dấu.
     query = "học phi mot tin chỉ"
 
     results = search.search(query, top_k=3)
@@ -93,11 +88,20 @@ def test_accented_query_below_threshold_falls_back_to_folded_index(monkeypatch) 
     assert results[0]["bm25_folded_norm_score"] > results[0]["bm25_norm_score"]
 
 
-def test_threshold_controls_fallback(monkeypatch) -> None:
+def test_weak_accented_query_stays_on_accented_index(monkeypatch) -> None:
     search = _search_over(monkeypatch)
-    monkeypatch.setattr(settings, "retrieval_min_bm25_norm_score", 0.0)
+    # Câu đủ dấu khớp yếu vẫn xếp theo chỉ mục có dấu: không có chữ nào thiếu dấu.
+    results = search.search("học phí ký túc xá giá bao nhiêu", top_k=3)
 
-    results = search.search("học phi mot tin chỉ", top_k=3)
+    assert results
+    assert results[0]["bm25_norm_score"] < 0.25
+    assert {result["bm25_index"] for result in results} == {"accented"}
+
+
+def test_plain_words_present_in_corpus_do_not_trigger_folded_index(monkeypatch) -> None:
+    search = _search_over(monkeypatch)
+    # "sinh" và "theo" vốn không dấu và có trong kho; chữ lạ "netflix" không có ở chỉ mục nào.
+    results = search.search("sinh theo netflix", top_k=3)
 
     assert {result["bm25_index"] for result in results} == {"accented"}
 
@@ -174,3 +178,17 @@ def test_heuristic_rerank_counts_folded_term_coverage_for_unaccented_query(monke
 
     assert results[0]["chunk_id"] == "tuition"
     assert results[0]["rerank_score"] == pytest.approx(1.0)
+
+
+def test_retriever_uses_folded_vector_weight_only_for_folded_ranking(monkeypatch) -> None:
+    from app.retrieval.retriever import _vector_weight
+
+    monkeypatch.setattr(settings, "hybrid_vector_weight", 0.8)
+    monkeypatch.setattr(settings, "hybrid_folded_vector_weight", 0.3)
+
+    assert _vector_weight([{"bm25_index": "folded"}]) == 0.3
+    assert _vector_weight([{"bm25_index": "accented"}]) == 0.8
+    assert _vector_weight([]) == 0.8
+
+    monkeypatch.setattr(settings, "hybrid_folded_vector_weight", None)
+    assert _vector_weight([{"bm25_index": "folded"}]) == 0.8

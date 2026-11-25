@@ -47,11 +47,23 @@ def _record(
 def test_top_signals_takes_max_and_keeps_missing_signals_as_none() -> None:
     contexts = [
         {"vector_score": 0.4, "bm25_score": 3.0, "bm25_norm_score": 0.2},
-        {"vector_score": 0.6, "bm25_score": None, "bm25_norm_score": None},
+        {"vector_score": 0.6, "bm25_score": None, "bm25_norm_score": None, "bm25_folded_norm_score": 0.5},
     ]
 
-    assert top_signals(contexts) == {"vector": 0.6, "bm25": 3.0, "bm25_norm": 0.2, "rerank": None}
-    assert top_signals([]) == {"vector": None, "bm25": None, "bm25_norm": None, "rerank": None}
+    assert top_signals(contexts) == {
+        "vector": 0.6,
+        "bm25": 3.0,
+        "bm25_norm": 0.2,
+        "bm25_folded_norm": 0.5,
+        "rerank": None,
+    }
+    assert top_signals([]) == {
+        "vector": None,
+        "bm25": None,
+        "bm25_norm": None,
+        "bm25_folded_norm": None,
+        "rerank": None,
+    }
 
 
 def test_legacy_gate_passes_on_either_signal() -> None:
