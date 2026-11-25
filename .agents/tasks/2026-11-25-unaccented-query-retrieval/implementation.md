@@ -2,7 +2,7 @@
 
 ## Tổng quan triển khai
 
-Nhánh `feat/unaccented-query-retrieval` (tách từ `dev` tại `b8c2ff3`). S-01, S-02, S-03 xong. S-04 chờ quyết định; S-05 chưa bắt đầu.
+Nhánh `feat/unaccented-query-retrieval` (tách từ `dev` tại `b8c2ff3`). S-01, S-02, S-03 xong. S-04 hủy (quyết định của user); S-05 chưa bắt đầu.
 
 ## Nhật ký theo nhiệm vụ
 
@@ -63,7 +63,14 @@ Nhánh `feat/unaccented-query-retrieval` (tách từ `dev` tại `b8c2ff3`). S-0
 
 ## Trao đổi giữa agents
 
-Chưa có.
+### MSG-agent-backend-001
+
+- Lúc: `2026-11-25T22:08:26+07:00`.
+- Từ: `agent-backend`; đến: user (người yêu cầu).
+- Nhiệm vụ: `S-03`, `S-04`, `S-05`.
+- Loại: `decision`.
+- Nội dung: hỏi cách xử lý AC-04/AC-05 lệch 1 câu ở ngưỡng 0.40 và có đưa `gateDecision.js` vào phạm vi không. User chọn: giữ 0.40, nới tiêu chí theo số đo, hủy S-04; thêm `gateDecision.js` vào S-05.
+- Hành động mong muốn: coordinator cập nhật `task.md`/`plan.md` (đã làm); `agent-backend` làm S-05.
 
 ## Bàn giao
 

@@ -5,7 +5,7 @@
 - Coordinator: `agent-backend`
 - Người yêu cầu: user
 - Tạo lúc: `2026-11-25T21:08:20+07:00`
-- Cập nhật lúc: `2026-11-25T22:02:09+07:00`
+- Cập nhật lúc: `2026-11-25T22:08:26+07:00`
 
 ## Yêu cầu và kết quả mong muốn
 
@@ -33,7 +33,8 @@ Kết quả cần có: câu không dấu (toàn phần hoặc một phần) đư
 ## Phạm vi
 
 - Bao gồm: tokenizer/chỉ mục BM25 bỏ dấu (`backend/app/retrieval/`), tín hiệu và ngưỡng gate cho BM25 bỏ dấu (`backend/app/generation/confidence.py`, `backend/app/core/config.py`), khôi phục dấu tất định từ corpus làm fallback cho LLM (điều kiện, xem `plan.md` S-04), script/fixture đo (`backend/scripts/`, `documents/rag-eval/unaccented-query/`), test backend.
-- Ngoài phạm vi: thay đổi prompt/validator của LLM sửa câu; đổi mặc định `QUERY_CORRECTION_ENABLED`; guardrail đầu vào (đã xử lý câu không dấu ở task `2026-11-18-guardrail-unaccented-scope`); UI ngoài việc hiển thị trường debug mới nếu có; re-embed hay đổi embedding model.
+- Bao gồm thêm (quyết định của user sau S-03): bản sao luật gate phía client `frontend/src/lib/gateDecision.js` và test của nó, để bảng xem trước ngưỡng trong `RetrievalTestPanel` khớp gate mới.
+- Ngoài phạm vi: thay đổi prompt/validator của LLM sửa câu; đổi mặc định `QUERY_CORRECTION_ENABLED`; guardrail đầu vào (đã xử lý câu không dấu ở task `2026-11-18-guardrail-unaccented-scope`); UI ngoài việc hiển thị trường debug mới và `gateDecision.js`; re-embed hay đổi embedding model.
 - Ràng buộc: câu có dấu giữ nguyên thứ hạng BM25, điểm `bm25_norm` và quyết định gate (so với baseline cùng commit nền). Không thêm dependency nặng (không model khôi phục dấu); chỉ dùng corpus đã index. Không dùng ngưỡng chưa đo: mọi ngưỡng mới phải ghi số đo trong `documents/rag-eval/unaccented-query/`.
 
 ## Tiêu chí nghiệm thu
@@ -43,10 +44,10 @@ Các số đo dưới đây chạy với `QUERY_CORRECTION_ENABLED=false` và c�
 - [ ] AC-01: Baseline trên commit nền được ghi lại cho `ptit_rag_300`, `ptit_faq`, `ptit_no_answer_56` với `--perturb none|strip_all|strip_partial|typo` (thêm chế độ `strip_partial` riêng vào `scripts/typo_variants.py`).
 - [ ] AC-02: Không hồi quy câu có dấu: `--perturb none` cho cùng số câu qua gate và hit@4 như baseline trên `ptit_rag_300`/`ptit_faq`; số câu `ptit_no_answer_56` qua gate không tăng ở cả ba nhóm.
 - [ ] AC-03: Câu bỏ dấu toàn bộ: `ptit_rag_300` qua gate ≥ 255/300 và hit@4 ≥ 224/300 (cùng mục tiêu tham khảo của task query-correction); `ptit_faq` qua gate ≥ 18/20.
-- [ ] AC-04: Không mở gate cho câu không đáp án bỏ dấu: `ptit_no_answer_56 --perturb strip_all` từ chối `out_of_domain` 14/14; số câu `in_domain_missing` + `near_miss` qua gate ≤ con số của bản có dấu ở baseline AC-01.
-- [ ] AC-05: Câu bỏ dấu một phần: `ptit_rag_300 --perturb strip_partial` qua gate ≥ 255/300; bộ `typo` không thấp hơn baseline ở mọi loại lỗi.
+- [ ] AC-04: Không mở gate cho câu không đáp án bỏ dấu: `ptit_no_answer_56 --perturb strip_all` từ chối `out_of_domain` ≥ 13/14; số câu `in_domain_missing` + `near_miss` qua gate ≤ con số của bản có dấu ở baseline AC-01 + 1 (tức ≤ 21). (Nới sau S-03, xem lịch sử quyết định; bản gốc: 14/14 và ≤ 20.)
+- [ ] AC-05: Câu bỏ dấu một phần: `ptit_rag_300 --perturb strip_partial` qua gate ≥ 254/300; bộ `typo` không thấp hơn baseline ở mọi loại lỗi. (Nới sau S-03; bản gốc: ≥ 255/300.)
 - [ ] AC-06: Fallback khi LLM hỏng: với `QUERY_CORRECTION_ENABLED=true` và LLM giả lập lỗi/hết budget, câu không dấu vẫn qua gate như AC-03 (test tự động trên `RAGChain` với provider giả, không cần endpoint thật).
-- [ ] AC-07: `retrieval_debug` cho biết chỉ mục BM25 đã dùng và tín hiệu BM25 bỏ dấu (nếu có), đủ để đọc lý do qua/trượt gate; ngưỡng mới có thể đặt qua env và runtime config như `min_bm25_norm_score`.
+- [ ] AC-07: `retrieval_debug` cho biết chỉ mục BM25 đã dùng và tín hiệu BM25 bỏ dấu (nếu có), đủ để đọc lý do qua/trượt gate; ngưỡng mới có thể đặt qua env và runtime config như `min_bm25_norm_score`; `frontend/src/lib/gateDecision.js` cho cùng quyết định với `assess_context` khi có `bm25_folded_norm_score` (test frontend).
 - [ ] AC-08: Toàn bộ test backend (`pytest`, cần Postgres) và test mới cho tokenizer bỏ dấu, chọn chỉ mục, gate, fallback đều đạt.
 
 ## Tài liệu và phụ thuộc
@@ -67,10 +68,12 @@ Các số đo dưới đây chạy với `QUERY_CORRECTION_ENABLED=false` và c�
 - Tóm tắt: S-01 xong trên nhánh `feat/unaccented-query-retrieval` (tách từ `dev` tại `b8c2ff3`): thêm chế độ đo `strip_partial`, số đo nền ở `documents/rag-eval/unaccented-query/`. Corpus hiện tại 993 chunk, khác bảng số ở mục đầu (1017 chunk); dùng số trong README mới làm mốc. Chưa sửa mã ứng dụng.
 - Blocker: không có.
 - S-03 xong (`documents/rag-eval/unaccented-query/README.md` mục "Sau S-03"): bỏ dấu qua gate 0 → 258/300, hit@4 50 → 236; bỏ dấu một phần 10 → 254, hit@4 173 → 234; câu có dấu không đổi. AC-04 lệch: 1 câu `out_of_domain` bỏ dấu lọt gate, câu không đáp án trong miền 21 (mốc 20); AC-05 lệch: 254/300 (mục tiêu 255).
-- Bước tiếp theo: user quyết định (1) chấp nhận ngưỡng 0.40 và nới AC-04/AC-05 theo số đo, hoặc làm S-04; (2) có thêm cập nhật `frontend/src/lib/gateDecision.js` vào phạm vi không. Sau đó `agent-backend` làm S-04 (nếu chọn) và S-05.
+- User đã quyết định: giữ ngưỡng 0.40, nới AC-04/AC-05 theo số đo, hủy S-04; thêm `gateDecision.js` vào S-05.
+- Bước tiếp theo: `agent-backend` làm S-05.
 
 ## Lịch sử quyết định về phạm vi/trạng thái
 
+- 2026-11-25T22:08:26+07:00 — user (qua agent-backend): giữ `RETRIEVAL_MIN_BM25_FOLDED_NORM_SCORE=0.40`; nới AC-04 (`out_of_domain` ≥ 13/14, trong miền ≤ 21) và AC-05 (≥ 254/300) theo số đo S-03 vì không ngưỡng nào đạt đồng thời AC-03 và AC-04 bản gốc; hủy S-04; thêm `frontend/src/lib/gateDecision.js` + test vào phạm vi S-05.
 - 2026-11-25T22:02:09+07:00 — agent-backend: S-03 xong; AC-04 và AC-05 chưa đạt ở ngưỡng chọn (0.40), không có ngưỡng nào đạt đồng thời AC-03 và AC-04 (README). Chưa đổi tiêu chí: chờ user.
 - 2026-11-25T21:30:00+07:00 — agent-backend: user duyệt kế hoạch; tạo nhánh, chuyển `in_progress`. Baseline mới: bỏ dấu 0/300 qua gate, hit@4 50; bỏ dấu một phần 10/300, hit@4 173; câu không đáp án trong miền có dấu qua gate 20 (mốc AC-04).
 - 2026-11-25T21:08:20+07:00 — agent-backend: tạo task từ phát hiện N1. Ghi nhận lỗi đã có số đo ở task query-correction (không phải "chưa từng đo"); phần chưa có là cách sửa không phụ thuộc LLM và bộ đo `strip_partial` riêng.

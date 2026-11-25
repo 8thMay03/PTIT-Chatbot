@@ -1,7 +1,7 @@
 # Verification: 2026-11-25-unaccented-query-retrieval
 
 - Verifier: `agent-backend`.
-- Trạng thái tổng: `failed` (V-01, V-02, V-03 `passed`; V-04, V-05 `failed` theo tiêu chí hiện tại; V-06 … V-08 chưa chạy).
+- Trạng thái tổng: `not_run` (V-01 … V-05 `passed` sau khi nới AC-04/AC-05; V-06 … V-08 chưa chạy).
 - Bản được kiểm tra: V-01 trên `b8c2ff3` + thay đổi S-01; V-02 … V-05 trên `bb80179` + working tree S-03 (commit S-03 ngay sau lượt đo).
 - Môi trường: Windows 11, `backend/.venv`, Postgres (Docker), corpus D26 đã index, embedding `text-embedding-3-small`.
 
@@ -53,7 +53,7 @@ python -m scripts.eval_confidence \
 - Lệnh / thao tác: lệnh chuẩn, `folded_strip_all` (và `folded_strip_partial` để tham khảo).
 - Kỳ vọng: `out_of_domain` bỏ dấu bị từ chối 14/14; `in_domain_missing` + `near_miss` qua gate ≤ 20.
 - Kết quả thực tế: `out_of_domain` 13/14 bị từ chối (lọt `Dai hoc Bach khoa Ha Noi co bao nhieu sinh vien?`, `bm25_folded_norm` 0.444); `in_domain_missing` + `near_miss` = 9 + 12 = 21. Bỏ dấu một phần: 9 + 11 = 20, `out_of_domain` lọt 1 (cùng câu).
-- Trạng thái: `failed`.
+- Trạng thái: `failed` theo tiêu chí gốc (14/14, ≤ 20); `passed` theo AC-04 đã nới (2026-11-25T22:08:26+07:00: ≥ 13/14, ≤ 21).
 - Bằng chứng: `folded_strip_all.json`, `folded_strip_partial.json`; bảng ngưỡng trong README (không ngưỡng nào đạt đồng thời AC-03).
 
 ### V-05 — AC-05
@@ -62,7 +62,7 @@ python -m scripts.eval_confidence \
 - Lệnh / thao tác: lệnh chuẩn, `folded_strip_partial`, `folded_typo`.
 - Kỳ vọng: `strip_partial` qua gate ≥ 255; `typo` không thấp hơn baseline ở mọi loại lỗi.
 - Kết quả thực tế: `strip_partial` 254/300 (thiếu 1); `typo` mọi loại tăng cả gate và hit@4 (README).
-- Trạng thái: `failed` (phần `strip_partial`); phần `typo` đạt.
+- Trạng thái: `failed` theo tiêu chí gốc (≥ 255); `passed` theo AC-05 đã nới (2026-11-25T22:08:26+07:00: ≥ 254); phần `typo` đạt.
 - Bằng chứng: `folded_strip_partial.json`, `folded_typo.json`.
 
 ### V-06 … V-08 — AC-06 … AC-08
@@ -71,11 +71,11 @@ python -m scripts.eval_confidence \
 
 ## Lỗi, kiểm tra lại và phần chưa xác minh
 
-- V-04, V-05 thất bại theo tiêu chí hiện tại (lệch 1 câu mỗi tiêu chí, xem trên); chờ user quyết định nới tiêu chí theo số đo hay làm S-04.
+- V-04, V-05 thất bại theo tiêu chí gốc (lệch 1 câu mỗi tiêu chí); user đã nới tiêu chí theo số đo, kết quả không đo lại vì không đổi mã.
 - V-06 … V-08 chưa chạy. Chưa đo với reranker/multi-query bật.
 
 ## Kết luận
 
-- Tiêu chí đã đạt: AC-01, AC-02, AC-03.
-- Tiêu chí chưa đạt/chưa xác minh: AC-04, AC-05 (thất bại sát ngưỡng), AC-06 … AC-08 (chưa chạy).
-- Đề xuất: chờ user quyết định AC-04/AC-05/S-04, rồi làm S-05.
+- Tiêu chí đã đạt: AC-01 … AC-05 (AC-04, AC-05 theo bản đã nới).
+- Tiêu chí chưa đạt/chưa xác minh: AC-06 … AC-08 (chưa chạy).
+- Đề xuất: làm S-05.
