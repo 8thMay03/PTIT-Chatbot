@@ -2,6 +2,7 @@
 
 import pytest
 
+from app.core.config import settings
 from app.retrieval.bm25 import BM25Search, normalize_bm25_score
 
 
@@ -22,6 +23,9 @@ FILLER = [
 
 
 def test_normalized_score_stays_in_unit_interval(monkeypatch) -> None:
+    # Ngưỡng 0: luôn xếp theo chỉ mục có dấu (câu này dưới 0.25 nên mặc định chuyển sang
+    # chỉ mục bỏ dấu, xem test_bm25_folded.py).
+    monkeypatch.setattr(settings, "retrieval_min_bm25_norm_score", 0.0)
     search = _search_over(
         monkeypatch,
         FILLER + ["mức học phí tín chỉ học phí học phí", "học phí đóng theo học kỳ"],

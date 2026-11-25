@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from app.core.config import ConfigValidationError, settings, validate_llm_url
+from app.guardrails.normalization import has_accents, strip_accents
 
 logger = logging.getLogger(__name__)
 
@@ -273,7 +274,9 @@ def heuristic_rerank(query: str, contexts: list[dict], top_k: int) -> list[dict]
     """Rescore candidates from vector, BM25 and query-term coverage signals."""
     vector_scores = _normalize([context.get("vector_score") for context in contexts])
     bm25_scores = _normalize([context.get("bm25_score") for context in contexts])
-    query_terms = set(_tokenize(query))
+    # Câu không dấu: so term trên dạng bỏ dấu để "hoc phi" phủ được "học phí".
+    tokenize = _tokenize if has_accents(query) else _tokenize_folded
+    query_terms = set(tokenize(query))
     reranked: list[dict] = []
 
     for index, context in enumerate(contexts):
@@ -281,7 +284,7 @@ def heuristic_rerank(query: str, contexts: list[dict], top_k: int) -> list[dict]
             str(context.get(field) or "")
             for field in ("heading", "section_path", "text")
         )
-        document_terms = set(_tokenize(searchable_text))
+        document_terms = set(tokenize(searchable_text))
         term_coverage = len(query_terms & document_terms) / max(len(query_terms), 1)
         rerank_score = (
             settings.reranker_vector_weight * vector_scores[index]
@@ -309,3 +312,7 @@ def _normalize(values: list[object]) -> list[float]:
 
 def _tokenize(text: str) -> list[str]:
     return re.findall(r"\w+", text.casefold(), flags=re.UNICODE)
+
+
+def _tokenize_folded(text: str) -> list[str]:
+    return _tokenize(strip_accents(text))

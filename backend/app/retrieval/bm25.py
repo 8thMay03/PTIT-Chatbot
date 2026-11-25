@@ -7,8 +7,10 @@ from threading import RLock
 from rank_bm25 import BM25Okapi
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.db.models import Chunk
 from app.db.session import SessionLocal
+from app.guardrails.normalization import has_accents, strip_accents
 from app.ingestion.legal_units import copy_legal_metadata
 
 
@@ -24,13 +26,25 @@ def invalidate_bm25_cache() -> None:
 
 
 class BM25Search:
-    """Keyword retrieval backed by a lazily built, reusable in-memory index."""
+    """Keyword retrieval backed by a lazily built, reusable in-memory index.
+
+    Hai chỉ mục trên cùng snapshot: có dấu (token ``casefold``) và bỏ dấu (token qua
+    ``strip_accents``). Câu có dấu xếp theo chỉ mục có dấu như trước; câu không dấu, hoặc
+    câu có dấu mà top-1 ``bm25_norm_score`` dưới ngưỡng gate (thường là câu bỏ dấu một
+    phần), xếp theo chỉ mục bỏ dấu. Không dùng một chỉ mục bỏ dấu duy nhất vì bỏ dấu gộp
+    các từ khác nghĩa (``học viện``/``học viên``) và đổi điểm của mọi câu có dấu.
+
+    Mỗi kết quả có ``bm25_norm_score`` (luôn theo chỉ mục có dấu), ``bm25_folded_norm_score``
+    (chỉ mục bỏ dấu, ``None`` khi không dùng) và ``bm25_index`` (chỉ mục quyết định thứ hạng,
+    ``accented`` hoặc ``folded``); ``score`` là điểm thô của chỉ mục đó.
+    """
 
     def __init__(self) -> None:
         self._lock = RLock()
         self._generation = -1
         self._chunks: list[dict] = []
         self._scorer: BM25Okapi | None = None
+        self._folded_scorer: BM25Okapi | None = None
 
     def search(self, query: str, top_k: int, dataset_ids: list[str] | None = None) -> list[dict]:
         if top_k <= 0:
@@ -54,23 +68,41 @@ class BM25Search:
                 return []
             # Tính điểm trên toàn index rồi lọc theo dataset để giữ IDF ổn định,
             # sau đó cắt top_k trong tập được phép.
-            scores = self._scorer.get_scores(query_terms)
-            scored_all = {self._chunks[i].get("chunk_id"): float(score) for i, score in enumerate(scores) if score > 0}
-            ranked = [
-                (chunk, scored_all.get(chunk.get("chunk_id"), 0.0))
-                for chunk in candidates
-                if scored_all.get(chunk.get("chunk_id"), 0.0) > 0
-            ]
-            ranked.sort(key=lambda item: (-item[1], item[0].get("chunk_index", 0)))
+            accented_scores, accented_bound = self._score_all(self._scorer, query_terms)
+            ranked = _rank(candidates, accented_scores)
+            index = "accented"
+            folded_scores: dict | None = None
+            folded_bound = 0.0
+            top_norm = normalize_bm25_score(ranked[0][1], accented_bound) if ranked else 0.0
+            if not has_accents(query) or top_norm < settings.retrieval_min_bm25_norm_score:
+                folded_scores, folded_bound = self._score_all(
+                    self._folded_scorer, _tokenize_folded(query)
+                )
+                ranked = _rank(candidates, folded_scores)
+                index = "folded"
 
-            upper_bound = _score_upper_bound(self._scorer, query_terms)
             results: list[dict] = []
             for chunk, score in ranked[:top_k]:
+                chunk_id = chunk.get("chunk_id")
                 result = chunk.copy()
                 result["score"] = score
-                result["bm25_norm_score"] = normalize_bm25_score(score, upper_bound)
+                result["bm25_norm_score"] = normalize_bm25_score(
+                    accented_scores.get(chunk_id, 0.0), accented_bound
+                )
+                result["bm25_folded_norm_score"] = (
+                    normalize_bm25_score(folded_scores.get(chunk_id, 0.0), folded_bound)
+                    if folded_scores is not None
+                    else None
+                )
+                result["bm25_index"] = index
                 results.append(result)
             return results
+
+    def _score_all(self, scorer: BM25Okapi, query_terms: list[str]) -> tuple[dict, float]:
+        """Điểm thô > 0 theo chunk_id trên toàn index và cận trên của query."""
+        scores = scorer.get_scores(query_terms)
+        by_id = {self._chunks[i].get("chunk_id"): float(score) for i, score in enumerate(scores) if score > 0}
+        return by_id, _score_upper_bound(scorer, query_terms)
 
     def _ensure_index(self) -> None:
         """Build once and rebuild only after ingestion invalidates the cache."""
@@ -86,11 +118,12 @@ class BM25Search:
                 return
 
             chunks = self._load_chunks()
-            tokenized_documents = [
-                _tokenize(chunk.get("search_text") or chunk["text"]) for chunk in chunks
-            ]
+            documents = [chunk.get("search_text") or chunk["text"] for chunk in chunks]
             self._chunks = chunks
-            self._scorer = BM25Okapi(tokenized_documents) if tokenized_documents else None
+            self._scorer = BM25Okapi([_tokenize(text) for text in documents]) if documents else None
+            self._folded_scorer = (
+                BM25Okapi([_tokenize_folded(text) for text in documents]) if documents else None
+            )
             self._generation = current_generation
 
     @staticmethod
@@ -130,6 +163,16 @@ class BM25Search:
             }
             snapshots.append(copy_legal_metadata(metadata, snapshot))
         return snapshots
+
+
+def _rank(candidates: list[dict], scores: dict) -> list[tuple[dict, float]]:
+    ranked = [
+        (chunk, scores[chunk.get("chunk_id")])
+        for chunk in candidates
+        if chunk.get("chunk_id") in scores
+    ]
+    ranked.sort(key=lambda item: (-item[1], item[0].get("chunk_index", 0)))
+    return ranked
 
 
 def rank_bm25(query: str, documents: list[str], top_k: int) -> list[tuple[int, float]]:
@@ -174,3 +217,8 @@ def _score_upper_bound(scorer: BM25Okapi, query_terms: list[str]) -> float:
 
 def _tokenize(text: str) -> list[str]:
     return re.findall(r"\w+", text.casefold(), flags=re.UNICODE)
+
+
+def _tokenize_folded(text: str) -> list[str]:
+    """Token bỏ dấu tiếng Việt (``học phí`` → ``hoc``, ``phi``; ``đ`` → ``d``)."""
+    return _tokenize(strip_accents(text))

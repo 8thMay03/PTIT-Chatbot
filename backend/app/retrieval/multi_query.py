@@ -22,6 +22,7 @@ def fuse_multi_query_results(
                     "vector_score": None,
                     "bm25_score": None,
                     "bm25_norm_score": None,
+                    "bm25_folded_norm_score": None,
                 },
             )
             entry["score"] += 1.0 / (rank_constant + rank)
@@ -30,6 +31,9 @@ def fuse_multi_query_results(
             entry["bm25_score"] = _maximum(entry["bm25_score"], result.get("bm25_score"))
             entry["bm25_norm_score"] = _maximum(
                 entry["bm25_norm_score"], result.get("bm25_norm_score")
+            )
+            entry["bm25_folded_norm_score"] = _maximum(
+                entry["bm25_folded_norm_score"], result.get("bm25_folded_norm_score")
             )
             if float(result.get("score") or 0) > float(entry["result"].get("score") or 0):
                 entry["result"] = result.copy()
@@ -45,6 +49,7 @@ def fuse_multi_query_results(
         result["vector_score"] = entry["vector_score"]
         result["bm25_score"] = entry["bm25_score"]
         result["bm25_norm_score"] = entry["bm25_norm_score"]
+        result["bm25_folded_norm_score"] = entry["bm25_folded_norm_score"]
         output.append(result)
     return output
 

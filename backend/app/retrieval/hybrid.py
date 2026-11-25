@@ -26,12 +26,16 @@ def reciprocal_rank_fusion(
                     "vector_score": None,
                     "bm25_score": None,
                     "bm25_norm_score": None,
+                    "bm25_folded_norm_score": None,
+                    "bm25_index": None,
                 },
             )
             entry["score"] += weight / (rank_constant + rank)
             entry[f"{label if label == 'vector' else 'bm25'}_score"] = result.get("score")
             if label == "keyword":
                 entry["bm25_norm_score"] = result.get("bm25_norm_score")
+                entry["bm25_folded_norm_score"] = result.get("bm25_folded_norm_score")
+                entry["bm25_index"] = result.get("bm25_index")
 
     ordered = sorted(fused.values(), key=lambda entry: -entry["score"])
     results: list[dict] = []
@@ -41,6 +45,8 @@ def reciprocal_rank_fusion(
         result["vector_score"] = entry["vector_score"]
         result["bm25_score"] = entry["bm25_score"]
         result["bm25_norm_score"] = entry["bm25_norm_score"]
+        result["bm25_folded_norm_score"] = entry["bm25_folded_norm_score"]
+        result["bm25_index"] = entry["bm25_index"]
         results.append(result)
     return results
 
