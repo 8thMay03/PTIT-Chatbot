@@ -172,8 +172,18 @@ def test_load_cases_reads_answerable_and_unanswerable_sets() -> None:
 
     assert all(not case["answerable"] for case in unanswerable)
     assert {case["category"] for case in unanswerable} == {"in_domain_missing", "near_miss", "out_of_domain"}
-    assert all(case["answerable"] and case["expected_terms"] for case in answerable)
+    assert all(case["answerable"] and case["evidence"] for case in answerable)
+    assert all(case["evidence"] == () for case in unanswerable)
     assert answerable[0]["dataset"] == "ptit_rag_300"
+
+
+def test_load_cases_reads_v2_and_skips_claim_only_cases() -> None:
+    cases = load_cases(FIXTURES / "eval_schema_v2_example.json")
+    by_id = {case["id"]: case for case in cases}
+
+    assert "ex_global_registration_timeline" not in by_id
+    assert by_id["ex_unanswerable_cutoff_score"]["category"] == "in_domain_missing"
+    assert len(by_id["ex_multi_hop_internship_july"]["evidence"]) == 2
 
 
 def test_rerank_rules_are_only_swept_for_cross_encoder_reports() -> None:

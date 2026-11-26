@@ -1,4 +1,4 @@
-"""Đánh giá retrieval offline: hit@k, MRR trên bộ câu hỏi có `expected_terms`.
+"""Đánh giá retrieval offline: hit@k, MRR trên bộ câu hỏi có bằng chứng (schema v1 hoặc v2).
 
 Chỉ chạy phần truy xuất, không sinh câu trả lời và không gọi LLM judge. Các chế độ:
 
@@ -10,15 +10,20 @@ Chỉ chạy phần truy xuất, không sinh câu trả lời và không gọi L
 
 Chỉ số:
 
-- hit@1/4/10 + MRR theo rank context đầu tiên chứa một `expected_terms`.
-- coverage@1/4/10: tỉ lệ `expected_terms` được phủ bởi top-k context (recall theo
-  term) — đo việc truy xuất đủ mọi thông tin cần cho câu trả lời, không chỉ một.
+- hit@1/4/10 + MRR theo rank context đầu tiên thỏa một nhóm bằng chứng.
+- coverage@1/4/10: tỉ lệ nhóm bằng chứng được phủ bởi top-k context (recall theo
+  nhóm) — đo việc truy xuất đủ mọi thông tin cần cho câu trả lời, không chỉ một.
+- all_groups@1/4/10: tỉ lệ câu có top-k phủ đủ **mọi** nhóm — chỉ số chính cho câu
+  multi-hop/so sánh (từ báo cáo schema v4).
 - section_dominance: tỉ lệ câu có mỗi section (source + section_path) trong top-4 —
   phát hiện section quá lớn chiếm chỗ đáp án đúng.
 
-Câu hỏi được xem là trúng khi một `expected_terms` xuất hiện trong text của context
-sau khi chuẩn hóa NFKC + bỏ thẻ HTML + casefold; nhãn không phụ thuộc chunk ID nên
-dùng được khi thay đổi chunking. Embedding câu hỏi được cache theo khóa
+Dataset nạp qua ``scripts.eval_dataset`` (đặc tả: documents/rag-eval/dataset-schema-v2.md).
+File v1: mỗi `expected_terms` là một nhóm, nên câu trúng khi một term xuất hiện trong
+text của context sau khi chuẩn hóa NFKC + bỏ thẻ HTML + casefold — như trước. Câu không
+có bằng chứng (không có đáp án, câu global chỉ chấm bằng claim) bị bỏ qua và ghi vào
+``dataset.skipped_no_evidence``. Nhãn không phụ thuộc chunk ID nên dùng được khi thay
+đổi chunking. Embedding câu hỏi được cache theo khóa
 (provider, model, text) để chạy lại không tốn API.
 
 Ví dụ::
@@ -29,24 +34,35 @@ Ví dụ::
     python -m scripts.eval_retrieval --mode full --perturb typo --seed 20261121
 
 ``--perturb strip_all|strip_partial|typo`` đo trên biến thể câu hỏi sinh lúc chạy
-(``scripts.typo_variants``, seed cố định) mà không ghi fixture mới.
+(``scripts.typo_variants``, seed cố định) mà không ghi fixture mới. ``--split dev|test``
+chỉ chạy các câu v2 thuộc split đó.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
-import html
 import json
-import re
 import subprocess
 import sys
 import time
-import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import fmean
 from typing import Any, Callable
+
+from scripts.eval_dataset import (
+    SPLITS,
+    UNKNOWN,
+    Dataset,
+    all_groups_rank,
+    first_hit,
+    group_ranks,
+    groups_from_terms,
+    load_cases,
+    normalize_text,  # noqa: F401 — giữ API cũ, các test vẫn import normalize_text từ module này
+)
+from scripts.eval_dataset import coverage_by_k as group_coverage_by_k
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_DIR.parent
@@ -56,20 +72,21 @@ DEFAULT_CACHE_FILE = BACKEND_DIR / "storage" / "eval" / "embedding_cache.json"
 MODES = ("bm25", "vector", "hybrid", "full")
 METRIC_KS = (1, 4, 10)
 # v3: thêm `retrieved[].section_path` và `metrics.section_dominance`.
-SCHEMA_VERSION = 3
+# v4: thêm `cases[].split`, `cases[].evidence_groups`, `cases[].all_groups_rank` và
+# metric `all_groups@k`; `dataset` ghi schema/tên/split của dataset và câu bị bỏ qua.
+SCHEMA_VERSION = 4
 DOMINANCE_K = 4
 DEFAULT_PERTURB_SEED = 20261121
 RANK_METRICS = ("hit@1", "hit@4", "hit@10", "mrr")
 COVERAGE_METRICS = ("coverage@1", "coverage@4", "coverage@10")
-REPORT_METRICS = RANK_METRICS + COVERAGE_METRICS
+ALL_GROUPS_METRICS = ("all_groups@1", "all_groups@4", "all_groups@10")
+REPORT_METRICS = RANK_METRICS + COVERAGE_METRICS + ALL_GROUPS_METRICS
 
-HTML_TAG_RE = re.compile(r"<[^>]+>")
-WHITESPACE_RE = re.compile(r"\s+")
 VIETNAMESE_DIACRITICS = set(
     "àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộ"
     "ơờớởỡợùúủũụưừứửữựỳýỷỹỵđ"
 )
-UNKNOWN_GROUP = "unknown"
+UNKNOWN_GROUP = UNKNOWN
 
 CONFIG_FIELDS = (
     "chunk_size",
@@ -104,51 +121,17 @@ CONFIG_FIELDS = (
 # ---------------------------------------------------------------------------
 
 
-def normalize_text(text: str) -> str:
-    """Chuẩn hóa để so khớp: NFKC, bỏ thẻ HTML, gộp khoảng trắng, casefold."""
-
-    if not text:
-        return ""
-    normalized = unicodedata.normalize("NFKC", text)
-    # NFKC trước để các ký tự full-width như ＜ trở thành < rồi mới lọc thẻ.
-    normalized = HTML_TAG_RE.sub(" ", normalized)
-    normalized = html.unescape(normalized)
-    normalized = WHITESPACE_RE.sub(" ", normalized)
-    return normalized.casefold().strip()
-
-
-def normalize_terms(expected_terms: list[str]) -> list[tuple[str, str]]:
-    """Chuẩn hóa danh sách term, giữ cả bản gốc để ghi vào báo cáo."""
-
-    pairs: list[tuple[str, str]] = []
-    for term in expected_terms:
-        normalized = normalize_text(str(term))
-        if normalized:
-            pairs.append((normalized, str(term)))
-    return pairs
-
-
 def first_hit_rank(
     contexts: list[dict],
     expected_terms: list[str],
     text_field: str = "text",
 ) -> tuple[int | None, str | None]:
-    """Tìm rank context đầu tiên chứa một term kỳ vọng.
+    """Tìm rank context đầu tiên chứa một term kỳ vọng (mỗi term là một nhóm bằng chứng).
 
     Trả về ``(rank_bắt_đầu_từ_1, term_gốc)``; ``(None, None)`` nếu không trúng.
     """
 
-    terms = normalize_terms(expected_terms)
-    if not terms:
-        return None, None
-    for rank, context in enumerate(contexts, start=1):
-        text = normalize_text(str(context.get(text_field) or ""))
-        if not text:
-            continue
-        for normalized, original in terms:
-            if normalized in text:
-                return rank, original
-    return None, None
+    return first_hit(group_ranks(contexts, groups_from_terms(expected_terms), text_field))
 
 
 def compute_metrics(ranks: list[int | None], ks: tuple[int, ...] = METRIC_KS) -> dict:
@@ -166,6 +149,18 @@ def compute_metrics(ranks: list[int | None], ks: tuple[int, ...] = METRIC_KS) ->
     return metrics
 
 
+def compute_all_groups_metrics(ranks: list[int | None], ks: tuple[int, ...] = METRIC_KS) -> dict:
+    """all_groups@k: tỉ lệ câu có top-k phủ đủ mọi nhóm bằng chứng (rank = all_groups_rank)."""
+
+    total = len(ranks)
+    if total == 0:
+        return {f"all_groups@{k}": 0.0 for k in ks}
+    return {
+        f"all_groups@{k}": round(sum(1 for rank in ranks if rank is not None and rank <= k) / total, 6)
+        for k in ks
+    }
+
+
 def coverage_by_k(
     contexts: list[dict],
     expected_terms: list[str],
@@ -179,18 +174,7 @@ def coverage_by_k(
     đòi hỏi phủ đủ mọi term, không chỉ trúng một.
     """
 
-    terms = [normalized for normalized, _ in normalize_terms(expected_terms)]
-    if not terms:
-        return {f"coverage@{k}": 0.0 for k in ks}
-    normalized_texts = [
-        normalize_text(str(context.get(text_field) or "")) for context in contexts
-    ]
-    metrics: dict[str, float] = {}
-    for k in ks:
-        prefix = [text for text in normalized_texts[:k] if text]
-        covered = sum(1 for term in terms if any(term in text for text in prefix))
-        metrics[f"coverage@{k}"] = round(covered / len(terms), 6)
-    return metrics
+    return group_coverage_by_k(group_ranks(contexts, groups_from_terms(expected_terms), text_field), ks)
 
 
 def compute_coverage_metrics(
@@ -214,16 +198,6 @@ def diacritics_group(question: str) -> str:
     return "co_dau" if any(char in VIETNAMESE_DIACRITICS for char in folded) else "khong_dau"
 
 
-def case_group_value(case: dict, *keys: str) -> str:
-    """Lấy nhóm từ metadata câu hỏi; dataset hiện có thể chưa có các trường này."""
-
-    for key in keys:
-        value = str(case.get(key) or "").strip()
-        if value:
-            return value
-    return UNKNOWN_GROUP
-
-
 def aggregate_metrics(case_results: list[dict]) -> dict:
     """Gộp chỉ số tổng và theo nhóm nguồn / loại câu hỏi / dấu."""
 
@@ -232,6 +206,8 @@ def aggregate_metrics(case_results: list[dict]) -> dict:
         metrics.update(
             compute_coverage_metrics([item.get("coverage") or {} for item in items])
         )
+        if items and all("all_groups_rank" in item for item in items):
+            metrics.update(compute_all_groups_metrics([item["all_groups_rank"] for item in items]))
         return metrics
 
     grouped: dict[str, dict[str, dict]] = {}
@@ -416,38 +392,40 @@ def git_info() -> dict:
     return {"commit": commit, "branch": branch, "dirty": dirty}
 
 
-def load_dataset(path: Path) -> list[dict]:
-    """Nạp dataset JSON: mảng câu hỏi, hoặc object có khóa data/samples/cases/questions."""
+def load_dataset(path: Path, split: str | None = None) -> list[dict]:
+    """Nạp dataset v1/v2 (``scripts.eval_dataset``), chỉ giữ câu có bằng chứng."""
 
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if isinstance(payload, dict):
-        for key in ("data", "samples", "cases", "questions"):
-            if isinstance(payload.get(key), list):
-                payload = payload[key]
-                break
-    if not isinstance(payload, list) or not payload:
-        raise ValueError(f"{path} phải chứa mảng câu hỏi không rỗng")
+    return select_cases(load_cases(path), split)[0]
+
+
+def select_cases(dataset: Dataset, split: str | None = None) -> tuple[list[dict], list[str]]:
+    """Câu dùng để đo retrieval và id các câu bị bỏ vì không có bằng chứng.
+
+    v1: mỗi `expected_terms` là một nhóm bằng chứng (trúng khi một term xuất hiện).
+    """
 
     cases: list[dict] = []
-    for number, raw in enumerate(payload, start=1):
-        question = str(raw.get("question") or raw.get("user_input") or "").strip()
-        terms = raw.get("expected_terms") or []
-        if isinstance(terms, str):
-            terms = [terms]
-        if not question:
-            raise ValueError(f"Câu thứ {number} trong {path} thiếu `question`")
-        if not terms:
-            raise ValueError(f"Câu {raw.get('id', number)!r} thiếu `expected_terms`")
+    skipped: list[str] = []
+    for case in dataset.cases:
+        if split and case.split != split:
+            continue
+        if not case.evidence:
+            skipped.append(case.id)
+            continue
         cases.append(
             {
-                "id": str(raw.get("id") or f"case_{number:04d}"),
-                "question": question,
-                "expected_terms": [str(term) for term in terms],
-                "source": case_group_value(raw, "source", "source_document", "document"),
-                "question_type": case_group_value(raw, "question_type"),
+                "id": case.id,
+                "question": case.query,
+                "evidence": case.evidence,
+                "source": case.source,
+                "question_type": case.query_type,
+                "split": case.split,
             }
         )
-    return cases
+    if not cases:
+        scope = f" thuộc split {split!r}" if split else ""
+        raise ValueError(f"{dataset.origin} không có câu nào{scope} có bằng chứng để đo retrieval")
+    return cases, skipped
 
 
 def dataset_sha256(path: Path) -> str:
@@ -615,9 +593,10 @@ def warm_cache_texts(mode: str, questions: list[str]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def run_case(question: str, retrieval_fn: Callable[[str], list[dict]], expected_terms: list[str]) -> dict:
+def run_case(question: str, retrieval_fn: Callable[[str], list[dict]], evidence: tuple) -> dict:
     contexts = retrieval_fn(question)
-    rank, matched_term = first_hit_rank(contexts, expected_terms)
+    ranks = group_ranks(contexts, evidence)
+    rank, matched_term = first_hit(ranks)
     retrieved = []
     for position, context in enumerate(contexts[: max(METRIC_KS)], start=1):
         retrieved.append(
@@ -634,7 +613,8 @@ def run_case(question: str, retrieval_fn: Callable[[str], list[dict]], expected_
         "first_hit_rank": rank,
         "matched_term": matched_term,
         "retrieved": retrieved,
-        "coverage": coverage_by_k(contexts, expected_terms),
+        "coverage": group_coverage_by_k(ranks, METRIC_KS),
+        "all_groups_rank": all_groups_rank(ranks),
     }
 
 
@@ -668,7 +648,7 @@ def evaluate(mode: str, cases: list[dict], top_k: int, cache_file: Path) -> dict
     case_results: list[dict] = []
     for index, case in enumerate(cases, start=1):
         trace.pop("correction", None)
-        outcome = run_case(case["question"], retrieval_fn, case["expected_terms"])
+        outcome = run_case(case["question"], retrieval_fn, case["evidence"])
         extra: dict = {}
         if "original_question" in case:
             extra["original_question"] = case["original_question"]
@@ -687,6 +667,9 @@ def evaluate(mode: str, cases: list[dict], top_k: int, cache_file: Path) -> dict
                 "matched_term": outcome["matched_term"],
                 "retrieved": outcome["retrieved"],
                 "coverage": outcome["coverage"],
+                "split": case["split"],
+                "evidence_groups": len(case["evidence"]),
+                "all_groups_rank": outcome["all_groups_rank"],
             }
         )
         print(
@@ -742,8 +725,10 @@ def evaluate_with_dataset(
     limit: int | None,
     perturb: str = "none",
     seed: int = 0,
+    split: str | None = None,
 ) -> tuple[dict, Path]:
-    cases = load_dataset(dataset_path)
+    dataset = load_cases(dataset_path)
+    cases, skipped = select_cases(dataset, split)
     if limit:
         cases = cases[:limit]
     cases = apply_perturbation(cases, perturb, seed)
@@ -753,6 +738,10 @@ def evaluate_with_dataset(
         "cases": len(cases),
         "sha256": dataset_sha256(dataset_path),
         "perturb": {"mode": perturb, "seed": seed if perturb in ("typo", "strip_partial") else None},
+        "schema_version": dataset.schema_version,
+        "name": dataset.name,
+        "split": split,
+        "skipped_no_evidence": skipped,
     }
     return report, dataset_path
 
@@ -791,9 +780,13 @@ def print_summary(report: dict) -> None:
             f"(cache {embedding['cache_hits']} hit / {embedding['cache_misses']} miss)"
         )
     print()
+    skipped = report["dataset"].get("skipped_no_evidence") or []
+    if skipped:
+        print(f"bỏ qua {len(skipped)} câu không có bằng chứng (không có đáp án / chỉ chấm claim)")
     for section_metrics, names in (
         (report["metrics"]["overall"], RANK_METRICS),
         (report["metrics"]["overall"], COVERAGE_METRICS),
+        (report["metrics"]["overall"], ALL_GROUPS_METRICS),
     ):
         print(format_metric_line("overall", section_metrics, names))
     for section in ("by_diacritics", "by_question_type", "by_source"):
@@ -804,6 +797,7 @@ def print_summary(report: dict) -> None:
         for label, metrics in groups.items():
             print(format_metric_line(label, metrics, RANK_METRICS))
             print(format_metric_line(label, metrics, COVERAGE_METRICS))
+            print(format_metric_line(label, metrics, ALL_GROUPS_METRICS))
     print_dominance(report_dominance(report))
 
 
@@ -895,7 +889,7 @@ def compare_reports(path_a: Path, path_b: Path) -> int:
     cases_a = (report_a.get("metrics", {}).get("overall") or {}).get("cases")
     cases_b = (report_b.get("metrics", {}).get("overall") or {}).get("cases")
     print()
-    header = f"{'nhóm':<38} {'metric':<8} {'A':>8} {'B':>8} {'delta':>9}"
+    header = f"{'nhóm':<38} {'metric':<13} {'A':>8} {'B':>8} {'delta':>9}"
     print(header)
     print("-" * len(header))
     for key in all_keys:
@@ -913,13 +907,13 @@ def compare_reports(path_a: Path, path_b: Path) -> int:
             else:
                 delta = "—"
             suffix = f"  (n={cases_a})" if name == "hit@1" and cases_a == cases_b else ""
-            print(f"{key:<38} {name:<8} {text_a:>8} {text_b:>8} {delta:>9}{suffix}")
+            print(f"{key:<38} {name:<13} {text_a:>8} {text_b:>8} {delta:>9}{suffix}")
 
     dominance_a = report_dominance(report_a)
     dominance_b = report_dominance(report_b)
     print()
     print(
-        f"{'section_dominance max':<38} {'share':<8} {dominance_a['max_share']:>8.3f} "
+        f"{'section_dominance max':<38} {'share':<13} {dominance_a['max_share']:>8.3f} "
         f"{dominance_b['max_share']:>8.3f} {dominance_b['max_share'] - dominance_a['max_share']:>+9.3f}"
     )
     print_dominance(dominance_a, label=" A")
@@ -957,6 +951,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help=f"File cache embedding (mặc định {DEFAULT_CACHE_FILE}).",
     )
     parser.add_argument("--limit", type=int, help="Chỉ chạy N câu đầu (debug nhanh).")
+    parser.add_argument("--split", choices=SPLITS, help="Chỉ chạy câu thuộc split này (dataset v2).")
     add_perturb_arguments(parser)
     parser.add_argument(
         "--compare",
@@ -1001,7 +996,7 @@ def main(argv: list[str] | None = None) -> int:
         return compare_reports(args.compare[0], args.compare[1])
 
     report, dataset_path = evaluate_with_dataset(
-        args.mode, args.dataset, args.top_k, args.embedding_cache, args.limit, args.perturb, args.seed
+        args.mode, args.dataset, args.top_k, args.embedding_cache, args.limit, args.perturb, args.seed, args.split
     )
     output = resolve_output(args.output, args.mode)
     write_report(report, output)

@@ -6,7 +6,7 @@ hybrid, rerank theo cấu hình; không gọi LLM) rồi ghi cho từng câu:
 - kết quả scope guardrail (`check_scope`);
 - tín hiệu top-1 = max trên các context sau rerank: `vector` (cosine), `bm25` (thô),
   `bm25_norm` (BM25 chuẩn hóa [0, 1]), `rerank`;
-- rank context đầu tiên chứa `expected_terms` (câu có đáp án);
+- rank context đầu tiên thỏa một nhóm bằng chứng (câu có đáp án; v1: một `expected_terms`);
 - quyết định của gate cũ (vector ≥ min_vector OR bm25 thô ≥ min_bm25) và gate đang cài.
 
 `--sweep` quét lưới ngưỡng cho từng luật kết hợp và in tỉ lệ từ chối nhầm (câu có đáp
@@ -34,6 +34,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from scripts.eval_dataset import first_hit, group_ranks
+from scripts.eval_dataset import load_cases as load_dataset_file
 from scripts.eval_retrieval import (
     BACKEND_DIR,
     DEFAULT_CACHE_FILE,
@@ -42,7 +44,6 @@ from scripts.eval_retrieval import (
     apply_perturbation,
     build_retrieval_fn,
     dataset_sha256,
-    first_hit_rank,
     git_info,
     snapshot_config,
     snapshot_corpus,
@@ -415,22 +416,23 @@ def correction_summary(records: list[dict]) -> dict:
 
 
 def load_cases(path: Path) -> list[dict]:
-    """Nạp câu có đáp án (có `expected_terms`) hoặc không có đáp án (`answerable: false`)."""
+    """Nạp câu có đáp án (có bằng chứng) và không có đáp án (``answerable: false``), v1 hoặc v2.
 
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    Câu có đáp án nhưng không có bằng chứng (câu v2 chỉ chấm bằng claim) không đo được rank nên
+    bị bỏ qua.
+    """
+
     cases = []
-    for number, raw in enumerate(payload, start=1):
-        answerable = raw.get("answerable", True) is not False
-        terms = raw.get("expected_terms") or []
-        if answerable and not terms:
-            raise ValueError(f"Câu {raw.get('id', number)!r} trong {path} thiếu `expected_terms`")
+    for case in load_dataset_file(path).cases:
+        if case.answerable and not case.evidence:
+            continue
         cases.append(
             {
-                "id": str(raw.get("id") or f"case_{number:04d}"),
-                "question": str(raw.get("question") or raw.get("user_input") or "").strip(),
-                "answerable": answerable,
-                "category": str(raw.get("category") or ("answerable" if answerable else "unknown")),
-                "expected_terms": [str(term) for term in terms],
+                "id": case.id,
+                "question": case.query,
+                "answerable": case.answerable,
+                "category": "answerable" if case.answerable else case.unanswerable_category or "unknown",
+                "evidence": case.evidence,
                 "dataset": path.stem,
             }
         )
@@ -528,7 +530,7 @@ def run(
         signals = top_signals(contexts)
         rank = None
         if case["answerable"]:
-            rank, _ = first_hit_rank(contexts, case["expected_terms"])
+            rank, _ = first_hit(group_ranks(contexts, case["evidence"]))
         record = {
             "id": case["id"],
             "dataset": case["dataset"],
