@@ -5,7 +5,8 @@ nhanh sau mỗi thay đổi về chunking, index hoặc cấu hình hybrid/reran
 
 Script: [`backend/scripts/eval_retrieval.py`](../../backend/scripts/eval_retrieval.py) ·
 Dataset: [`backend/tests/fixtures/ptit_ragas_100.json`](../../backend/tests/fixtures/ptit_ragas_100.json) (100 câu, sha256 `fa9d2d64f4045c0f…`)
-Unit test: [`backend/tests/test_eval_retrieval.py`](../../backend/tests/test_eval_retrieval.py)
+Unit test: [`backend/tests/test_eval_retrieval.py`](../../backend/tests/test_eval_retrieval.py) ·
+Schema dataset: [`dataset-schema-v2.md`](dataset-schema-v2.md) (mọi script đánh giá đọc được cả v1 lẫn v2)
 
 ## Cách chạy
 
@@ -323,10 +324,36 @@ chỉ ghi khi tập id và `text` chunk khớp DB; tài liệu lệch phải chu
   top-10 của một câu giữa các lần chụp do Postgres phá hòa theo thứ tự vật lý sau `UPDATE`;
   không ảnh hưởng ghép cặp (theo `chunk_id`).
 
+## Schema test case v2 và `all_groups@k` (2026-11-27)
+
+Đặc tả: [`dataset-schema-v2.md`](dataset-schema-v2.md). Loader dùng chung
+`scripts/eval_dataset.py`; báo cáo `eval_retrieval` lên schema v4 (thêm `all_groups@k`,
+`cases[].all_groups_rank`, `cases[].split`, `dataset.skipped_no_evidence`; `--split dev|test`).
+Dataset v1 đọc như cũ: chạy lại bm25/hybrid trên `ptit_ragas_100`, `ptit_rag_300` và
+`eval_confidence` mặc định cho kết quả từng câu giống hệt bản trước khi đổi loader (commit nền
+`b890935`).
+
+`all_groups@k` = tỉ lệ câu có top-k chứa **mọi** nhóm bằng chứng. Với file v1 mỗi
+`expected_terms` là một nhóm, nên đây là cận dưới bi quan: một số term v1 là cách viết thay thế
+hoặc ngữ cảnh chứ không phải dữ kiện bắt buộc. Số đo trên index hiện tại (fingerprint
+`a43f1dd48c7f…`, `qwen3-embedding:0.6b`, `HYBRID_VECTOR_WEIGHT=0.5`, top_k 10):
+
+| Dataset | Chế độ | hit@4 | coverage@4 | all_groups@1 | all_groups@4 | all_groups@10 | câu ≥ 2 term: hit@4 → all_groups@4 |
+|---|---|---:|---:|---:|---:|---:|---|
+| `ptit_ragas_100` | bm25 | 0.830 | 0.753 | 0.540 | 0.670 | 0.760 | 0.899 → 0.667 (n=69) |
+| `ptit_ragas_100` | hybrid | 0.860 | 0.809 | 0.600 | 0.750 | 0.760 | 0.913 → 0.754 (n=69) |
+| `ptit_rag_300` | bm25 | 0.840 | 0.809 | 0.607 | 0.780 | 0.833 | 0.950 → 0.772 (n=101) |
+| `ptit_rag_300` | hybrid | 0.897 | 0.868 | 0.633 | 0.840 | 0.857 | 0.950 → 0.782 (n=101) |
+
+Với câu cần nhiều dữ kiện, hit@4 cao hơn all_groups@4 khoảng 15–25 điểm: retrieval "trúng" nhưng
+top-4 thường thiếu một phần thông tin. Bộ multi-hop/global viết theo v2 (có neo Điều và cách viết
+tương đương) sẽ cho số đo đáng tin hơn cận dưới này.
+
 ## Hạn chế đã biết
 
-- Dataset chưa có metadata `question_type` / `source` nên các nhóm
+- Các fixture v1 chưa có `question_type` / `source` / `split` nên các nhóm
   `by_question_type`, `by_source` hiện toàn `unknown`; 100/100 câu đều có dấu nên
-  nhóm `by_diacritics` mới chỉ có `co_dau`. RAG-02 bổ sung dữ liệu sẽ điền các nhóm này.
+  nhóm `by_diacritics` mới chỉ có `co_dau`. Schema v2 có các trường này; cần người gắn nhãn
+  khi chuyển (`python -m scripts.eval_dataset convert` không tự đoán).
 - Các số Ragas 0.90/0.95/0.93/0.85 trong README chính đo bằng pipeline kèm sinh
   câu trả lời (LLM judge), không so sánh trực tiếp với các số retrieval thuần ở đây.

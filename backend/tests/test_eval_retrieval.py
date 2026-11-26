@@ -5,10 +5,14 @@ module chỉ import thư viện chuẩn ở top-level.
 """
 
 import importlib
+from pathlib import Path
 
 import pytest
 
+from scripts.eval_dataset import EvidenceGroup
 from scripts.eval_retrieval import UNKNOWN_GROUP
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def _load_module(monkeypatch: pytest.MonkeyPatch):
@@ -155,14 +159,6 @@ def test_diacritics_group_classification() -> None:
     assert diacritics_group("Học phí là bao nhiêu?") == "co_dau"
     assert diacritics_group("cho minh hoi thu tuc nhap hoc?") == "khong_dau"
     assert diacritics_group("tuition fee") == "khong_dau"
-
-
-def test_case_group_value_defaults_to_unknown() -> None:
-    from scripts.eval_retrieval import case_group_value
-
-    assert case_group_value({"question_type": "tuition"}, "question_type") == "tuition"
-    assert case_group_value({}, "question_type") == UNKNOWN_GROUP
-    assert case_group_value({"source": " "}, "source", "source_document") == UNKNOWN_GROUP
 
 
 def test_aggregate_metrics_groups_and_overall() -> None:
@@ -345,9 +341,10 @@ def test_load_dataset_requires_question_and_terms(tmp_path) -> None:
         {
             "id": "q1",
             "question": "Học phí?",
-            "expected_terms": ["học phí"],
+            "evidence": (EvidenceGroup(terms=(("học phí",),)),),
             "source": "unknown",
             "question_type": "unknown",
+            "split": "unknown",
         }
     ]
 
@@ -363,3 +360,60 @@ def test_load_dataset_requires_question_and_terms(tmp_path) -> None:
     bad.write_text('[{"id": "q3", "question": "Thiếu term"}]', encoding="utf-8")
     with pytest.raises(ValueError, match="expected_terms"):
         load_dataset(bad)
+
+
+def test_select_cases_skips_cases_without_evidence_and_filters_split() -> None:
+    from scripts.eval_dataset import load_cases
+    from scripts.eval_retrieval import select_cases
+
+    dataset = load_cases(FIXTURES / "eval_schema_v2_example.json")
+
+    cases, skipped = select_cases(dataset)
+    assert skipped == ["ex_global_registration_timeline", "ex_unanswerable_cutoff_score"]
+    assert {case["question_type"] for case in cases} == {"single_hop", "comparison", "multi_hop", "aggregation"}
+
+    dev_cases, dev_skipped = select_cases(dataset, "dev")
+    assert [case["id"] for case in dev_cases] == ["ex_single_hop_engineer_min_credits"]
+    assert dev_skipped == []
+
+    unanswerable = load_cases(FIXTURES / "ptit_no_answer_56.json")
+    with pytest.raises(ValueError, match="không có câu nào"):
+        select_cases(unanswerable)
+
+
+def test_run_case_reports_all_groups_rank_for_multi_group_evidence() -> None:
+    from scripts.eval_retrieval import run_case
+
+    evidence = (EvidenceGroup(terms=(("25 tín chỉ",),)), EvidenceGroup(terms=(("12 tín chỉ",),)))
+    contexts = [
+        {"chunk_id": "a", "text": "Kỳ phụ tối đa 12 tín chỉ."},
+        {"chunk_id": "b", "text": "khác"},
+        {"chunk_id": "c", "text": "Kỳ chính tối đa 25 tín chỉ."},
+    ]
+
+    outcome = run_case("?", lambda _query: contexts, evidence)
+
+    assert outcome["first_hit_rank"] == 1
+    assert outcome["matched_term"] == "12 tín chỉ"
+    assert outcome["all_groups_rank"] == 3
+    assert outcome["coverage"] == {"coverage@1": 0.5, "coverage@4": 1.0, "coverage@10": 1.0}
+    assert [item["chunk_id"] for item in outcome["retrieved"]] == ["a", "b", "c"]
+
+
+def test_aggregate_metrics_adds_all_groups_only_for_v4_cases() -> None:
+    from scripts.eval_retrieval import aggregate_metrics
+
+    base = {"diacritics": "co_dau", "question_type": "multi_hop", "source": "x", "coverage": {}}
+    cases = [
+        {**base, "id": "a", "first_hit_rank": 1, "all_groups_rank": 3},
+        {**base, "id": "b", "first_hit_rank": 2, "all_groups_rank": None},
+    ]
+
+    overall = aggregate_metrics(cases)["overall"]
+    assert overall["hit@1"] == 0.5
+    assert overall["all_groups@1"] == 0.0
+    assert overall["all_groups@4"] == 0.5
+    assert overall["all_groups@10"] == 0.5
+
+    old = [{key: value for key, value in case.items() if key != "all_groups_rank"} for case in cases]
+    assert "all_groups@4" not in aggregate_metrics(old)["overall"]

@@ -3,12 +3,13 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import unicodedata
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from statistics import mean
 
 from app.generation.rag_chain import RagChain, rag_chain
+from scripts.eval_dataset import EvalCase, all_groups_rank, group_ranks, load_cases, slot_coverage
 
 
 DEFAULT_DATASET = Path(__file__).parents[1] / "tests" / "fixtures" / "ptit_faq.json"
@@ -29,29 +30,21 @@ class CaseResult:
     error: str | None = None
 
 
-def _normalize(value: str) -> str:
-    """Normalize Unicode, casing, and whitespace for stable text matching."""
+def load_faq_cases(path: Path) -> list[EvalCase]:
+    """Load answerable cases whose evidence has keyword terms (schema v1 or v2).
 
-    return " ".join(unicodedata.normalize("NFKC", value).casefold().split())
+    v1 `expected_terms` form a single evidence group, so a retrieval hit still means one
+    context contains every term. v2 cases hit once the top-k covers every evidence group.
+    Cases without terms (anchor-only or claim-only) would score a free keyword recall of 1.0,
+    so they are left to `eval_retrieval` / `evaluate_ragas`.
+    """
 
-
-def _term_coverage(text: str, expected_terms: list[str]) -> float:
-    """Return the fraction of expected terms found in the supplied text."""
-
-    if not expected_terms:
-        return 1.0
-    normalized_text = _normalize(text)
-    matched = sum(_normalize(term) in normalized_text for term in expected_terms)
-    return matched / len(expected_terms)
-
-
-def _evidence_rank(contexts: list[dict], expected_terms: list[str]) -> int | None:
-    """Return the one-based rank of the first context containing all evidence terms."""
-
-    for rank, context in enumerate(contexts, start=1):
-        if _term_coverage(str(context.get("text", "")), expected_terms) == 1.0:
-            return rank
-    return None
+    dataset = load_cases(path, v1_evidence="single_group")
+    cases = [case for case in dataset.cases if case.answerable and case.evidence and case.answer_slots]
+    skipped = len(dataset.cases) - len(cases)
+    if skipped:
+        print(f"Skipped {skipped} cases without an answer or evidence terms.", file=sys.stderr)
+    return cases
 
 
 def _citation_validity(answer: str, sources: list[dict]) -> float:
@@ -66,21 +59,16 @@ def _citation_validity(answer: str, sources: list[dict]) -> float:
     return float(bool(cited_ids) and cited_ids <= valid_ids)
 
 
-def evaluate_case(case: dict, chain: RagChain, top_k: int) -> CaseResult:
+def evaluate_case(case: EvalCase, chain: RagChain, top_k: int) -> CaseResult:
     """Run one FAQ through the RAG chain and calculate its evaluation metrics."""
 
-    question = str(case["question"])
-    expected_terms = [str(term) for term in case.get("expected_terms", [])]
-    answer_terms = [
-        str(term)
-        for term in case.get("answer_terms", expected_terms)
-    ]
+    question = case.query
 
     try:
         result = chain.answer(question, top_k=top_k)
     except Exception as exc:
         return CaseResult(
-            id=str(case["id"]),
+            id=case.id,
             question=question,
             retrieval_hit=False,
             reciprocal_rank=0.0,
@@ -93,12 +81,12 @@ def evaluate_case(case: dict, chain: RagChain, top_k: int) -> CaseResult:
 
     contexts = result.get("contexts", [])
     answer = str(result.get("answer", ""))
-    rank = _evidence_rank(contexts, expected_terms)
-    keyword_recall = _term_coverage(answer, answer_terms)
+    rank = all_groups_rank(group_ranks(contexts, case.evidence))
+    keyword_recall = slot_coverage(answer, case.answer_slots)
     citation_validity = _citation_validity(answer, result.get("sources", []))
 
     return CaseResult(
-        id=str(case["id"]),
+        id=case.id,
         question=question,
         retrieval_hit=rank is not None,
         reciprocal_rank=1.0 / rank if rank else 0.0,
@@ -109,7 +97,7 @@ def evaluate_case(case: dict, chain: RagChain, top_k: int) -> CaseResult:
     )
 
 
-def evaluate(dataset: list[dict], chain: RagChain, top_k: int) -> dict:
+def evaluate(dataset: list[EvalCase], chain: RagChain, top_k: int) -> dict:
     """Evaluate all cases and return per-case results plus aggregate metrics."""
 
     results = [evaluate_case(case, chain, top_k) for case in dataset]
@@ -175,7 +163,7 @@ def main() -> int:
     """Run evaluation, optionally write JSON, and enforce configured CI thresholds."""
 
     args = _parse_args()
-    dataset = json.loads(args.dataset.read_text(encoding="utf-8"))
+    dataset = load_faq_cases(args.dataset)
     report = evaluate(dataset, rag_chain, args.top_k)
     _print_report(report)
 

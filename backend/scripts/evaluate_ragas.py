@@ -14,6 +14,7 @@ from typing import Any
 
 from app.core.config import settings
 from app.generation.rag_chain import RagChain, rag_chain
+from scripts.eval_dataset import UNKNOWN, parse_payload
 
 
 DEFAULT_DATASET = Path(__file__).parents[1] / "tests" / "fixtures" / "data.json"
@@ -391,7 +392,11 @@ def _parse_args() -> argparse.Namespace:
 
 
 def load_dataset(path: Path) -> list[dict]:
-    """Load a JSON array, a wrapped JSON object, or a Markdown JSON code block."""
+    """Load a dataset (schema v1 or v2, optionally inside a Markdown JSON code block).
+
+    Cases come back in the Ragas shape used by :func:`normalize_case`. Unanswerable cases
+    without a ``ground_truth`` have no reference to score against and are skipped.
+    """
 
     raw = path.read_text(encoding="utf-8").strip()
     try:
@@ -408,18 +413,24 @@ def load_dataset(path: Path) -> list[dict]:
             raise ValueError(f"{path} contains an incomplete JSON code block")
         payload = json.loads(raw[start:end].strip())
 
-    if isinstance(payload, dict):
-        for key in ("data", "samples", "cases", "questions"):
-            if isinstance(payload.get(key), list):
-                payload = payload[key]
-                break
-
-    if not isinstance(payload, list) or not all(isinstance(item, dict) for item in payload):
-        raise ValueError(
-            f"{path} must contain a JSON array of objects "
-            "(or an object with data/samples/cases/questions)."
+    dataset = parse_payload(payload, origin=str(path), require_evidence=False)
+    cases: list[dict] = []
+    for case in dataset.cases:
+        if not case.answerable and not case.ground_truth:
+            continue
+        cases.append(
+            {
+                "id": case.id,
+                "user_input": case.query,
+                "reference": case.ground_truth,
+                "reference_context": "\n\n".join(item["content"] for item in case.reference_contexts),
+                "question_type": "" if case.query_type == UNKNOWN else case.query_type,
+                "difficulty": case.difficulty,
+            }
         )
-    return payload
+    if len(cases) < len(dataset.cases):
+        print(f"Skipped {len(dataset.cases) - len(cases)} unanswerable cases without ground_truth.", file=sys.stderr)
+    return cases
 
 
 def main() -> int:

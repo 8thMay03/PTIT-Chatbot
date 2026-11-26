@@ -1,0 +1,115 @@
+{
+  "schema_version": 2,
+  "name": "eval_schema_v2_example",
+  "description": "Ví dụ minh họa schema v2 trên Sổ tay sinh viên D26; không phải bộ đánh giá.",
+  "corpus": {
+    "documents": ["Sổ tay sinh viên D26 _1_.pdf"]
+  },
+  "cases": [
+    {
+      "id": "ex_single_hop_engineer_min_credits",
+      "query": "Sinh viên chương trình kỹ sư phải đăng ký tối thiểu bao nhiêu tín chỉ mỗi học kỳ?",
+      "query_type": "single_hop",
+      "answerable": true,
+      "split": "dev",
+      "ground_truth": "Chương trình kỹ sư đăng ký tối thiểu 16 tín chỉ mỗi học kỳ (tối đa 25 tín chỉ).",
+      "evidence": [
+        {
+          "doc_id": "Sổ tay sinh viên D26 _1_.pdf",
+          "anchor": { "article": "Điều 12. Đăng ký học tập" },
+          "terms": [["không thấp hơn 16 tín chỉ", "tối thiểu 16 tín chỉ"]]
+        }
+      ],
+      "reference_contexts": [
+        {
+          "doc_id": "Sổ tay sinh viên D26 _1_.pdf",
+          "content": "b) Đối với các chương trình đào tạo kỹ sư: khối lượng tối thiểu không thấp hơn 16 tín chỉ và tối đa không vượt quá 25 tín chỉ;"
+        }
+      ],
+      "metadata": { "difficulty": "easy", "created_by": "human" }
+    },
+    {
+      "id": "ex_comparison_main_vs_summer_max",
+      "query": "Khối lượng đăng ký tối đa ở học kỳ chính và học kỳ phụ khác nhau thế nào?",
+      "query_type": "comparison",
+      "split": "test",
+      "ground_truth": "Học kỳ chính tối đa 25 tín chỉ; học kỳ phụ tối đa 12 tín chỉ.",
+      "required_claims": ["Học kỳ chính tối đa 25 tín chỉ", "Học kỳ phụ tối đa 12 tín chỉ"],
+      "evidence": [
+        {
+          "anchor": { "article": "Điều 12. Đăng ký học tập" },
+          "terms": [["không vượt quá 25 tín chỉ"]]
+        },
+        {
+          "anchor": { "article": "Điều 12. Đăng ký học tập" },
+          "terms": [["không vượt quá 12 tín chỉ"]],
+          "note": "Bản gốc viết sai chính tả \"tối ta\" nên không neo theo cụm \"tối đa\"."
+        }
+      ],
+      "metadata": { "difficulty": "easy", "created_by": "human" }
+    },
+    {
+      "id": "ex_multi_hop_internship_july",
+      "query": "Muốn đi thực tập cuối khóa đợt tháng 07 thì phải tích lũy được ít nhất bao nhiêu phần trăm tín chỉ?",
+      "query_type": "multi_hop",
+      "split": "test",
+      "ground_truth": "Học viện xét thực tập cuối khóa hai đợt (tháng 01 và tháng 07); điều kiện là tích lũy ít nhất 75% tổng số tín chỉ của chương trình.",
+      "evidence": [
+        {
+          "anchor": { "article": "Điều 34. Thực tập cuối khóa", "clause": 4 },
+          "terms": [["tháng 07"]]
+        },
+        {
+          "anchor": { "article": "Điều 34. Thực tập cuối khóa", "clause": 3 },
+          "terms": [["ít nhất 75%"]]
+        }
+      ],
+      "metadata": { "difficulty": "medium", "created_by": "human" }
+    },
+    {
+      "id": "ex_aggregation_warning_levels",
+      "query": "Cảnh báo kết quả học tập có những mức nào và mỗi mức áp dụng khi nào?",
+      "query_type": "aggregation",
+      "split": "test",
+      "ground_truth": "Có 3 mức. Mức 1 khi phạm điều kiện tại khoản 3; mức 2 khi đã bị mức 1 mà lần xử lý tiếp theo không cải thiện; mức 3 khi đã bị mức 2 mà không cải thiện, và sinh viên bị đưa vào danh sách xem xét buộc thôi học.",
+      "required_claims": [
+        "Có 3 mức cảnh báo",
+        "Mức 2 áp dụng khi đã bị mức 1 mà không cải thiện",
+        "Mức 3 áp dụng khi đã bị mức 2 mà không cải thiện",
+        "Mức 3 bị đưa vào danh sách xem xét buộc thôi học"
+      ],
+      "evidence": [
+        {
+          "anchor": { "article": "Điều 33. Cảnh báo kết quả học tập" },
+          "terms": [["danh sách xem xét buộc thôi học"]]
+        }
+      ],
+      "metadata": { "difficulty": "medium", "created_by": "human" }
+    },
+    {
+      "id": "ex_global_registration_timeline",
+      "query": "Tóm tắt các mốc đăng ký học tập sinh viên cần nhớ trong một học kỳ.",
+      "query_type": "global",
+      "split": "test",
+      "ground_truth": "Học kỳ chính có đợt đăng ký chính và đợt đăng ký điều chỉnh; học kỳ phụ có một đợt. Đợt đăng ký chính bắt đầu không ít hơn 03 tuần trước khi học kỳ bắt đầu.",
+      "required_claims": [
+        "Học kỳ chính có hai đợt: đăng ký chính và đăng ký điều chỉnh",
+        "Học kỳ phụ chỉ có một đợt đăng ký",
+        "Đợt đăng ký chính không ít hơn 03 tuần trước khi bắt đầu học kỳ"
+      ],
+      "metadata": { "difficulty": "hard", "created_by": "human" }
+    },
+    {
+      "id": "ex_unanswerable_cutoff_score",
+      "query": "Điểm chuẩn ngành Công nghệ thông tin của PTIT năm 2025 là bao nhiêu?",
+      "answerable": false,
+      "split": "test",
+      "unanswerable": {
+        "category": "in_domain_missing",
+        "reason": "Sổ tay không có điểm chuẩn tuyển sinh theo năm.",
+        "probe_terms": ["điểm chuẩn"]
+      },
+      "metadata": { "created_by": "human" }
+    }
+  ]
+}

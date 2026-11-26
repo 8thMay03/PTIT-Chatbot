@@ -9,7 +9,8 @@ import pytest
 from app.core.config import settings
 from app.ingestion.chunker import Chunk, split_text
 from app.retrieval.bm25 import rank_bm25
-from scripts.evaluate import _citation_validity, _evidence_rank, _term_coverage
+from scripts.eval_dataset import EvalCase, groups_from_terms
+from scripts.evaluate import _citation_validity, evaluate_case, load_faq_cases
 from scripts.evaluate_ragas import _format_duration, build_sample, evaluate_ragas
 
 
@@ -142,12 +143,50 @@ def test_evaluation_metrics_score_retrieval_answer_and_citations() -> None:
         {"text": "Nội dung không liên quan."},
     ]
     answer = "Sinh viên cần đạt 450 điểm TOEIC [1]."
-    terms = ["450", "TOEIC"]
 
-    assert _evidence_rank(contexts, terms) == 1
-    assert _term_coverage(answer, terms) == 1.0
+    class FakeChain:
+        def __init__(self, contexts: list[dict]) -> None:
+            self.contexts = contexts
+
+        def answer(self, question: str, top_k: int) -> dict:
+            return {"answer": answer, "contexts": self.contexts, "sources": [{"citation_id": 1}]}
+
+    # v1: các term là một nhóm bằng chứng, nên phải nằm chung một context.
+    case = EvalCase(id="toeic", query="?", evidence=groups_from_terms(["450", "TOEIC"], "single_group"))
+    result = evaluate_case(case, FakeChain(contexts), top_k=4)
+    assert result.retrieval_hit and result.reciprocal_rank == 1.0
+    assert result.answer_keyword_recall == 1.0
+    assert result.citation_validity == 1.0
+    split = [{"text": "450 điểm"}, {"text": "TOEIC"}]
+    assert not evaluate_case(case, FakeChain(split), top_k=4).retrieval_hit
+
+    # v2: mỗi nhóm có thể nằm ở context khác; trúng khi top-k phủ đủ nhóm.
+    multi = EvalCase(id="toeic2", query="?", evidence=groups_from_terms(["450", "TOEIC"], "per_term"))
+    assert evaluate_case(multi, FakeChain(split), top_k=4).reciprocal_rank == 0.5
+
     assert _citation_validity(answer, [{"citation_id": 1}]) == 1.0
     assert _citation_validity(answer, [{"citation_id": 2}]) == 0.0
+
+
+def test_evaluate_loads_faq_as_single_evidence_group() -> None:
+    cases = load_faq_cases(FAQ_PATH)
+    raw = {case["id"]: case for case in _load_faq_cases()}
+    assert len(cases) == len(raw)
+    for case in cases:
+        assert len(case.evidence) == 1
+        assert case.evidence[0].terms == tuple((term,) for term in raw[case.id]["expected_terms"])
+
+
+def test_evaluate_skips_v2_cases_without_keyword_terms() -> None:
+    example = Path(__file__).parent / "fixtures" / "eval_schema_v2_example.json"
+    ids = {case.id for case in load_faq_cases(example)}
+    # global (không bằng chứng) và không có đáp án bị bỏ; các câu có terms được giữ.
+    assert ids == {
+        "ex_single_hop_engineer_min_credits",
+        "ex_comparison_main_vs_summer_max",
+        "ex_multi_hop_internship_july",
+        "ex_aggregation_warning_levels",
+    }
 
 
 def test_all_faq_cases_have_reference_answers_for_ragas() -> None:

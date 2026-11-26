@@ -49,7 +49,12 @@ def test_dataset_has_300_well_formed_cases() -> None:
 def test_dataset_loads_with_eval_retrieval_schema() -> None:
     cases = load_dataset(DATASET_PATH)
     assert len(cases) == 300
-    assert all(case["expected_terms"] for case in cases)
+    by_id = {case["id"]: case for case in CASES}
+    for case in cases:
+        # v1: mỗi expected_terms là một nhóm bằng chứng một term.
+        assert [group.terms for group in case["evidence"]] == [
+            ((term,),) for term in by_id[case["id"]]["expected_terms"]
+        ]
 
 
 def test_questions_and_term_sets_are_unique() -> None:
